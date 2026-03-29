@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Logistics Authority - Overview Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0056D2",
+                        "on-primary": "#FFFFFF",
+                        "surface": "#FFFFFF",
+                        "background": "#F8FAFC", // slate-50 equivalent
+                        "outline": "#E2E8F0", // slate-200
+                        "on-surface": "#0F172A", // slate-900
+                        "on-surface-variant": "#64748B", // slate-500
+                        "tertiary": "#940002",
+                    },
+                    fontFamily: {
+                        "sans": ["Manrope", "sans-serif"],
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.375rem",
+                        "xl": "0.5rem",
+                        "full": "9999px",
+                    },
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            font-family: 'Manrope', sans-serif;
+            background-color: #F8FAFC;
+        }
+        .tabular-nums {
+            font-variant-numeric: tabular-nums;
+        }
+        .sidebar-item-active {
+            background-color: #FFFFFF;
+            color: #0056D2;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body class="text-on-surface antialiased">
+<!-- SideNavBar Component -->
+<aside class="h-screen w-64 fixed left-0 top-0 bg-slate-50 border-r border-outline flex flex-col py-8 px-5 z-50">
+<div class="mb-12 px-2">
+<h1 class="text-lg font-extrabold text-on-surface tracking-tight leading-tight">Logistics Authority</h1>
+<p class="text-[10px] text-on-surface-variant uppercase tracking-[0.2em] mt-1.5 font-bold">Admin Dashboard</p>
+</div>
+<nav class="flex-1 space-y-1.5">
+<a class="flex items-center gap-3 px-4 py-3 rounded-lg sidebar-item-active font-bold transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
+<span class="text-sm">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="payments">payments</span>
+<span class="text-sm">Payroll</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="groups">groups</span>
+<span class="text-sm">Staff</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="upload_file">upload_file</span>
+<span class="text-sm">Upload</span>
+</a>
+</nav>
+<div class="pt-6 border-t border-outline space-y-1.5">
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
+<span class="text-sm font-medium">Settings</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]" data-icon="logout">logout</span>
+<span class="text-sm font-medium">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Wrapper -->
+<div class="ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar Component -->
+<header class="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-outline">
+<div class="flex justify-between items-center h-20 px-10">
+<div class="flex items-center gap-10">
+<span class="text-sm font-extrabold text-on-surface uppercase tracking-[0.15em]">Salary Automation</span>
+<div class="relative hidden lg:block">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input class="bg-slate-50 border border-outline rounded-lg pl-10 pr-4 py-2 text-sm w-72 focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-slate-400" placeholder="Search data..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-6">
+<div class="flex items-center gap-4 text-on-surface-variant">
+<button class="hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[22px]" data-icon="notifications">notifications</span>
+</button>
+<button class="hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[22px]" data-icon="help">help</span>
+</button>
+</div>
+<div class="h-6 w-px bg-outline"></div>
+<div class="flex items-center gap-3">
+<div class="text-right">
+<p class="text-xs font-bold text-on-surface">Admin User</p>
+<p class="text-[10px] text-primary font-extrabold uppercase tracking-widest">Super Admin</p>
+</div>
+<img alt="Agent Profile Avatar" class="w-10 h-10 rounded-full border border-outline p-0.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpTvVc9xhO1exzudlT-bF5vy8UboQ21gjosnrBfE1Ouivrlapywz3lja2O_momPfOdK7Qc6YLJSSUEsGaaCQoS0XOStnrfbUh2VOg-w1hEo44FvwjRjB6nIXOFvNLV7nRvW9Bb3n9nv9-5_mUHidE-Qb6MnMioAMaUK7UXioJ784R4g4Y9jhhMl8oUebvwmHotdNPZeNyF5EGVYReNceySFyQthnZHgoXehUUZ3uiAC9jgY_n_1PZRbCWD6xJXc2yT3mPkTlzN_Sft"/>
+</div>
+</div>
+</div>
+</header>
+<!-- Dashboard Content -->
+<main class="p-10 space-y-12 max-w-360 mx-auto w-full">
+<!-- Page Header & Filters -->
+<section class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+<div>
+<h2 class="text-4xl font-extrabold text-on-surface tracking-tighter mb-3">Overview</h2>
+<p class="text-on-surface-variant text-sm font-medium leading-relaxed max-w-xl">Real-time performance metrics and salary distribution across logistics hubs with precision reporting.</p>
+</div>
+<div class="flex flex-wrap items-center gap-4">
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant px-0.5">Branch</label>
+<select class="bg-white border border-outline rounded-lg px-4 py-2 text-xs font-bold min-w-45s:ring-1 focus:ring-primary focus:border-primary">
+<option>All Hubs</option>
+<option>North Central</option>
+<option>West Coast Main</option>
+<option>Southern Terminal</option>
+</select>
+</div>
+<div class="flex flex-col gap-2">
+<label class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant px-0.5">Dispatcher</label>
+<select class="bg-white border border-outline rounded-lg px-4 py-2 text-xs font-bold min-w-45 focus:ring-1 focus:ring-primary focus:border-primary">
+<option>All Personnel</option>
+<option>Top Performers</option>
+<option>Recent Hires</option>
+</select>
+</div>
+<button class="mt-auto bg-primary text-white h-9.5 px-8 rounded-lg text-xs font-extrabold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
+<span class="material-symbols-outlined text-[16px]">tune</span>
+                        Apply
+                    </button>
+</div>
+</section>
+<!-- Summary Bento Grid -->
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
+<!-- Total Net Salary (Featured) -->
+<div class="lg:col-span-2 bg-primary p-8 rounded-lg flex flex-col justify-between text-white relative overflow-hidden group border border-primary/20">
+<div class="relative z-10">
+<div class="flex justify-between items-start mb-6">
+<span class="text-[10px] font-black uppercase tracking-[0.25em] text-white/80">Total Net Payout</span>
+<span class="material-symbols-outlined text-white/50">account_balance_wallet</span>
+</div>
+<h3 class="text-4xl font-extrabold tracking-tighter tabular-nums">$482,950.00</h3>
+<p class="text-[11px] mt-3 font-bold flex items-center gap-1.5 text-white/90">
+<span class="material-symbols-outlined text-[14px]">trending_up</span>
+                            +12.4% from last month
+                        </p>
+</div>
+<div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+</div>
+<!-- Stat Cards -->
+<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
+<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Base Salary</span>
+<div>
+<p class="text-2xl font-extrabold tracking-tight tabular-nums">$310,200</p>
+<p class="text-[10px] text-on-surface-variant mt-1.5 font-medium">64% of volume</p>
+</div>
+</div>
+<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
+<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Incentive</span>
+<div>
+<p class="text-2xl font-extrabold tracking-tight tabular-nums text-primary">$92,450</p>
+<p class="text-[10px] text-primary/70 mt-1.5 font-medium">Performance bonus</p>
+</div>
+</div>
+<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
+<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Petrol Subsidy</span>
+<div>
+<p class="text-2xl font-extrabold tracking-tight tabular-nums">$54,100</p>
+<p class="text-[10px] text-on-surface-variant mt-1.5 font-medium">Fuel &amp; Logistics</p>
+</div>
+</div>
+<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
+<span class="text-[10px] font-extrabold uppercase tracking-widest text-tertiary">Penalty/Advance</span>
+<div>
+<p class="text-2xl font-extrabold tracking-tight tabular-nums text-tertiary">-$26,200</p>
+<p class="text-[10px] text-tertiary/70 mt-1.5 font-medium">Adjusted this period</p>
+</div>
+</div>
+</section>
+<!-- Data Visualizations -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- Main Trend Chart -->
+<div class="lg:col-span-8 bg-white border border-outline rounded-lg p-8">
+<div class="flex justify-between items-center mb-10">
+<div>
+<h3 class="text-lg font-extrabold tracking-tight">Monthly Net Payout Trend</h3>
+<p class="text-[11px] text-on-surface-variant font-medium mt-1">6-month operational cost analysis</p>
+</div>
+<div class="flex gap-4">
+<span class="inline-flex items-center gap-2 text-[10px] font-bold text-on-surface">
+<span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
+                                Net Payout
+                            </span>
+<span class="inline-flex items-center gap-2 text-[10px] font-bold text-slate-300">
+<span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span>
+                                Target
+                            </span>
+</div>
+</div>
+<div class="h-64 flex items-end justify-between gap-6 px-4">
+<div class="flex-1 bg-slate-100 rounded-t h-[40%] transition-all hover:bg-slate-200"></div>
+<div class="flex-1 bg-slate-100 rounded-t h-[55%] transition-all hover:bg-slate-200"></div>
+<div class="flex-1 bg-slate-100 rounded-t h-[45%] transition-all hover:bg-slate-200"></div>
+<div class="flex-1 bg-blue-100 rounded-t h-[75%] transition-all hover:bg-blue-200"></div>
+<div class="flex-1 bg-primary rounded-t h-[85%] relative group">
+<div class="absolute -top-12 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] py-1.5 px-2.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-bold">$482,950</div>
+</div>
+<div class="flex-1 bg-slate-100 rounded-t h-[65%] transition-all hover:bg-slate-200"></div>
+</div>
+<div class="flex justify-between mt-6 px-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-widest">
+<span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+</div>
+</div>
+<!-- Branch Breakdown -->
+<div class="lg:col-span-4 bg-white border border-outline rounded-lg p-8">
+<h3 class="text-lg font-extrabold tracking-tight mb-8">Branch Distribution</h3>
+<div class="space-y-7">
+<div class="space-y-3">
+<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
+<span>North Hub</span>
+<span class="text-primary tabular-nums">$182.4k</span>
+</div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[65%] rounded-full"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
+<span>West Terminal</span>
+<span class="text-primary tabular-nums">$142.1k</span>
+</div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[52%] rounded-full"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
+<span>South Point</span>
+<span class="text-primary tabular-nums">$98.5k</span>
+</div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[38%] rounded-full"></div>
+</div>
+</div>
+<div class="space-y-3">
+<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
+<span>Central Depot</span>
+<span class="text-primary tabular-nums">$59.9k</span>
+</div>
+<div class="w-full bg-slate-100 h-1.5 rounded-full">
+<div class="bg-primary h-full w-[22%] rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- Bottom Section: Top Dispatchers -->
+<section class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
+<div class="lg:col-span-2 bg-white border border-outline rounded-lg p-8">
+<div class="flex justify-between items-center mb-8">
+<h3 class="text-lg font-extrabold tracking-tight">Top Performing Dispatchers</h3>
+<button class="text-primary text-xs font-extrabold hover:underline tracking-tight">View All Staff</button>
+</div>
+<div class="space-y-4">
+<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
+<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
+<img alt="James Sullivan" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACR_dVXBROEP0fZb7wBq7GUzsw06oMQvJ0Muh2H1Ochmvw39p-6doImTObFe7C7Wiz-kgi1sXi2GyPwB0yl6gNaHexKRit-QAv67ja1jiVu-TfehAwGQ5udk_P5AshhYdjk2MIvRo1-SEGZ9pwHeQdffXMJEZLrWjgmAM5EFO0P000L8YD7gX5VS0tJvIGT2syFMzzZzAd6vFZZpsIcAdHfyuW83QpgONI_0qcWzbS5Z2swnK86zEkzpN6NucuTwwhEhCXrgZY7Sed"/>
+</div>
+<div class="flex-1">
+<p class="text-sm font-extrabold text-on-surface">James Sullivan</p>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">North Hub • 1,240 Deliveries</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-extrabold text-primary tabular-nums">$4,850.00</p>
+<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
+<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
+                                    98.2%
+                                </div>
+</div>
+</div>
+<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
+<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
+<img alt="Laura Rodriguez" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYNVgWd-KXD_xq22ohpQvvHi_k1wg9rCddedXvmErgiKFH-cC85GjbJIpekuCd1oJXzhkO2RoEU9s80hiZmRt_pmMYlp7GjyKogoSy7_O-Xn5r0BX14zHz2y3Ui8gJT-uZl3sUNza3264HMglzSlFqK5J-cKtaEdZX0s_cZwDqx0R05X2Fy0H4EtFET3JQTTx_2wZGSMuxShrDX7FVKVwcDtXtfGjrIxDoUTAKNkdCNXHbC1hZmg5VoYz4RHzdrCxjVLdH_Y_18rbY"/>
+</div>
+<div class="flex-1">
+<p class="text-sm font-extrabold text-on-surface">Laura Rodriguez</p>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">West Terminal • 1,195 Deliveries</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-extrabold text-primary tabular-nums">$4,620.00</p>
+<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
+<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
+                                    97.8%
+                                </div>
+</div>
+</div>
+<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
+<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
+<img alt="Marcus Knight" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqCUXEupRvDnbUclswrbxZJkGe4xZ4SdTV32Jp6su98YGmTzfYll-J6hDtCWHlgAO797ESprBannN7_nBRokMSPHFl-Nl8ehVTZvJOTTVuo9DSZVYg5X5QbKNOl8_yZYTTKfRoFrbC3hnqLQRwAcyoZJ9aOkzWVGbZxq0aChn_GNWmZ9FthXvBRCbAx4iE4onDvDbLgnG_VKt6IyMyME83ETe7r0uWM8cTkG86C7lfIx3MiE-lFY0Rf_pCSvi1lzvZWd2xXUUGKNvm"/>
+</div>
+<div class="flex-1">
+<p class="text-sm font-extrabold text-on-surface">Marcus Knight</p>
+<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">North Hub • 1,180 Deliveries</p>
+</div>
+<div class="text-right">
+<p class="text-sm font-extrabold text-primary tabular-nums">$4,590.00</p>
+<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
+<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
+                                    99.1%
+                                </div>
+</div>
+</div>
+</div>
+</div>
+<!-- Recent Activities / Alerts -->
+<div class="bg-white border border-outline rounded-lg p-8 flex flex-col">
+<h3 class="text-lg font-extrabold tracking-tight mb-8">System Notifications</h3>
+<div class="space-y-8 flex-1">
+<div class="flex gap-5">
+<div class="w-10 h-10 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">warning</span>
+</div>
+<div>
+<p class="text-xs font-extrabold text-on-surface">Advance Request: #3492</p>
+<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">Dispatcher Marcus K. requested $500 early payout. Awaiting approval.</p>
+<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">14 mins ago</p>
+</div>
+</div>
+<div class="flex gap-5">
+<div class="w-10 h-10 rounded bg-green-50 text-green-600 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">task_alt</span>
+</div>
+<div>
+<p class="text-xs font-extrabold text-on-surface">Payroll Finalized: May 2024</p>
+<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">Branch North Hub payroll batch has been successfully exported.</p>
+<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">2 hours ago</p>
+</div>
+</div>
+<div class="flex gap-5">
+<div class="w-10 h-10 rounded bg-blue-50 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px]">info</span>
+</div>
+<div>
+<p class="text-xs font-extrabold text-on-surface">Data Sync Complete</p>
+<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">New delivery logs imported from Logistics Core (8,240 records).</p>
+<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">4 hours ago</p>
+</div>
+</div>
+</div>
+<button class="mt-10 py-3 w-full border border-outline rounded-lg text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-colors">
+                        Clear All Notifications
+                    </button>
+</div>
+</section>
+</main>
+<!-- Subtle Footer -->
+<footer class="mt-auto p-10 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-t border-outline/50">
+            © 2024 Logistics Authority • Salary Automation System • Precision Insight Series
+        </footer>
+</div>
+</body></html>
