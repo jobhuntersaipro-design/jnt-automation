@@ -58,7 +58,7 @@ We eschew "Standard Web" shadows for **Ambient Occlusion**.
 *   **Logic:** Feature a "Brand Accent Trace"—a 4px vertical line of `tertiary` (#940002) on the left edge to anchor the brand identity.
 
 ### Data Tables (Logistics Heavy)
-*   **Layout:** Forbid divider lines. Use `spacing-4` (0.9rem) vertical padding between rows.
+*   **Layout:** Forbid divider lines. Use `spacing-4` (0.9rem) vertical padding between rows. 
 *   **Row Hover:** Transition background to `surface_container_high` (#e7e8e9) with a `DEFAULT` (0.25rem) radius.
 *   **Hierarchy:** The "Salary Amount" column should use `title-md` and `primary` color to draw the eye immediately.
 

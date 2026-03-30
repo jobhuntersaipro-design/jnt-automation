@@ -3,383 +3,582 @@
 <html class="light" lang="en"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Logistics Authority - Overview Dashboard</title>
+<title>LogiPay - Precision Insight</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#0056D2",
-                        "on-primary": "#FFFFFF",
-                        "surface": "#FFFFFF",
-                        "background": "#F8FAFC", // slate-50 equivalent
-                        "outline": "#E2E8F0", // slate-200
-                        "on-surface": "#0F172A", // slate-900
-                        "on-surface-variant": "#64748B", // slate-500
-                        "tertiary": "#940002",
-                    },
-                    fontFamily: {
-                        "sans": ["Manrope", "sans-serif"],
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.25rem",
-                        "lg": "0.375rem",
-                        "xl": "0.5rem",
-                        "full": "9999px",
-                    },
-                },
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "on-surface": "#191c1d",
+              "on-tertiary": "#ffffff",
+              "inverse-primary": "#b2c5ff",
+              "on-primary": "#ffffff",
+              "error-container": "#ffdad6",
+              "secondary": "#525f73",
+              "on-tertiary-fixed-variant": "#930002",
+              "on-tertiary-container": "#ffcec6",
+              "primary-container": "#0056d2",
+              "tertiary-container": "#c10003",
+              "outline-variant": "#c3c6d6",
+              "outline": "#737785",
+              "tertiary-fixed": "#ffdad5",
+              "on-primary-fixed-variant": "#0040a1",
+              "surface-container-low": "#f3f4f5",
+              "surface-container-lowest": "#ffffff",
+              "surface": "#f8f9fa",
+              "surface-container": "#edeeef",
+              "error": "#ba1a1a",
+              "surface-variant": "#e1e3e4",
+              "primary-fixed": "#dae2ff",
+              "surface-dim": "#d9dadb",
+              "primary": "#0040a1",
+              "inverse-surface": "#2e3132",
+              "tertiary-fixed-dim": "#ffb4a8",
+              "on-secondary": "#ffffff",
+              "on-background": "#191c1d",
+              "background": "#f8f9fa",
+              "surface-container-high": "#e7e8e9",
+              "secondary-fixed": "#d6e3fb",
+              "surface-tint": "#0056d2",
+              "on-primary-fixed": "#001847",
+              "on-primary-container": "#ccd8ff",
+              "on-tertiary-fixed": "#410000",
+              "on-surface-variant": "#424654",
+              "secondary-container": "#d6e3fb",
+              "secondary-fixed-dim": "#bac7de",
+              "on-secondary-container": "#586579",
+              "surface-container-highest": "#e1e3e4",
+              "inverse-on-surface": "#f0f1f2",
+              "tertiary": "#940002",
+              "surface-bright": "#f8f9fa",
+              "on-secondary-fixed-variant": "#3b485a",
+              "primary-fixed-dim": "#b2c5ff",
+              "on-error-container": "#93000a",
+              "on-secondary-fixed": "#0f1c2d",
+              "on-error": "#ffffff"
             },
-        }
+            fontFamily: {
+              "headline": ["Manrope"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
     </script>
 <style>
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-        body {
-            font-family: 'Manrope', sans-serif;
-            background-color: #F8FAFC;
-        }
-        .tabular-nums {
-            font-variant-numeric: tabular-nums;
-        }
-        .sidebar-item-active {
-            background-color: #FFFFFF;
-            color: #0056D2;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-            border: 1px solid #E2E8F0;
-        }
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      .brand-accent-trace {
+        border-left: 4px solid #0040a1;
+      }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      body { font-family: 'Inter', sans-serif; }
+      h1, h2, h3, .brand-font { font-family: 'Manrope', sans-serif; }
+      .tabular-nums { font-variant-numeric: tabular-nums; }
+      .chart-container { position: relative; height: 100%; width: 100%; }
     </style>
 </head>
-<body class="text-on-surface antialiased">
-<!-- SideNavBar Component -->
-<aside class="h-screen w-64 fixed left-0 top-0 bg-slate-50 border-r border-outline flex flex-col py-8 px-5 z-50">
-<div class="mb-12 px-2">
-<h1 class="text-lg font-extrabold text-on-surface tracking-tight leading-tight">Logistics Authority</h1>
-<p class="text-[10px] text-on-surface-variant uppercase tracking-[0.2em] mt-1.5 font-bold">Admin Dashboard</p>
+<body class="bg-[#f6f9fc] text-on-surface min-h-screen">
+<!-- TopNavBar -->
+<header class="bg-white sticky top-0 z-50 border-b border-slate-200 shadow-[0_1px_2px_0_rgba(0,0,0,0.05)] font-['Manrope'] antialiased">
+<div class="max-w-[1920px] flex justify-between items-center w-full px-8 py-3 mx-auto">
+<div class="flex items-center gap-12">
+<div class="flex items-center gap-2">
+<div class="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-xl" data-icon="account_balance_wallet">account_balance_wallet</span>
 </div>
-<nav class="flex-1 space-y-1.5">
-<a class="flex items-center gap-3 px-4 py-3 rounded-lg sidebar-item-active font-bold transition-all" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="dashboard">dashboard</span>
-<span class="text-sm">Overview</span>
-</a>
-<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="payments">payments</span>
-<span class="text-sm">Payroll</span>
-</a>
-<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="groups">groups</span>
-<span class="text-sm">Staff</span>
-</a>
-<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-white hover:border-outline border border-transparent rounded-lg transition-all" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="upload_file">upload_file</span>
-<span class="text-sm">Upload</span>
-</a>
+<span class="text-xl font-bold tracking-tight text-primary">LogiPay</span>
+</div>
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-primary border-b-2 border-primary pb-1 font-semibold text-sm" href="#">Overview</a>
+<a class="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium" href="#">Payroll</a>
+<a class="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium" href="#">Dispatchers</a>
+<a class="text-slate-500 hover:text-slate-900 transition-colors text-sm font-medium" href="#">Reports</a>
 </nav>
-<div class="pt-6 border-t border-outline space-y-1.5">
-<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="settings">settings</span>
-<span class="text-sm font-medium">Settings</span>
-</a>
-<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface transition-colors" href="#">
-<span class="material-symbols-outlined text-[20px]" data-icon="logout">logout</span>
-<span class="text-sm font-medium">Logout</span>
-</a>
-</div>
-</aside>
-<!-- Main Content Wrapper -->
-<div class="ml-64 min-h-screen flex flex-col">
-<!-- TopAppBar Component -->
-<header class="sticky top-0 z-40 w-full bg-white/90 backdrop-blur-md border-b border-outline">
-<div class="flex justify-between items-center h-20 px-10">
-<div class="flex items-center gap-10">
-<span class="text-sm font-extrabold text-on-surface uppercase tracking-[0.15em]">Salary Automation</span>
-<div class="relative hidden lg:block">
-<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
-<input class="bg-slate-50 border border-outline rounded-lg pl-10 pr-4 py-2 text-sm w-72 focus:ring-1 focus:ring-primary focus:border-primary transition-all placeholder:text-slate-400" placeholder="Search data..." type="text"/>
-</div>
 </div>
 <div class="flex items-center gap-6">
-<div class="flex items-center gap-4 text-on-surface-variant">
-<button class="hover:text-primary transition-colors">
-<span class="material-symbols-outlined text-[22px]" data-icon="notifications">notifications</span>
+<div class="relative group">
+<button class="p-2 hover:bg-slate-50 rounded-md transition-all text-slate-500 active:scale-[0.98]">
+<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
 </button>
-<button class="hover:text-primary transition-colors">
-<span class="material-symbols-outlined text-[22px]" data-icon="help">help</span>
+<span class="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+</div>
+<div class="h-6 w-px bg-slate-200"></div>
+<div class="relative group">
+<button class="flex items-center gap-3 active:scale-[0.98] transition-transform">
+<div class="text-right hidden sm:block">
+<p class="text-xs font-bold text-on-surface leading-tight">Admin User</p>
+<p class="text-[10px] text-on-surface-variant font-medium">Headquarters</p>
+</div>
+<img alt="User Profile Avatar" class="w-9 h-9 rounded-full object-cover ring-2 ring-primary/10" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-CA9z_B3OinUupD6LP9d-V9HA72eFu_rF4O5kiUblrHp7eU4AjjMwP7mPj2gOR3DQE0aug6Zy3zZSyXQuxRuWgGYQ7wqLUXaV3F-7AIQnry-cxNDQlpJ1kMUX5X6sprx9QzG1FCTKLzamBWrNxYLMp5IQ2tWu_f5ObvSpVfMD_N73mRnMJwFaxa5oX2EVq7ICaiJDrB2A44vKI0oay-OWdbkdgIOZtIRuwiWlF8ZoD51eoj3Hk40B-mnkjku6S6_ZEoJbg9qbrEju"/>
 </button>
+<div class="absolute right-0 top-full mt-2 w-48 bg-white shadow-xl rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 border border-slate-100 p-2 z-50">
+<a class="flex items-center gap-3 px-3 py-2 text-sm text-on-surface-variant hover:bg-slate-50 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="settings">settings</span> Settings
+                        </a>
+<div class="h-px bg-slate-100 my-1"></div>
+<a class="flex items-center gap-3 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="logout">logout</span> Logout
+                        </a>
 </div>
-<div class="h-6 w-px bg-outline"></div>
-<div class="flex items-center gap-3">
-<div class="text-right">
-<p class="text-xs font-bold text-on-surface">Admin User</p>
-<p class="text-[10px] text-primary font-extrabold uppercase tracking-widest">Super Admin</p>
-</div>
-<img alt="Agent Profile Avatar" class="w-10 h-10 rounded-full border border-outline p-0.5" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCpTvVc9xhO1exzudlT-bF5vy8UboQ21gjosnrBfE1Ouivrlapywz3lja2O_momPfOdK7Qc6YLJSSUEsGaaCQoS0XOStnrfbUh2VOg-w1hEo44FvwjRjB6nIXOFvNLV7nRvW9Bb3n9nv9-5_mUHidE-Qb6MnMioAMaUK7UXioJ784R4g4Y9jhhMl8oUebvwmHotdNPZeNyF5EGVYReNceySFyQthnZHgoXehUUZ3uiAC9jgY_n_1PZRbCWD6xJXc2yT3mPkTlzN_Sft"/>
 </div>
 </div>
 </div>
 </header>
-<!-- Dashboard Content -->
-<main class="p-10 space-y-12 max-w-360 mx-auto w-full">
-<!-- Page Header & Filters -->
-<section class="flex flex-col md:flex-row md:items-end justify-between gap-8">
+<main class="max-w-[1920px] mx-auto px-8 py-8">
+<!-- Header & Filters Section -->
+<div class="mb-8 space-y-6">
 <div>
-<h2 class="text-4xl font-extrabold text-on-surface tracking-tighter mb-3">Overview</h2>
-<p class="text-on-surface-variant text-sm font-medium leading-relaxed max-w-xl">Real-time performance metrics and salary distribution across logistics hubs with precision reporting.</p>
+<h1 class="text-3xl font-extrabold tracking-tight text-slate-900 mb-1">Precision Insight</h1>
+<p class="text-slate-500 font-body text-sm">Enterprise-grade salary distribution and dispatcher performance metrics across all hubs.</p>
 </div>
-<div class="flex flex-wrap items-center gap-4">
-<div class="flex flex-col gap-2">
-<label class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant px-0.5">Branch</label>
-<select class="bg-white border border-outline rounded-lg px-4 py-2 text-xs font-bold min-w-45s:ring-1 focus:ring-primary focus:border-primary">
-<option>All Hubs</option>
-<option>North Central</option>
-<option>West Coast Main</option>
-<option>Southern Terminal</option>
+<!-- Filter Row: Horizontal Stripe-inspired -->
+<div class="flex flex-wrap items-center gap-4 py-3 border-y border-slate-200">
+<div class="flex items-center gap-2 mr-2">
+<span class="material-symbols-outlined text-slate-400 text-sm" data-icon="filter_list">filter_list</span>
+<span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Filter By</span>
+</div>
+<div class="flex flex-wrap items-center gap-3">
+<div class="relative group">
+<select class="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-10 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-primary/30 transition-all cursor-pointer min-w-[160px]">
+<option>All Branches</option>
+<option>Southeast Hub</option>
+<option>Northwest Terminal</option>
+<option>Central Logistics</option>
+<option>Western Frontier</option>
 </select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none" data-icon="expand_more">expand_more</span>
 </div>
-<div class="flex flex-col gap-2">
-<label class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant px-0.5">Dispatcher</label>
-<select class="bg-white border border-outline rounded-lg px-4 py-2 text-xs font-bold min-w-45 focus:ring-1 focus:ring-primary focus:border-primary">
-<option>All Personnel</option>
-<option>Top Performers</option>
-<option>Recent Hires</option>
+<div class="relative group">
+<select class="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-10 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-primary/30 transition-all cursor-pointer min-w-[160px]">
+<option>All Dispatchers</option>
+<option>Julian Vance</option>
+<option>Elena Rodriguez</option>
+<option>Marcus Thorne</option>
 </select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none" data-icon="expand_more">expand_more</span>
 </div>
-<button class="mt-auto bg-primary text-white h-9.5 px-8 rounded-lg text-xs font-extrabold hover:bg-blue-700 transition-colors flex items-center gap-2 shadow-sm">
-<span class="material-symbols-outlined text-[16px]">tune</span>
-                        Apply
-                    </button>
+<div class="relative group">
+<select class="appearance-none bg-white border border-slate-200 rounded-lg pl-3 pr-10 py-2 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/20 hover:border-primary/30 transition-all cursor-pointer min-w-[160px]">
+<option>Last 30 Days</option>
+<option>Last Quarter</option>
+<option>Last Year</option>
+</select>
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none" data-icon="calendar_today">calendar_today</span>
 </div>
-</section>
-<!-- Summary Bento Grid -->
-<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-<!-- Total Net Salary (Featured) -->
-<div class="lg:col-span-2 bg-primary p-8 rounded-lg flex flex-col justify-between text-white relative overflow-hidden group border border-primary/20">
-<div class="relative z-10">
-<div class="flex justify-between items-start mb-6">
-<span class="text-[10px] font-black uppercase tracking-[0.25em] text-white/80">Total Net Payout</span>
-<span class="material-symbols-outlined text-white/50">account_balance_wallet</span>
 </div>
-<h3 class="text-4xl font-extrabold tracking-tighter tabular-nums">$482,950.00</h3>
-<p class="text-[11px] mt-3 font-bold flex items-center gap-1.5 text-white/90">
-<span class="material-symbols-outlined text-[14px]">trending_up</span>
-                            +12.4% from last month
-                        </p>
+<div class="ml-auto flex gap-3">
+<button class="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors">Reset</button>
+<button class="px-5 py-2 bg-primary text-white text-xs font-bold rounded-lg shadow-sm hover:shadow-md hover:bg-primary/90 transition-all active:scale-95">Apply Filters</button>
 </div>
-<div class="absolute -right-6 -bottom-6 w-32 h-32 bg-white/5 rounded-full blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
 </div>
-<!-- Stat Cards -->
-<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
-<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Base Salary</span>
+</div>
+<!-- Summary Grid -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<!-- Total Net Payout -->
+<div class="bg-white p-6 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200 brand-accent-trace">
+<span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Net Payout</span>
+<div class="flex items-baseline gap-2 mt-2">
+<h2 class="text-3xl font-extrabold text-slate-900">RM 4.2M</h2>
+</div>
+<div class="mt-4 flex items-center gap-2 text-xs text-emerald-600 font-bold">
+<span class="material-symbols-outlined text-sm" data-icon="trending_up">trending_up</span>
+                    +12.4% vs last month
+                </div>
+</div>
+<!-- Base Salary Pool -->
+<div class="bg-white p-6 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200 brand-accent-trace">
+<span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Base Salary Pool</span>
+<h2 class="text-3xl font-extrabold text-slate-900 mt-2">RM 3.85M</h2>
+<div class="mt-4 flex items-center gap-2 text-xs text-slate-500 font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="pie_chart">pie_chart</span>
+                    92% of total budget
+                </div>
+</div>
+<!-- Active Dispatchers -->
+<div class="bg-white p-6 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200 brand-accent-trace">
+<span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Active Dispatchers</span>
+<h2 class="text-3xl font-extrabold text-slate-900 mt-2">1,248</h2>
+<div class="mt-4 flex items-center gap-2 text-xs text-slate-500 font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="group">group</span>
+                    +12 added this week
+                </div>
+</div>
+<!-- Total Orders Delivered -->
+<div class="bg-white p-6 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200 brand-accent-trace">
+<span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">Total Orders Delivered</span>
+<h2 class="text-3xl font-extrabold text-slate-900 mt-2">42,850</h2>
+<div class="mt-4 flex items-center gap-2 text-xs text-slate-500 font-medium">
+<span class="material-symbols-outlined text-sm" data-icon="local_shipping">local_shipping</span>
+                    Peak period volume
+                </div>
+</div>
+</div>
+<!-- High-Density Chart Grid -->
+<div class="grid grid-cols-12 gap-6 mb-8">
+<!-- Row 1 Left: Monthly Payout Trend (Large) -->
+<div class="col-span-12 lg:col-span-8 bg-white p-8 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200">
+<div class="flex justify-between items-start mb-8">
 <div>
-<p class="text-2xl font-extrabold tracking-tight tabular-nums">$310,200</p>
-<p class="text-[10px] text-on-surface-variant mt-1.5 font-medium">64% of volume</p>
+<h3 class="text-lg font-bold text-slate-900">Monthly Net Payout Trend</h3>
+<p class="text-xs text-slate-400 mt-1">Full-year cash flow and growth projection</p>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex bg-slate-100 p-1 rounded-lg">
+<button class="px-3 py-1.5 text-[10px] font-bold text-slate-500 hover:text-slate-800 transition-colors">6 MONTHS</button>
+<button class="px-3 py-1.5 bg-white shadow-sm rounded-md text-[10px] font-extrabold text-primary">1 YEAR</button>
 </div>
 </div>
-<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
-<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Incentive</span>
+</div>
+<div class="flex gap-6 mb-10">
+<div class="flex items-center gap-2">
+<span class="w-3 h-1.5 rounded-full bg-primary"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Actual Net Payout</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-1.5 rounded-full bg-primary/30"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Projected Growth</span>
+</div>
+</div>
+<div class="relative h-[300px]">
+<div class="absolute inset-0 flex flex-col justify-between text-[10px] font-bold text-slate-300">
+<div class="flex items-center gap-4"><span>RM 5M</span><div class="flex-1 h-px bg-slate-50"></div></div>
+<div class="flex items-center gap-4"><span>RM 4M</span><div class="flex-1 h-px bg-slate-50"></div></div>
+<div class="flex items-center gap-4"><span>RM 3M</span><div class="flex-1 h-px bg-slate-50"></div></div>
+<div class="flex items-center gap-4"><span>RM 2M</span><div class="flex-1 h-px bg-slate-50"></div></div>
+<div class="flex items-center gap-4"><span>RM 1M</span><div class="flex-1 h-px bg-slate-50"></div></div>
+<div class="flex items-center gap-4"><span>RM 0</span><div class="flex-1 h-px bg-slate-50"></div></div>
+</div>
+<div class="absolute inset-x-12 inset-y-0">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 300">
+<path d="M0,240 L166,210 L332,225 L498,165 L664,120 L830,60 L1000,60" fill="none" stroke="#0040a1" stroke-linecap="round" stroke-width="3"></path>
+<path d="M0,240 L166,210 L332,225 L498,165 L664,120 L830,60 L1000,60 L1000,300 L0,300 Z" fill="url(#mainChartGradient)" opacity="0.1"></path>
+<defs>
+<lineargradient id="mainChartGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" stop-color="#0040a1"></stop>
+<stop offset="100%" stop-color="#0040a1" stop-opacity="0"></stop>
+</lineargradient>
+</defs>
+<circle cx="0" cy="240" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="166" cy="210" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="332" cy="225" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="498" cy="165" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="664" cy="120" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="830" cy="60" fill="white" r="4" stroke="#0040a1" stroke-width="2"></circle>
+<circle cx="1000" cy="60" fill="#0040a1" r="5"></circle>
+</svg>
+</div>
+<div class="absolute bottom-[-24px] left-12 right-0 flex justify-between px-2">
+<span class="text-[10px] font-bold text-slate-400">JAN</span>
+<span class="text-[10px] font-bold text-slate-400">MAR</span>
+<span class="text-[10px] font-bold text-slate-400">MAY</span>
+<span class="text-[10px] font-bold text-slate-400">JUL</span>
+<span class="text-[10px] font-bold text-slate-400">SEP</span>
+<span class="text-[10px] font-bold text-slate-900">DEC</span>
+</div>
+</div>
+</div>
+<!-- Row 1 Right: Branch Distribution -->
+<div class="col-span-12 lg:col-span-4 bg-white p-8 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200">
+<h3 class="text-lg font-bold text-slate-900 mb-6">Branch Distribution</h3>
+<div class="space-y-6">
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold text-slate-700">
+<span>Southeast Hub</span>
+<span class="tabular-nums">RM 1.76M</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary" style="width: 42%;"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold text-slate-700">
+<span>Northwest Terminal</span>
+<span class="tabular-nums">RM 1.18M</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary/70" style="width: 28%;"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold text-slate-700">
+<span>Central Logistics</span>
+<span class="tabular-nums">RM 756K</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary/50" style="width: 18%;"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold text-slate-700">
+<span>Western Frontier</span>
+<span class="tabular-nums">RM 504K</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary/30" style="width: 12%;"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-xs font-bold text-slate-700">
+<span>Northern Outpost</span>
+<span class="tabular-nums">RM 420K</span>
+</div>
+<div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+<div class="h-full bg-primary/20" style="width: 10%;"></div>
+</div>
+</div>
+</div>
+<button class="mt-10 w-full py-2.5 text-[11px] font-bold text-primary hover:bg-slate-50 border border-slate-200 rounded-lg transition-all uppercase tracking-widest">
+                    View Comprehensive Report
+                </button>
+</div>
+<!-- Row 2 Left: Salary Breakdown (Stacked) -->
+<div class="col-span-12 lg:col-span-6 bg-white p-8 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200">
+<div class="mb-8">
+<h3 class="text-lg font-bold text-slate-900">Salary Breakdown</h3>
+<p class="text-xs text-slate-400 mt-1">Monthly cost components across entire operation</p>
+</div>
+<!-- Explicit Color Legend -->
+<div class="flex flex-wrap gap-4 mb-10">
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-sm bg-[#0040a1]"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Base Salary</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-sm bg-[#10b981]"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Monthly Incentive</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-sm bg-[#fbbf24]"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Petrol Subsidy</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-3 rounded-sm bg-[#f43f5e]"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Penalty / Deductions</span>
+</div>
+</div>
+<div class="h-64 flex items-end justify-between px-6 pb-6 border-b border-slate-100 relative">
+<!-- Bar 1 -->
+<div class="flex flex-col gap-0.5 w-16 group cursor-pointer">
+<div class="bg-[#f43f5e] h-4 rounded-t-sm" title="Penalty"></div>
+<div class="bg-[#fbbf24] h-6" title="Petrol"></div>
+<div class="bg-[#10b981] h-8" title="Incentive"></div>
+<div class="bg-[#0040a1] h-32 rounded-b-sm" title="Base"></div>
+<span class="text-[10px] font-bold text-slate-400 mt-3 text-center">FEB</span>
+</div>
+<!-- Bar 2 -->
+<div class="flex flex-col gap-0.5 w-16 group cursor-pointer">
+<div class="bg-[#f43f5e] h-3 rounded-t-sm"></div>
+<div class="bg-[#fbbf24] h-5"></div>
+<div class="bg-[#10b981] h-10"></div>
+<div class="bg-[#0040a1] h-36 rounded-b-sm"></div>
+<span class="text-[10px] font-bold text-slate-400 mt-3 text-center">MAR</span>
+</div>
+<!-- Bar 3 -->
+<div class="flex flex-col gap-0.5 w-16 group cursor-pointer">
+<div class="bg-[#f43f5e] h-5 rounded-t-sm"></div>
+<div class="bg-[#fbbf24] h-7"></div>
+<div class="bg-[#10b981] h-12"></div>
+<div class="bg-[#0040a1] h-40 rounded-b-sm"></div>
+<span class="text-[10px] font-bold text-slate-400 mt-3 text-center">APR</span>
+</div>
+<!-- Bar 4 -->
+<div class="flex flex-col gap-0.5 w-16 group cursor-pointer">
+<div class="bg-[#f43f5e] h-4 rounded-t-sm"></div>
+<div class="bg-[#fbbf24] h-8"></div>
+<div class="bg-[#10b981] h-14"></div>
+<div class="bg-[#0040a1] h-44 rounded-b-sm"></div>
+<span class="text-[10px] font-bold text-slate-400 mt-3 text-center">MAY</span>
+</div>
+</div>
+</div>
+<!-- Row 2 Right: Petrol Subsidy Eligibility Rate -->
+<div class="col-span-12 lg:col-span-6 bg-white p-8 rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200">
+<div class="flex justify-between items-start mb-8">
 <div>
-<p class="text-2xl font-extrabold tracking-tight tabular-nums text-primary">$92,450</p>
-<p class="text-[10px] text-primary/70 mt-1.5 font-medium">Performance bonus</p>
-</div>
-</div>
-<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
-<span class="text-[10px] font-extrabold uppercase tracking-widest text-on-surface-variant">Petrol Subsidy</span>
-<div>
-<p class="text-2xl font-extrabold tracking-tight tabular-nums">$54,100</p>
-<p class="text-[10px] text-on-surface-variant mt-1.5 font-medium">Fuel &amp; Logistics</p>
-</div>
-</div>
-<div class="bg-white border border-outline p-6 rounded-lg flex flex-col justify-between">
-<span class="text-[10px] font-extrabold uppercase tracking-widest text-tertiary">Penalty/Advance</span>
-<div>
-<p class="text-2xl font-extrabold tracking-tight tabular-nums text-tertiary">-$26,200</p>
-<p class="text-[10px] text-tertiary/70 mt-1.5 font-medium">Adjusted this period</p>
-</div>
-</div>
-</section>
-<!-- Data Visualizations -->
-<section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-<!-- Main Trend Chart -->
-<div class="lg:col-span-8 bg-white border border-outline rounded-lg p-8">
-<div class="flex justify-between items-center mb-10">
-<div>
-<h3 class="text-lg font-extrabold tracking-tight">Monthly Net Payout Trend</h3>
-<p class="text-[11px] text-on-surface-variant font-medium mt-1">6-month operational cost analysis</p>
-</div>
-<div class="flex gap-4">
-<span class="inline-flex items-center gap-2 text-[10px] font-bold text-on-surface">
-<span class="w-2.5 h-2.5 rounded-full bg-primary"></span>
-                                Net Payout
-                            </span>
-<span class="inline-flex items-center gap-2 text-[10px] font-bold text-slate-300">
-<span class="w-2.5 h-2.5 rounded-full bg-slate-200"></span>
-                                Target
-                            </span>
-</div>
-</div>
-<div class="h-64 flex items-end justify-between gap-6 px-4">
-<div class="flex-1 bg-slate-100 rounded-t h-[40%] transition-all hover:bg-slate-200"></div>
-<div class="flex-1 bg-slate-100 rounded-t h-[55%] transition-all hover:bg-slate-200"></div>
-<div class="flex-1 bg-slate-100 rounded-t h-[45%] transition-all hover:bg-slate-200"></div>
-<div class="flex-1 bg-blue-100 rounded-t h-[75%] transition-all hover:bg-blue-200"></div>
-<div class="flex-1 bg-primary rounded-t h-[85%] relative group">
-<div class="absolute -top-12 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[10px] py-1.5 px-2.5 rounded shadow-sm opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap font-bold">$482,950</div>
-</div>
-<div class="flex-1 bg-slate-100 rounded-t h-[65%] transition-all hover:bg-slate-200"></div>
-</div>
-<div class="flex justify-between mt-6 px-4 text-[10px] font-extrabold text-on-surface-variant uppercase tracking-widest">
-<span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
-</div>
-</div>
-<!-- Branch Breakdown -->
-<div class="lg:col-span-4 bg-white border border-outline rounded-lg p-8">
-<h3 class="text-lg font-extrabold tracking-tight mb-8">Branch Distribution</h3>
-<div class="space-y-7">
-<div class="space-y-3">
-<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
-<span>North Hub</span>
-<span class="text-primary tabular-nums">$182.4k</span>
-</div>
-<div class="w-full bg-slate-100 h-1.5 rounded-full">
-<div class="bg-primary h-full w-[65%] rounded-full"></div>
-</div>
-</div>
-<div class="space-y-3">
-<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
-<span>West Terminal</span>
-<span class="text-primary tabular-nums">$142.1k</span>
-</div>
-<div class="w-full bg-slate-100 h-1.5 rounded-full">
-<div class="bg-primary h-full w-[52%] rounded-full"></div>
-</div>
-</div>
-<div class="space-y-3">
-<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
-<span>South Point</span>
-<span class="text-primary tabular-nums">$98.5k</span>
-</div>
-<div class="w-full bg-slate-100 h-1.5 rounded-full">
-<div class="bg-primary h-full w-[38%] rounded-full"></div>
-</div>
-</div>
-<div class="space-y-3">
-<div class="flex justify-between text-[11px] font-extrabold uppercase tracking-tight">
-<span>Central Depot</span>
-<span class="text-primary tabular-nums">$59.9k</span>
-</div>
-<div class="w-full bg-slate-100 h-1.5 rounded-full">
-<div class="bg-primary h-full w-[22%] rounded-full"></div>
-</div>
-</div>
-</div>
-</div>
-</section>
-<!-- Bottom Section: Top Dispatchers -->
-<section class="grid grid-cols-1 lg:grid-cols-3 gap-8 pb-10">
-<div class="lg:col-span-2 bg-white border border-outline rounded-lg p-8">
-<div class="flex justify-between items-center mb-8">
-<h3 class="text-lg font-extrabold tracking-tight">Top Performing Dispatchers</h3>
-<button class="text-primary text-xs font-extrabold hover:underline tracking-tight">View All Staff</button>
-</div>
-<div class="space-y-4">
-<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
-<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
-<img alt="James Sullivan" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuACR_dVXBROEP0fZb7wBq7GUzsw06oMQvJ0Muh2H1Ochmvw39p-6doImTObFe7C7Wiz-kgi1sXi2GyPwB0yl6gNaHexKRit-QAv67ja1jiVu-TfehAwGQ5udk_P5AshhYdjk2MIvRo1-SEGZ9pwHeQdffXMJEZLrWjgmAM5EFO0P000L8YD7gX5VS0tJvIGT2syFMzzZzAd6vFZZpsIcAdHfyuW83QpgONI_0qcWzbS5Z2swnK86zEkzpN6NucuTwwhEhCXrgZY7Sed"/>
-</div>
-<div class="flex-1">
-<p class="text-sm font-extrabold text-on-surface">James Sullivan</p>
-<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">North Hub • 1,240 Deliveries</p>
+<h3 class="text-lg font-bold text-slate-900">Petrol Subsidy Eligibility Rate</h3>
+<p class="text-xs text-slate-400 mt-1">% of dispatchers reaching ≥70 daily order threshold</p>
 </div>
 <div class="text-right">
-<p class="text-sm font-extrabold text-primary tabular-nums">$4,850.00</p>
-<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
-<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
-                                    98.2%
-                                </div>
+<span class="text-2xl font-black text-primary">64.2%</span>
+<p class="text-[10px] font-bold text-emerald-600 mt-1">+2.4% vs Baseline</p>
 </div>
 </div>
-<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
-<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
-<img alt="Laura Rodriguez" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBYNVgWd-KXD_xq22ohpQvvHi_k1wg9rCddedXvmErgiKFH-cC85GjbJIpekuCd1oJXzhkO2RoEU9s80hiZmRt_pmMYlp7GjyKogoSy7_O-Xn5r0BX14zHz2y3Ui8gJT-uZl3sUNza3264HMglzSlFqK5J-cKtaEdZX0s_cZwDqx0R05X2Fy0H4EtFET3JQTTx_2wZGSMuxShrDX7FVKVwcDtXtfGjrIxDoUTAKNkdCNXHbC1hZmg5VoYz4RHzdrCxjVLdH_Y_18rbY"/>
+<div class="flex gap-4 mb-6">
+<div class="flex items-center gap-2">
+<span class="w-3 h-0.5 bg-primary"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Current Performance</span>
 </div>
-<div class="flex-1">
-<p class="text-sm font-extrabold text-on-surface">Laura Rodriguez</p>
-<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">West Terminal • 1,195 Deliveries</p>
-</div>
-<div class="text-right">
-<p class="text-sm font-extrabold text-primary tabular-nums">$4,620.00</p>
-<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
-<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
-                                    97.8%
-                                </div>
+<div class="flex items-center gap-2">
+<span class="w-3 h-0.5 bg-slate-200 border-t border-dashed border-slate-400"></span>
+<span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Baseline Target</span>
 </div>
 </div>
-<div class="flex items-center gap-5 p-4 hover:bg-slate-50 border border-transparent hover:border-outline transition-all rounded-lg group">
-<div class="w-11 h-11 rounded-full border border-outline overflow-hidden shrink-0">
-<img alt="Marcus Knight" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAqCUXEupRvDnbUclswrbxZJkGe4xZ4SdTV32Jp6su98YGmTzfYll-J6hDtCWHlgAO797ESprBannN7_nBRokMSPHFl-Nl8ehVTZvJOTTVuo9DSZVYg5X5QbKNOl8_yZYTTKfRoFrbC3hnqLQRwAcyoZJ9aOkzWVGbZxq0aChn_GNWmZ9FthXvBRCbAx4iE4onDvDbLgnG_VKt6IyMyME83ETe7r0uWM8cTkG86C7lfIx3MiE-lFY0Rf_pCSvi1lzvZWd2xXUUGKNvm"/>
-</div>
-<div class="flex-1">
-<p class="text-sm font-extrabold text-on-surface">Marcus Knight</p>
-<p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wide">North Hub • 1,180 Deliveries</p>
-</div>
-<div class="text-right">
-<p class="text-sm font-extrabold text-primary tabular-nums">$4,590.00</p>
-<div class="flex items-center gap-1 justify-end text-[10px] font-extrabold text-green-600">
-<span class="material-symbols-outlined text-[10px]">arrow_upward</span>
-                                    99.1%
-                                </div>
+<div class="relative h-48 mt-12 px-2">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 100">
+<!-- Baseline dashed line -->
+<path d="M0,70 C200,65 400,60 600,62 C800,64 1000,55" fill="none" stroke="#94a3b8" stroke-dasharray="4 4" stroke-width="1"></path>
+<!-- Actual line -->
+<path d="M0,80 L200,75 L400,65 L600,45 L800,35 L1000,25" fill="none" stroke="#0040a1" stroke-linecap="round" stroke-linejoin="round" stroke-width="3"></path>
+<circle cx="1000" cy="25" fill="#0040a1" r="5"></circle>
+</svg>
+<div class="absolute inset-x-0 bottom-[-24px] flex justify-between text-[10px] font-bold text-slate-400">
+<span>JANUARY</span>
+<span>DECEMBER</span>
 </div>
 </div>
 </div>
 </div>
-<!-- Recent Activities / Alerts -->
-<div class="bg-white border border-outline rounded-lg p-8 flex flex-col">
-<h3 class="text-lg font-extrabold tracking-tight mb-8">System Notifications</h3>
-<div class="space-y-8 flex-1">
-<div class="flex gap-5">
-<div class="w-10 h-10 rounded bg-red-50 text-red-600 flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-[18px]">warning</span>
+<!-- High-Density Table: Top Performers -->
+<div class="bg-white rounded-xl shadow-[0_2px_4px_rgba(0,0,0,0.02),0_1px_0_rgba(0,0,0,0.06)] border border-slate-200 overflow-hidden">
+<div class="px-8 py-6 flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50 border-b border-slate-100">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary" data-icon="leaderboard">leaderboard</span>
+<h3 class="text-lg font-bold text-slate-900">Top Performing Dispatchers</h3>
 </div>
-<div>
-<p class="text-xs font-extrabold text-on-surface">Advance Request: #3492</p>
-<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">Dispatcher Marcus K. requested $500 early payout. Awaiting approval.</p>
-<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">14 mins ago</p>
+<div class="flex items-center gap-4 w-full sm:w-auto">
+<div class="relative flex-1 sm:flex-none">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-lg" data-icon="search">search</span>
+<input class="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 w-full sm:w-72 shadow-inner" placeholder="Search dispatchers..." type="text"/>
 </div>
-</div>
-<div class="flex gap-5">
-<div class="w-10 h-10 rounded bg-green-50 text-green-600 flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-[18px]">task_alt</span>
-</div>
-<div>
-<p class="text-xs font-extrabold text-on-surface">Payroll Finalized: May 2024</p>
-<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">Branch North Hub payroll batch has been successfully exported.</p>
-<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">2 hours ago</p>
+<button class="p-2.5 bg-white text-slate-500 rounded-lg border border-slate-200 hover:bg-slate-50 transition-all shadow-sm">
+<span class="material-symbols-outlined block text-xl" data-icon="tune">tune</span>
+</button>
 </div>
 </div>
-<div class="flex gap-5">
-<div class="w-10 h-10 rounded bg-blue-50 text-primary flex items-center justify-center shrink-0">
-<span class="material-symbols-outlined text-[18px]">info</span>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead class="bg-white border-b border-slate-100">
+<tr>
+<th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Dispatcher</th>
+<th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Branch</th>
+<th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Total Deliveries</th>
+<th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Net Salary</th>
+<th class="px-8 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-[0.1em]">Compliance Status</th>
+<th class="px-8 py-4"></th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-50">
+<!-- Dispatcher 1 -->
+<tr class="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border border-slate-200 overflow-hidden ring-2 ring-primary/5">
+<img alt="Dispatcher" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDVigiJbgqxXnNN3H3vccTBALVbIPx4NF-liD3Nd_s9b3R8AbPXHS5BXPxbsKkT4zuu2glQ58Zt5LKAT6nWwZdbcQCCNUnhhL3B-TcBcrb3XCZ8weAbVb4yVZM3lOcUDYKIW7gHduET69c0a7jjzumZpDHp4rb7LelwRKLku9eHpC0CK4PhqxTheMl9cakmEqRyt33xKhpRPxFJWi2555rlbHY9f30cZylw7_Z7LD5XKuPrk8ds2Fbux3lh4Twyp9U36Kizt7AiPAsq"/>
 </div>
 <div>
-<p class="text-xs font-extrabold text-on-surface">Data Sync Complete</p>
-<p class="text-[11px] text-on-surface-variant mt-1.5 leading-relaxed font-medium">New delivery logs imported from Logistics Core (8,240 records).</p>
-<p class="text-[9px] text-slate-400 mt-2.5 font-black uppercase tracking-widest">4 hours ago</p>
+<p class="font-bold text-slate-900 text-sm">Julian Vance</p>
+<p class="text-[10px] font-semibold text-slate-400 uppercase tracking-tighter">ID: 88492-JV</p>
 </div>
 </div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-extrabold uppercase tracking-wider">Southeast Hub</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-extrabold text-slate-900 tabular-nums">2,482</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-black text-primary tabular-nums text-sm">RM 8,420.00</span>
+</td>
+<td class="px-8 py-5">
+<span class="flex items-center gap-2 text-[10px] font-black text-emerald-600 tracking-widest">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    VERIFIED
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-slate-300" data-icon="chevron_right">chevron_right</span>
+</button>
+</td>
+</tr>
+<!-- Dispatcher 2 -->
+<tr class="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border border-slate-200 overflow-hidden ring-2 ring-primary/5">
+<img alt="Dispatcher" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA5J57WA1SGVGvUVaN881UjbTB1OXGnb7_LrM86kWUlr3kAzWjWn8NUXsN8EEehib14nal6FgIqzOmSKU-V-G0ELtC3OaL-FDhgk5QJIqLU51Hcza4-OAR9VUam9gUOWz1_kkG9WnH_KO_8V6aUqhTKA6TG6U_W0HDbC4izAQI9qTSj1al_QGPNLtpTQsSMNnWpJb_8g5k6vQuo9sZDCH-a6T70LIvODhaobUY436HxeJneIDZUA1eq8W0JplPVcJSehfNpZjg6xZmf"/>
 </div>
-<button class="mt-10 py-3 w-full border border-outline rounded-lg text-[10px] font-black uppercase tracking-widest text-on-surface-variant hover:bg-slate-50 transition-colors">
-                        Clear All Notifications
-                    </button>
+<div>
+<p class="font-bold text-slate-900 text-sm">Elena Rodriguez</p>
+<p class="text-[10px] font-semibold text-slate-400 uppercase tracking-tighter">ID: 77210-ER</p>
 </div>
-</section>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-extrabold uppercase tracking-wider">Northwest Terminal</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-extrabold text-slate-900 tabular-nums">2,310</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-black text-primary tabular-nums text-sm">RM 7,950.00</span>
+</td>
+<td class="px-8 py-5">
+<span class="flex items-center gap-2 text-[10px] font-black text-emerald-600 tracking-widest">
+<span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                    VERIFIED
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-slate-300" data-icon="chevron_right">chevron_right</span>
+</button>
+</td>
+</tr>
+<!-- Dispatcher 3 -->
+<tr class="hover:bg-slate-50/80 transition-colors group cursor-pointer">
+<td class="px-8 py-5">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full border border-slate-200 overflow-hidden ring-2 ring-primary/5">
+<img alt="Dispatcher" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB3QpzjjVcvZcHOWgyFOYBt-wt7jL7eJ0hup8r9zUkO4FPPDEROmy0iM4lAW6MOC311_v0ZrA4KPBg3qghTt8gteSj5pJUIYyAxkxvtK52juESCKZMNtfG2REoawlt-4aOY0sMMUyIZ1ro33qmSxdJTcFXimYJCgxzGBL7VRT4XZ9A4LG6MSjDYLZUMICmK_5bBT-NRi2Uy40LwMNC4biJW9be3qAcj1H_iUqXBwdKojjHTouW3HbLAjeX1RKGjl95Bsae7Fq-Uqrax"/>
+</div>
+<div>
+<p class="font-bold text-slate-900 text-sm">Marcus Thorne</p>
+<p class="text-[10px] font-semibold text-slate-400 uppercase tracking-tighter">ID: 11029-MT</p>
+</div>
+</div>
+</td>
+<td class="px-8 py-5">
+<span class="px-3 py-1 bg-slate-100 text-slate-600 rounded-md text-[10px] font-extrabold uppercase tracking-wider">Southeast Hub</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-extrabold text-slate-900 tabular-nums">2,155</span>
+</td>
+<td class="px-8 py-5">
+<span class="font-black text-primary tabular-nums text-sm">RM 7,200.00</span>
+</td>
+<td class="px-8 py-5">
+<span class="flex items-center gap-2 text-[10px] font-black text-amber-500 tracking-widest">
+<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                                    PENDING
+                                </span>
+</td>
+<td class="px-8 py-5 text-right">
+<button class="p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+<span class="material-symbols-outlined text-slate-300" data-icon="chevron_right">chevron_right</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="px-8 py-5 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Showing top 3 of 1,248 total dispatchers</p>
+<button class="text-xs font-black text-primary hover:underline transition-all uppercase tracking-widest">View All Analytics</button>
+</div>
+</div>
 </main>
-<!-- Subtle Footer -->
-<footer class="mt-auto p-10 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] border-t border-outline/50">
-            © 2024 Logistics Authority • Salary Automation System • Precision Insight Series
-        </footer>
-</div>
+<!-- Footer for High-Density Layout -->
+<footer class="max-w-[1920px] mx-auto px-8 py-10 text-center">
+<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">LogiPay Precision Insight © 2023 | Enterprise Salary Distribution Platform</p>
+</footer>
 </body></html>
