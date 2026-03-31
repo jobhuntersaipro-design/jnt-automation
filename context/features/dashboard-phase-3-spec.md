@@ -92,7 +92,6 @@ Replace the Phase 1 placeholders in Row 4 with the Top Performing Dispatchers ta
 ---
 
 ## Definition of Done
-- [ ] Items/types with links to /items/TYPE (eg.items/snippets)
 - [ ] Top Performing Dispatchers table renders with mock data
 - [ ] Avatar initials show correctly with gender ring colour
 - [ ] Compliance status chips render correctly (VERIFIED / PENDING)

@@ -1,102 +1,116 @@
-import { mockSalaryBreakdown } from "@/lib/mock-data";
+"use client";
 
-const COLORS = {
-  baseSalary: "#0056d2",
-  incentive: "#87D4C4",
-  petrolSubsidy: "#FFD747",
-  deductions: "#F68D8D",
-};
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
+import { mockSalaryBreakdown4 } from "@/lib/mock-data";
 
-const LEGEND = [
-  { key: "baseSalary" as const, label: "Base Salary", color: COLORS.baseSalary },
-  { key: "incentive" as const, label: "Incentive", color: COLORS.incentive },
-  { key: "petrolSubsidy" as const, label: "Petrol Subsidy", color: COLORS.petrolSubsidy },
-  { key: "deductions" as const, label: "Deductions", color: COLORS.deductions },
-];
+const SEGMENTS = [
+  { key: "baseSalary", label: "Base Salary", color: "#0056D2" },
+  { key: "incentive", label: "Monthly Incentive", color: "#10B981" },
+  { key: "petrolSubsidy", label: "Petrol Subsidy", color: "#F59E0B" },
+  { key: "deductions", label: "Penalty / Deductions", color: "#940002" },
+] as const;
 
 function fmtShort(n: number) {
   if (n >= 1_000_000) return `RM ${(n / 1_000_000).toFixed(1)}M`;
   return `RM ${(n / 1_000).toFixed(0)}K`;
 }
 
-export function SalaryBreakdown() {
-  const max = Math.max(
-    ...mockSalaryBreakdown.map(
-      (d) => d.baseSalary + d.incentive + d.petrolSubsidy + d.deductions
-    )
-  );
+function fmtY(value: number) {
+  if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(0)}M`;
+  return `RM ${(value / 1_000).toFixed(0)}K`;
+}
 
+function CustomTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ name: string; value: number; fill: string }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="font-heading font-semibold text-[1rem] text-on-surface">
-            Salary Breakdown
-          </h2>
-          <p className="text-[0.75rem] text-on-surface-variant mt-0.5">
-            Base salary vs components per month
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1.5 justify-end">
-          {LEGEND.map(({ key, label, color }) => (
+    <div className="bg-white rounded-lg px-3 py-2 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] text-[0.9rem] space-y-1">
+      <p className="font-semibold text-on-surface mb-1">{label}</p>
+      {payload.map((p) => (
+        <p key={p.name} className="flex items-center gap-1.5">
+          <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: p.fill }} />
+          <span className="text-on-surface-variant">{p.name}:</span>
+          <span className="font-medium text-on-surface tabular-nums">{fmtShort(p.value)}</span>
+        </p>
+      ))}
+    </div>
+  );
+}
+
+export function SalaryBreakdown() {
+  return (
+    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-critical h-full">
+      <div className="shrink-0">
+        <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
+          Salary Breakdown
+        </h2>
+        <p className="text-[0.9rem] text-on-surface-variant mt-0.5">
+          Monthly cost components across entire operation
+        </p>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+          {SEGMENTS.map(({ key, label, color }) => (
             <div key={key} className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
-              <span className="text-[0.7rem] text-on-surface-variant">{label}</span>
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: color }} />
+              <span className="text-[0.84rem] text-on-surface-variant">{label}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Stacked bar chart */}
-      <div className="flex items-end gap-3 h-36">
-        {mockSalaryBreakdown.map((d) => {
-          const total = d.baseSalary + d.incentive + d.petrolSubsidy + d.deductions;
-          const totalPct = (total / max) * 100;
-          const segments = [
-            { key: "baseSalary", value: d.baseSalary, color: COLORS.baseSalary, label: "Base" },
-            { key: "incentive", value: d.incentive, color: COLORS.incentive, label: "Incentive" },
-            { key: "petrolSubsidy", value: d.petrolSubsidy, color: COLORS.petrolSubsidy, label: "Petrol" },
-            { key: "deductions", value: d.deductions, color: COLORS.deductions, label: "Deductions" },
-          ];
-
-          return (
-            <div key={d.month} className="flex-1 flex flex-col items-center gap-2 relative group">
-              {/* Hover tooltip */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-full -mt-1 bg-on-surface text-white text-[0.65rem] px-2.5 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20 space-y-0.5">
-                <div className="font-semibold mb-0.5">{d.month}</div>
-                {segments.map((seg) => (
-                  <div key={seg.key} className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-sm shrink-0" style={{ background: seg.color }} />
-                    <span className="text-white/80">{seg.label}:</span>
-                    <span>{fmtShort(seg.value)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="w-full flex flex-col justify-end" style={{ height: "120px" }}>
-                <div
-                  className="w-full rounded-t-lg overflow-hidden flex flex-col-reverse"
-                  style={{ height: `${totalPct}%` }}
-                >
-                  {segments.map((seg) => (
-                    <div
-                      key={seg.key}
-                      style={{
-                        background: seg.color,
-                        height: `${(seg.value / total) * 100}%`,
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <span className="text-[0.7rem] text-on-surface-variant">{d.month}</span>
-            </div>
-          );
-        })}
+      <div className="h-56">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={mockSalaryBreakdown4}
+            margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
+            barSize={110}
+          >
+            <XAxis
+              dataKey="month"
+              tick={{ fontSize: 13, fill: "#424654", dy: 4 }}
+              axisLine={false}
+              tickLine={false}
+              padding={{ left: 24, right: 24 }}
+            />
+            <YAxis
+              tickFormatter={fmtY}
+              tick={{ fontSize: 12, fill: "#424654", dx: -4 }}
+              axisLine={false}
+              tickLine={false}
+              width={72}
+            />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={false}
+            />
+            {SEGMENTS.map(({ key, label, color }, i) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                name={label}
+                stackId="a"
+                fill={color}
+                fillOpacity={1}
+                activeBar={{ fill: color, fillOpacity: 0.82, stroke: "white", strokeWidth: 1.5 }}
+                radius={i === SEGMENTS.length - 1 ? [4, 4, 0, 0] : undefined}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
       </div>
-
-      <p className="text-[0.7rem] text-on-surface-variant/60 text-center">
-        Chart component — Phase 2
-      </p>
     </div>
   );
 }

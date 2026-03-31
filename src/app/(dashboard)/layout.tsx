@@ -1,12 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-
-const navItems = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/payroll", label: "Payroll" },
-  { href: "/staff", label: "Staff" },
-  { href: "/upload", label: "Upload" },
-];
+import { Bell, CircleHelp } from "lucide-react";
+import { NavLinks } from "@/components/dashboard/nav-links";
 
 export default function DashboardLayout({
   children,
@@ -27,29 +22,38 @@ export default function DashboardLayout({
           />
         </Link>
 
-        {/* Spacer between logo and nav */}
         <div className="mx-3 shrink-0" />
 
-        <nav className="flex items-center gap-0.5">
-          {navItems.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="px-3 py-1 text-[1rem] font-medium text-on-surface-variant hover:text-on-surface border-b-2 border-transparent hover:border-brand transition-colors hover:text-[1.05rem] hover:font-bold"
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <NavLinks />
 
-        {/* Profile placeholder */}
-        <div className="ml-auto w-8 h-8 rounded-full bg-surface-hover flex items-center justify-center text-[0.75rem] font-semibold text-on-surface-variant shrink-0">
-          A
+        {/* Right side — icons + user */}
+        <div className="ml-auto flex items-center gap-3 shrink-0">
+          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors">
+            <CircleHelp size={18} className="text-on-surface-variant" />
+          </button>
+          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors">
+            <Bell size={18} className="text-on-surface-variant" />
+          </button>
+
+          <div className="w-px h-5 bg-outline-variant/40 mx-1" />
+
+          {/* Avatar + user info */}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[0.9rem] font-bold text-white shrink-0">
+              A
+            </div>
+            <div className="flex flex-col leading-tight">
+              <span className="text-[0.975rem] font-semibold text-on-surface">Admin</span>
+              <span className="text-[0.78rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant">
+                Super Admin
+              </span>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Main content — flex so children can fill and scroll */}
+      <div className="flex-1 flex overflow-hidden">
         {children}
       </div>
     </div>

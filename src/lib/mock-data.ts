@@ -20,6 +20,21 @@ export const mockMonthlyTrend = [
   { month: "Mar", netPayout: 4200000 },
 ];
 
+export const mockMonthlyTrendFull = [
+  { month: "JAN", actual: 3200000, projected: 3100000 },
+  { month: "FEB", actual: 3050000, projected: 3200000 },
+  { month: "MAR", actual: 3400000, projected: 3300000 },
+  { month: "APR", actual: 3600000, projected: 3500000 },
+  { month: "MAY", actual: 3500000, projected: 3600000 },
+  { month: "JUN", actual: 3750000, projected: 3700000 },
+  { month: "JUL", actual: 3900000, projected: 3800000 },
+  { month: "AUG", actual: 3800000, projected: 3900000 },
+  { month: "SEP", actual: 4000000, projected: 4000000 },
+  { month: "OCT", actual: 4100000, projected: 4100000 },
+  { month: "NOV", actual: 4200000, projected: 4300000 },
+  { month: "DEC", actual: 4350000, projected: 4500000 },
+];
+
 export const mockBranches = [
   { name: "Kepong", netPayout: 980000 },
   { name: "Cheras", netPayout: 850000 },
@@ -38,6 +53,13 @@ export const mockSalaryBreakdown = [
   { month: "Mar", baseSalary: 3450000, incentive: 490000, petrolSubsidy: 160000, deductions: 110000 },
 ];
 
+export const mockSalaryBreakdown4 = [
+  { month: "FEB", baseSalary: 3050000, incentive: 430000, petrolSubsidy: 140000, deductions: 95000 },
+  { month: "MAR", baseSalary: 3450000, incentive: 490000, petrolSubsidy: 160000, deductions: 110000 },
+  { month: "APR", baseSalary: 3200000, incentive: 455000, petrolSubsidy: 145000, deductions: 102000 },
+  { month: "MAY", baseSalary: 3380000, incentive: 472000, petrolSubsidy: 155000, deductions: 108000 },
+];
+
 export const mockPetrolEligibilityRate = [
   { month: "Oct", rate: 58.24 },
   { month: "Nov", rate: 61.47 },
@@ -45,6 +67,21 @@ export const mockPetrolEligibilityRate = [
   { month: "Jan", rate: 63.12 },
   { month: "Feb", rate: 62.55 },
   { month: "Mar", rate: 64.38 },
+];
+
+export const mockPetrolEligibilityFull = [
+  { month: "JAN", rate: 57.2, baseline: 60 },
+  { month: "FEB", rate: 61.0, baseline: 60 },
+  { month: "MAR", rate: 59.5, baseline: 60 },
+  { month: "APR", rate: 62.8, baseline: 60 },
+  { month: "MAY", rate: 61.5, baseline: 60 },
+  { month: "JUN", rate: 63.0, baseline: 60 },
+  { month: "JUL", rate: 62.0, baseline: 60 },
+  { month: "AUG", rate: 61.8, baseline: 60 },
+  { month: "SEP", rate: 63.5, baseline: 60 },
+  { month: "OCT", rate: 62.4, baseline: 60 },
+  { month: "NOV", rate: 63.8, baseline: 60 },
+  { month: "DEC", rate: 64.2, baseline: 60 },
 ];
 
 export const mockNotifications = [
@@ -77,6 +114,7 @@ export const mockTopDispatchers = [
     name: "James Marcus",
     branch: "Kepong",
     totalOrders: 3882,
+    baseSalary: 5940,
     netSalary: 6810,
     avatarUrl: null,
     gender: "MALE" as const,
@@ -86,6 +124,7 @@ export const mockTopDispatchers = [
     name: "Laura Rodriguez",
     branch: "Cheras",
     totalOrders: 2533,
+    baseSalary: 4820,
     netSalary: 5960,
     avatarUrl: null,
     gender: "FEMALE" as const,
@@ -95,6 +134,7 @@ export const mockTopDispatchers = [
     name: "Marcus Knight",
     branch: "Puchong",
     totalOrders: 2490,
+    baseSalary: 4310,
     netSalary: 5260,
     avatarUrl: null,
     gender: "MALE" as const,
