@@ -493,7 +493,7 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 | `surface_dim` | #d9dadb | Sidebar background |
 | `on_surface` | #191c1d | Primary text (never use #000000) |
 | `on_surface_variant` | #424654 | Secondary / table body text |
-| `primary` | #0040a1 | Main actions, avatar ring (male) |
+| `primary` | #0056D2 | Main actions, avatar ring (male) |
 | `primary_container` | #0056d2 | Gradient end for hero cards |
 | `tertiary` | #940002 | Critical actions only (Finalize Payroll, errors), card left accent trace |
 | `outline_variant` | #c3c6d6 | Ghost border at 15% opacity max |
@@ -530,12 +530,12 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 - All numbers: tabular-numeric (monospaced) for vertical scanning
 
 **Buttons**
-- Primary: `primary` (#0040a1) bg, `md` (0.375rem) radius
+- Primary: `primary` (#0056D2) bg, `md` (0.375rem) radius
 - Critical/Action: `tertiary` (#940002) — Finalize Payroll, errors only
 
 **Avatars**
 - Default: gender-neutral silhouette
-- Male ring: `primary` (#0040a1), 2px
+- Male ring: `primary` (#0056D2), 2px
 - Female ring: soft rose (#f472b6), 2px
 - Gender always derived from IC number — never a manual input
 

@@ -48,6 +48,42 @@
 - No inline styles
 - Use ShadCN UI components where applicable
 
+### Design Tokens
+
+All design system colors are defined as CSS variables in `src/app/globals.css` and must be used as Tailwind utilities — never as arbitrary values.
+
+**Always use the token, never the raw hex:**
+
+| ✅ Correct | ❌ Wrong |
+|-----------|---------|
+| `bg-surface` | `bg-[#f8f9fa]` |
+| `bg-surface-container-low` | `bg-[#f3f4f5]` |
+| `text-on-surface` | `text-[#191c1d]` |
+| `text-on-surface-variant` | `text-[#424654]` |
+| `bg-primary` | `bg-[#0056D2]` |
+| `border-tertiary` | `border-[#940002]` |
+
+Tokens are defined in `globals.css` like so:
+```css
+@import "tailwindcss";
+
+@theme {
+  --color-surface: #f8f9fa;
+  --color-surface-container-low: #f3f4f5;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-high: #e7e8e9;
+  --color-surface-dim: #d9dadb;
+  --color-on-surface: #191c1d;
+  --color-on-surface-variant: #424654;
+  --color-primary: #0056D2;
+  --color-primary-container: #0056d2;
+  --color-tertiary: #940002;
+  --color-outline-variant: #c3c6d6;
+}
+```
+
+This also gives you the full token list ready to paste straight into your `globals.css` to make the warnings go away immediately.
+
 ## File Organization
 
 ```
