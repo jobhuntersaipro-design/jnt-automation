@@ -1,58 +1,50 @@
 export const mockSummary = {
-  totalNetPayout: 482950,
-  baseSalary: 310200,
-  incentive: 92450,
-  petrolSubsidy: 54100,
-  penalty: 18400,
-  advance: 7200,
+  totalNetPayout: 4200000,
+  avgMonthlySalary: 3850,
+  totalDispatchers: 1248,
+  totalOrders: 42850,
+};
+
+export const mockPrevSummary = {
+  avgMonthlySalary: 3640,
+  totalDispatchers: 1205,
+  totalOrders: 41200,
 };
 
 export const mockMonthlyTrend = [
-  { month: "Oct", netPayout: 390000 },
-  { month: "Nov", netPayout: 420000 },
-  { month: "Dec", netPayout: 405000 },
-  { month: "Jan", netPayout: 455000 },
-  { month: "Feb", netPayout: 438000 },
-  { month: "Mar", netPayout: 482950 },
+  { month: "Oct", netPayout: 3400000 },
+  { month: "Nov", netPayout: 3600000 },
+  { month: "Dec", netPayout: 3500000 },
+  { month: "Jan", netPayout: 3900000 },
+  { month: "Feb", netPayout: 3750000 },
+  { month: "Mar", netPayout: 4200000 },
 ];
 
 export const mockBranches = [
-  { name: "Kepong", netPayout: 112400, totalOrders: 5820 },
-  { name: "Cheras", netPayout: 98750, totalOrders: 5100 },
-  { name: "Puchong", netPayout: 87300, totalOrders: 4510 },
-  { name: "Subang", netPayout: 76200, totalOrders: 3940 },
-  { name: "Klang", netPayout: 63150, totalOrders: 3260 },
-  { name: "Shah Alam", netPayout: 45150, totalOrders: 2330 },
+  { name: "Kepong", netPayout: 980000 },
+  { name: "Cheras", netPayout: 850000 },
+  { name: "Puchong", netPayout: 720000 },
+  { name: "Subang", netPayout: 640000 },
+  { name: "Klang", netPayout: 570000 },
+  { name: "Shah Alam", netPayout: 440000 },
 ];
 
-export const mockTopDispatchers = [
-  {
-    id: "D001",
-    name: "James Sullivan",
-    branch: "Kepong",
-    totalOrders: 2840,
-    netSalary: 6450,
-    avatarUrl: null,
-    gender: "MALE" as const,
-  },
-  {
-    id: "D042",
-    name: "Laura Rodriguez",
-    branch: "Cheras",
-    totalOrders: 2610,
-    netSalary: 5880,
-    avatarUrl: null,
-    gender: "FEMALE" as const,
-  },
-  {
-    id: "D017",
-    name: "Marcus Knight",
-    branch: "Puchong",
-    totalOrders: 2490,
-    netSalary: 5260,
-    avatarUrl: null,
-    gender: "MALE" as const,
-  },
+export const mockSalaryBreakdown = [
+  { month: "Oct", baseSalary: 2800000, incentive: 380000, petrolSubsidy: 120000, deductions: 80000 },
+  { month: "Nov", baseSalary: 2950000, incentive: 410000, petrolSubsidy: 130000, deductions: 90000 },
+  { month: "Dec", baseSalary: 2900000, incentive: 390000, petrolSubsidy: 110000, deductions: 85000 },
+  { month: "Jan", baseSalary: 3200000, incentive: 450000, petrolSubsidy: 150000, deductions: 100000 },
+  { month: "Feb", baseSalary: 3050000, incentive: 430000, petrolSubsidy: 140000, deductions: 95000 },
+  { month: "Mar", baseSalary: 3450000, incentive: 490000, petrolSubsidy: 160000, deductions: 110000 },
+];
+
+export const mockPetrolEligibilityRate = [
+  { month: "Oct", rate: 58.24 },
+  { month: "Nov", rate: 61.47 },
+  { month: "Dec", rate: 59.83 },
+  { month: "Jan", rate: 63.12 },
+  { month: "Feb", rate: 62.55 },
+  { month: "Mar", rate: 64.38 },
 ];
 
 export const mockNotifications = [
@@ -76,5 +68,35 @@ export const mockNotifications = [
     message: "Data Entry Complete",
     detail: "Cheras Branch · 3 new dispatchers detected",
     createdAt: "2025-03-26T11:05:00Z",
+  },
+];
+
+export const mockTopDispatchers = [
+  {
+    id: "D001",
+    name: "James Marcus",
+    branch: "Kepong",
+    totalOrders: 3882,
+    netSalary: 6810,
+    avatarUrl: null,
+    gender: "MALE" as const,
+  },
+  {
+    id: "D042",
+    name: "Laura Rodriguez",
+    branch: "Cheras",
+    totalOrders: 2533,
+    netSalary: 5960,
+    avatarUrl: null,
+    gender: "FEMALE" as const,
+  },
+  {
+    id: "D017",
+    name: "Marcus Knight",
+    branch: "Puchong",
+    totalOrders: 2490,
+    netSalary: 5260,
+    avatarUrl: null,
+    gender: "MALE" as const,
   },
 ];

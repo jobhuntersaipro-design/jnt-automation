@@ -18,13 +18,13 @@ Traditional 1px borders are prohibited for sectioning. We define space through *
 - **Prominence:** Use `surface_container_lowest` (#ffffff) for primary interactive cards to make them "pop" against the gray base.
 
 ### The Glass & Gradient Rule
-For high-level summary cards (e.g., Total Monthly Payout), do not use flat colors. Apply a subtle **Linear Gradient** from `primary` (#0040a1) to `primary_container` (#0056d2) at a 135° angle. For floating navigation or filters, use **Glassmorphism**:
+For high-level summary cards (e.g., Total Monthly Payout), do not use flat colors. Apply a subtle **Linear Gradient** from `primary` (#0056D2) to `primary_container` (#0056d2) at a 135° angle. For floating navigation or filters, use **Glassmorphism**:
 - **Background:** `surface_container_lowest` at 80% opacity.
 - **Effect:** `backdrop-filter: blur(12px)`.
 
 ### Specialized Logistics Logic (Gender-Specific Avatars)
 To provide instant visual recognition for dispatcher management:
-- **Male Dispatchers:** Avatar ring uses `primary` (#0040a1) at 2px weight.
+- **Male Dispatchers:** Avatar ring uses `primary` (#0056D2) at 2px weight.
 - **Female Dispatchers:** Avatar ring uses a custom soft rose (suggested: #f472b6) to provide a clear, non-conflicting distinction from the brand red.
 
 ---
@@ -63,7 +63,7 @@ We eschew "Standard Web" shadows for **Ambient Occlusion**.
 *   **Hierarchy:** The "Salary Amount" column should use `title-md` and `primary` color to draw the eye immediately.
 
 ### Buttons
-*   **Primary:** `primary` (#0040a1) background with `on_primary` text. Use `md` (0.375rem) rounding.
+*   **Primary:** `primary` (#0056D2) background with `on_primary` text. Use `md` (0.375rem) rounding.
 *   **Tertiary (Action):** `tertiary` (#940002) used exclusively for "Finalize Payroll" or "Critical Error" states. This is our "J&T" signature pop.
 
 ### Input Fields

@@ -27,9 +27,9 @@
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐  │
 │  │  Pages (SSR) │   │  API Routes  │   │  Auth (NextAuth)  │  │
 │  │              │   │              │   │                   │  │
-│  │  /dashboard  │   │  /api/upload │   │  Email + Password │  │
-│  │  /staff      │   │  /api/staff  │   │  GitHub OAuth     │  │
-│  │  /history    │   │  /api/salary │   │  Roles: agent,    │  │
+│  │  /overview   │   │  /api/upload │   │  Email + Password │  │
+│  │  /staff      │   │  /api/staff  │   │  Approval-gated   │  │
+│  │  /payroll    │   │  /api/salary │   │  Roles: agent,    │  │
 │  │  /upload     │   │  /api/export │   │  superadmin       │  │
 │  │  /admin      │   │  /api/admin  │   └──────────────────┘  │
 │  └──────────────┘   └──────────────┘                         │
@@ -95,10 +95,10 @@ Parcels are bucketed by billing weight into tiers. Each tier has a configurable 
 
 | Field | Required before processing? |
 |-------|-----------------------------|
+| I/C No | ✅ Mandatory |
 | Weight tiers (all 3) | ✅ Mandatory |
 | Monthly incentive | ✅ Mandatory |
 | Petrol subsidy | ✅ Mandatory |
-| I/C No | ❌ Optional |
 | Penalty | ❌ Optional (manual, per month) |
 | Advance | ❌ Optional (manual, per month) |
 | SOCSO No | ❌ Blank for now |
@@ -493,7 +493,7 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 | `surface_dim` | #d9dadb | Sidebar background |
 | `on_surface` | #191c1d | Primary text (never use #000000) |
 | `on_surface_variant` | #424654 | Secondary / table body text |
-| `primary` | #0040a1 | Main actions, avatar ring (male) |
+| `primary` | #0056D2 | Main actions, avatar ring (male) |
 | `primary_container` | #0056d2 | Gradient end for hero cards |
 | `tertiary` | #940002 | Critical actions only (Finalize Payroll, errors), card left accent trace |
 | `outline_variant` | #c3c6d6 | Ghost border at 15% opacity max |
@@ -530,12 +530,12 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 - All numbers: tabular-numeric (monospaced) for vertical scanning
 
 **Buttons**
-- Primary: `primary` (#0040a1) bg, `md` (0.375rem) radius
+- Primary: `primary` (#0056D2) bg, `md` (0.375rem) radius
 - Critical/Action: `tertiary` (#940002) — Finalize Payroll, errors only
 
 **Avatars**
 - Default: gender-neutral silhouette
-- Male ring: `primary` (#0040a1), 2px
+- Male ring: `primary` (#0056D2), 2px
 - Female ring: soft rose (#f472b6), 2px
 - Gender always derived from IC number — never a manual input
 
@@ -550,9 +550,10 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 - **Top:** Page title + subtitle + Branch / Dispatcher filters + Apply button
 - **Row 1:** Summary cards — Total Net Payout (gradient hero), Base Salary, Incentive, Petrol Subsidy, Penalty/Advance
 - **Row 2 left:** Monthly Net Payout Trend — bar chart, 6-month view
-- **Row 2 right:** Branch Distribution — list with progress bars and RM totals
-- **Row 3 left:** Top Performing Dispatchers — avatar, name, branch, deliveries, net salary
-- **Row 3 right:** System Notifications — upload events, payroll finalized, new dispatcher detected
+- **Row 2 right:** Branch Distribution — horizontal bars with RM totals per branch
+- **Row 3 left:** Salary Breakdown — stacked bar chart showing base salary vs incentive vs petrol subsidy vs deductions per month
+- **Row 3 right:** Petrol Subsidy Eligibility Rate — % of dispatchers who hit the ≥70 daily orders threshold each month, shown as a trend line
+- **Row 4 left:** Top Performing Dispatchers — avatar, name, branch, total deliveries, net salary (top 5)
 
 ---
 
@@ -580,6 +581,6 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 | 9 | **Advance** is a manual, optional deduction on the invoice alongside Penalty |
 | 10 | PDF invoice format confirmed — addition rows show `parcels * rate` per tier. SOCSO No, Income Tax No, and Employer's Contribution left blank for now |
 | 11 | Only **IC No, weight tiers, monthly incentive, and petrol subsidy** are mandatory before a dispatcher can be processed |
-| 12 | Pages renamed: **Dashboard → Overview**, **History → Payroll** (or TBD from options above) |
+| 12 | Pages renamed: **Dashboard → Overview**, **History → Payroll** |
 | 13 | **Overview** shows all-time filterable data with charts; **Payroll** is scoped to one month at a time with summary totals + orders table |
 | 14 | Each dispatcher has an **avatar** (uploadable), with border colour derived from IC gender |
