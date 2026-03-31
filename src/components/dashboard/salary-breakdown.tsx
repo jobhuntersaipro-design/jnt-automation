@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -8,7 +9,8 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { mockSalaryBreakdown4 } from "@/lib/mock-data";
+import { mockSalaryBreakdownFull } from "@/lib/mock-data";
+import type { ChartRange } from "@/app/(dashboard)/dashboard/page";
 
 const SEGMENTS = [
   { key: "baseSalary", label: "Base Salary", color: "#0056D2" },
@@ -17,17 +19,18 @@ const SEGMENTS = [
   { key: "deductions", label: "Penalty / Deductions", color: "#940002" },
 ] as const;
 
+type SegmentKey = (typeof SEGMENTS)[number]["key"];
+
 function fmtShort(n: number) {
   if (n >= 1_000_000) return `RM ${(n / 1_000_000).toFixed(1)}M`;
   return `RM ${(n / 1_000).toFixed(0)}K`;
 }
 
 function fmtY(value: number) {
-  if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(0)}M`;
-  return `RM ${(value / 1_000).toFixed(0)}K`;
+  return `RM ${(value / 1_000_000).toFixed(1)}M`;
 }
 
-function CustomTooltip({
+function TooltipContent({
   active,
   payload,
   label,
@@ -51,9 +54,13 @@ function CustomTooltip({
   );
 }
 
-export function SalaryBreakdown() {
+export function SalaryBreakdown({ chartRange }: { chartRange: ChartRange }) {
+  const [hoveredKey, setHoveredKey] = useState<SegmentKey | null>(null);
+
+  const data = mockSalaryBreakdownFull.slice(chartRange.from, chartRange.to + 1);
+
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-critical h-full">
+    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       <div className="shrink-0">
         <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
           Salary Breakdown
@@ -63,18 +70,36 @@ export function SalaryBreakdown() {
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
           {SEGMENTS.map(({ key, label, color }) => (
-            <div key={key} className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: color }} />
-              <span className="text-[0.84rem] text-on-surface-variant">{label}</span>
+            <div
+              key={key}
+              className="flex items-center gap-1.5 cursor-pointer"
+              onMouseEnter={() => setHoveredKey(key)}
+              onMouseLeave={() => setHoveredKey(null)}
+            >
+              <div
+                className="w-3 h-3 rounded-sm shrink-0 transition-opacity"
+                style={{
+                  background: color,
+                  opacity: hoveredKey === null || hoveredKey === key ? 1 : 0.3,
+                }}
+              />
+              <span
+                className="text-[0.84rem] transition-colors"
+                style={{
+                  color: hoveredKey === null || hoveredKey === key ? "#424654" : "#c3c6d6",
+                }}
+              >
+                {label}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
       <div className="h-56">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
-            data={mockSalaryBreakdown4}
+            data={data}
             margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
             barSize={110}
           >
@@ -92,10 +117,7 @@ export function SalaryBreakdown() {
               tickLine={false}
               width={72}
             />
-            <Tooltip
-              content={<CustomTooltip />}
-              cursor={false}
-            />
+            <Tooltip content={<TooltipContent />} cursor={false} />
             {SEGMENTS.map(({ key, label, color }, i) => (
               <Bar
                 key={key}
@@ -103,7 +125,7 @@ export function SalaryBreakdown() {
                 name={label}
                 stackId="a"
                 fill={color}
-                fillOpacity={1}
+                fillOpacity={hoveredKey === null || hoveredKey === key ? 1 : 0.15}
                 activeBar={{ fill: color, fillOpacity: 0.82, stroke: "white", strokeWidth: 1.5 }}
                 radius={i === SEGMENTS.length - 1 ? [4, 4, 0, 0] : undefined}
               />

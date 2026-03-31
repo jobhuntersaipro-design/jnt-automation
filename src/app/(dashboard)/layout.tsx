@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Bell, CircleHelp } from "lucide-react";
 import { NavLinks } from "@/components/dashboard/nav-links";
+import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { AccountMenu } from "@/components/dashboard/account-menu";
 
 export default function DashboardLayout({
   children,
@@ -28,27 +29,11 @@ export default function DashboardLayout({
 
         {/* Right side — icons + user */}
         <div className="ml-auto flex items-center gap-3 shrink-0">
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors">
-            <CircleHelp size={18} className="text-on-surface-variant" />
-          </button>
-          <button className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors">
-            <Bell size={18} className="text-on-surface-variant" />
-          </button>
+          <NotificationBell />
 
           <div className="w-px h-5 bg-outline-variant/40 mx-1" />
 
-          {/* Avatar + user info */}
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[0.9rem] font-bold text-white shrink-0">
-              A
-            </div>
-            <div className="flex flex-col leading-tight">
-              <span className="text-[0.975rem] font-semibold text-on-surface">Admin</span>
-              <span className="text-[0.78rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant">
-                Super Admin
-              </span>
-            </div>
-          </div>
+          <AccountMenu />
         </div>
       </header>
 
