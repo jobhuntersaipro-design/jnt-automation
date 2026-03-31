@@ -11,80 +11,131 @@ import {
   CartesianGrid,
 } from "recharts";
 import { mockMonthlyTrendFull } from "@/lib/mock-data";
+import type { ChartRange } from "@/app/(dashboard)/dashboard/page";
+
+type ActiveLine = null | "actual" | "baseSalary";
+
+const BASE_COLOR = "#38BDF8";
 
 function fmtY(value: number) {
-  return `RM ${(value / 1_000_000).toFixed(0)}M`;
+  return `RM ${(value / 1_000_000).toFixed(1)}M`;
 }
 
 function fmtFull(value: number) {
   return `RM ${(value / 1_000_000).toFixed(2)}M`;
 }
 
-// Module-level — always looks up against the full dataset for correct MoM
 function CustomTooltip({
   active,
   payload,
   label,
+  activeLine,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; color: string }>;
+  payload?: Array<{ dataKey: string; value: number }>;
   label?: string;
+  activeLine: ActiveLine;
 }) {
   if (!active || !payload?.length) return null;
-  const current = payload[0].value;
   const idx = mockMonthlyTrendFull.findIndex((d) => d.month === label);
-  const prev = idx > 0 ? mockMonthlyTrendFull[idx - 1].actual : null;
-  const mom = prev !== null ? ((current - prev) / prev) * 100 : null;
+  const netItem = payload.find((p) => p.dataKey === "actual");
+  const baseItem = payload.find((p) => p.dataKey === "baseSalary");
+
+  const showNet = activeLine === null || activeLine === "actual";
+  const showBase = activeLine === null || activeLine === "baseSalary";
+
+  const prevNet = idx > 0 ? mockMonthlyTrendFull[idx - 1].actual : null;
+  const prevBase = idx > 0 ? mockMonthlyTrendFull[idx - 1].baseSalary : null;
+  const momNet =
+    prevNet !== null && netItem ? ((netItem.value - prevNet) / prevNet) * 100 : null;
+  const momBase =
+    prevBase !== null && baseItem ? ((baseItem.value - prevBase) / prevBase) * 100 : null;
 
   return (
-    <div className="bg-white rounded-lg px-3 py-2 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] text-[0.9rem]">
-      <p className="font-semibold text-on-surface mb-1">{label}</p>
-      <p style={{ color: payload[0].color }}>{fmtFull(current)}</p>
-      {mom !== null && (
-        <p className="mt-0.5 font-medium" style={{ color: mom >= 0 ? "#10B981" : "#940002" }}>
-          {mom >= 0 ? "+" : ""}{mom.toFixed(1)}% vs prev month
-        </p>
+    <div className="bg-white rounded-lg px-3 py-2 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] text-[0.9rem] space-y-1.5">
+      <p className="font-semibold text-on-surface">{label}</p>
+      {showNet && netItem && (
+        <div>
+          <p style={{ color: "#0056D2" }}>Net: {fmtFull(netItem.value)}</p>
+          {momNet !== null && (
+            <p
+              className="text-[0.8rem] font-medium"
+              style={{ color: momNet >= 0 ? "#10B981" : "#940002" }}
+            >
+              {momNet >= 0 ? "+" : ""}{momNet.toFixed(1)}% vs prev month
+            </p>
+          )}
+        </div>
+      )}
+      {showBase && baseItem && (
+        <div className={showNet && netItem ? "border-t border-outline-variant/20 pt-1.5" : ""}>
+          <p style={{ color: BASE_COLOR }}>Base: {fmtFull(baseItem.value)}</p>
+          {momBase !== null && (
+            <p
+              className="text-[0.8rem] font-medium"
+              style={{ color: momBase >= 0 ? "#10B981" : "#940002" }}
+            >
+              {momBase >= 0 ? "+" : ""}{momBase.toFixed(1)}% vs prev month
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-export function MonthlyNetPayoutTrend() {
-  const [view, setView] = useState<"6M" | "1Y">("1Y");
+export function MonthlyNetPayoutTrend({ chartRange }: { chartRange: ChartRange }) {
+  const [activeLine, setActiveLine] = useState<ActiveLine>(null);
 
-  const data = view === "6M" ? mockMonthlyTrendFull.slice(-6) : mockMonthlyTrendFull;
+  const data = mockMonthlyTrendFull.slice(chartRange.from, chartRange.to + 1);
+
+  const allValues = data.flatMap((d) => [d.actual, d.baseSalary]);
+  const minVal = Math.min(...allValues);
+  const maxVal = Math.max(...allValues);
+  const pad = (maxVal - minVal) * 0.18;
+  const yMin = Math.floor((minVal - pad) / 200000) * 200000;
+  const yMax = Math.ceil((maxVal + pad) / 200000) * 200000;
+
+  function toggleLine(key: "actual" | "baseSalary") {
+    setActiveLine((prev) => (prev === key ? null : key));
+  }
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-critical h-full">
-      <div className="flex items-start justify-between gap-4 shrink-0">
-        <div>
-          <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
-            Monthly Net Payout Trend
-          </h2>
-          <p className="text-[0.9rem] text-on-surface-variant mt-0.5">
-            Full-year cash flow overview
-          </p>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {(["6M", "1Y"] as const).map((v) => (
+    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
+      <div className="shrink-0">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
+              Net Payout vs Base Salary
+            </h2>
+            <p className="text-[0.9rem] text-on-surface-variant mt-0.5">
+              Monthly comparison across the operation
+            </p>
+          </div>
+          {/* Inline legend — click to focus a line */}
+          <div className="flex items-center gap-4 shrink-0 pt-1">
             <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-3 py-1.5 text-[0.825rem] font-semibold tracking-wide rounded-[0.375rem] transition-colors ${
-                view === v
-                  ? "bg-brand text-white"
-                  : "bg-surface-low text-on-surface-variant"
-              }`}
+              onClick={() => toggleLine("actual")}
+              className="flex items-center gap-1.5 transition-opacity"
+              style={{ opacity: activeLine === null || activeLine === "actual" ? 1 : 0.35 }}
             >
-              {v === "6M" ? "6 MONTHS" : "1 YEAR"}
+              <div className="w-6 h-0.5 rounded-full bg-brand" />
+              <span className="text-[0.8rem] text-on-surface-variant">Net Payout</span>
             </button>
-          ))}
+            <button
+              onClick={() => toggleLine("baseSalary")}
+              className="flex items-center gap-1.5 transition-opacity"
+              style={{ opacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.35 }}
+            >
+              <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: BASE_COLOR }} />
+              <span className="text-[0.8rem] text-on-surface-variant">Base Salary</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* flex-1 + min-h-0 lets the chart expand to fill all remaining card space */}
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="flex-1 min-h-0" style={{ minHeight: "220px" }}>
+        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
             <XAxis
@@ -95,21 +146,60 @@ export function MonthlyNetPayoutTrend() {
               padding={{ left: 12, right: 12 }}
             />
             <YAxis
+              domain={[yMin, yMax]}
               tickFormatter={fmtY}
               tick={{ fontSize: 12, fill: "#424654", dx: -20 }}
               axisLine={false}
               tickLine={false}
               width={84}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip
+              content={(props) => (
+                <CustomTooltip
+                  active={props.active}
+                  payload={
+                    (props.payload as unknown) as Array<{ dataKey: string; value: number }>
+                  }
+                  label={props.label as string}
+                  activeLine={activeLine}
+                />
+              )}
+            />
             <Line
               type="monotone"
               dataKey="actual"
-              name="ACTUAL NET PAYOUT"
+              name="Net Payout"
               stroke="#0056D2"
               strokeWidth={2.5}
-              dot={{ fill: "#0056D2", r: 4, strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0 }}
+              strokeOpacity={activeLine === null || activeLine === "actual" ? 1 : 0.2}
+              dot={{
+                fill: "#0056D2",
+                r: 4,
+                strokeWidth: 0,
+                fillOpacity: activeLine === null || activeLine === "actual" ? 1 : 0.2,
+                cursor: "pointer",
+              }}
+              activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0, cursor: "pointer" }}
+              onClick={() => toggleLine("actual")}
+              style={{ cursor: "pointer" }}
+            />
+            <Line
+              type="monotone"
+              dataKey="baseSalary"
+              name="Base Salary"
+              stroke={BASE_COLOR}
+              strokeWidth={2.5}
+              strokeOpacity={activeLine === null || activeLine === "baseSalary" ? 1 : 0.2}
+              dot={{
+                fill: BASE_COLOR,
+                r: 4,
+                strokeWidth: 0,
+                fillOpacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.2,
+                cursor: "pointer",
+              }}
+              activeDot={{ r: 6, fill: BASE_COLOR, strokeWidth: 0, cursor: "pointer" }}
+              onClick={() => toggleLine("baseSalary")}
+              style={{ cursor: "pointer" }}
             />
           </LineChart>
         </ResponsiveContainer>
