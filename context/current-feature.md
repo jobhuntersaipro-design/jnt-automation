@@ -1,10 +1,27 @@
 # Current Feature
 
-None.
+**Database Setup** — Neon PostgreSQL + Prisma 7
+
+Set up Prisma ORM with Neon PostgreSQL. Initial migration covering the full domain schema: Agent (tenant), Branch, Dispatcher, WeightTier, IncentiveRule, PetrolRule, Upload, SalaryRecord, SalaryLineItem, plus NextAuth v5 models (Account, Session, VerificationToken).
+
+## Requirements
+
+- Prisma 7 (breaking changes — follow upgrade guide)
+- Neon PostgreSQL serverless with `DATABASE_URL` (pooled) + `DIRECT_URL` (direct, for migrations)
+- Full schema from `@context/database-spec.md`
+- Indexes for all high-frequency query patterns
+- Cascade deletes wired correctly
+- NextAuth v5 Prisma adapter configured with `agentId` instead of `userId`
+- Seed 3 default WeightTier rows on every new Dispatcher creation (transaction)
+- Never use `prisma db push` — migrations only
+
+## Spec
+
+See `@context/database-spec.md` for full schema and notes.
 
 ## Status
 
-—
+In Progress.
 
 ## Notes
 Overview's notification icon to be updated after Upload and Payroll page.
