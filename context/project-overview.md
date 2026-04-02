@@ -160,15 +160,16 @@ model Agent {
 
 model Branch {
   id          String       @id @default(cuid())
-  agentId     String                        // tenant scope — branch belongs to one agent
-  name        String
+  agentId     String
+  code        String       // raw branch code from J&T data e.g. "PHG379"
   dispatchers Dispatcher[]
   uploads     Upload[]
   agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  @@unique([agentId, name])               // branch names unique per agent, not globally
+  @@unique([agentId, code])  // branch codes unique per agent
+  @@index([agentId])
 }
 
 model Dispatcher {
@@ -192,6 +193,8 @@ model Dispatcher {
   updatedAt     DateTime       @updatedAt
 
   @@unique([branchId, extId])            // dispatcher IDs unique per branch
+  @@index([branchId])                    // fast lookup of all dispatchers in a branch
+  @@index([extId])                       // fast lookup by raw ID during upload parsing
 }
 
 enum Gender {
@@ -212,6 +215,7 @@ model WeightTier {
   dispatcher   Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
 
   @@unique([dispatcherId, tier])
+  @@index([dispatcherId])
 }
 
 model IncentiveRule {
@@ -245,6 +249,8 @@ model Upload {
   createdAt     DateTime       @default(now())
 
   @@unique([branchId, month, year])
+  @@index([branchId])
+  @@index([month, year])
 }
 
 model SalaryRecord {
@@ -268,6 +274,10 @@ model SalaryRecord {
   createdAt  DateTime         @default(now())
 
   @@unique([dispatcherId, uploadId])
+  @@index([dispatcherId])
+  @@index([uploadId])
+  @@index([month, year])
+  @@index([dispatcherId, month, year])
 }
 
 // Per-parcel breakdown stored for GSheets/PDF export
@@ -277,7 +287,10 @@ model SalaryLineItem {
   waybillNumber  String
   weight         Float
   commission     Float
+  deliveryDate   DateTime?    // date of delivery — used for daily order counts (petrol subsidy)
   salaryRecord   SalaryRecord @relation(fields: [salaryRecordId], references: [id], onDelete: Cascade)
+
+  @@index([salaryRecordId])
 }
 ```
 
@@ -582,5 +595,6 @@ Using **NextAuth v5** with email + password (bcrypt). No OAuth for now — agent
 | 10 | PDF invoice format confirmed — addition rows show `parcels * rate` per tier. SOCSO No, Income Tax No, and Employer's Contribution left blank for now |
 | 11 | Only **IC No, weight tiers, monthly incentive, and petrol subsidy** are mandatory before a dispatcher can be processed |
 | 12 | Pages renamed: **Dashboard → Overview**, **History → Payroll** |
+| 15 | **Branch** uses only the raw `code` from J&T data (e.g. `PHG379`) — no separate display name |
 | 13 | **Overview** shows all-time filterable data with charts; **Payroll** is scoped to one month at a time with summary totals + orders table |
 | 14 | Each dispatcher has an **avatar** (uploadable), with border colour derived from IC gender |

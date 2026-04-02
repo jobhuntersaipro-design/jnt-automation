@@ -1,0 +1,195 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth & Tenancy ───────────────────────────────────────────
+
+model Agent {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  password     String?   // bcrypt hashed. Null for OAuth agents (future)
+  name         String
+  companyName  String?
+  isApproved   Boolean   @default(false)
+  isSuperAdmin Boolean   @default(false)
+  branches     Branch[]
+  accounts     Account[]
+  sessions     Session[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  agentId           String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  agent             Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([agentId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  agentId      String
+  expires      DateTime
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Core Domain ─────────────────────────────────────────────
+
+model Branch {
+  id          String       @id @default(cuid())
+  agentId     String
+  code        String       // raw branch code from J&T data e.g. "PHG379"
+  dispatchers Dispatcher[]
+  uploads     Upload[]
+  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@unique([agentId, code])
+  @@index([agentId])
+}
+
+model Dispatcher {
+  id        String  @id @default(cuid())
+  extId     String  // Dispatcher ID from raw data (col M) e.g. "PHG3795023"
+  name      String
+  icNo      String  // Malaysian MyKad — mandatory. Last digit: odd = male, even = female
+  gender    Gender  @default(UNKNOWN)
+  avatarUrl String?
+  branchId  String
+  isPinned  Boolean @default(false)
+
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  weightTiers   WeightTier[]
+  incentiveRule IncentiveRule?
+  petrolRule    PetrolRule?
+  salaryRecords SalaryRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([branchId, extId])
+  @@index([branchId])
+  @@index([extId])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  UNKNOWN
+}
+
+model WeightTier {
+  id           String     @id @default(cuid())
+  dispatcherId String
+  tier         Int        // 1, 2, or 3
+  minWeight    Float
+  maxWeight    Float?     // null = no upper bound (tier 3)
+  commission   Float      // RM flat rate per parcel in this tier
+  dispatcher   Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatcherId, tier])
+  @@index([dispatcherId])
+}
+
+model IncentiveRule {
+  id              String     @id @default(cuid())
+  dispatcherId    String     @unique
+  orderThreshold  Int        @default(2000)
+  incentiveAmount Float
+  dispatcher      Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+}
+
+model PetrolRule {
+  id             String     @id @default(cuid())
+  dispatcherId   String     @unique
+  isEligible     Boolean    @default(false)
+  dailyThreshold Int        @default(70)
+  subsidyAmount  Float      @default(15)
+  dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+}
+
+// ─── Uploads & Results ───────────────────────────────────────
+
+model Upload {
+  id            String         @id @default(cuid())
+  branchId      String
+  fileName      String
+  r2Key         String
+  month         Int            // 1–12
+  year          Int
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  salaryRecords SalaryRecord[]
+  createdAt     DateTime       @default(now())
+
+  @@unique([branchId, month, year])
+  @@index([branchId])
+  @@index([month, year])
+}
+
+model SalaryRecord {
+  id           String @id @default(cuid())
+  dispatcherId String
+  uploadId     String
+  month        Int
+  year         Int
+
+  totalOrders   Int
+  baseSalary    Float
+  incentive     Float @default(0)
+  petrolSubsidy Float @default(0)
+  penalty       Float @default(0)
+  advance       Float @default(0)
+  netSalary     Float
+
+  lineItems  SalaryLineItem[]
+  dispatcher Dispatcher       @relation(fields: [dispatcherId], references: [id])
+  upload     Upload           @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  createdAt  DateTime         @default(now())
+
+  @@unique([dispatcherId, uploadId])
+  @@index([dispatcherId])
+  @@index([uploadId])
+  @@index([month, year])
+  @@index([dispatcherId, month, year])
+}
+
+model SalaryLineItem {
+  id             String       @id @default(cuid())
+  salaryRecordId String
+  waybillNumber  String
+  weight         Float
+  commission     Float
+  deliveryDate   DateTime?
+  salaryRecord   SalaryRecord @relation(fields: [salaryRecordId], references: [id], onDelete: Cascade)
+
+  @@index([salaryRecordId])
+}
