@@ -145,6 +145,171 @@ export async function getMonthlyPayoutTrend(
     }));
 }
 
+// ─── Salary Breakdown ─────────────────────────────────────────
+
+export type BreakdownPoint = {
+  month: string;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  deductions: number;
+};
+
+const MONTH_ABBR_BD = [
+  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+];
+
+export async function getSalaryBreakdown(
+  agentId: string,
+  filters: Filters,
+): Promise<BreakdownPoint[]> {
+  const { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear } = filters;
+  const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
+  const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+
+  const records = await prisma.salaryRecord.groupBy({
+    by: ["month", "year"],
+    where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+    _sum: {
+      baseSalary: true,
+      incentive: true,
+      petrolSubsidy: true,
+      penalty: true,
+      advance: true,
+    },
+    orderBy: [{ year: "asc" }, { month: "asc" }],
+  });
+
+  return records.map((r) => ({
+    month: MONTH_ABBR_BD[r.month - 1],
+    baseSalary: r._sum.baseSalary ?? 0,
+    incentive: r._sum.incentive ?? 0,
+    petrolSubsidy: r._sum.petrolSubsidy ?? 0,
+    deductions: (r._sum.penalty ?? 0) + (r._sum.advance ?? 0),
+  }));
+}
+
+// ─── Incentive Hit Rate ───────────────────────────────────────
+
+export type HitRatePoint = { month: string; rate: number };
+
+export async function getIncentiveHitRate(
+  agentId: string,
+  filters: Filters,
+): Promise<HitRatePoint[]> {
+  const { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear } = filters;
+  const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
+  const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+
+  const records = await prisma.salaryRecord.findMany({
+    where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+    select: {
+      month: true,
+      year: true,
+      totalOrders: true,
+      dispatcher: {
+        select: {
+          incentiveRule: { select: { orderThreshold: true } },
+        },
+      },
+    },
+  });
+
+  // Group by year-month, count hits vs total
+  const grouped = new Map<string, { hits: number; total: number; month: number }>();
+  for (const r of records) {
+    const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
+    const prev = grouped.get(key) ?? { hits: 0, total: 0, month: r.month };
+    const threshold = r.dispatcher.incentiveRule?.orderThreshold ?? Infinity;
+    grouped.set(key, {
+      hits: prev.hits + (r.totalOrders >= threshold ? 1 : 0),
+      total: prev.total + 1,
+      month: r.month,
+    });
+  }
+
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({
+      month: MONTH_ABBR_BD[v.month - 1],
+      rate: v.total > 0 ? (v.hits / v.total) * 100 : 0,
+    }));
+}
+
+// ─── Top Dispatchers ──────────────────────────────────────────
+
+export type DispatcherRow = {
+  id: string;
+  name: string;
+  branch: string;
+  gender: "MALE" | "FEMALE" | "UNKNOWN";
+  avatarUrl: string | null;
+  totalOrders: number;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  netSalary: number;
+};
+
+export async function getTopDispatchers(
+  agentId: string,
+  filters: Filters,
+): Promise<DispatcherRow[]> {
+  const { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear } = filters;
+  const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
+  const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+
+  const records = await prisma.salaryRecord.findMany({
+    where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+    select: {
+      dispatcherId: true,
+      totalOrders: true,
+      baseSalary: true,
+      incentive: true,
+      petrolSubsidy: true,
+      netSalary: true,
+      dispatcher: {
+        select: {
+          extId: true,
+          name: true,
+          gender: true,
+          avatarUrl: true,
+          branch: { select: { code: true } },
+        },
+      },
+    },
+  });
+
+  // Aggregate per dispatcher
+  const map = new Map<string, DispatcherRow>();
+  for (const r of records) {
+    const existing = map.get(r.dispatcherId);
+    if (existing) {
+      existing.totalOrders += r.totalOrders;
+      existing.baseSalary += r.baseSalary;
+      existing.incentive += r.incentive;
+      existing.petrolSubsidy += r.petrolSubsidy;
+      existing.netSalary += r.netSalary;
+    } else {
+      map.set(r.dispatcherId, {
+        id: r.dispatcher.extId,
+        name: r.dispatcher.name,
+        branch: r.dispatcher.branch.code,
+        gender: r.dispatcher.gender,
+        avatarUrl: r.dispatcher.avatarUrl,
+        totalOrders: r.totalOrders,
+        baseSalary: r.baseSalary,
+        incentive: r.incentive,
+        petrolSubsidy: r.petrolSubsidy,
+        netSalary: r.netSalary,
+      });
+    }
+  }
+
+  return [...map.values()];
+}
+
 // ─── Branch Distribution ──────────────────────────────────────
 
 export type BranchPoint = {
@@ -154,13 +319,18 @@ export type BranchPoint = {
   dispatcherCount: number;
 };
 
-export async function getBranchDistribution(agentId: string): Promise<BranchPoint[]> {
+export async function getBranchDistribution(agentId: string, filters: Filters): Promise<BranchPoint[]> {
+  const months = buildMonthRange(filters.fromMonth, filters.fromYear, filters.toMonth, filters.toYear);
+
   const branches = await prisma.branch.findMany({
     where: { agentId },
-    include: {
+    select: {
+      code: true,
+      _count: { select: { dispatchers: true } },
       dispatchers: {
-        include: {
+        select: {
           salaryRecords: {
+            where: { OR: months.map(({ month, year }) => ({ month, year })) },
             select: { netSalary: true, totalOrders: true },
           },
         },
@@ -181,7 +351,7 @@ export async function getBranchDistribution(agentId: string): Promise<BranchPoin
       name: branch.code,
       netPayout,
       totalOrders,
-      dispatcherCount: branch.dispatchers.length,
+      dispatcherCount: branch._count.dispatchers,
     };
   });
 }

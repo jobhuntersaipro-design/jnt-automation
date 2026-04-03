@@ -20,7 +20,7 @@ export default function DashboardLayout({
             width={140}
             height={36}
             className="h-14 w-auto"
-          />
+            priority />
         </Link>
 
         <div className="mx-3 shrink-0" />

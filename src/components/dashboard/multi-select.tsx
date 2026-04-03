@@ -32,7 +32,7 @@ export function MultiSelect({ label, options, selected, onChange }: MultiSelectP
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-[0.375rem] text-[0.8125rem] font-medium text-on-surface border border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)] transition-colors min-w-35 justify-between">
+      <PopoverTrigger className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-[0.375rem] text-[0.975rem] font-medium text-on-surface border border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)] transition-colors min-w-35 justify-between">
         <span className="truncate">{displayLabel}</span>
         <ChevronDown size={14} className="text-on-surface-variant shrink-0" />
       </PopoverTrigger>

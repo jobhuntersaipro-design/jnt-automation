@@ -1,5 +1,28 @@
 import { TrendingUp, TrendingDown } from "lucide-react";
-import type { SummaryStats } from "@/lib/db/overview";
+import type { SummaryStats, Filters } from "@/lib/db/overview";
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function getPrevPeriodLabel(filters: Filters): string {
+  const { fromMonth, fromYear, toMonth, toYear } = filters;
+  // Count months in the selected range
+  let count = (toYear - fromYear) * 12 + (toMonth - fromMonth) + 1;
+  // Shift start back by count months
+  let prevToMonth = fromMonth - 1;
+  let prevToYear = fromYear;
+  if (prevToMonth <= 0) { prevToMonth += 12; prevToYear--; }
+  let prevFromMonth = prevToMonth - (count - 1);
+  let prevFromYear = prevToYear;
+  while (prevFromMonth <= 0) { prevFromMonth += 12; prevFromYear--; }
+
+  if (count === 1) {
+    return `${MONTH_ABBR[prevFromMonth - 1]} ${prevFromYear}`;
+  }
+  return `${MONTH_ABBR[prevFromMonth - 1]} ${prevFromYear} – ${MONTH_ABBR[prevToMonth - 1]} ${prevToYear}`;
+}
 
 function fmtRM(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -50,8 +73,10 @@ function StatCard({
   );
 }
 
-export function SummaryCards({ data }: { data: SummaryStats }) {
+export function SummaryCards({ data, filters }: { data: SummaryStats; filters: Filters }) {
+  const prevLabel = getPrevPeriodLabel(filters);
   return (
+    <div className="flex flex-col gap-2">
     <div className="grid grid-cols-4 gap-4">
       {/* Hero card */}
       <div
@@ -87,6 +112,10 @@ export function SummaryCards({ data }: { data: SummaryStats }) {
         value={fmtCount(data.totalOrders)}
         subtitle={<Delta current={data.totalOrders} prev={data.prev.totalOrders} />}
       />
+    </div>
+    <p className="text-[0.78rem] text-on-surface-variant/70">
+      % changes compared to {prevLabel}
+    </p>
     </div>
   );
 }

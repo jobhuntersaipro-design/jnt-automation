@@ -9,14 +9,12 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
-import { mockSalaryBreakdownFull } from "@/lib/mock-data";
-import type { ChartRange } from "@/app/(dashboard)/dashboard/page";
 
 const SEGMENTS = [
   { key: "baseSalary", label: "Base Salary", color: "#0056D2" },
   { key: "incentive", label: "Monthly Incentive", color: "#10B981" },
-  { key: "petrolSubsidy", label: "Petrol Subsidy", color: "#F59E0B" },
-  { key: "deductions", label: "Penalty / Deductions", color: "#940002" },
+  { key: "petrolSubsidy", label: "Petrol Subsidy", color: "#FBBF24" },
+  { key: "deductions", label: "Penalty / Deductions", color: "#EF4444" },
 ] as const;
 
 type SegmentKey = (typeof SEGMENTS)[number]["key"];
@@ -54,10 +52,16 @@ function TooltipContent({
   );
 }
 
-export function SalaryBreakdown({ chartRange }: { chartRange: ChartRange }) {
-  const [hoveredKey, setHoveredKey] = useState<SegmentKey | null>(null);
+type BreakdownPoint = {
+  month: string;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  deductions: number;
+};
 
-  const data = mockSalaryBreakdownFull.slice(chartRange.from, chartRange.to + 1);
+export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
+  const [hoveredKey, setHoveredKey] = useState<SegmentKey | null>(null);
 
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
@@ -126,6 +130,8 @@ export function SalaryBreakdown({ chartRange }: { chartRange: ChartRange }) {
                 stackId="a"
                 fill={color}
                 fillOpacity={hoveredKey === null || hoveredKey === key ? 1 : 0.15}
+                stroke="white"
+                strokeWidth={1.5}
                 activeBar={{ fill: color, fillOpacity: 0.82, stroke: "white", strokeWidth: 1.5 }}
                 radius={i === SEGMENTS.length - 1 ? [4, 4, 0, 0] : undefined}
               />

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MonthlyNetPayoutTrend } from "@/components/dashboard/monthly-net-payout-trend";
 import { BranchDistribution } from "@/components/dashboard/branch-distribution";
@@ -10,12 +11,28 @@ import {
   getSummaryStats,
   getMonthlyPayoutTrend,
   getBranchDistribution,
+  getSalaryBreakdown,
+  getIncentiveHitRate,
+  getTopDispatchers,
   type Filters,
 } from "@/lib/db/overview";
 import { prisma } from "@/lib/prisma";
 
-// Shared type for chart components still on mock data (Part 2)
-export type ChartRange = { from: number; to: number };
+const fetchDashboardData = unstable_cache(
+  async (agentId: string, filters: Filters) => {
+    const [summary, trend, branchDist, breakdown, hitRate, dispatchers] = await Promise.all([
+      getSummaryStats(agentId, filters),
+      getMonthlyPayoutTrend(agentId, filters),
+      getBranchDistribution(agentId, filters),
+      getSalaryBreakdown(agentId, filters),
+      getIncentiveHitRate(agentId, filters),
+      getTopDispatchers(agentId, filters),
+    ]);
+    return { summary, trend, branchDist, breakdown, hitRate, dispatchers };
+  },
+  ["dashboard-overview"],
+  { revalidate: 5 * 60 }, // 5 minutes
+);
 
 type SearchParams = {
   branches?: string;
@@ -58,21 +75,12 @@ export default async function DashboardPage({
 
   const agentId = await getAgentId();
 
-  const [summary, trend, branchDist, allBranches] = await Promise.all([
-    getSummaryStats(agentId, filters),
-    getMonthlyPayoutTrend(agentId, filters),
-    getBranchDistribution(agentId),
+  const [{ summary, trend, branchDist, breakdown, hitRate, dispatchers }, allBranches] = await Promise.all([
+    fetchDashboardData(agentId, filters),
     prisma.branch.findMany({ where: { agentId }, select: { code: true } }),
   ]);
 
   const branchCodes = allBranches.map((b) => b.code);
-
-  // ChartRange for mock-data components still waiting for Part 2
-  // from/to are 0-based month indices (0=JAN, 11=DEC) within the same year
-  const chartRange: ChartRange = {
-    from: fromMonth - 1,
-    to: toMonth - 1,
-  };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -96,7 +104,7 @@ export default async function DashboardPage({
 
       {/* Content */}
       <main className="px-8 pb-16 space-y-6">
-        <SummaryCards data={summary} />
+        <SummaryCards data={summary} filters={filters} />
 
         <div className="grid grid-cols-2 gap-4">
           <MonthlyNetPayoutTrend data={trend} />
@@ -104,11 +112,11 @@ export default async function DashboardPage({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <SalaryBreakdown chartRange={chartRange} />
-          <IncentiveHitRate chartRange={chartRange} />
+          <SalaryBreakdown data={breakdown} />
+          <IncentiveHitRate data={hitRate} />
         </div>
 
-        <TopDispatchers selectedBranches={selectedBranchCodes} />
+        <TopDispatchers data={dispatchers} />
       </main>
     </div>
   );

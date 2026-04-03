@@ -109,6 +109,17 @@
     }
 }
 
+@keyframes progress-indeterminate-1 {
+  0%   { left: -40%; width: 40%; }
+  60%  { left: 100%; width: 40%; }
+  100% { left: 100%; width: 40%; }
+}
+@keyframes progress-indeterminate-2 {
+  0%   { left: -80%; width: 60%; }
+  50%  { left: -10%; width: 60%; }
+  100% { left: 100%; width: 60%; }
+}
+
 @layer utilities {
     .font-display {
         font-family: var(--font-manrope), system-ui, sans-serif;
