@@ -1,5 +1,5 @@
-import { mockSummary, mockPrevSummary } from "@/lib/mock-data";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import type { SummaryStats } from "@/lib/db/overview";
 
 function fmtRM(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -9,17 +9,20 @@ function fmtCount(value: number) {
   return value.toLocaleString("en-MY");
 }
 
-function Delta({ current, prev }: { current: number; prev: number }) {
+function Delta({ current, prev, invert = false }: { current: number; prev: number; invert?: boolean }) {
+  if (prev === 0) return null;
   const pct = ((current - prev) / prev) * 100;
   const up = pct >= 0;
   const Icon = up ? TrendingUp : TrendingDown;
-  const color = up ? "text-emerald-600" : "text-critical";
+  const color = invert
+    ? up ? "text-emerald-300" : "text-red-300"
+    : up ? "text-emerald-600" : "text-critical";
   const sign = up ? "+" : "";
 
   return (
     <div className={`flex items-center gap-1 text-[0.96rem] font-medium ${color}`}>
       <Icon size={13} strokeWidth={2} />
-      <span>{sign}{pct.toFixed(1)}% vs last month</span>
+      <span>{sign}{pct.toFixed(1)}% vs last period</span>
     </div>
   );
 }
@@ -47,7 +50,7 @@ function StatCard({
   );
 }
 
-export function SummaryCards() {
+export function SummaryCards({ data }: { data: SummaryStats }) {
   return (
     <div className="grid grid-cols-4 gap-4">
       {/* Hero card */}
@@ -62,30 +65,27 @@ export function SummaryCards() {
           className="tabular-nums font-heading font-bold text-white leading-none"
           style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}
         >
-          RM {fmtRM(mockSummary.totalNetPayout)}
+          RM {fmtRM(data.totalNetPayout)}
         </p>
-        <div className="flex items-center gap-1 text-[0.96rem] font-medium" style={{ color: "#10B981" }}>
-          <TrendingUp size={13} strokeWidth={2} />
-          <span>+12.4% vs last month</span>
-        </div>
+        <Delta current={data.totalNetPayout} prev={data.prev.totalNetPayout} invert />
       </div>
 
       <StatCard
-        label="Base Salary Pool"
-        value={`RM ${fmtRM(mockSummary.avgMonthlySalary)}`}
+        label="Avg Monthly Salary"
+        value={`RM ${fmtRM(data.avgMonthlySalary)}`}
         subtitle={
-          <p className="text-[0.96rem] text-on-surface-variant">92% of total budget</p>
+          <Delta current={data.avgMonthlySalary} prev={data.prev.avgMonthlySalary} />
         }
       />
       <StatCard
         label="Total Dispatchers"
-        value={fmtCount(mockSummary.totalDispatchers)}
-        subtitle={<Delta current={mockSummary.totalDispatchers} prev={mockPrevSummary.totalDispatchers} />}
+        value={fmtCount(data.totalDispatchers)}
+        subtitle={<Delta current={data.totalDispatchers} prev={data.prev.totalDispatchers} />}
       />
       <StatCard
         label="Total Orders"
-        value={fmtCount(mockSummary.totalOrders)}
-        subtitle={<Delta current={mockSummary.totalOrders} prev={mockPrevSummary.totalOrders} />}
+        value={fmtCount(data.totalOrders)}
+        subtitle={<Delta current={data.totalOrders} prev={data.prev.totalOrders} />}
       />
     </div>
   );

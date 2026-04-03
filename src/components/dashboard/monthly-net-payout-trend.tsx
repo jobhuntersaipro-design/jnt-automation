@@ -10,19 +10,18 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { mockMonthlyTrendFull } from "@/lib/mock-data";
-import type { ChartRange } from "@/app/(dashboard)/dashboard/page";
+import type { TrendPoint } from "@/lib/db/overview";
 
 type ActiveLine = null | "actual" | "baseSalary";
 
 const BASE_COLOR = "#38BDF8";
 
 function fmtY(value: number) {
-  return `RM ${(value / 1_000_000).toFixed(1)}M`;
+  return `RM ${(value / 1_000_000).toFixed(3)}M`;
 }
 
 function fmtFull(value: number) {
-  return `RM ${(value / 1_000_000).toFixed(2)}M`;
+  return `RM ${(value / 1_000_000).toFixed(3)}M`;
 }
 
 function CustomTooltip({
@@ -30,22 +29,24 @@ function CustomTooltip({
   payload,
   label,
   activeLine,
+  data,
 }: {
   active?: boolean;
   payload?: Array<{ dataKey: string; value: number }>;
   label?: string;
   activeLine: ActiveLine;
+  data: TrendPoint[];
 }) {
   if (!active || !payload?.length) return null;
-  const idx = mockMonthlyTrendFull.findIndex((d) => d.month === label);
+  const idx = data.findIndex((d) => d.month === label);
   const netItem = payload.find((p) => p.dataKey === "actual");
   const baseItem = payload.find((p) => p.dataKey === "baseSalary");
 
   const showNet = activeLine === null || activeLine === "actual";
   const showBase = activeLine === null || activeLine === "baseSalary";
 
-  const prevNet = idx > 0 ? mockMonthlyTrendFull[idx - 1].actual : null;
-  const prevBase = idx > 0 ? mockMonthlyTrendFull[idx - 1].baseSalary : null;
+  const prevNet = idx > 0 ? data[idx - 1].actual : null;
+  const prevBase = idx > 0 ? data[idx - 1].baseSalary : null;
   const momNet =
     prevNet !== null && netItem ? ((netItem.value - prevNet) / prevNet) * 100 : null;
   const momBase =
@@ -84,17 +85,20 @@ function CustomTooltip({
   );
 }
 
-export function MonthlyNetPayoutTrend({ chartRange }: { chartRange: ChartRange }) {
+export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
   const [activeLine, setActiveLine] = useState<ActiveLine>(null);
 
-  const data = mockMonthlyTrendFull.slice(chartRange.from, chartRange.to + 1);
-
   const allValues = data.flatMap((d) => [d.actual, d.baseSalary]);
-  const minVal = Math.min(...allValues);
-  const maxVal = Math.max(...allValues);
-  const pad = (maxVal - minVal) * 0.18;
-  const yMin = Math.floor((minVal - pad) / 200000) * 200000;
-  const yMax = Math.ceil((maxVal + pad) / 200000) * 200000;
+  const minVal = allValues.length ? Math.min(...allValues) : 0;
+  const maxVal = allValues.length ? Math.max(...allValues) : 1;
+  const range = maxVal - minVal || maxVal;
+  const pad = range * 0.25;
+  // Dynamic step: ~4-6 ticks regardless of data magnitude
+  const rawStep = (range + pad * 2) / 5;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const step = Math.ceil(rawStep / magnitude) * magnitude;
+  const yMin = Math.floor((minVal - pad) / step) * step;
+  const yMax = Math.ceil((maxVal + pad) / step) * step;
 
   function toggleLine(key: "actual" | "baseSalary") {
     setActiveLine((prev) => (prev === key ? null : key));
@@ -112,7 +116,6 @@ export function MonthlyNetPayoutTrend({ chartRange }: { chartRange: ChartRange }
               Monthly comparison across the operation
             </p>
           </div>
-          {/* Inline legend — click to focus a line */}
           <div className="flex items-center gap-4 shrink-0 pt-1">
             <button
               onClick={() => toggleLine("actual")}
@@ -135,74 +138,81 @@ export function MonthlyNetPayoutTrend({ chartRange }: { chartRange: ChartRange }
       </div>
 
       <div className="flex-1 min-h-0" style={{ minHeight: "220px" }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
-            <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
-            <XAxis
-              dataKey="month"
-              tick={{ fontSize: 13, fill: "#424654", dy: 4 }}
-              axisLine={false}
-              tickLine={false}
-              padding={{ left: 12, right: 12 }}
-            />
-            <YAxis
-              domain={[yMin, yMax]}
-              tickFormatter={fmtY}
-              tick={{ fontSize: 12, fill: "#424654", dx: -20 }}
-              axisLine={false}
-              tickLine={false}
-              width={84}
-            />
-            <Tooltip
-              content={(props) => (
-                <CustomTooltip
-                  active={props.active}
-                  payload={
-                    (props.payload as unknown) as Array<{ dataKey: string; value: number }>
-                  }
-                  label={props.label as string}
-                  activeLine={activeLine}
-                />
-              )}
-            />
-            <Line
-              type="monotone"
-              dataKey="actual"
-              name="Net Payout"
-              stroke="#0056D2"
-              strokeWidth={2.5}
-              strokeOpacity={activeLine === null || activeLine === "actual" ? 1 : 0.2}
-              dot={{
-                fill: "#0056D2",
-                r: 4,
-                strokeWidth: 0,
-                fillOpacity: activeLine === null || activeLine === "actual" ? 1 : 0.2,
-                cursor: "pointer",
-              }}
-              activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0, cursor: "pointer" }}
-              onClick={() => toggleLine("actual")}
-              style={{ cursor: "pointer" }}
-            />
-            <Line
-              type="monotone"
-              dataKey="baseSalary"
-              name="Base Salary"
-              stroke={BASE_COLOR}
-              strokeWidth={2.5}
-              strokeOpacity={activeLine === null || activeLine === "baseSalary" ? 1 : 0.2}
-              dot={{
-                fill: BASE_COLOR,
-                r: 4,
-                strokeWidth: 0,
-                fillOpacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.2,
-                cursor: "pointer",
-              }}
-              activeDot={{ r: 6, fill: BASE_COLOR, strokeWidth: 0, cursor: "pointer" }}
-              onClick={() => toggleLine("baseSalary")}
-              style={{ cursor: "pointer" }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
+        {data.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
+            No data for selected range
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+            <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+              <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
+              <XAxis
+                dataKey="month"
+                tick={{ fontSize: 13, fill: "#424654", dy: 4 }}
+                axisLine={false}
+                tickLine={false}
+                padding={{ left: 12, right: 12 }}
+              />
+              <YAxis
+                domain={[yMin, yMax]}
+                tickFormatter={fmtY}
+                tick={{ fontSize: 12, fill: "#424654", dx: -24 }}
+                axisLine={false}
+                tickLine={false}
+                width={104}
+              />
+              <Tooltip
+                content={(props) => (
+                  <CustomTooltip
+                    active={props.active}
+                    payload={
+                      (props.payload as unknown) as Array<{ dataKey: string; value: number }>
+                    }
+                    label={props.label as string}
+                    activeLine={activeLine}
+                    data={data}
+                  />
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="actual"
+                name="Net Payout"
+                stroke="#0056D2"
+                strokeWidth={2.5}
+                strokeOpacity={activeLine === null || activeLine === "actual" ? 1 : 0.2}
+                dot={{
+                  fill: "#0056D2",
+                  r: 4,
+                  strokeWidth: 0,
+                  fillOpacity: activeLine === null || activeLine === "actual" ? 1 : 0.2,
+                  cursor: "pointer",
+                }}
+                activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0, cursor: "pointer" }}
+                onClick={() => toggleLine("actual")}
+                style={{ cursor: "pointer" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="baseSalary"
+                name="Base Salary"
+                stroke={BASE_COLOR}
+                strokeWidth={2.5}
+                strokeOpacity={activeLine === null || activeLine === "baseSalary" ? 1 : 0.2}
+                dot={{
+                  fill: BASE_COLOR,
+                  r: 4,
+                  strokeWidth: 0,
+                  fillOpacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.2,
+                  cursor: "pointer",
+                }}
+                activeDot={{ r: 6, fill: BASE_COLOR, strokeWidth: 0, cursor: "pointer" }}
+                onClick={() => toggleLine("baseSalary")}
+                style={{ cursor: "pointer" }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
       </div>
     </div>
   );
