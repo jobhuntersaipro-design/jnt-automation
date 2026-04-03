@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
-import { mockTopDispatchers } from "@/lib/mock-data";
+
+type DispatcherRow = {
+  id: string;
+  name: string;
+  branch: string;
+  gender: "MALE" | "FEMALE" | "UNKNOWN";
+  avatarUrl: string | null;
+  totalOrders: number;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  netSalary: number;
+};
 
 type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy";
 type SortDir = "asc" | "desc";
@@ -51,12 +63,12 @@ function DispatcherTable({
   title,
   subtitle,
   defaultDir,
-  selectedBranches = [],
+  data,
 }: {
   title: string;
   subtitle: string;
   defaultDir: SortDir;
-  selectedBranches?: string[];
+  data: DispatcherRow[];
 }) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("netSalary");
@@ -71,13 +83,12 @@ function DispatcherTable({
     }
   }
 
-  const sorted = [...mockTopDispatchers]
+  const sorted = [...data]
     .filter(
       (d) =>
-        (selectedBranches.length === 0 || selectedBranches.includes(d.branch)) &&
-        (d.name.toLowerCase().includes(query.toLowerCase()) ||
-          d.id.toLowerCase().includes(query.toLowerCase()) ||
-          d.branch.toLowerCase().includes(query.toLowerCase()))
+        d.name.toLowerCase().includes(query.toLowerCase()) ||
+        d.id.toLowerCase().includes(query.toLowerCase()) ||
+        d.branch.toLowerCase().includes(query.toLowerCase())
     )
     .sort((a, b) => {
       const av = a[sortKey];
@@ -182,20 +193,20 @@ function DispatcherTable({
       {/* Footer */}
       <div className="pt-1 border-t border-outline-variant/20">
         <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
-          Showing top {Math.min(TOP_N, sorted.length)} of {mockTopDispatchers.length} total
+          Showing top {Math.min(TOP_N, sorted.length)} of {data.length} total
         </span>
       </div>
     </div>
   );
 }
 
-export function TopDispatchers({ selectedBranches = [] }: { selectedBranches?: string[] }) {
+export function TopDispatchers({ data }: { data: DispatcherRow[] }) {
   return (
     <DispatcherTable
       title="Dispatcher Performance"
       subtitle="Sort by any column — highest net salary by default"
       defaultDir="desc"
-      selectedBranches={selectedBranches}
+      data={data}
     />
   );
 }

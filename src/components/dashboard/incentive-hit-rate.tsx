@@ -9,22 +9,24 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { mockIncentiveHitRateFull } from "@/lib/mock-data";
-import type { ChartRange } from "@/app/(dashboard)/dashboard/page";
+
+type HitRatePoint = { month: string; rate: number };
 
 function TooltipContent({
   active,
   payload,
   label,
+  data,
 }: {
   active?: boolean;
   payload?: Array<{ value: number; color: string }>;
   label?: string;
+  data: HitRatePoint[];
 }) {
   if (!active || !payload?.length) return null;
   const current = payload[0].value;
-  const idx = mockIncentiveHitRateFull.findIndex((d) => d.month === label);
-  const prev = idx > 0 ? mockIncentiveHitRateFull[idx - 1].rate : null;
+  const idx = data.findIndex((d) => d.month === label);
+  const prev = idx > 0 ? data[idx - 1].rate : null;
   const mom = prev !== null ? current - prev : null;
 
   return (
@@ -40,15 +42,14 @@ function TooltipContent({
   );
 }
 
-export function IncentiveHitRate({ chartRange }: { chartRange: ChartRange }) {
-  const data = mockIncentiveHitRateFull.slice(chartRange.from, chartRange.to + 1);
+export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
   const latest = data[data.length - 1];
   const prev = data.length >= 2 ? data[data.length - 2].rate : null;
-  const delta = prev !== null ? latest.rate - prev : null;
+  const delta = prev !== null && latest ? latest.rate - prev : null;
 
   const rates = data.map((d) => d.rate);
-  const minRate = Math.min(...rates);
-  const maxRate = Math.max(...rates);
+  const minRate = rates.length > 0 ? Math.min(...rates) : 0;
+  const maxRate = rates.length > 0 ? Math.max(...rates) : 100;
   const pad = Math.max((maxRate - minRate) * 0.35, 1.5);
   const yMin = Math.floor(minRate - pad);
   const yMax = Math.ceil(maxRate + pad);
@@ -69,7 +70,7 @@ export function IncentiveHitRate({ chartRange }: { chartRange: ChartRange }) {
             className="font-heading font-bold text-brand tabular-nums leading-none"
             style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}
           >
-            {latest.rate.toFixed(1)}%
+            {latest ? `${latest.rate.toFixed(1)}%` : "—"}
           </p>
           {delta !== null && (
             <p
@@ -101,7 +102,7 @@ export function IncentiveHitRate({ chartRange }: { chartRange: ChartRange }) {
               tickLine={false}
               width={64}
             />
-            <Tooltip content={<TooltipContent />} />
+            <Tooltip content={<TooltipContent data={data} />} />
             <Line
               type="monotone"
               dataKey="rate"
