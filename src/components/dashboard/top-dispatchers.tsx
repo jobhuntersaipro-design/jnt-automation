@@ -2,19 +2,7 @@
 
 import { useState } from "react";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
-
-type DispatcherRow = {
-  id: string;
-  name: string;
-  branch: string;
-  gender: "MALE" | "FEMALE" | "UNKNOWN";
-  avatarUrl: string | null;
-  totalOrders: number;
-  baseSalary: number;
-  incentive: number;
-  petrolSubsidy: number;
-  netSalary: number;
-};
+import type { DispatcherRow } from "@/lib/db/overview";
 
 type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy";
 type SortDir = "asc" | "desc";

@@ -1,8 +1,16 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Bell, Upload, BadgeDollarSign, UserPlus } from "lucide-react";
-import { mockNotifications } from "@/lib/mock-data";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
+
+type Notification = {
+  id: string;
+  type: "upload" | "payroll" | "new_dispatcher";
+  message: string;
+  detail: string;
+  createdAt: string;
+};
 
 const iconMap = {
   upload: { Icon: Upload, bg: "#0056D2" },
@@ -23,18 +31,10 @@ function timeAgo(iso: string) {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
-  const [items, setItems] = useState(mockNotifications);
+  const [items, setItems] = useState<Notification[]>([]);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  useClickOutside(ref, close);
 
   return (
     <div ref={ref} className="relative">
@@ -71,7 +71,7 @@ export function NotificationBell() {
             </p>
           ) : (
             <div className="flex flex-col gap-3.5">
-              {items.map((n) => {
+              {items.map((n: Notification) => {
                 const { Icon, bg } = iconMap[n.type];
                 return (
                   <div key={n.id} className="flex items-start gap-3">

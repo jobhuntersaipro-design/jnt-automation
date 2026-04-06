@@ -155,11 +155,6 @@ export type BreakdownPoint = {
   deductions: number;
 };
 
-const MONTH_ABBR_BD = [
-  "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-  "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-];
-
 export async function getSalaryBreakdown(
   agentId: string,
   filters: Filters,
@@ -182,7 +177,7 @@ export async function getSalaryBreakdown(
   });
 
   return records.map((r) => ({
-    month: MONTH_ABBR_BD[r.month - 1],
+    month: MONTH_ABBR[r.month - 1],
     baseSalary: r._sum.baseSalary ?? 0,
     incentive: r._sum.incentive ?? 0,
     petrolSubsidy: r._sum.petrolSubsidy ?? 0,
@@ -202,26 +197,26 @@ export async function getIncentiveHitRate(
   const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
   const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
 
-  const records = await prisma.salaryRecord.findMany({
-    where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
-    select: {
-      month: true,
-      year: true,
-      totalOrders: true,
-      dispatcher: {
-        select: {
-          incentiveRule: { select: { orderThreshold: true } },
-        },
-      },
-    },
-  });
+  // Fetch thresholds once (one row per dispatcher) instead of re-fetching per salary record
+  const [records, thresholds] = await Promise.all([
+    prisma.salaryRecord.findMany({
+      where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+      select: { month: true, year: true, totalOrders: true, dispatcherId: true },
+    }),
+    prisma.incentiveRule.findMany({
+      where: { dispatcher: { branch: { agentId } } },
+      select: { dispatcherId: true, orderThreshold: true },
+    }),
+  ]);
+
+  const thresholdMap = new Map(thresholds.map((r) => [r.dispatcherId, r.orderThreshold]));
 
   // Group by year-month, count hits vs total
   const grouped = new Map<string, { hits: number; total: number; month: number }>();
   for (const r of records) {
     const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
     const prev = grouped.get(key) ?? { hits: 0, total: 0, month: r.month };
-    const threshold = r.dispatcher.incentiveRule?.orderThreshold ?? Infinity;
+    const threshold = thresholdMap.get(r.dispatcherId) ?? Infinity;
     grouped.set(key, {
       hits: prev.hits + (r.totalOrders >= threshold ? 1 : 0),
       total: prev.total + 1,
@@ -232,7 +227,7 @@ export async function getIncentiveHitRate(
   return [...grouped.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => ({
-      month: MONTH_ABBR_BD[v.month - 1],
+      month: MONTH_ABBR[v.month - 1],
       rate: v.total > 0 ? (v.hits / v.total) * 100 : 0,
     }));
 }
@@ -260,54 +255,41 @@ export async function getTopDispatchers(
   const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
   const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
 
-  const records = await prisma.salaryRecord.findMany({
+  // Aggregate and sort at the DB level; fetch only the top 20 dispatcher IDs
+  const aggregated = await prisma.salaryRecord.groupBy({
+    by: ["dispatcherId"],
     where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
-    select: {
-      dispatcherId: true,
-      totalOrders: true,
-      baseSalary: true,
-      incentive: true,
-      petrolSubsidy: true,
-      netSalary: true,
-      dispatcher: {
-        select: {
-          extId: true,
-          name: true,
-          gender: true,
-          avatarUrl: true,
-          branch: { select: { code: true } },
-        },
-      },
-    },
+    _sum: { totalOrders: true, baseSalary: true, incentive: true, petrolSubsidy: true, netSalary: true },
+    orderBy: { _sum: { netSalary: "desc" } },
+    take: 20,
   });
 
-  // Aggregate per dispatcher
-  const map = new Map<string, DispatcherRow>();
-  for (const r of records) {
-    const existing = map.get(r.dispatcherId);
-    if (existing) {
-      existing.totalOrders += r.totalOrders;
-      existing.baseSalary += r.baseSalary;
-      existing.incentive += r.incentive;
-      existing.petrolSubsidy += r.petrolSubsidy;
-      existing.netSalary += r.netSalary;
-    } else {
-      map.set(r.dispatcherId, {
-        id: r.dispatcher.extId,
-        name: r.dispatcher.name,
-        branch: r.dispatcher.branch.code,
-        gender: r.dispatcher.gender,
-        avatarUrl: r.dispatcher.avatarUrl,
-        totalOrders: r.totalOrders,
-        baseSalary: r.baseSalary,
-        incentive: r.incentive,
-        petrolSubsidy: r.petrolSubsidy,
-        netSalary: r.netSalary,
-      });
-    }
-  }
+  if (aggregated.length === 0) return [];
 
-  return [...map.values()];
+  const dispatcherIds = aggregated.map((r) => r.dispatcherId);
+  const dispatcherMeta = await prisma.dispatcher.findMany({
+    where: { id: { in: dispatcherIds } },
+    select: { id: true, extId: true, name: true, gender: true, avatarUrl: true, branch: { select: { code: true } } },
+  });
+
+  const metaMap = new Map(dispatcherMeta.map((d) => [d.id, d]));
+
+  return aggregated.flatMap((r) => {
+    const d = metaMap.get(r.dispatcherId);
+    if (!d) return [];
+    return [{
+      id: d.extId,
+      name: d.name,
+      branch: d.branch.code,
+      gender: d.gender,
+      avatarUrl: d.avatarUrl,
+      totalOrders: r._sum.totalOrders ?? 0,
+      baseSalary: r._sum.baseSalary ?? 0,
+      incentive: r._sum.incentive ?? 0,
+      petrolSubsidy: r._sum.petrolSubsidy ?? 0,
+      netSalary: r._sum.netSalary ?? 0,
+    }];
+  });
 }
 
 // ─── Branch Distribution ──────────────────────────────────────
@@ -322,36 +304,37 @@ export type BranchPoint = {
 export async function getBranchDistribution(agentId: string, filters: Filters): Promise<BranchPoint[]> {
   const months = buildMonthRange(filters.fromMonth, filters.fromYear, filters.toMonth, filters.toYear);
 
-  const branches = await prisma.branch.findMany({
-    where: { agentId },
-    select: {
-      code: true,
-      _count: { select: { dispatchers: true } },
-      dispatchers: {
-        select: {
-          salaryRecords: {
-            where: { OR: months.map(({ month, year }) => ({ month, year })) },
-            select: { netSalary: true, totalOrders: true },
-          },
-        },
+  // Note: intentionally ignores selectedBranchCodes — always shows all branches for comparison.
+  const [branches, aggregated] = await Promise.all([
+    prisma.branch.findMany({
+      where: { agentId },
+      select: {
+        code: true,
+        _count: { select: { dispatchers: true } },
+        dispatchers: { select: { id: true } },
       },
-    },
-  });
+    }),
+    prisma.salaryRecord.groupBy({
+      by: ["dispatcherId"],
+      where: {
+        dispatcher: { branch: { agentId } },
+        OR: months.map(({ month, year }) => ({ month, year })),
+      },
+      _sum: { netSalary: true, totalOrders: true },
+    }),
+  ]);
+
+  const dispatcherTotals = new Map(
+    aggregated.map((r) => [r.dispatcherId, { netSalary: r._sum.netSalary ?? 0, totalOrders: r._sum.totalOrders ?? 0 }]),
+  );
 
   return branches.map((branch) => {
     let netPayout = 0;
     let totalOrders = 0;
-    for (const dispatcher of branch.dispatchers) {
-      for (const record of dispatcher.salaryRecords) {
-        netPayout += record.netSalary;
-        totalOrders += record.totalOrders;
-      }
+    for (const { id } of branch.dispatchers) {
+      const totals = dispatcherTotals.get(id);
+      if (totals) { netPayout += totals.netSalary; totalOrders += totals.totalOrders; }
     }
-    return {
-      name: branch.code,
-      netPayout,
-      totalOrders,
-      dispatcherCount: branch._count.dispatchers,
-    };
+    return { name: branch.code, netPayout, totalOrders, dispatcherCount: branch._count.dispatchers };
   });
 }

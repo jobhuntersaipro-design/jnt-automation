@@ -17,7 +17,7 @@ export function NavLinks() {
   return (
     <nav className="flex items-center">
       {navItems.map(({ href, label }, i) => {
-        const isActive = pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+        const isActive = pathname === href || (href !== "/dashboard" && (pathname + "/").startsWith(href + "/"));
         return (
           <Fragment key={href}>
             {i > 0 && (

@@ -1,6 +1,6 @@
 function Skeleton({ className }: { className?: string }) {
   return (
-    <div className={`animate-pulse bg-surface-container-high rounded-[0.5rem] ${className ?? ""}`} />
+    <div className={`animate-pulse bg-surface-hover rounded-[0.5rem] ${className ?? ""}`} />
   );
 }
 

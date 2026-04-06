@@ -18,21 +18,6 @@ import {
 } from "@/lib/db/overview";
 import { prisma } from "@/lib/prisma";
 
-const fetchDashboardData = unstable_cache(
-  async (agentId: string, filters: Filters) => {
-    const [summary, trend, branchDist, breakdown, hitRate, dispatchers] = await Promise.all([
-      getSummaryStats(agentId, filters),
-      getMonthlyPayoutTrend(agentId, filters),
-      getBranchDistribution(agentId, filters),
-      getSalaryBreakdown(agentId, filters),
-      getIncentiveHitRate(agentId, filters),
-      getTopDispatchers(agentId, filters),
-    ]);
-    return { summary, trend, branchDist, breakdown, hitRate, dispatchers };
-  },
-  ["dashboard-overview"],
-  { revalidate: 5 * 60 }, // 5 minutes
-);
 
 type SearchParams = {
   branches?: string;
@@ -75,12 +60,27 @@ export default async function DashboardPage({
 
   const agentId = await getAgentId();
 
-  const [{ summary, trend, branchDist, breakdown, hitRate, dispatchers }, allBranches] = await Promise.all([
-    fetchDashboardData(agentId, filters),
+  // Cache key includes agentId + filters so each tenant and filter combo gets its own bucket.
+  // Defined inside the page function (not module scope) so agentId is available for the key.
+  const fetchDashboardData = unstable_cache(
+    () => Promise.all([
+      getSummaryStats(agentId, filters),
+      getMonthlyPayoutTrend(agentId, filters),
+      getBranchDistribution(agentId, filters),
+      getSalaryBreakdown(agentId, filters),
+      getIncentiveHitRate(agentId, filters),
+      getTopDispatchers(agentId, filters),
+    ]),
+    [`dashboard-overview:${agentId}:${JSON.stringify(filters)}`],
+    { revalidate: 5 * 60 },
+  );
+
+  const [[summary, trend, branchDist, breakdown, hitRate, dispatchers], allBranches] = await Promise.all([
+    fetchDashboardData(),
     prisma.branch.findMany({ where: { agentId }, select: { code: true } }),
   ]);
 
-  const branchCodes = allBranches.map((b) => b.code);
+  const branchCodes = allBranches.map((b: { code: string }) => b.code);
 
   return (
     <div className="flex-1 overflow-y-auto">

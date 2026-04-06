@@ -9,12 +9,13 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from "recharts";
+import { CHART_COLORS } from "@/lib/chart-colors";
 
 const SEGMENTS = [
-  { key: "baseSalary", label: "Base Salary", color: "#0056D2" },
-  { key: "incentive", label: "Monthly Incentive", color: "#10B981" },
-  { key: "petrolSubsidy", label: "Petrol Subsidy", color: "#FBBF24" },
-  { key: "deductions", label: "Penalty / Deductions", color: "#EF4444" },
+  { key: "baseSalary", label: "Base Salary", color: CHART_COLORS.brand },
+  { key: "incentive", label: "Monthly Incentive", color: CHART_COLORS.incentive },
+  { key: "petrolSubsidy", label: "Petrol Subsidy", color: CHART_COLORS.petrolSubsidy },
+  { key: "deductions", label: "Penalty / Deductions", color: CHART_COLORS.deductions },
 ] as const;
 
 type SegmentKey = (typeof SEGMENTS)[number]["key"];
@@ -90,7 +91,7 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
               <span
                 className="text-[0.84rem] transition-colors"
                 style={{
-                  color: hoveredKey === null || hoveredKey === key ? "#424654" : "#c3c6d6",
+                  color: hoveredKey === null || hoveredKey === key ? CHART_COLORS.axisText : CHART_COLORS.outlineVariant,
                 }}
               >
                 {label}
@@ -100,7 +101,7 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
         </div>
       </div>
 
-      <div className="h-56">
+      <div style={{ height: "14rem" }}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <BarChart
             data={data}

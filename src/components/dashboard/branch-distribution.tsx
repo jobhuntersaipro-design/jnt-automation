@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import type { BranchPoint } from "@/lib/db/overview";
+import { CHART_COLORS } from "@/lib/chart-colors";
 
 type Metric = "netPayout" | "totalOrders";
 
@@ -155,13 +156,13 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
       </div>
 
       {/* Chart */}
-      <div className="flex-1 min-h-0" style={{ minHeight: "200px" }}>
+      <div style={{ height: "200px" }}>
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No branch data available
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="120%" minWidth={0}>
+          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
             <BarChart
               data={chartData}
               margin={{ top: 8, right: 8, bottom: 36, left: 0 }}
@@ -212,7 +213,7 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
                   const opacity = hoveredIndex === null || hoveredIndex === index ? 1 : 0.2;
                   const r = 4;
                   const path = `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`;
-                  return <path d={path} fill="#0056D2" fillOpacity={opacity} />;
+                  return <path d={path} fill={CHART_COLORS.brand} fillOpacity={opacity} />;
                 }}
               />
             </BarChart>
