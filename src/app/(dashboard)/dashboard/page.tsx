@@ -16,8 +16,8 @@ import {
   getTopDispatchers,
   type Filters,
 } from "@/lib/db/overview";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
 
 type SearchParams = {
   branches?: string;
@@ -26,13 +26,6 @@ type SearchParams = {
   toMonth?: string;
   toYear?: string;
 };
-
-// TODO: Replace with session.user.id once auth is set up
-async function getAgentId(): Promise<string> {
-  const agent = await prisma.agent.findFirst({ select: { id: true } });
-  if (!agent) throw new Error("No agent found — run the seed first.");
-  return agent.id;
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -58,7 +51,8 @@ export default async function DashboardPage({
 
   const filters: Filters = { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear };
 
-  const agentId = await getAgentId();
+  const session = await auth();
+  const agentId = session!.user.id;
 
   // Cache key includes agentId + filters so each tenant and filter combo gets its own bucket.
   // Defined inside the page function (not module scope) so agentId is available for the key.
