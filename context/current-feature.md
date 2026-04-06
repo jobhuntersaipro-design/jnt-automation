@@ -1,33 +1,19 @@
-# Current Feature: Auth Phase 1 — NextAuth v5 Setup + Google Provider
+# Current Feature
+
+None.
 
 ## Status
 
-In Progress
-
-## Goals
-
-- Install NextAuth v5 (`next-auth@beta`) and `@auth/prisma-adapter`
-- Set up split auth config pattern for edge compatibility (`src/auth.config.ts` + `src/auth.ts`)
-- Add Google OAuth provider
-- Create API route handler at `src/app/api/auth/[...nextauth]/route.ts`
-- Protect `/dashboard/*` routes via Next.js middleware (proxy pattern)
-- Redirect unauthenticated users to `/auth/login`
-- Extend Session type with `user.id` and `user.isApproved` in `src/types/next-auth.d.ts`
-- Implement approval gate: redirect unapproved users to `/auth/pending` after Google sign-in
+None.
 
 ## Notes
-
-- Schema uses `Agent` instead of `User` and `agentId` instead of `userId` — configure Prisma adapter with `userModel: "agent"`, `accountModel: "account"`, `sessionModel: "session"`
-- Google OAuth credentials needed: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
-- Use NextAuth's default sign-in pages for testing (custom pages come in Phase 2/3)
-- Approval check in `signIn` callback: if `isApproved: false`, return `"/auth/pending"`
-- Authorised redirect URI for dev: `http://localhost:3000/api/auth/callback/google`
-- Overview's notification icon to be updated after Upload and Payroll page.
+Overview's notification icon to be updated after Upload and Payroll page.
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-06: **Auth Phase 1 — NextAuth v5 + Google OAuth** — Completed. Installed `next-auth@beta` + `@auth/prisma-adapter`. Split auth config for edge compatibility (`auth.config.ts` edge-safe, `auth.ts` full server). Wrote custom Prisma adapter (`src/lib/auth-adapter.ts`) to map `Agent`/`agentId` → NextAuth's `user`/`userId` interface (v2.11 of `@auth/prisma-adapter` does not support custom model names). JWT session strategy. Used `proxy.ts` (Next.js 16 replaced `middleware.ts` with `proxy.ts`). Proxy protects `/dashboard/*` and redirects unauthenticated users to `/auth/login`. `signIn` callback gates on `agent.isApproved` — unapproved users go to `/auth/pending`. Session type augmented with `user.id` + `user.isApproved`. Added `allowDangerousEmailAccountLinking: true` on Google provider to allow linking OAuth sign-in to pre-seeded agent records.
 - 2026-04-06: **Code Quality Quick Wins** — Completed. Fixed broken loading skeletons (`bg-surface-container-high` → `bg-surface-hover`). Fixed `unstable_cache` static cache key to include `agentId` + filters to prevent cross-tenant data leaks once auth is wired in. Eliminated N+1 queries in `getBranchDistribution` (now uses `groupBy`), `getIncentiveHitRate` (thresholds fetched once via `Map`), and `getTopDispatchers` (DB-level `groupBy` + `orderBy` + `take 20`). Created `src/lib/chart-colors.ts` and replaced all raw hex strings across 4 chart components. Fixed arbitrary hover hex in `account-menu.tsx`. Made year range in date filter dynamic. Removed dead `mock-data.ts` and replaced `mockNotifications` import with empty typed state. Deduplicated `MONTH_ABBR` constant and `DispatcherRow` type. Fixed nav active-state false-match with path-segment check. Extracted shared `useClickOutside` hook to `src/lib/hooks/use-click-outside.ts` and applied to 3 components. Fixed Recharts `width/height -1` SSR warning by replacing CSS class heights with inline `style` on all 4 chart container divs. Build passes clean.
 - 2026-04-03: **Overview Real Data Migration (Part 2)** — Completed. Migrated remaining charts (Salary Breakdown, Incentive Hit Rate, Top Dispatchers) from mock data to real Neon PostgreSQL via Prisma. Added `getSalaryBreakdown`, `getIncentiveHitRate`, `getTopDispatchers` to `src/lib/db/overview.ts`. Deleted `src/lib/mock-data.ts`. Added full-page loading skeleton (`loading.tsx`). Fixed `getBranchDistribution` to respect the selected date filter. Wrapped all filter-dependent queries in `unstable_cache` (5-min TTL) so repeated filter combos are served instantly. Fixed SSL warning (`sslmode=verify-full`). Filter state (date range + branches) now persists on page refresh via URL params. Replaced filter-area spinner with indeterminate progress bar at top of page. Added "% changes compared to [prev period]" note below summary cards. Updated logo. Fixed branch/date font size mismatch in filter bar.
 - 2026-04-03: **Overview Real Data Migration (Part 1)** — Completed. Replaced mock data in Summary Cards, Monthly Net Payout Trend, and Branch Distribution with real Neon PostgreSQL data via Prisma. Created `src/lib/db/overview.ts` with `getSummaryStats`, `getMonthlyPayoutTrend`, `getBranchDistribution`. Converted `dashboard/page.tsx` to async server component with `searchParams`-driven filters. Extracted filter UI into `DashboardFilters` client component (pushes URL params on Apply). Dynamic Y-axis zoom on both charts. Branch codes display as alphabetic prefix (e.g. KPG). `prev` period delta on all summary cards including hero. Auth stubbed — queries first agent in DB, to be replaced with session once auth is set up.
