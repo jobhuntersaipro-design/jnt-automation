@@ -27,7 +27,7 @@
 │  ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐  │
 │  │  Pages (SSR) │   │  API Routes  │   │  Auth (NextAuth)  │  │
 │  │              │   │              │   │                   │  │
-│  │  /overview   │   │  /api/upload │   │  Email + Password │  │
+│  │  /dashboard  │   │  /api/upload │   │  Email + Password │  │
 │  │  /staff      │   │  /api/staff  │   │  Approval-gated   │  │
 │  │  /payroll    │   │  /api/salary │   │  Roles: agent,    │  │
 │  │  /upload     │   │  /api/export │   │  superadmin       │  │
@@ -307,7 +307,7 @@ src/
 │   │   └── pending/page.tsx            # Shown after register, waiting for approval
 │   ├── (dashboard)/
 │   │   ├── layout.tsx                  # Sidebar + nav shell
-│   │   ├── overview/page.tsx           # Charts, summary cards, all-time + filterable by branch/dispatcher
+│   │   ├── dashboard/page.tsx          # Charts, summary cards, all-time + filterable by branch/dispatcher
 │   │   ├── staff/
 │   │   │   ├── page.tsx                # Branch & dispatcher list
 │   │   │   └── [dispatcherId]/page.tsx # Individual dispatcher settings
@@ -344,7 +344,7 @@ src/
 
 ### Overview Page
 
-> **Route:** `/overview`
+> **Route:** `/dashboard`
 
 The main landing page after login. Shows all-time and filterable data across branches and dispatchers.
 

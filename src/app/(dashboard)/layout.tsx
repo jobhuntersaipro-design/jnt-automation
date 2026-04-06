@@ -1,5 +1,4 @@
 import Image from "next/image";
-import Link from "next/link";
 import { NavLinks } from "@/components/dashboard/nav-links";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { AccountMenu } from "@/components/dashboard/account-menu";
@@ -13,15 +12,15 @@ export default function DashboardLayout({
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Top nav */}
       <header className="h-20 shrink-0 flex items-center px-20 bg-surface-dim">
-        <Link href="/dashboard" className="shrink-0">
+        <a href="/dashboard" className="shrink-0">
           <Image
-            src="/logo-new.png"
+            src="/logo-blue.png"
             alt="EasyStaff"
             width={140}
             height={36}
             className="h-14 w-auto"
             priority />
-        </Link>
+        </a>
 
         <div className="mx-3 shrink-0" />
 

@@ -28,7 +28,12 @@ function ChartSkeleton({ tall }: { tall?: boolean }) {
 
 export default function DashboardLoading() {
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto relative">
+      {/* Indeterminate progress bar */}
+      <div className="fixed top-0 left-0 right-0 h-0.75 bg-primary/10 overflow-hidden z-50">
+        <div className="absolute h-full bg-primary" style={{ animation: "progress-indeterminate-1 2s infinite ease-in-out" }} />
+        <div className="absolute h-full bg-primary/60" style={{ animation: "progress-indeterminate-2 2s 0.5s infinite ease-in-out" }} />
+      </div>
       {/* Top bar placeholder — just spacer, real header is sticky */}
       <div className="px-8 pt-7 pb-5 flex items-center justify-between gap-6">
         <div className="flex flex-col gap-2">
