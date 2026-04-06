@@ -25,10 +25,10 @@ export function NavLinks() {
             )}
             <Link
               href={href}
-              className={`px-3 py-1 text-[1.2rem] border-b-2 transition-colors ${
+              className={`px-2.5 py-0.5 text-[1.02rem] border-b-2 transition-colors ${
                 isActive
                   ? "font-bold text-on-surface border-brand"
-                  : "font-medium text-on-surface-variant hover:text-on-surface border-transparent hover:border-brand hover:font-bold hover:text-lg"
+                  : "font-medium text-on-surface-variant hover:text-on-surface border-transparent hover:border-brand hover:font-bold hover:text-[1.02rem]"
               }`}
             >
               {label}

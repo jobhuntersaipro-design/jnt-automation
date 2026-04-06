@@ -32,9 +32,9 @@ export function MultiSelect({ label, options, selected, onChange }: MultiSelectP
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className="inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-[0.375rem] text-[0.975rem] font-medium text-on-surface border border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)] transition-colors min-w-35 justify-between">
+      <PopoverTrigger className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)] transition-colors min-w-28 justify-between">
         <span className="truncate">{displayLabel}</span>
-        <ChevronDown size={14} className="text-on-surface-variant shrink-0" />
+        <ChevronDown size={12} className="text-on-surface-variant shrink-0" />
       </PopoverTrigger>
       <PopoverContent className="w-52 p-1.5" align="start">
         {options.map((option) => {
@@ -43,7 +43,7 @@ export function MultiSelect({ label, options, selected, onChange }: MultiSelectP
             <button
               key={option}
               onClick={() => toggle(option)}
-              className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[0.8125rem] text-on-surface hover:bg-surface-low transition-colors"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[0.69rem] text-on-surface hover:bg-surface-low transition-colors"
             >
               <Checkbox
                 checked={checked}
@@ -51,7 +51,7 @@ export function MultiSelect({ label, options, selected, onChange }: MultiSelectP
                 id={option}
               />
               <span>{option}</span>
-              {checked && <Check size={13} className="ml-auto text-brand" />}
+              {checked && <Check size={11} className="ml-auto text-brand" />}
             </button>
           );
         })}

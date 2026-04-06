@@ -16,12 +16,12 @@ export function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2.5 hover:opacity-80 transition-opacity"
       >
-        <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-[0.9rem] font-bold text-white shrink-0">
+        <div className="w-7 h-7 rounded-full bg-brand flex items-center justify-center text-[0.77rem] font-bold text-white shrink-0">
           A
         </div>
         <div className="flex flex-col leading-tight text-left">
-          <span className="text-[0.975rem] font-semibold text-on-surface">Admin</span>
-          <span className="text-[0.78rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant">
+          <span className="text-[0.83rem] font-semibold text-on-surface">Admin</span>
+          <span className="text-[0.66rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant">
             Super Admin
           </span>
         </div>
@@ -35,17 +35,17 @@ export function AccountMenu() {
         <div className="absolute right-0 top-full mt-2 w-44 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-[rgba(195,198,214,0.2)] z-50 py-1 overflow-hidden">
           <button
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[0.9rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors"
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors"
           >
-            <Settings size={15} />
+            <Settings size={13} />
             Settings
           </button>
           <div className="border-t border-outline-variant/20 my-1" />
           <button
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[0.9rem] text-critical hover:bg-tertiary/5 transition-colors"
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.77rem] text-critical hover:bg-tertiary/5 transition-colors"
           >
-            <LogOut size={15} />
+            <LogOut size={13} />
             Logout
           </button>
         </div>

@@ -9,7 +9,7 @@ const MONTH_ABBR = [
 function getPrevPeriodLabel(filters: Filters): string {
   const { fromMonth, fromYear, toMonth, toYear } = filters;
   // Count months in the selected range
-  let count = (toYear - fromYear) * 12 + (toMonth - fromMonth) + 1;
+  const count = (toYear - fromYear) * 12 + (toMonth - fromMonth) + 1;
   // Shift start back by count months
   let prevToMonth = fromMonth - 1;
   let prevToYear = fromYear;

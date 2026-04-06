@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: "Salary Automation",
   description: "J&T dispatcher salary calculation platform",
   icons: {
-    icon: "/logo.png",
+    icon: "/logo-square-white.png",
   },
 };
 

@@ -11,23 +11,23 @@ export default function DashboardLayout({
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Top nav */}
-      <header className="h-20 shrink-0 flex items-center px-20 bg-surface-dim">
+      <header className="h-16 shrink-0 flex items-center px-16 bg-surface-dim">
         <a href="/dashboard" className="shrink-0">
           <Image
             src="/logo-blue.png"
             alt="EasyStaff"
             width={140}
             height={36}
-            className="h-14 w-auto"
+            className="h-12 w-auto"
             priority />
         </a>
 
-        <div className="mx-3 shrink-0" />
+        <div className="mx-2 shrink-0" />
 
         <NavLinks />
 
         {/* Right side — icons + user */}
-        <div className="ml-auto flex items-center gap-3 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <NotificationBell />
 
           <div className="w-px h-5 bg-outline-variant/40 mx-1" />
