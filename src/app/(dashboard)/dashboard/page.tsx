@@ -85,13 +85,13 @@ export default async function DashboardPage({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Top bar */}
-      <header className="sticky top-0 z-10 px-8 pt-7 pb-5 bg-surface/80 backdrop-blur-md">
+      <header className="sticky top-0 z-10 px-8 pt-5 pb-4 bg-surface/80 backdrop-blur-md">
         <div className="flex items-center justify-between gap-6">
           <div className="shrink-0">
-            <h1 className="font-heading font-bold text-[1.6rem] text-on-surface tracking-tight">
+            <h1 className="font-heading font-bold text-[1.36rem] text-on-surface tracking-tight">
               Overview
             </h1>
-            <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
+            <p className="text-[0.72rem] text-on-surface-variant mt-0.5">
               All-time performance and salary distribution across branches and dispatchers.
             </p>
           </div>

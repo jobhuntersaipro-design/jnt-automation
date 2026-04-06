@@ -156,13 +156,13 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
       </div>
 
       {/* Chart */}
-      <div style={{ height: "200px" }}>
+      <div style={{ height: "250px" }}>
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No branch data available
           </div>
         ) : (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+          <ResponsiveContainer width="100%" height="110%" minWidth={0}>
             <BarChart
               data={chartData}
               margin={{ top: 8, right: 8, bottom: 36, left: 0 }}

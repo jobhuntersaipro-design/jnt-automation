@@ -1,13 +1,28 @@
-# Current Feature
-
-None.
+# Current Feature: Auth Phase 1 — NextAuth v5 Setup + Google Provider
 
 ## Status
 
-None.
+In Progress
+
+## Goals
+
+- Install NextAuth v5 (`next-auth@beta`) and `@auth/prisma-adapter`
+- Set up split auth config pattern for edge compatibility (`src/auth.config.ts` + `src/auth.ts`)
+- Add Google OAuth provider
+- Create API route handler at `src/app/api/auth/[...nextauth]/route.ts`
+- Protect `/dashboard/*` routes via Next.js middleware (proxy pattern)
+- Redirect unauthenticated users to `/auth/login`
+- Extend Session type with `user.id` and `user.isApproved` in `src/types/next-auth.d.ts`
+- Implement approval gate: redirect unapproved users to `/auth/pending` after Google sign-in
 
 ## Notes
-Overview's notification icon to be updated after Upload and Payroll page.
+
+- Schema uses `Agent` instead of `User` and `agentId` instead of `userId` — configure Prisma adapter with `userModel: "agent"`, `accountModel: "account"`, `sessionModel: "session"`
+- Google OAuth credentials needed: `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`
+- Use NextAuth's default sign-in pages for testing (custom pages come in Phase 2/3)
+- Approval check in `signIn` callback: if `isApproved: false`, return `"/auth/pending"`
+- Authorised redirect URI for dev: `http://localhost:3000/api/auth/callback/google`
+- Overview's notification icon to be updated after Upload and Payroll page.
 
 ## History
 

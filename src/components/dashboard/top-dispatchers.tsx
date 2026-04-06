@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Search, ChevronUp, ChevronDown as ChevronDownIcon } from "lucide-react";
+import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DispatcherRow } from "@/lib/db/overview";
 
 type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy";
 type SortDir = "asc" | "desc";
 
-const TOP_N = 5;
+const PAGE_SIZE = 10;
 
 function fmt(value: number) {
   return value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -61,6 +61,7 @@ function DispatcherTable({
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("netSalary");
   const [sortDir, setSortDir] = useState<SortDir>(defaultDir);
+  const [page, setPage] = useState(1);
 
   function handleSort(col: SortKey) {
     if (col === sortKey) {
@@ -69,9 +70,15 @@ function DispatcherTable({
       setSortKey(col);
       setSortDir(defaultDir);
     }
+    setPage(1);
   }
 
-  const sorted = [...data]
+  function handleSearch(value: string) {
+    setQuery(value);
+    setPage(1);
+  }
+
+  const filtered = [...data]
     .filter(
       (d) =>
         d.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -87,8 +94,10 @@ function DispatcherTable({
       const as = String(av).toLowerCase();
       const bs = String(bv).toLowerCase();
       return sortDir === "asc" ? as.localeCompare(bs) : bs.localeCompare(as);
-    })
-    .slice(0, TOP_N);
+    });
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const sorted = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
@@ -109,7 +118,7 @@ function DispatcherTable({
             type="text"
             placeholder="Search..."
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             className="pl-8 pr-3 py-1.5 text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-36 transition-shadow"
           />
         </div>
@@ -179,10 +188,31 @@ function DispatcherTable({
       </div>
 
       {/* Footer */}
-      <div className="pt-1 border-t border-outline-variant/20">
+      <div className="pt-1 border-t border-outline-variant/20 flex items-center justify-between">
         <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
-          Showing top {Math.min(TOP_N, sorted.length)} of {data.length} total
+          Showing {filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
         </span>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="p-1 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            >
+              <ChevronLeft size={14} />
+            </button>
+            <span className="text-[0.72rem] font-medium text-on-surface-variant tabular-nums px-1">
+              {page} / {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="p-1 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none transition-colors"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

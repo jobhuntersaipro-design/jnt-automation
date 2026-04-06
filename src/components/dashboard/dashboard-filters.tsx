@@ -23,7 +23,7 @@ const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 const selectClass =
-  "flex-1 px-2 py-1.5 text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40 cursor-pointer";
+  "flex-1 px-2 py-1 text-[0.71rem] bg-surface-low rounded-[0.375rem] text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40 cursor-pointer";
 
 function presetToRange(preset: DateRange): {
   fromMonth: number; fromYear: number; toMonth: number; toYear: number;
@@ -155,7 +155,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
         </div>
       )}
     <div className="flex items-center gap-2">
-      <span className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant whitespace-nowrap">
+      <span className="text-[0.71rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant whitespace-nowrap">
         Filter By
       </span>
 
@@ -170,27 +170,27 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
       <div ref={dateRef} className="relative">
         <button
           onClick={() => setDateDropdownOpen((o) => !o)}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 bg-white rounded-[0.375rem] text-[0.975rem] font-medium text-on-surface border transition-colors whitespace-nowrap ${
+          className={`inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border transition-colors whitespace-nowrap ${
             dateInvalid
               ? "border-critical/60 hover:border-critical"
               : "border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)]"
           }`}
         >
-          <CalendarDays size={14} className="text-on-surface-variant shrink-0" />
+          <CalendarDays size={12} className="text-on-surface-variant shrink-0" />
           {buttonLabel}
           <ChevronDown
-            size={13}
+            size={11}
             className={`text-on-surface-variant transition-transform shrink-0 ${dateDropdownOpen ? "rotate-180" : ""}`}
           />
         </button>
 
         {dateDropdownOpen && (
-          <div className="absolute right-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-[rgba(195,198,214,0.2)] z-50 w-56 py-1 overflow-hidden">
+          <div className="absolute right-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-[rgba(195,198,214,0.2)] z-50 w-48 py-1 overflow-hidden">
             {DATE_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 onClick={() => handlePresetSelect(option.value)}
-                className={`w-full text-left px-4 py-2.5 text-[0.9rem] transition-colors ${
+                className={`w-full text-left px-3.5 py-2 text-[0.77rem] transition-colors ${
                   !isCustom && dateRange === option.value
                     ? "text-brand font-semibold bg-surface-low"
                     : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"
@@ -201,12 +201,12 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
             ))}
             <div className="border-t border-outline-variant/20 my-1" />
             <div className="px-3 pb-3 pt-1">
-              <p className="text-[0.7rem] font-semibold uppercase tracking-[0.05em] text-on-surface-variant mb-2">
+              <p className="text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-on-surface-variant mb-2">
                 Custom Range
               </p>
               <div className="flex flex-col gap-2">
                 <div>
-                  <label className="text-[0.72rem] text-on-surface-variant block mb-1">From</label>
+                  <label className="text-[0.61rem] text-on-surface-variant block mb-1">From</label>
                   <div className="flex gap-1">
                     <select
                       value={fromMonth}
@@ -229,7 +229,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[0.72rem] text-on-surface-variant block mb-1">To</label>
+                  <label className="text-[0.61rem] text-on-surface-variant block mb-1">To</label>
                   <div className="flex gap-1">
                     <select
                       value={toMonth}
@@ -251,7 +251,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
                     </select>
                   </div>
                   {dateInvalid && (
-                    <p className="text-[0.72rem] text-critical mt-1">
+                    <p className="text-[0.61rem] text-critical mt-1">
                       End date must be after the start date.
                     </p>
                   )}
@@ -265,7 +265,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
       {/* Reset */}
       <button
         onClick={handleReset}
-        className="text-[0.975rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-hover px-3 py-2 rounded-[0.375rem] transition-colors"
+        className="text-[0.83rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-hover px-2.5 py-1.5 rounded-[0.375rem] transition-colors"
       >
         Reset
       </button>
