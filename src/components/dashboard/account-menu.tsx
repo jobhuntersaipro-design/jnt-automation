@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Settings, LogOut, ChevronDown } from "lucide-react";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
 
 export function AccountMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
+  const close = useCallback(() => setOpen(false), []);
+  useClickOutside(ref, close);
 
   return (
     <div ref={ref} className="relative">
@@ -50,7 +43,7 @@ export function AccountMenu() {
           <div className="border-t border-outline-variant/20 my-1" />
           <button
             onClick={() => setOpen(false)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[0.9rem] text-critical hover:bg-[#fff5f5] transition-colors"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[0.9rem] text-critical hover:bg-tertiary/5 transition-colors"
           >
             <LogOut size={15} />
             Logout

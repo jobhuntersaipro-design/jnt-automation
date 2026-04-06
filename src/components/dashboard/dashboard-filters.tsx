@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import { useState, useRef, useCallback, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { MultiSelect } from "@/components/dashboard/multi-select";
 
@@ -17,6 +18,9 @@ const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = [CURRENT_YEAR - 1, CURRENT_YEAR, CURRENT_YEAR + 1];
 
 const selectClass =
   "flex-1 px-2 py-1.5 text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40 cursor-pointer";
@@ -71,16 +75,8 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
   const [isPending, startTransition] = useTransition();
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
   const dateRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleOutside(e: MouseEvent) {
-      if (dateRef.current && !dateRef.current.contains(e.target as Node)) {
-        setDateDropdownOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
+  const closeDateDropdown = useCallback(() => setDateDropdownOpen(false), []);
+  useClickOutside(dateRef, closeDateDropdown);
 
   function push(branches: string[], fm: number, fy: number, tm: number, ty: number) {
     const params = new URLSearchParams();
@@ -226,7 +222,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
                       onChange={(e) => handleFromChange(fromMonth, Number(e.target.value))}
                       className={selectClass}
                     >
-                      {[2025, 2026, 2027].map((y) => (
+                      {YEAR_OPTIONS.map((y) => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
@@ -249,7 +245,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
                       onChange={(e) => handleToChange(toMonth, Number(e.target.value))}
                       className={selectClass}
                     >
-                      {[2025, 2026, 2027].map((y) => (
+                      {YEAR_OPTIONS.map((y) => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
@@ -269,7 +265,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
       {/* Reset */}
       <button
         onClick={handleReset}
-        className="text-[0.975rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high px-3 py-2 rounded-[0.375rem] transition-colors"
+        className="text-[0.975rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-hover px-3 py-2 rounded-[0.375rem] transition-colors"
       >
         Reset
       </button>

@@ -11,10 +11,9 @@ import {
   CartesianGrid,
 } from "recharts";
 import type { TrendPoint } from "@/lib/db/overview";
+import { CHART_COLORS } from "@/lib/chart-colors";
 
 type ActiveLine = null | "actual" | "baseSalary";
-
-const BASE_COLOR = "#38BDF8";
 
 function fmtY(value: number) {
   return `RM ${(value / 1_000_000).toFixed(3)}M`;
@@ -57,11 +56,11 @@ function CustomTooltip({
       <p className="font-semibold text-on-surface">{label}</p>
       {showNet && netItem && (
         <div>
-          <p style={{ color: "#0056D2" }}>Net: {fmtFull(netItem.value)}</p>
+          <p style={{ color: CHART_COLORS.brand }}>Net: {fmtFull(netItem.value)}</p>
           {momNet !== null && (
             <p
               className="text-[0.8rem] font-medium"
-              style={{ color: momNet >= 0 ? "#10B981" : "#940002" }}
+              style={{ color: momNet >= 0 ? CHART_COLORS.success : CHART_COLORS.critical }}
             >
               {momNet >= 0 ? "+" : ""}{momNet.toFixed(1)}% vs prev month
             </p>
@@ -70,11 +69,11 @@ function CustomTooltip({
       )}
       {showBase && baseItem && (
         <div className={showNet && netItem ? "border-t border-outline-variant/20 pt-1.5" : ""}>
-          <p style={{ color: BASE_COLOR }}>Base: {fmtFull(baseItem.value)}</p>
+          <p style={{ color: CHART_COLORS.baseSalaryLine }}>Base: {fmtFull(baseItem.value)}</p>
           {momBase !== null && (
             <p
               className="text-[0.8rem] font-medium"
-              style={{ color: momBase >= 0 ? "#10B981" : "#940002" }}
+              style={{ color: momBase >= 0 ? CHART_COLORS.success : CHART_COLORS.critical }}
             >
               {momBase >= 0 ? "+" : ""}{momBase.toFixed(1)}% vs prev month
             </p>
@@ -130,14 +129,14 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
               className="flex items-center gap-1.5 transition-opacity"
               style={{ opacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.35 }}
             >
-              <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: BASE_COLOR }} />
+              <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.baseSalaryLine }} />
               <span className="text-[0.8rem] text-on-surface-variant">Base Salary</span>
             </button>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0" style={{ minHeight: "220px" }}>
+      <div style={{ height: "220px" }}>
         {data.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No data for selected range
@@ -178,17 +177,17 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
                 type="monotone"
                 dataKey="actual"
                 name="Net Payout"
-                stroke="#0056D2"
+                stroke={CHART_COLORS.brand}
                 strokeWidth={2.5}
                 strokeOpacity={activeLine === null || activeLine === "actual" ? 1 : 0.2}
                 dot={{
-                  fill: "#0056D2",
+                  fill: CHART_COLORS.brand,
                   r: 4,
                   strokeWidth: 0,
                   fillOpacity: activeLine === null || activeLine === "actual" ? 1 : 0.2,
                   cursor: "pointer",
                 }}
-                activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0, cursor: "pointer" }}
+                activeDot={{ r: 6, fill: CHART_COLORS.brand, strokeWidth: 0, cursor: "pointer" }}
                 onClick={() => toggleLine("actual")}
                 style={{ cursor: "pointer" }}
               />
@@ -196,17 +195,17 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
                 type="monotone"
                 dataKey="baseSalary"
                 name="Base Salary"
-                stroke={BASE_COLOR}
+                stroke={CHART_COLORS.baseSalaryLine}
                 strokeWidth={2.5}
                 strokeOpacity={activeLine === null || activeLine === "baseSalary" ? 1 : 0.2}
                 dot={{
-                  fill: BASE_COLOR,
+                  fill: CHART_COLORS.baseSalaryLine,
                   r: 4,
                   strokeWidth: 0,
                   fillOpacity: activeLine === null || activeLine === "baseSalary" ? 1 : 0.2,
                   cursor: "pointer",
                 }}
-                activeDot={{ r: 6, fill: BASE_COLOR, strokeWidth: 0, cursor: "pointer" }}
+                activeDot={{ r: 6, fill: CHART_COLORS.baseSalaryLine, strokeWidth: 0, cursor: "pointer" }}
                 onClick={() => toggleLine("baseSalary")}
                 style={{ cursor: "pointer" }}
               />

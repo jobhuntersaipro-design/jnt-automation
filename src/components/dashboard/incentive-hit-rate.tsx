@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { CHART_COLORS } from "@/lib/chart-colors";
 
 type HitRatePoint = { month: string; rate: number };
 
@@ -32,9 +33,9 @@ function TooltipContent({
   return (
     <div className="bg-white rounded-lg px-3 py-2 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] text-[0.9rem]">
       <p className="font-semibold text-on-surface mb-1">{label}</p>
-      <p style={{ color: "#0056D2" }}>{current.toFixed(1)}%</p>
+      <p style={{ color: CHART_COLORS.brand }}>{current.toFixed(1)}%</p>
       {mom !== null && (
-        <p className="mt-0.5 font-medium" style={{ color: mom >= 0 ? "#10B981" : "#940002" }}>
+        <p className="mt-0.5 font-medium" style={{ color: mom >= 0 ? CHART_COLORS.success : CHART_COLORS.critical }}>
           {mom >= 0 ? "+" : ""}{mom.toFixed(1)}% vs prev month
         </p>
       )}
@@ -75,7 +76,7 @@ export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
           {delta !== null && (
             <p
               className="text-[0.9rem] font-medium mt-0.5"
-              style={{ color: delta >= 0 ? "#10B981" : "#940002" }}
+              style={{ color: delta >= 0 ? CHART_COLORS.success : CHART_COLORS.critical }}
             >
               {delta >= 0 ? "+" : ""}{delta.toFixed(1)}% vs prev month
             </p>
@@ -83,7 +84,7 @@ export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
         </div>
       </div>
 
-      <div className="h-56">
+      <div style={{ height: "14rem" }}>
         <ResponsiveContainer width="100%" height="100%" minWidth={0}>
           <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
@@ -107,10 +108,10 @@ export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
               type="monotone"
               dataKey="rate"
               name="INCENTIVE HIT RATE"
-              stroke="#0056D2"
+              stroke={CHART_COLORS.brand}
               strokeWidth={2.5}
-              dot={{ fill: "#0056D2", r: 4, strokeWidth: 0 }}
-              activeDot={{ r: 6, fill: "#0056D2", strokeWidth: 0 }}
+              dot={{ fill: CHART_COLORS.brand, r: 4, strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: CHART_COLORS.brand, strokeWidth: 0 }}
             />
           </LineChart>
         </ResponsiveContainer>
