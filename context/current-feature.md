@@ -1,59 +1,17 @@
-# Current Feature: Auth Phase 3 — Custom Auth UI
+# Current Feature
 
 ## Status
 
-In Progress
-
-## Goals
-
-- Replace NextAuth default sign-in page with custom `/auth/login` page matching the design system
-- Replace default register page with custom `/auth/register` page matching the design system
-- Replace default pending page with custom `/auth/pending` static page
-- Create reusable `Avatar` component at `src/components/ui/avatar.tsx` with initials fallback and optional image
-- Update account menu in nav bar to show real session data (name, email, avatar)
-- Point `auth.config.ts` `pages.signIn` to `/auth/login`
+None.
 
 ## Notes
 Overview's notification icon to be updated after Upload and Payroll page.
-
-### Auth UI Spec
-
-**Sign In Page (`/auth/login`):**
-- Centered card on `surface` background, logo at top
-- "Continue with Google" button → `signIn("google")`
-- Email + password inputs with show/hide toggle
-- "Sign In" → `signIn("credentials", { ..., redirect: false })` → redirect to `/dashboard` on success
-- Inline error for wrong credentials or unapproved account
-- Link to register page
-
-**Register Page (`/auth/register`):**
-- Same card layout
-- Name, company name (optional), email, password, confirm password
-- Client-side validation: name required, email format, password min 8 chars, passwords match
-- `POST /api/auth/register` → 201 redirects to `/auth/pending`, 409 shows "email already exists", 400 shows validation error
-- "Continue with Google" button (same OAuth flow)
-- Link to sign-in page
-
-**Pending Page (`/auth/pending`):**
-- No card — centered content on `surface`
-- Lucide `Clock` or `Hourglass` icon
-- Static message + contact email (jobhunters.ai.pro@gmail.com)
-- Link back to sign-in
-
-**Avatar Component (`src/components/ui/avatar.tsx`):**
-- Props: `{ name: string; imageUrl?: string | null; size?: "sm" | "md" | "lg" }`
-- Initials: first letter of each word, up to 2, uppercase
-- If `imageUrl` → render with `next/image`
-- Ring: `primary` by default, `tertiary` for superadmin, `outline_variant` as fallback
-
-**Account Menu:**
-- Show `session.user.name`, `session.user.email`, avatar (initials or Google image)
-- Sign out → `signOut()` → redirect to `/auth/login`
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-07: **Auth Phase 3 — Custom Auth UI + Settings + Forgot Password** — Completed. Custom sign-in page (`/auth/login`) with Google button, credentials form, distinct error messages (unregistered, OAuth-only, wrong password), and forgot password link. Custom register page (`/auth/register`) with Google button, client-side validation, toast errors via Sonner. Custom pending page (`/auth/pending`) with Lucide Clock icon, contact email `help@easystaff.top`. Reusable `UserAvatar` component (`src/components/ui/avatar.tsx`) with initials fallback, optional `next/image`, ring color by role. Account menu wired to real session data (name + avatar). Forgot/reset password flow: hashed tokens (SHA-256) stored in `VerificationToken`, 1-hour expiry, emails sent from `help@easystaff.top` via Resend. Settings page (`/dashboard/settings`) with profile editing (name), change password (current + new + confirm), connected accounts (Google link/connect button), and danger zone (delete account with "DELETE" confirmation). Removed `companyName` from Agent model + migration. Fixed Google OAuth not persisting agent records — `signIn` callback returns `true`, proxy gates on `isApproved` and redirects unapproved users to `/auth/pending`. Email inputs normalized (trim + lowercase). Installed `sonner` for toast notifications (10s auto-dismiss, critical left-border styling). Dashboard layout guarded with redirect. Code review fixes applied.
 - 2026-04-07: **Auth Phase 2 — Email + Password + Registration** — Completed. Added Credentials provider (split pattern: placeholder in `auth.config.ts`, bcrypt in `auth.ts`). `PendingApprovalError` thrown in `authorize` for unapproved users — prevents session creation entirely. `signIn` callback gates Google OAuth on `isApproved`. JWT + session callbacks extended with `isApproved` + `isSuperAdmin`. Edge-compatible session callback added to `authConfig` so proxy middleware can read `isApproved` from the decoded JWT. Proxy `authorized` check verifies `isApproved`. `POST /api/auth/register` with full validation + bcrypt hashing + Resend superadmin email notification. Login page updated with credentials form, show-password toggle, Google button, and register link. New `/auth/register` page with full form and show-password toggles. Replaced stubbed `agentId` in `dashboard/page.tsx` with real `session.user.id`. Installed `resend`. Requires env vars: `RESEND_API_KEY`, `NOTIFY_EMAIL`.
 - 2026-04-06: **Auth Phase 1 — NextAuth v5 + Google OAuth** — Completed. Installed `next-auth@beta` + `@auth/prisma-adapter`. Split auth config for edge compatibility (`auth.config.ts` edge-safe, `auth.ts` full server). Wrote custom Prisma adapter (`src/lib/auth-adapter.ts`) to map `Agent`/`agentId` → NextAuth's `user`/`userId` interface (v2.11 of `@auth/prisma-adapter` does not support custom model names). JWT session strategy. Used `proxy.ts` (Next.js 16 replaced `middleware.ts` with `proxy.ts`). Proxy protects `/dashboard/*` and redirects unauthenticated users to `/auth/login`. `signIn` callback gates on `agent.isApproved` — unapproved users go to `/auth/pending`. Session type augmented with `user.id` + `user.isApproved`. Added `allowDangerousEmailAccountLinking: true` on Google provider to allow linking OAuth sign-in to pre-seeded agent records.
 - 2026-04-06: **Code Quality Quick Wins** — Completed. Fixed broken loading skeletons (`bg-surface-container-high` → `bg-surface-hover`). Fixed `unstable_cache` static cache key to include `agentId` + filters to prevent cross-tenant data leaks once auth is wired in. Eliminated N+1 queries in `getBranchDistribution` (now uses `groupBy`), `getIncentiveHitRate` (thresholds fetched once via `Map`), and `getTopDispatchers` (DB-level `groupBy` + `orderBy` + `take 20`). Created `src/lib/chart-colors.ts` and replaced all raw hex strings across 4 chart components. Fixed arbitrary hover hex in `account-menu.tsx`. Made year range in date filter dynamic. Removed dead `mock-data.ts` and replaced `mockNotifications` import with empty typed state. Deduplicated `MONTH_ABBR` constant and `DispatcherRow` type. Fixed nav active-state false-match with path-segment check. Extracted shared `useClickOutside` hook to `src/lib/hooks/use-click-outside.ts` and applied to 3 components. Fixed Recharts `width/height -1` SSR warning by replacing CSS class heights with inline `style` on all 4 chart container divs. Build passes clean.
