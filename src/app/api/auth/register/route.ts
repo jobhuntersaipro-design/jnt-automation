@@ -11,13 +11,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, companyName, email, password, confirmPassword } = body as {
+  const { name: rawName, email: rawEmail, password, confirmPassword } = body as {
     name?: string;
-    companyName?: string;
     email?: string;
     password?: string;
     confirmPassword?: string;
   };
+
+  const name = rawName?.trim();
+  const email = rawEmail?.trim().toLowerCase();
 
   // Validation
   if (!name || !email || !password || !confirmPassword) {
@@ -64,7 +66,6 @@ export async function POST(req: NextRequest) {
     await prisma.agent.create({
       data: {
         name,
-        companyName: companyName ?? null,
         email,
         password: hashedPassword,
         isApproved: false,
@@ -77,14 +78,13 @@ export async function POST(req: NextRequest) {
     if (notifyEmail && process.env.RESEND_API_KEY) {
       const resend = new Resend(process.env.RESEND_API_KEY);
       await resend.emails.send({
-        from: "EasyStaff <onboarding@resend.dev>",
+        from: "EasyStaff <help@easystaff.top>",
         to: notifyEmail,
         subject: `New Agent Registration — ${name}`,
         text: [
           "A new agent has registered and is awaiting approval.",
           "",
           `Name: ${name}`,
-          `Company: ${companyName ?? "Not provided"}`,
           `Email: ${email}`,
           `Registered at: ${new Date().toISOString()}`,
           "",

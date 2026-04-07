@@ -9,6 +9,14 @@ class PendingApprovalError extends CredentialsSignin {
   code = "pending_approval" as const;
 }
 
+class UserNotFoundError extends CredentialsSignin {
+  code = "user_not_found" as const;
+}
+
+class OAuthOnlyError extends CredentialsSignin {
+  code = "oauth_only" as const;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   adapter: agentAdapter,
@@ -22,7 +30,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           password: string;
         };
         const agent = await prisma.agent.findUnique({ where: { email } });
-        if (!agent?.password) return null;
+        if (!agent) throw new UserNotFoundError();
+        if (!agent.password) throw new OAuthOnlyError();
         const valid = await bcrypt.compare(password, agent.password);
         if (!valid) return null;
         if (!agent.isApproved) throw new PendingApprovalError();
@@ -39,13 +48,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     ...authConfig.callbacks,
 
-    async signIn({ user }) {
-      if (!user.email) return false;
-      const agent = await prisma.agent.findUnique({
-        where: { email: user.email },
-        select: { isApproved: true },
-      });
-      if (!agent?.isApproved) return "/auth/pending";
+    async signIn() {
+      // Credentials: PendingApprovalError/UserNotFoundError thrown in authorize
+      // OAuth: always allow sign-in — proxy gates on isApproved
       return true;
     },
 

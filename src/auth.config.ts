@@ -1,4 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
+import { NextResponse } from "next/server";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 
@@ -13,8 +14,13 @@ export const authConfig = {
     signIn: "/auth/login",
   },
   callbacks: {
-    authorized({ auth }) {
-      return !!(auth?.user as { isApproved?: boolean } | undefined)?.isApproved;
+    authorized({ auth, request }) {
+      const user = auth?.user as { isApproved?: boolean } | undefined;
+      if (!user) return false; // not authenticated → redirect to signIn
+      if (!user.isApproved) {
+        return NextResponse.redirect(new URL("/auth/pending", request.url));
+      }
+      return true;
     },
     session({ session, token }) {
       (session.user as { isApproved?: boolean }).isApproved =
