@@ -14,7 +14,6 @@ model Agent {
   email        String    @unique
   password     String?   // bcrypt hashed. Null for OAuth agents (future)
   name         String
-  companyName  String?
   isApproved   Boolean   @default(false)
   isSuperAdmin Boolean   @default(false)
   branches     Branch[]

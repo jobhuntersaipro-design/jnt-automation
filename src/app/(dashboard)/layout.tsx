@@ -2,12 +2,17 @@ import Image from "next/image";
 import { NavLinks } from "@/components/dashboard/nav-links";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { AccountMenu } from "@/components/dashboard/account-menu";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/auth/login");
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Top nav */}
@@ -32,7 +37,12 @@ export default function DashboardLayout({
 
           <div className="w-px h-5 bg-outline-variant/40 mx-1" />
 
-          <AccountMenu />
+          <AccountMenu
+            name={session?.user?.name ?? "User"}
+            email={session?.user?.email ?? ""}
+            imageUrl={session?.user?.image}
+            isSuperAdmin={session?.user?.isSuperAdmin ?? false}
+          />
         </div>
       </header>
 

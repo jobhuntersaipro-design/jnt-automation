@@ -1,11 +1,54 @@
-# Current Feature
+# Current Feature: Auth Phase 3 — Custom Auth UI
 
 ## Status
 
-None.
+In Progress
+
+## Goals
+
+- Replace NextAuth default sign-in page with custom `/auth/login` page matching the design system
+- Replace default register page with custom `/auth/register` page matching the design system
+- Replace default pending page with custom `/auth/pending` static page
+- Create reusable `Avatar` component at `src/components/ui/avatar.tsx` with initials fallback and optional image
+- Update account menu in nav bar to show real session data (name, email, avatar)
+- Point `auth.config.ts` `pages.signIn` to `/auth/login`
 
 ## Notes
 Overview's notification icon to be updated after Upload and Payroll page.
+
+### Auth UI Spec
+
+**Sign In Page (`/auth/login`):**
+- Centered card on `surface` background, logo at top
+- "Continue with Google" button → `signIn("google")`
+- Email + password inputs with show/hide toggle
+- "Sign In" → `signIn("credentials", { ..., redirect: false })` → redirect to `/dashboard` on success
+- Inline error for wrong credentials or unapproved account
+- Link to register page
+
+**Register Page (`/auth/register`):**
+- Same card layout
+- Name, company name (optional), email, password, confirm password
+- Client-side validation: name required, email format, password min 8 chars, passwords match
+- `POST /api/auth/register` → 201 redirects to `/auth/pending`, 409 shows "email already exists", 400 shows validation error
+- "Continue with Google" button (same OAuth flow)
+- Link to sign-in page
+
+**Pending Page (`/auth/pending`):**
+- No card — centered content on `surface`
+- Lucide `Clock` or `Hourglass` icon
+- Static message + contact email (jobhunters.ai.pro@gmail.com)
+- Link back to sign-in
+
+**Avatar Component (`src/components/ui/avatar.tsx`):**
+- Props: `{ name: string; imageUrl?: string | null; size?: "sm" | "md" | "lg" }`
+- Initials: first letter of each word, up to 2, uppercase
+- If `imageUrl` → render with `next/image`
+- Ring: `primary` by default, `tertiary` for superadmin, `outline_variant` as fallback
+
+**Account Menu:**
+- Show `session.user.name`, `session.user.email`, avatar (initials or Google image)
+- Sign out → `signOut()` → redirect to `/auth/login`
 
 ## History
 
