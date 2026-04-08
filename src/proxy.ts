@@ -6,5 +6,6 @@ const { auth } = NextAuth(authConfig);
 export default auth;
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  // Protect all routes except auth pages, public API auth endpoints, and static assets
+  matcher: ["/((?!auth|api/auth|_next/static|_next/image|favicon\\.ico).*)"],
 };
