@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { signIn, signOut } from "next-auth/react";
 import { Eye, EyeOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -121,11 +121,8 @@ function SecuritySection({
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-
-  const isGoogleLinked = mounted && connectedProviders.includes("google");
+  const isGoogleLinked = connectedProviders.includes("google");
 
   async function handleChangePassword() {
     if (newPassword.length < 8) {

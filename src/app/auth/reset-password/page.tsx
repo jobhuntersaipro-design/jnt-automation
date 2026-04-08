@@ -39,8 +39,8 @@ function ResetPasswordForm() {
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+    if (password.length < 8 || password.length > 128) {
+      toast.error("Password must be between 8 and 128 characters.");
       return;
     }
     if (password !== confirmPassword) {

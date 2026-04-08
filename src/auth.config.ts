@@ -5,7 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 
 export const authConfig = {
   providers: [
-    Google({ allowDangerousEmailAccountLinking: true }),
+    Google({}),
     Credentials({
       authorize: () => null, // real logic in auth.ts
     }),

@@ -8,9 +8,9 @@ export const CHART_COLORS = {
   baseSalaryLine: "#38BDF8", // sky-blue secondary line (Net Payout vs Base Salary chart)
   success: "#10B981",       // positive MoM delta indicators
   critical: "#940002",      // --color-critical — negative MoM delta / errors
-  incentive: "#10B981",     // incentive segment in Salary Breakdown
-  petrolSubsidy: "#FBBF24", // petrol subsidy segment in Salary Breakdown
-  deductions: "#EF4444",    // deductions/penalties segment in Salary Breakdown
+  incentive: "#12B981",     // incentive segment in Salary Breakdown
+  petrolSubsidy: "#FBC024", // petrol subsidy segment in Salary Breakdown
+  deductions: "#F43f5F",    // deductions/penalties segment in Salary Breakdown
   axisText: "#424654",      // --color-on-surface-variant — axis tick labels
   grid: "#f3f4f5",          // --color-surface-container-low — chart grid lines
   outlineVariant: "#c3c6d6", // --color-outline-variant — subdued legend text

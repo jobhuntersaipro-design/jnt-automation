@@ -36,6 +36,7 @@ export default function RootLayout({
         <Toaster
           position="top-right"
           duration={10000}
+          icons={{ success: undefined, error: undefined }}
           toastOptions={{
             style: {
               background: "#ffffff",

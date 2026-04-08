@@ -9,14 +9,6 @@ class PendingApprovalError extends CredentialsSignin {
   code = "pending_approval" as const;
 }
 
-class UserNotFoundError extends CredentialsSignin {
-  code = "user_not_found" as const;
-}
-
-class OAuthOnlyError extends CredentialsSignin {
-  code = "oauth_only" as const;
-}
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   adapter: agentAdapter,
@@ -29,9 +21,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           email: string;
           password: string;
         };
+        if (!password || password.length > 128) return null;
         const agent = await prisma.agent.findUnique({ where: { email } });
-        if (!agent) throw new UserNotFoundError();
-        if (!agent.password) throw new OAuthOnlyError();
+        if (!agent || !agent.password) return null;
         const valid = await bcrypt.compare(password, agent.password);
         if (!valid) return null;
         if (!agent.isApproved) throw new PendingApprovalError();
@@ -49,14 +41,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...authConfig.callbacks,
 
     async signIn() {
-      // Credentials: PendingApprovalError/UserNotFoundError thrown in authorize
+      // Credentials: PendingApprovalError thrown in authorize
       // OAuth: always allow sign-in — proxy gates on isApproved
       return true;
     },
 
-    async jwt({ token, user }) {
+    async jwt({ token, user, profile }) {
       if (user?.id) {
         token.id = user.id;
+        token.picture = (profile as { picture?: string })?.picture ?? null;
         const agent = await prisma.agent.findUnique({
           where: { id: user.id },
           select: { isApproved: true, isSuperAdmin: true },
@@ -69,6 +62,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
     async session({ session, token }) {
       session.user.id = token.id as string;
+      session.user.image = token.picture as string | null;
       session.user.isApproved = token.isApproved as boolean;
       session.user.isSuperAdmin = token.isSuperAdmin as boolean;
       return session;
