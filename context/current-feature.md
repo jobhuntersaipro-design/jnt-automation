@@ -6,11 +6,25 @@ Not Started
 
 ## Goals
 
-<!-- Goals will be populated when a feature is loaded -->
+- View and edit a dispatcher's IC number with live gender derivation
+- View and edit all 3 weight tiers (min weight, max weight, commission)
+- View and edit incentive rule (order threshold + incentive amount)
+- View and edit petrol rule (eligibility toggle, daily threshold, subsidy amount)
+- Auto-save on blur/change with debounced PATCH to `/api/staff/[id]/settings`
+- Completeness check: "Incomplete" badge resolves to "Complete" when all mandatory fields filled
+- Saved values persist after closing and reopening drawer
 
 ## Notes
 
-<!-- Notes will be populated when a feature is loaded -->
+- **Spec:** `context/features/staff-phase-2-spec.md`
+- **Drawer sections:** Identity (IC + derived gender), Weight Tiers (3 rows), Monthly Incentive, Petrol Subsidy
+- **Auto-save:** `onBlur` on inputs, `onChange` on toggle, debounced 600ms. PATCH `/api/staff/[id]/settings`. Success → toast + green indicator. Error → toast + revert field.
+- **Gender derivation:** Last digit of IC — odd = Male, even = Female, incomplete = "—". Run on client for live preview + server before saving.
+- **Completeness:** `icNo` filled + all 3 WeightTier rows valid + IncentiveRule with `incentiveAmount` set + PetrolRule exists. Recompute after every save, update badge in drawer + list.
+- **API:** PATCH `/api/staff/[id]/settings` — partial updates, `upsert` for WeightTier/IncentiveRule/PetrolRule, scope check `dispatcher.branch.agentId === session.user.id`. Response: `{ success: true, isComplete: boolean }`.
+- **Weight tier defaults:** 0–5kg→RM1.00, 5.01–10kg→RM1.40, 10.01+→RM2.20. Tier 1 min locked at 0, Tier 3 max shows "∞" (input disabled).
+- **Petrol subsidy:** Daily threshold + subsidy amount fields hidden when eligible = false.
+- **Files to create/modify:** `dispatcher-drawer.tsx` (modify), `weight-tier-section.tsx`, `incentive-section.tsx`, `petrol-section.tsx`, `api/staff/[id]/settings/route.ts`, `staff.ts` (add `getDispatcherById`), `gender.ts` utility.
 
 ## History
 
