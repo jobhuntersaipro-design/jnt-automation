@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { registerLimiter, extractIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const ip = extractIp((await headers()).get("x-forwarded-for"));
+  const { success } = await registerLimiter.limit(ip);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -37,9 +48,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (password.length < 8) {
+  if (password.length < 8 || password.length > 128) {
     return NextResponse.json(
-      { error: "Password must be at least 8 characters." },
+      { error: "Password must be between 8 and 128 characters." },
       { status: 400 }
     );
   }
@@ -51,12 +62,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Check for existing email
+  // Check for existing email — return same success shape to prevent enumeration
   const existing = await prisma.agent.findUnique({ where: { email } });
   if (existing) {
+    await bcrypt.hash(password, 12); // equalize timing with real registration path
     return NextResponse.json(
-      { error: "Email already registered." },
-      { status: 409 }
+      { message: "Registration successful. Awaiting approval." },
+      { status: 201 }
     );
   }
 

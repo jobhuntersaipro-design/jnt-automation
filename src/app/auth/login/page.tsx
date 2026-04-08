@@ -1,19 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get("logged_out") === "1") {
+      toast.success("You have been logged out.");
+      router.replace("/auth/login", { scroll: false });
+    }
+    if (searchParams.get("error") === "OAuthAccountNotLinked") {
+      toast.error(
+        "You haven't linked your Google account. Please sign in with email & password, then connect Google in Settings."
+      );
+      router.replace("/auth/login", { scroll: false });
+    }
+  }, [searchParams, router]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -34,13 +49,7 @@ export default function LoginPage() {
       }
 
       if (result?.error) {
-        if (result.code === "user_not_found") {
-          toast.error("No account found with this email.");
-        } else if (result.code === "oauth_only") {
-          toast.error("This account uses Google sign-in. Use the Google button or set a password via Forgot Password.");
-        } else {
-          toast.error("Invalid email or password.");
-        }
+        toast.error("Invalid email or password.");
         return;
       }
 
@@ -162,5 +171,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

@@ -8,14 +8,12 @@ import { UserAvatar } from "@/components/ui/avatar";
 
 interface AccountMenuProps {
   name: string;
-  email: string;
   imageUrl?: string | null;
   isSuperAdmin: boolean;
 }
 
 export function AccountMenu({
   name,
-  email,
   imageUrl,
   isSuperAdmin,
 }: AccountMenuProps) {
@@ -57,11 +55,11 @@ export function AccountMenu({
           </a>
           <div className="border-t border-outline-variant/20 my-1" />
           <button
-            onClick={() => signOut({ redirectTo: "/auth/login" })}
+            onClick={() => signOut({ redirectTo: "/auth/login?logged_out=1" })}
             className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.77rem] text-critical hover:bg-tertiary/5 transition-colors"
           >
             <LogOut size={13} />
-            Sign out
+            Log out
           </button>
         </div>
       )}

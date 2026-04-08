@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { headers } from "next/headers";
 import crypto from "crypto";
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { forgotPasswordLimiter, extractIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  const ip = extractIp((await headers()).get("x-forwarded-for"));
+  const { success } = await forgotPasswordLimiter.limit(ip);
+  if (!success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please try again later." },
+      { status: 429 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

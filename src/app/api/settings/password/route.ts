@@ -28,9 +28,16 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  if (newPassword.length < 8) {
+  if (currentPassword.length > 128) {
     return NextResponse.json(
-      { error: "New password must be at least 8 characters." },
+      { error: "Current password is incorrect." },
+      { status: 400 }
+    );
+  }
+
+  if (newPassword.length < 8 || newPassword.length > 128) {
+    return NextResponse.json(
+      { error: "New password must be between 8 and 128 characters." },
       { status: 400 }
     );
   }

@@ -26,8 +26,8 @@ export default function RegisterPage() {
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (form.password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+    if (form.password.length < 8 || form.password.length > 128) {
+      toast.error("Password must be between 8 and 128 characters.");
       return;
     }
     if (form.password !== form.confirmPassword) {
@@ -45,11 +45,6 @@ export default function RegisterPage() {
 
     const data = await res.json();
     setLoading(false);
-
-    if (res.status === 409) {
-      toast.error("An account with this email already exists.");
-      return;
-    }
 
     if (!res.ok) {
       toast.error(data.error ?? "Something went wrong. Please contact support at help@easystaff.top");

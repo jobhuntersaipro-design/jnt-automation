@@ -39,7 +39,6 @@ export default async function DashboardLayout({
 
           <AccountMenu
             name={session?.user?.name ?? "User"}
-            email={session?.user?.email ?? ""}
             imageUrl={session?.user?.image}
             isSuperAdmin={session?.user?.isSuperAdmin ?? false}
           />
