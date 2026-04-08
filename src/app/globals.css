@@ -59,6 +59,8 @@
     --color-critical: #940002;
     --color-outline-variant: #c3c6d6;
     --color-female-ring: #f472b6;
+
+    --animate-slide-in-right: slide-in-right 0.25s ease-out;
 }
 
 :root {
@@ -118,6 +120,11 @@
   0%   { left: -80%; width: 60%; }
   50%  { left: -10%; width: 60%; }
   100% { left: 100%; width: 60%; }
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
 }
 
 @layer utilities {

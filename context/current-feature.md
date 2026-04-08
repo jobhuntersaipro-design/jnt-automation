@@ -1,12 +1,41 @@
-# Current Feature: Auth Security Fixes
+# Current Feature: Staff Page — Phase 1: UI Layout + Dispatcher List
 
 ## Status
 
-Completed
+In Progress
+
+## Goals
+
+- View all dispatchers across all branches with real DB data
+- Filter by branch, search by name or dispatcher ID
+- Pin/unpin dispatchers to top of list
+- See dispatcher avatar (initials), name, ID, branch, gender ring, IC (masked), completion status
+- Click dispatcher row → side drawer opens (empty shell)
+- Delete dispatcher with confirmation dialog
+- Filters pushed to URL as searchParams (same pattern as Overview)
 
 ## Notes
 
 - Overview's notification icon to be updated after Upload and Payroll page.
+- Spec: `@context/features/staff-phase-1-spec.md`
+- Side drawer is shell only — full content in Phase 2
+- "Add Dispatcher" button in header — opens drawer in Phase 3
+- `isComplete` = true if dispatcher has 3 weight tiers + incentive rule + petrol rule
+- IC masked: show last 4 digits only (e.g. `••••••••1234`)
+- Pinned dispatchers get `primary/10` background tint + filled pin icon
+- Data isolation: all queries scoped by `agentId`
+
+### Files to Create
+
+| File | Purpose |
+|---|---|
+| `src/app/(dashboard)/staff/page.tsx` | Server component, fetches data |
+| `src/lib/db/staff.ts` | `getDispatchers` query |
+| `src/components/staff/staff-filters.tsx` | Branch filter + search |
+| `src/components/staff/dispatcher-list.tsx` | Table with rows |
+| `src/components/staff/dispatcher-drawer.tsx` | Drawer shell |
+| `src/app/api/staff/[id]/pin/route.ts` | Toggle pin |
+| `src/app/api/staff/[id]/route.ts` | DELETE dispatcher |
 
 ## History
 

@@ -12,6 +12,7 @@ export default async function DashboardLayout({
 }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/login");
+  if (!session.user.isApproved) redirect("/auth/pending");
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
