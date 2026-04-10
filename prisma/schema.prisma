@@ -10,17 +10,41 @@ datasource db {
 // ─── Auth & Tenancy ───────────────────────────────────────────
 
 model Agent {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  password     String?   // bcrypt hashed. Null for OAuth agents (future)
+  id           String         @id @default(cuid())
+  email        String         @unique
+  password     String?        // bcrypt hashed. Null for OAuth agents (future)
   name         String
-  isApproved   Boolean   @default(false)
-  isSuperAdmin Boolean   @default(false)
+  isApproved   Boolean        @default(false)
+  isSuperAdmin Boolean        @default(false)
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  defaults     AgentDefault?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model AgentDefault {
+  id                 String  @id @default(cuid())
+  agentId            String  @unique
+  // Weight tiers
+  tier1MinWeight     Float   @default(0)
+  tier1MaxWeight     Float   @default(5)
+  tier1Commission    Float   @default(1.00)
+  tier2MinWeight     Float   @default(5.01)
+  tier2MaxWeight     Float   @default(10)
+  tier2Commission    Float   @default(1.40)
+  tier3MinWeight     Float   @default(10.01)
+  tier3Commission    Float   @default(2.20)
+  // Incentive
+  orderThreshold     Int     @default(2000)
+  incentiveAmount    Float   @default(200)
+  // Petrol
+  petrolEligible     Boolean @default(true)
+  dailyThreshold     Int     @default(70)
+  subsidyAmount      Float   @default(15)
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 }
 
 model Account {

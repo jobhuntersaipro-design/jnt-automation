@@ -23,6 +23,17 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  // Delete salary line items and records first (no onDelete: Cascade on SalaryRecord → Dispatcher)
+  const salaryRecords = await prisma.salaryRecord.findMany({
+    where: { dispatcherId: id },
+    select: { id: true },
+  });
+  if (salaryRecords.length > 0) {
+    const recordIds = salaryRecords.map((r) => r.id);
+    await prisma.salaryLineItem.deleteMany({ where: { salaryRecordId: { in: recordIds } } });
+    await prisma.salaryRecord.deleteMany({ where: { dispatcherId: id } });
+  }
+
   await prisma.dispatcher.delete({ where: { id } });
 
   return NextResponse.json({ success: true });

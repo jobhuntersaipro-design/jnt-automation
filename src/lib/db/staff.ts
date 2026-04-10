@@ -58,12 +58,7 @@ export async function getDispatchers(
     avatarUrl: d.avatarUrl,
     isPinned: d.isPinned,
     branchCode: d.branch.code,
-    isComplete: computeIsComplete(
-      d.icNo,
-      d.weightTiers,
-      d.incentiveRule,
-      d.petrolRule,
-    ),
+    isComplete: computeIsComplete(d.name, d.icNo, d.extId),
     rawIcNo: d.icNo,
     weightTiers: d.weightTiers,
     incentiveRule: d.incentiveRule,
@@ -116,29 +111,52 @@ export async function getDispatcherById(
     gender: d.gender,
     branchCode: d.branch.code,
     isPinned: d.isPinned,
-    isComplete: computeIsComplete(d.icNo, d.weightTiers, d.incentiveRule, d.petrolRule),
+    isComplete: computeIsComplete(d.name, d.icNo, d.extId),
     weightTiers: d.weightTiers,
     incentiveRule: d.incentiveRule,
     petrolRule: d.petrolRule,
   };
 }
 
-function computeIsComplete(
-  icNo: string,
-  weightTiers: { tier: number }[],
-  incentiveRule: { incentiveAmount: number } | null,
-  petrolRule: unknown,
-): boolean {
-  return (
-    icNo.length > 0 &&
-    weightTiers.length === 3 &&
-    !!incentiveRule &&
-    incentiveRule.incentiveAmount > 0 &&
-    !!petrolRule
-  );
+export type AgentDefaults = {
+  weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number; incentiveAmount: number };
+  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
+};
+
+const FALLBACK_DEFAULTS: AgentDefaults = {
+  weightTiers: [
+    { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.0 },
+    { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 1.4 },
+    { tier: 3, minWeight: 10.01, maxWeight: null, commission: 2.2 },
+  ],
+  incentiveRule: { orderThreshold: 2000, incentiveAmount: 200 },
+  petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15 },
+};
+
+export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> {
+  const d = await prisma.agentDefault.findUnique({ where: { agentId } });
+  if (!d) return FALLBACK_DEFAULTS;
+  return {
+    weightTiers: [
+      { tier: 1, minWeight: d.tier1MinWeight, maxWeight: d.tier1MaxWeight, commission: d.tier1Commission },
+      { tier: 2, minWeight: d.tier2MinWeight, maxWeight: d.tier2MaxWeight, commission: d.tier2Commission },
+      { tier: 3, minWeight: d.tier3MinWeight, maxWeight: null, commission: d.tier3Commission },
+    ],
+    incentiveRule: { orderThreshold: d.orderThreshold, incentiveAmount: d.incentiveAmount },
+    petrolRule: { isEligible: d.petrolEligible, dailyThreshold: d.dailyThreshold, subsidyAmount: d.subsidyAmount },
+  };
 }
 
-function maskIc(ic: string): string {
+export function computeIsComplete(
+  name: string,
+  icNo: string,
+  extId: string,
+): boolean {
+  return name.length > 0 && icNo.length > 0 && extId.length > 0;
+}
+
+export function maskIc(ic: string): string {
   if (ic.length <= 4) return ic;
   return "\u2022".repeat(ic.length - 4) + ic.slice(-4);
 }

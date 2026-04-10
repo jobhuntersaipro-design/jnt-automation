@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Pin, Trash2, Pencil } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Pin, Trash2, Pencil, Camera, X, Upload, Trash } from "lucide-react";
+import Image from "next/image";
 import { toast } from "sonner";
-import type { StaffDispatcher } from "@/lib/db/staff";
+import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";
 
@@ -20,36 +22,179 @@ const TIER_DEFAULTS = [
 ];
 
 function validateIc(ic: string): string | null {
-  if (!ic) return null;
+  if (!ic) return "IC number is required";
   if (!/^\d*$/.test(ic)) return "Digits only";
   if (ic.length !== 12) return "Must be 12 digits";
   return null;
 }
 
-/** Grid: name | branch | IC | tiers | sep | incentive(3) | sep | petrol(3) | status | actions */
-export const ROW_GRID = "grid grid-cols-[1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.4fr] items-center gap-x-1.5";
+/** Decimal input — "cents" mode auto-formats as RM (typing 521 → 5.21) with +/- buttons */
+function DecimalInput({ value, onChange, onBlur, className, onClick, cents }: {
+  value: number;
+  onChange: (n: number) => void;
+  onBlur: () => void;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+  cents?: boolean;
+}) {
+  const [raw, setRaw] = useState(cents ? Math.round(value * 100).toString() : String(value));
+  const [focused, setFocused] = useState(false);
+
+  const formatCents = (digits: string) => {
+    const n = parseInt(digits || "0", 10);
+    return (n / 100).toFixed(2);
+  };
+
+  const display = cents
+    ? (focused ? formatCents(raw) : value.toFixed(2))
+    : (focused ? raw : String(value));
+
+  if (!cents) {
+    return (
+      <input
+        type="text"
+        inputMode="decimal"
+        value={display}
+        onChange={(e) => {
+          const v = e.target.value.replace(",", ".");
+          if (v === "" || /^\d*\.?\d*$/.test(v)) {
+            setRaw(v);
+            onChange(v === "" ? 0 : parseFloat(v) || 0);
+          }
+        }}
+        onFocus={() => { setFocused(true); setRaw(String(value)); }}
+        onBlur={() => { setFocused(false); onBlur(); }}
+        onClick={onClick}
+        className={className}
+      />
+    );
+  }
+
+  const step = (dir: 1 | -1) => {
+    const next = Math.max(0, Math.round((value + dir * 0.01) * 100) / 100);
+    onChange(next);
+    setRaw(Math.round(next * 100).toString());
+  };
+
+  return (
+    <div className="relative group/decimal" onClick={onClick}>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={display}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "");
+          setRaw(digits);
+          onChange(parseInt(digits || "0", 10) / 100);
+        }}
+        onFocus={() => { setFocused(true); setRaw(Math.round(value * 100).toString()); }}
+        onBlur={() => { setFocused(false); onBlur(); }}
+        className={className}
+      />
+      <div className="absolute right-0 top-0 bottom-0 flex flex-col opacity-0 group-hover/decimal:opacity-100 transition-opacity">
+        <button type="button" onClick={(e) => { e.stopPropagation(); step(1); }} className="flex-1 px-1 text-[0.55rem] text-on-surface-variant hover:text-brand">▲</button>
+        <button type="button" onClick={(e) => { e.stopPropagation(); step(-1); }} className="flex-1 px-1 text-[0.55rem] text-on-surface-variant hover:text-brand">▼</button>
+      </div>
+    </div>
+  );
+}
+
+/** Grid: check | name | branch | IC | tiers | sep | incentive(3) | sep | petrol(3) | status | actions */
+export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.4fr] items-center gap-x-1.5";
 
 interface DispatcherRowProps {
   dispatcher: StaffDispatcher;
+  dataVersion: number;
+  defaults: AgentDefaults;
+  isNew?: boolean;
+  isChecked?: boolean;
+  onCheck: (dispatcherId: string, checked: boolean) => void;
   onPin: (e: React.MouseEvent, d: StaffDispatcher) => void;
   onDelete: (d: StaffDispatcher) => void;
   onFieldSaved: (dispatcherId: string, isComplete: boolean) => void;
+  onAvatarChange: (dispatcherId: string, avatarUrl: string | null) => void;
+  onAcknowledge: (dispatcherId: string) => void;
+  onErrorChange: (dispatcherId: string, hasError: boolean) => void;
 }
 
 const INPUT_CLASS =
   "w-full px-1.5 py-1 text-[0.78rem] tabular-nums text-center bg-transparent border border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/40 focus:border-brand/40 focus:bg-white focus:outline-none transition-colors";
 
-export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: DispatcherRowProps) {
+const AVATAR_ACCEPTED = ".jpg,.jpeg,.png,.webp";
+const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
+
+export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange }: DispatcherRowProps) {
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+
+  async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Only JPG, PNG, and WebP files are allowed");
+      return;
+    }
+    if (file.size > AVATAR_MAX_SIZE) {
+      toast.error("File must be under 2MB");
+      return;
+    }
+    setAvatarUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch(`/api/staff/${dispatcher.id}/avatar`, { method: "POST", body: fd });
+      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
+      const { avatarUrl: newUrl } = await res.json();
+      setAvatarUrl(newUrl);
+      onAvatarChange(dispatcher.id, newUrl);
+      toast.success("Photo updated");
+    } catch { toast.error("Upload failed"); }
+    finally { setAvatarUploading(false); }
+  }
+
+  async function handleAvatarRemove() {
+    setAvatarUploading(true);
+    setShowLightbox(false);
+    try {
+      const res = await fetch(`/api/staff/${dispatcher.id}/avatar`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setAvatarUrl(null);
+      onAvatarChange(dispatcher.id, null);
+      toast.success("Photo removed");
+    } catch { toast.error("Failed to remove photo"); }
+    finally { setAvatarUploading(false); }
+  }
+
   const [icNo, setIcNo] = useState(dispatcher.rawIcNo);
   const [icError, setIcError] = useState<string | null>(null);
   const [orderThreshold, setOrderThreshold] = useState(dispatcher.incentiveRule?.orderThreshold ?? 2000);
   const [incentiveAmount, setIncentiveAmount] = useState(dispatcher.incentiveRule?.incentiveAmount ?? 0);
+  const [incentiveEnabled, setIncentiveEnabled] = useState((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
   const [isEligible, setIsEligible] = useState(dispatcher.petrolRule?.isEligible ?? false);
   const [dailyThreshold, setDailyThreshold] = useState(dispatcher.petrolRule?.dailyThreshold ?? 70);
   const [subsidyAmount, setSubsidyAmount] = useState(dispatcher.petrolRule?.subsidyAmount ?? 15);
   const [weightTiers, setWeightTiers] = useState(
     dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
   );
+
+  // Re-sync local state only when server data refreshes (dataVersion changes)
+  useEffect(() => {
+    setIcNo(dispatcher.rawIcNo);
+    setAvatarUrl(dispatcher.avatarUrl);
+    setOrderThreshold(dispatcher.incentiveRule?.orderThreshold ?? 2000);
+    setIncentiveAmount(dispatcher.incentiveRule?.incentiveAmount ?? 0);
+    setIncentiveEnabled((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
+    setIsEligible(dispatcher.petrolRule?.isEligible ?? false);
+    setDailyThreshold(dispatcher.petrolRule?.dailyThreshold ?? 70);
+    setSubsidyAmount(dispatcher.petrolRule?.subsidyAmount ?? 15);
+    setWeightTiers(dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS);
+    setIcError(null);
+    onErrorChange(dispatcher.id, false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataVersion]);
 
   // Tier popover
   const [editingTier, setEditingTier] = useState<number | null>(null);
@@ -67,7 +212,10 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
     return () => document.removeEventListener("mousedown", handleClick);
   }, [editingTier]);
 
+  const [saving, setSaving] = useState(false);
+
   const save = useCallback(async (payload: Record<string, unknown>) => {
+    setSaving(true);
     try {
       const res = await fetch(`/api/staff/${dispatcher.id}/settings`, {
         method: "PATCH",
@@ -79,12 +227,15 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
       onFieldSaved(dispatcher.id, result.isComplete);
     } catch {
       toast.error("Failed to save. Please try again.");
+    } finally {
+      setSaving(false);
     }
   }, [dispatcher.id, onFieldSaved]);
 
   function handleIcBlur() {
     const err = validateIc(icNo);
     setIcError(err);
+    onErrorChange(dispatcher.id, !!err);
     if (!err && icNo !== dispatcher.rawIcNo) {
       save({ icNo });
     }
@@ -105,9 +256,10 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
   }
 
   function handleTierFieldChange(tierIndex: number, field: "minWeight" | "maxWeight" | "commission", value: string) {
+    const cleaned = value.replace(",", ".");
     setWeightTiers((prev) => prev.map((t, i) => {
       if (i !== tierIndex) return t;
-      const num = parseFloat(value);
+      const num = parseFloat(cleaned);
       return { ...t, [field]: isNaN(num) ? 0 : num };
     }));
   }
@@ -156,19 +308,97 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
     <div className={`${ROW_GRID} px-5 py-[0.6rem] ${
       dispatcher.isPinned ? "bg-brand/4 hover:bg-brand/8" : "hover:bg-surface-hover"
     } transition-colors`}>
+      {/* Checkbox */}
+      <div className="flex justify-center">
+        <input
+          type="checkbox"
+          checked={!!isChecked}
+          onChange={(e) => { e.stopPropagation(); onCheck(dispatcher.id, e.target.checked); }}
+          className="w-3.5 h-3.5 rounded-sm border-outline-variant/40 text-brand focus:ring-brand/30 cursor-pointer accent-brand"
+        />
+      </div>
+
       {/* Dispatcher */}
       <div className="flex items-center gap-2 min-w-0">
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center bg-surface-low text-[0.7rem] font-semibold text-on-surface-variant shrink-0"
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); if (avatarUrl) { setShowLightbox(true); } else { avatarInputRef.current?.click(); } }}
+          className="relative w-8 h-8 rounded-full flex items-center justify-center bg-surface-low text-[0.7rem] font-semibold text-on-surface-variant shrink-0 overflow-hidden group/avatar cursor-pointer"
           style={{ outline: `2px solid ${ringColor}`, outlineOffset: "1px" }}
+          title={avatarUrl ? "View photo" : "Upload photo"}
         >
-          {initials}
-        </div>
+          {avatarUrl ? (
+            <Image src={avatarUrl} alt="" width={32} height={32} className="w-full h-full object-cover" unoptimized />
+          ) : (
+            initials
+          )}
+          {avatarUploading ? (
+            <div className="absolute inset-0 rounded-full bg-on-surface/30 flex items-center justify-center">
+              <div className="w-3.5 h-3.5 border-[1.5px] border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="absolute inset-0 rounded-full bg-on-surface/0 group-hover/avatar:bg-on-surface/30 flex items-center justify-center transition-colors">
+              <Camera size={12} className="text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity" />
+            </div>
+          )}
+        </button>
+        <input ref={avatarInputRef} type="file" accept={AVATAR_ACCEPTED} onChange={handleAvatarSelect} className="hidden" />
         <div className="min-w-0">
           <p className="text-[0.82rem] font-medium text-on-surface truncate">{dispatcher.name}</p>
           <p className="text-[0.66rem] text-on-surface-variant">{dispatcher.extId}</p>
         </div>
       </div>
+
+      {/* Avatar lightbox */}
+      {showLightbox && avatarUrl && createPortal(
+        <div
+          className="fixed inset-0 z-100 flex items-center justify-center bg-on-surface/60 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={() => setShowLightbox(false)}
+        >
+          <div
+            className="relative max-w-[min(90vw,400px)] max-h-[min(90vh,400px)]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Image
+              src={avatarUrl}
+              alt={dispatcher.name}
+              width={400}
+              height={400}
+              className="w-full h-full rounded-2xl object-cover shadow-[0_12px_40px_-12px_rgba(25,28,29,0.3)]"
+              style={{ outline: `3px solid ${ringColor}`, outlineOffset: "3px" }}
+              unoptimized
+            />
+            <div className="absolute -top-3 -right-3 flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => { setShowLightbox(false); avatarInputRef.current?.click(); }}
+                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-brand transition-colors"
+                title="Change photo"
+              >
+                <Upload size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={handleAvatarRemove}
+                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-critical transition-colors"
+                title="Remove photo"
+              >
+                <Trash size={13} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLightbox(false)}
+                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
+                title="Close"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p className="text-center mt-3 text-[0.85rem] font-medium text-white drop-shadow-sm">{dispatcher.name}</p>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Branch */}
       <span className="text-[0.78rem] font-medium text-on-surface-variant text-center">{dispatcher.branchCode}</span>
@@ -178,7 +408,13 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
         <input
           type="text"
           value={icNo}
-          onChange={(e) => { setIcNo(e.target.value); setIcError(null); }}
+          onChange={(e) => {
+            const val = e.target.value;
+            setIcNo(val);
+            const err = validateIc(val);
+            setIcError(err);
+            onErrorChange(dispatcher.id, !!err);
+          }}
           onBlur={handleIcBlur}
           onClick={(e) => e.stopPropagation()}
           placeholder="—"
@@ -235,7 +471,7 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
                     disabled={i === 0}
                     onChange={(e) => handleTierFieldChange(i, "minWeight", e.target.value)}
                     onBlur={handleTierBlur}
-                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40 disabled:opacity-40 disabled:bg-surface-low"
+                    className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
                   />
                   {i === 2 ? (
                     <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
@@ -268,17 +504,30 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
       <div className="h-6 rounded-full" style={{ backgroundColor: "rgba(18, 185, 129, 0.15)" }} />
 
       {/* ── Incentive: Eligible, Min Orders, Amount ── */}
-      <Toggle color="#12B981" checked={incentiveAmount > 0} onChange={() => {
-        const next = incentiveAmount > 0 ? 0 : 200;
-        setIncentiveAmount(next);
-        save({ incentiveRule: { orderThreshold, incentiveAmount: next } });
+      <Toggle color="#12B981" checked={incentiveEnabled} onChange={() => {
+        const next = !incentiveEnabled;
+        setIncentiveEnabled(next);
+        if (!next) {
+          setOrderThreshold(0);
+          save({ incentiveRule: { orderThreshold: 0, incentiveAmount } });
+        } else {
+          const dt = defaults.incentiveRule;
+          setOrderThreshold(dt.orderThreshold);
+          const amt = incentiveAmount || dt.incentiveAmount;
+          setIncentiveAmount(amt);
+          save({ incentiveRule: { orderThreshold: dt.orderThreshold, incentiveAmount: amt } });
+        }
       }} />
 
-      {incentiveAmount > 0 ? (
+      {incentiveEnabled ? (
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={orderThreshold}
-          onChange={(e) => setOrderThreshold(parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+            setOrderThreshold(v === "" ? 0 : parseInt(v, 10));
+          }}
           onBlur={handleIncentiveBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
@@ -287,15 +536,14 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
       )}
 
-      {incentiveAmount > 0 ? (
-        <input
-          type="number"
-          step="0.01"
+      {incentiveEnabled ? (
+        <DecimalInput
           value={incentiveAmount}
-          onChange={(e) => setIncentiveAmount(parseFloat(e.target.value) || 0)}
+          onChange={setIncentiveAmount}
           onBlur={handleIncentiveBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
+          cents
         />
       ) : (
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
@@ -309,9 +557,13 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
 
       {isEligible ? (
         <input
-          type="number"
+          type="text"
+          inputMode="numeric"
           value={dailyThreshold}
-          onChange={(e) => setDailyThreshold(parseInt(e.target.value) || 0)}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+            setDailyThreshold(v === "" ? 0 : parseInt(v, 10));
+          }}
           onBlur={handlePetrolBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
@@ -321,14 +573,13 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
       )}
 
       {isEligible ? (
-        <input
-          type="number"
-          step="0.01"
+        <DecimalInput
           value={subsidyAmount}
-          onChange={(e) => setSubsidyAmount(parseFloat(e.target.value) || 0)}
+          onChange={setSubsidyAmount}
           onBlur={handlePetrolBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
+          cents
         />
       ) : (
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
@@ -336,10 +587,30 @@ export function DispatcherRow({ dispatcher, onPin, onDelete, onFieldSaved }: Dis
 
       {/* Status */}
       <div className="flex justify-center">
-        <span className={`inline-flex items-center gap-1 text-[0.72rem] font-medium ${dispatcher.isComplete ? "text-green-600" : "text-amber-500"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${dispatcher.isComplete ? "bg-green-500" : "bg-amber-400"}`} />
-          {dispatcher.isComplete ? "OK" : "Inc."}
-        </span>
+        {saving ? (
+          <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-on-surface-variant">
+            <span className="w-3 h-3 border-[1.5px] border-on-surface-variant border-t-transparent rounded-full animate-spin" />
+          </span>
+        ) : isNew ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAcknowledge(dispatcher.id); }}
+            className="inline-flex items-center gap-1 text-[0.68rem] font-semibold text-brand hover:text-brand/80 transition-colors"
+            title="Acknowledge new dispatcher"
+          >
+            <input
+              type="checkbox"
+              checked={false}
+              readOnly
+              className="w-3 h-3 rounded-sm accent-brand cursor-pointer"
+            />
+            New
+          </button>
+        ) : (
+          <span className={`inline-flex items-center gap-1 text-[0.72rem] font-medium ${dispatcher.isComplete ? "text-green-600" : "text-critical"}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dispatcher.isComplete ? "bg-green-500" : "bg-critical"}`} />
+            {dispatcher.isComplete ? "OK" : "Inc."}
+          </span>
+        )}
       </div>
 
       {/* Actions */}

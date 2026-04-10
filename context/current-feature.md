@@ -2,15 +2,35 @@
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
-<!-- Goals will be populated when a feature is loaded -->
+- Add "Add Dispatcher" button + drawer with name, extId, IC number, branch fields
+- On creation: seed 3 default weight tiers, incentive rule (amount=0), petrol rule in a single transaction
+- Dispatcher is "Incomplete" only if missing name, IC, or extId — incentive amount doesn't affect completeness
+- Incomplete dispatchers marked in red and cannot be saved
+- Upload custom avatar photo per dispatcher (stored in Cloudflare R2)
+- Remove uploaded avatar (reverts to initials)
+- `POST /api/staff` — create dispatcher with defaults
+- `POST /api/staff/[id]/avatar` — upload avatar to R2
+- `DELETE /api/staff/[id]/avatar` — remove avatar from R2
+- Set up Cloudflare R2 client (`src/lib/r2.ts`)
 
 ## Notes
 
-<!-- Notes will be populated when a feature is loaded -->
+- Add Dispatcher drawer is separate from the edit drawer (Phase 2)
+- After creation, dispatcher is added to list and edit drawer opens immediately
+- Toast: "Dispatcher added. Complete their salary rules."
+- extId must be unique within the selected branch (409 if duplicate)
+- Completeness = has name + IC + extId (incentive toggle/amount is irrelevant)
+- Incomplete rows shown in red, save blocked
+- Avatar accepts `.jpg`, `.jpeg`, `.png`, `.webp` only, max 2MB
+- R2 key format: `avatars/{agentId}/{dispatcherId}.{ext}`
+- Avatar upload UI lives inside the edit drawer (Phase 2), at the top below the header
+- "Remove photo" link only shown if custom photo exists
+- Env vars needed: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
+- Full spec: `context/features/staff-phase-3-spec.md`
 
 ## History
 

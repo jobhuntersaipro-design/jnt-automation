@@ -62,6 +62,9 @@ export async function PATCH(
 
   // Update IC number + derived gender
   if (body.icNo !== undefined) {
+    if (body.icNo.length > 0 && !/^\d{12}$/.test(body.icNo)) {
+      return NextResponse.json({ error: "IC number must be 12 digits" }, { status: 400 });
+    }
     const gender = deriveGender(body.icNo);
     await prisma.dispatcher.update({
       where: { id },
@@ -127,21 +130,14 @@ export async function PATCH(
   // Recompute completeness
   const updated = await prisma.dispatcher.findUnique({
     where: { id },
-    select: {
-      icNo: true,
-      weightTiers: { select: { tier: true } },
-      incentiveRule: { select: { incentiveAmount: true } },
-      petrolRule: { select: { id: true } },
-    },
+    select: { name: true, icNo: true, extId: true },
   });
 
   const isComplete =
     !!updated &&
+    updated.name.length > 0 &&
     updated.icNo.length > 0 &&
-    updated.weightTiers.length === 3 &&
-    !!updated.incentiveRule &&
-    updated.incentiveRule.incentiveAmount > 0 &&
-    !!updated.petrolRule;
+    updated.extId.length > 0;
 
   return NextResponse.json({ success: true, isComplete });
 }
