@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { AvatarUpload } from "./avatar-upload";
 import { WeightTierSection } from "./weight-tier-section";
 import { IncentiveSection } from "./incentive-section";
 import { PetrolSection } from "./petrol-section";
@@ -39,9 +40,10 @@ interface DispatcherDrawerProps {
   dispatcher: StaffDispatcher;
   onClose: () => void;
   onCompletenessChange: (dispatcherId: string, isComplete: boolean) => void;
+  onAvatarChange: (dispatcherId: string, avatarUrl: string | null) => void;
 }
 
-export function DispatcherDrawer({ dispatcher, onClose, onCompletenessChange }: DispatcherDrawerProps) {
+export function DispatcherDrawer({ dispatcher, onClose, onCompletenessChange, onAvatarChange }: DispatcherDrawerProps) {
   const drawerRef = useRef<HTMLDivElement>(null);
   useClickOutside(drawerRef, onClose);
 
@@ -154,19 +156,23 @@ export function DispatcherDrawer({ dispatcher, onClose, onCompletenessChange }: 
 
   // Completeness badge
   const isComplete =
+    dispatcher.name.length > 0 &&
     icNo.length > 0 &&
-    weightTiers.length === 3 &&
-    !!incentiveRule &&
-    incentiveRule.incentiveAmount > 0 &&
-    !!petrolRule;
+    dispatcher.extId.length > 0;
 
-  // Avatar initials
+  // Avatar
+  const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
   const initials = dispatcher.name
     .trim()
     .split(/\s+/)
     .map((n) => n[0])
     .slice(0, 2)
     .join("");
+
+  function handleAvatarChanged(url: string | null) {
+    setAvatarUrl(url);
+    onAvatarChange(dispatcher.id, url);
+  }
 
   return (
     <div className="fixed inset-0 z-40">
@@ -178,16 +184,20 @@ export function DispatcherDrawer({ dispatcher, onClose, onCompletenessChange }: 
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-5 border-b border-outline-variant/20">
           <div
-            className="w-10 h-10 rounded-full flex items-center justify-center bg-surface-low text-[0.84rem] font-semibold text-on-surface-variant shrink-0"
+            className="w-10 h-10 rounded-full flex items-center justify-center bg-surface-low text-[0.84rem] font-semibold text-on-surface-variant shrink-0 overflow-hidden"
             style={{ outline: `2px solid ${ringColor}`, outlineOffset: "1px" }}
           >
-            {initials}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              initials
+            )}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface truncate">{dispatcher.name}</h2>
               {!isComplete && (
-                <span className="inline-flex items-center px-1.5 py-0.5 text-[0.65rem] font-semibold text-amber-600 bg-amber-50 rounded-lg">
+                <span className="inline-flex items-center px-1.5 py-0.5 text-[0.65rem] font-semibold text-critical bg-critical/10 rounded-lg">
                   Incomplete
                 </span>
               )}
@@ -206,6 +216,15 @@ export function DispatcherDrawer({ dispatcher, onClose, onCompletenessChange }: 
 
         {/* Body */}
         <div className="flex-1 px-6 py-6 overflow-y-auto space-y-7">
+          {/* Avatar */}
+          <AvatarUpload
+            dispatcherId={dispatcher.id}
+            avatarUrl={avatarUrl}
+            initials={initials}
+            ringColor={ringColor}
+            onAvatarChange={handleAvatarChanged}
+          />
+
           {/* Identity */}
           <section>
             <h3 className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-3">

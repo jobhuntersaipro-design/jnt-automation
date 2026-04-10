@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { deriveGender } from "@/lib/utils/gender";
+import { getAgentDefaults } from "@/lib/db/staff";
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.isApproved) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const { name, extId, icNo, branchCode } = body as {
+    name?: string;
+    extId?: string;
+    icNo?: string;
+    branchCode?: string;
+  };
+
+  if (!name?.trim() || !extId?.trim() || !icNo?.trim() || !branchCode) {
+    return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+  }
+
+  if (!/^\d{12}$/.test(icNo)) {
+    return NextResponse.json({ error: "IC number must be 12 digits" }, { status: 400 });
+  }
+
+  // Verify branch belongs to this agent
+  const branch = await prisma.branch.findFirst({
+    where: { code: branchCode, agentId: session.user.id },
+    select: { id: true, code: true },
+  });
+
+  if (!branch) {
+    return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+  }
+
+  // Check extId uniqueness within branch
+  const existing = await prisma.dispatcher.findFirst({
+    where: { branchId: branch.id, extId: extId.trim() },
+    select: { id: true },
+  });
+
+  if (existing) {
+    return NextResponse.json(
+      { error: "A dispatcher with this ID already exists in the selected branch" },
+      { status: 409 },
+    );
+  }
+
+  const gender = deriveGender(icNo);
+  const trimmedName = name.trim();
+  const trimmedExtId = extId.trim();
+
+  const defs = await getAgentDefaults(session.user.id);
+  const wt = defs.weightTiers;
+  const ir = defs.incentiveRule;
+  const pr = defs.petrolRule;
+
+  const dispatcher = await prisma.$transaction(async (tx) => {
+    const d = await tx.dispatcher.create({
+      data: {
+        name: trimmedName,
+        extId: trimmedExtId,
+        icNo,
+        gender,
+        branchId: branch.id,
+      },
+    });
+
+    await tx.weightTier.createMany({
+      data: wt.map((t) => ({
+        dispatcherId: d.id,
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
+    });
+
+    await tx.incentiveRule.create({
+      data: { dispatcherId: d.id, orderThreshold: ir.orderThreshold, incentiveAmount: ir.incentiveAmount },
+    });
+
+    await tx.petrolRule.create({
+      data: { dispatcherId: d.id, isEligible: pr.isEligible, dailyThreshold: pr.dailyThreshold, subsidyAmount: pr.subsidyAmount },
+    });
+
+    return d;
+  });
+
+  return NextResponse.json({
+    dispatcher: {
+      id: dispatcher.id,
+      extId: dispatcher.extId,
+      name: dispatcher.name,
+      icNo: dispatcher.icNo,
+      gender: dispatcher.gender,
+      avatarUrl: dispatcher.avatarUrl,
+      isPinned: false,
+      branchCode: branch.code,
+      isComplete: true,
+      rawIcNo: dispatcher.icNo,
+      weightTiers: wt,
+      incentiveRule: ir,
+      petrolRule: pr,
+    },
+  }, { status: 201 });
+}
