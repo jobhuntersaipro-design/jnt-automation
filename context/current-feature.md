@@ -2,34 +2,21 @@
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- View and edit a dispatcher's IC number with live gender derivation
-- View and edit all 3 weight tiers (min weight, max weight, commission)
-- View and edit incentive rule (order threshold + incentive amount)
-- View and edit petrol rule (eligibility toggle, daily threshold, subsidy amount)
-- Auto-save on blur/change with debounced PATCH to `/api/staff/[id]/settings`
-- Completeness check: "Incomplete" badge resolves to "Complete" when all mandatory fields filled
-- Saved values persist after closing and reopening drawer
+<!-- Goals will be populated when a feature is loaded -->
 
 ## Notes
 
-- **Spec:** `context/features/staff-phase-2-spec.md`
-- **Drawer sections:** Identity (IC + derived gender), Weight Tiers (3 rows), Monthly Incentive, Petrol Subsidy
-- **Auto-save:** `onBlur` on inputs, `onChange` on toggle, debounced 600ms. PATCH `/api/staff/[id]/settings`. Success → toast + green indicator. Error → toast + revert field.
-- **Gender derivation:** Last digit of IC — odd = Male, even = Female, incomplete = "—". Run on client for live preview + server before saving.
-- **Completeness:** `icNo` filled + all 3 WeightTier rows valid + IncentiveRule with `incentiveAmount` set + PetrolRule exists. Recompute after every save, update badge in drawer + list.
-- **API:** PATCH `/api/staff/[id]/settings` — partial updates, `upsert` for WeightTier/IncentiveRule/PetrolRule, scope check `dispatcher.branch.agentId === session.user.id`. Response: `{ success: true, isComplete: boolean }`.
-- **Weight tier defaults:** 0–5kg→RM1.00, 5.01–10kg→RM1.40, 10.01+→RM2.20. Tier 1 min locked at 0, Tier 3 max shows "∞" (input disabled).
-- **Petrol subsidy:** Daily threshold + subsidy amount fields hidden when eligible = false.
-- **Files to create/modify:** `dispatcher-drawer.tsx` (modify), `weight-tier-section.tsx`, `incentive-section.tsx`, `petrol-section.tsx`, `api/staff/[id]/settings/route.ts`, `staff.ts` (add `getDispatcherById`), `gender.ts` utility.
+<!-- Notes will be populated when a feature is loaded -->
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-10: **Staff Phase 2 — Inline Dispatcher Settings + UI Fixes** — Completed. Replaced drawer with inline-editable fields per row: IC number (12-digit validation with error message), incentive (eligible toggle, min orders, amount), petrol subsidy (eligible toggle, daily threshold, subsidy amount) — all auto-save on blur via `PATCH /api/staff/[id]/settings`. Weight tiers shown as compact RM chips (`RM1.00 RM1.40 RM2.20`) with pencil icon on hover; click opens popover with all 3 tiers editable (min/max weight + commission). Incentive colored `#12B981`, petrol `#FBC024` with matching toggles and vertical separator bars. Toggled-off fields show "—". Gender derived from IC (odd=Male, even=Female). Grouped column headers with colored labels. API: `GET` + `PATCH /api/staff/[id]/settings` with `agentId` ownership, upsert for rules, completeness recomputation. Also: toast close button + swipe-to-dismiss, chart focus outline removed, Y-axis K format (<1M), dispatcher performance penalty/advance columns + box pagination (50/page), branch distribution tighter Y-axis, Google profile picture fix. Files: `src/components/staff/dispatcher-row.tsx`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/settings/route.ts`, `src/lib/db/staff.ts`, `src/lib/utils/gender.ts`, `src/components/staff/{dispatcher-drawer,incentive-section,petrol-section,weight-tier-section}.tsx`, `src/components/ui/toast-close-icon.tsx`, `src/app/globals.css`, `src/app/layout.tsx`, `src/auth.ts`, dashboard chart components.
 - 2026-04-08: **Staff Phase 1 — UI Layout + Dispatcher List** — Completed. Staff page at `/staff` with full dispatcher list from Neon DB via Prisma. Single `StaffClient` client component handles all UI: branch filter (single-select dropdown), search by name/ID, pagination (20/page) — all client-side filtering for instant response. Pin/unpin dispatchers with FLIP animation + optimistic updates + `router.refresh()` background sync. Delete with confirmation dialog + cascade. Side drawer shell (Phase 2 content). IC masked (last 4 digits), `isComplete` status dot, gender-based avatar ring via CSS vars. Loading skeleton. API routes: `PATCH /api/staff/[id]/pin`, `DELETE /api/staff/[id]` — both with `agentId` ownership + `isApproved` gate. Proxy matcher expanded to cover `/staff`, `/payroll`, `/upload`. Dashboard layout `isApproved` defence-in-depth. Vitest setup (`vitest.config.ts`, `test`/`test:watch` scripts). Files: `src/app/(dashboard)/staff/page.tsx`, `src/lib/db/staff.ts`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/pin/route.ts`, `src/app/api/staff/[id]/route.ts`, `src/app/(dashboard)/staff/loading.tsx`. Spec files added: `context/features/staff-phase-{1,2,3}-spec.md`.
 - 2026-04-08: **Auth Security Fixes** — Completed. Added rate limiting to `/api/auth/register` (10/hour), `/api/auth/forgot-password` (5/15min), `/api/auth/reset-password` (10/hour) using `@upstash/ratelimit` + Upstash Redis (`src/lib/rate-limit.ts`). Added password max length guard (128 chars) before all `bcrypt.hash()` calls — server-side validation in register, reset-password, and settings/password routes + client-side validation on register and reset-password forms. Fixed password reset race condition with atomic delete-as-validation pattern in reset-password route. Fixed email enumeration: registration returns generic response for existing emails; login shows single generic "Invalid email or password" error. Removed `allowDangerousEmailAccountLinking` and handled `OAuthAccountNotLinked` error with toast. Added auth layout session guard (`src/app/auth/layout.tsx`) — redirects approved authenticated users away from login/register pages to `/dashboard`, while allowing unapproved users to remain on `/auth/pending`. Playwright-tested 42+ auth test cases. Env vars: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - 2026-04-07: **Auth Phase 3 — Custom Auth UI + Settings + Forgot Password** — Completed. Custom sign-in page (`/auth/login`) with Google button, credentials form, distinct error messages (unregistered, OAuth-only, wrong password), and forgot password link. Custom register page (`/auth/register`) with Google button, client-side validation, toast errors via Sonner. Custom pending page (`/auth/pending`) with Lucide Clock icon, contact email `help@easystaff.top`. Reusable `UserAvatar` component (`src/components/ui/avatar.tsx`) with initials fallback, optional `next/image`, ring color by role. Account menu wired to real session data (name + avatar). Forgot/reset password flow: hashed tokens (SHA-256) stored in `VerificationToken`, 1-hour expiry, emails sent from `help@easystaff.top` via Resend. Settings page (`/dashboard/settings`) with profile editing (name), change password (current + new + confirm), connected accounts (Google link/connect button), and danger zone (delete account with "DELETE" confirmation). Removed `companyName` from Agent model + migration. Fixed Google OAuth not persisting agent records — `signIn` callback returns `true`, proxy gates on `isApproved` and redirects unapproved users to `/auth/pending`. Email inputs normalized (trim + lowercase). Installed `sonner` for toast notifications (10s auto-dismiss, critical left-border styling). Dashboard layout guarded with redirect. Code review fixes applied.
