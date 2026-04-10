@@ -2,40 +2,17 @@
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Add "Add Dispatcher" button + drawer with name, extId, IC number, branch fields
-- On creation: seed 3 default weight tiers, incentive rule (amount=0), petrol rule in a single transaction
-- Dispatcher is "Incomplete" only if missing name, IC, or extId — incentive amount doesn't affect completeness
-- Incomplete dispatchers marked in red and cannot be saved
-- Upload custom avatar photo per dispatcher (stored in Cloudflare R2)
-- Remove uploaded avatar (reverts to initials)
-- `POST /api/staff` — create dispatcher with defaults
-- `POST /api/staff/[id]/avatar` — upload avatar to R2
-- `DELETE /api/staff/[id]/avatar` — remove avatar from R2
-- Set up Cloudflare R2 client (`src/lib/r2.ts`)
-
 ## Notes
-
-- Add Dispatcher drawer is separate from the edit drawer (Phase 2)
-- After creation, dispatcher is added to list and edit drawer opens immediately
-- Toast: "Dispatcher added. Complete their salary rules."
-- extId must be unique within the selected branch (409 if duplicate)
-- Completeness = has name + IC + extId (incentive toggle/amount is irrelevant)
-- Incomplete rows shown in red, save blocked
-- Avatar accepts `.jpg`, `.jpeg`, `.png`, `.webp` only, max 2MB
-- R2 key format: `avatars/{agentId}/{dispatcherId}.{ext}`
-- Avatar upload UI lives inside the edit drawer (Phase 2), at the top below the header
-- "Remove photo" link only shown if custom photo exists
-- Env vars needed: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`, `R2_PUBLIC_URL`
-- Full spec: `context/features/staff-phase-3-spec.md`
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-10: **Staff Phase 3 — Add Dispatcher, Avatar Upload, Agent Defaults** — Completed. Add Dispatcher drawer with name, extId, IC number, branch fields — creation seeds 3 default weight tiers, incentive rule, and petrol rule in a single transaction. Avatar upload/remove via Cloudflare R2 (JPG/PNG/WebP, max 2MB) with lightbox preview on click (upload, remove, close controls). Agent-level defaults drawer to view/edit default salary rules and bulk-apply to all or selected dispatchers. Completeness = name + IC + extId (incentive amount irrelevant). extId uniqueness enforced per branch (409). Prisma migration for `AgentDefault` model. API routes: `POST /api/staff` (create dispatcher), `POST/DELETE /api/staff/[id]/avatar` (R2 upload/remove), `GET/PUT /api/staff/defaults`, `POST /api/staff/apply-defaults`. R2 client at `src/lib/r2.ts`. Row-level checkbox selection for bulk operations. Files: `src/components/staff/{add-dispatcher-drawer,avatar-upload,defaults-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/{route,defaults/route,apply-defaults/route,[id]/avatar/route}.ts`, `src/lib/db/staff.ts`, `src/lib/r2.ts`, `prisma/schema.prisma`.
 - 2026-04-10: **Staff Phase 2 — Inline Dispatcher Settings + UI Fixes** — Completed. Replaced drawer with inline-editable fields per row: IC number (12-digit validation with error message), incentive (eligible toggle, min orders, amount), petrol subsidy (eligible toggle, daily threshold, subsidy amount) — all auto-save on blur via `PATCH /api/staff/[id]/settings`. Weight tiers shown as compact RM chips (`RM1.00 RM1.40 RM2.20`) with pencil icon on hover; click opens popover with all 3 tiers editable (min/max weight + commission). Incentive colored `#12B981`, petrol `#FBC024` with matching toggles and vertical separator bars. Toggled-off fields show "—". Gender derived from IC (odd=Male, even=Female). Grouped column headers with colored labels. API: `GET` + `PATCH /api/staff/[id]/settings` with `agentId` ownership, upsert for rules, completeness recomputation. Also: toast close button + swipe-to-dismiss, chart focus outline removed, Y-axis K format (<1M), dispatcher performance penalty/advance columns + box pagination (50/page), branch distribution tighter Y-axis, Google profile picture fix. Files: `src/components/staff/dispatcher-row.tsx`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/settings/route.ts`, `src/lib/db/staff.ts`, `src/lib/utils/gender.ts`, `src/components/staff/{dispatcher-drawer,incentive-section,petrol-section,weight-tier-section}.tsx`, `src/components/ui/toast-close-icon.tsx`, `src/app/globals.css`, `src/app/layout.tsx`, `src/auth.ts`, dashboard chart components.
 - 2026-04-08: **Staff Phase 1 — UI Layout + Dispatcher List** — Completed. Staff page at `/staff` with full dispatcher list from Neon DB via Prisma. Single `StaffClient` client component handles all UI: branch filter (single-select dropdown), search by name/ID, pagination (20/page) — all client-side filtering for instant response. Pin/unpin dispatchers with FLIP animation + optimistic updates + `router.refresh()` background sync. Delete with confirmation dialog + cascade. Side drawer shell (Phase 2 content). IC masked (last 4 digits), `isComplete` status dot, gender-based avatar ring via CSS vars. Loading skeleton. API routes: `PATCH /api/staff/[id]/pin`, `DELETE /api/staff/[id]` — both with `agentId` ownership + `isApproved` gate. Proxy matcher expanded to cover `/staff`, `/payroll`, `/upload`. Dashboard layout `isApproved` defence-in-depth. Vitest setup (`vitest.config.ts`, `test`/`test:watch` scripts). Files: `src/app/(dashboard)/staff/page.tsx`, `src/lib/db/staff.ts`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/pin/route.ts`, `src/app/api/staff/[id]/route.ts`, `src/app/(dashboard)/staff/loading.tsx`. Spec files added: `context/features/staff-phase-{1,2,3}-spec.md`.
 - 2026-04-08: **Auth Security Fixes** — Completed. Added rate limiting to `/api/auth/register` (10/hour), `/api/auth/forgot-password` (5/15min), `/api/auth/reset-password` (10/hour) using `@upstash/ratelimit` + Upstash Redis (`src/lib/rate-limit.ts`). Added password max length guard (128 chars) before all `bcrypt.hash()` calls — server-side validation in register, reset-password, and settings/password routes + client-side validation on register and reset-password forms. Fixed password reset race condition with atomic delete-as-validation pattern in reset-password route. Fixed email enumeration: registration returns generic response for existing emails; login shows single generic "Invalid email or password" error. Removed `allowDangerousEmailAccountLinking` and handled `OAuthAccountNotLinked` error with toast. Added auth layout session guard (`src/app/auth/layout.tsx`) — redirects approved authenticated users away from login/register pages to `/dashboard`, while allowing unapproved users to remain on `/auth/pending`. Playwright-tested 42+ auth test cases. Env vars: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
