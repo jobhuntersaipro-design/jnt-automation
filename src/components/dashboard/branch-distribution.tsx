@@ -21,14 +21,18 @@ function branchLabel(code: string) {
 
 function fmtValue(value: number, metric: Metric) {
   if (metric === "netPayout") {
-    return `RM ${(value / 1_000_000).toFixed(3)}M`;
+    if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(3)}M`;
+    if (value >= 1_000) return `RM ${(value / 1_000).toFixed(1)}K`;
+    return `RM ${value.toFixed(2)}`;
   }
   return value.toLocaleString("en-MY");
 }
 
 function fmtTick(value: number, metric: Metric) {
   if (metric === "netPayout") {
-    return `RM ${(value / 1_000_000).toFixed(3)}M`;
+    if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `RM ${(value / 1_000).toFixed(0)}K`;
+    return `RM ${value}`;
   }
   if (value >= 1000) return `${(value / 1000).toFixed(0)}K`;
   return String(value);
@@ -36,17 +40,13 @@ function fmtTick(value: number, metric: Metric) {
 
 function yDomain(values: number[]): [number, number] {
   if (!values.length) return [0, 1];
-  const minVal = Math.min(...values);
   const maxVal = Math.max(...values);
-  const range = maxVal - minVal || maxVal;
-  const pad = range * 0.25;
-  const rawStep = (range + pad * 2) / 5;
+  // Tight domain starting at 0 with 15% headroom so bars fill more of the chart
+  const pad = maxVal * 0.15;
+  const rawStep = (maxVal + pad) / 5;
   const magnitude = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const step = Math.ceil(rawStep / magnitude) * magnitude;
-  return [
-    Math.floor((minVal - pad) / step) * step,
-    Math.ceil((maxVal + pad) / step) * step,
-  ];
+  return [0, Math.ceil((maxVal + pad) / step) * step];
 }
 
 function TooltipContent({

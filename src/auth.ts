@@ -49,7 +49,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user, profile }) {
       if (user?.id) {
         token.id = user.id;
-        token.picture = (profile as { picture?: string })?.picture ?? null;
+        const profilePic = (profile as { picture?: string })?.picture;
+        if (profilePic) token.picture = profilePic;
         const agent = await prisma.agent.findUnique({
           where: { id: user.id },
           select: { isApproved: true, isSuperAdmin: true },

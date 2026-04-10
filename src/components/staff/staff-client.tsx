@@ -2,41 +2,17 @@
 
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Pin, Trash2, Search, ChevronDown, Check, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Save } from "lucide-react";
 import { toast } from "sonner";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { DispatcherRow } from "./dispatcher-row";
 import type { StaffDispatcher } from "@/lib/db/staff";
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 interface StaffClientProps {
   dispatchers: StaffDispatcher[];
   branchCodes: string[];
-}
-
-/* ─── Helpers ──────────────────────────────────────────────── */
-
-function Avatar({ name, gender }: { name: string; gender: string }) {
-  const initials = name
-    .trim()
-    .split(/\s+/)
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("");
-  const ringColor =
-    gender === "MALE"
-      ? "var(--color-brand)"
-      : gender === "FEMALE"
-        ? "var(--color-female-ring)"
-        : "var(--color-outline-variant)";
-  return (
-    <div
-      className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-low text-[0.8rem] font-semibold text-on-surface-variant shrink-0"
-      style={{ outline: `2px solid ${ringColor}`, outlineOffset: "1px" }}
-    >
-      {initials}
-    </div>
-  );
 }
 
 function sortItems(list: StaffDispatcher[]) {
@@ -46,24 +22,33 @@ function sortItems(list: StaffDispatcher[]) {
   });
 }
 
-/* ─── Main Component ───────────────────────────────────────── */
+import { ROW_GRID } from "./dispatcher-row";
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  const pages: (number | "...")[] = [];
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, current + 2);
+  if (start > 1) {
+    pages.push(1);
+    if (start > 2) pages.push("...");
+  }
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total) {
+    if (end < total - 1) pages.push("...");
+    pages.push(total);
+  }
+  return pages;
+}
 
 export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClientProps) {
   const router = useRouter();
 
-  // Master list — updated optimistically on pin/delete, resynced on server refresh
   const [items, setItems] = useState(serverData);
   useEffect(() => { setItems(serverData); }, [serverData]);
 
-  // Filter state
   const [selectedBranch, setSelectedBranch] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-
-  // Drawer state
-  const [drawerDispatcher, setDrawerDispatcher] = useState<StaffDispatcher | null>(null);
-
-  // Delete dialog
   const [deleteTarget, setDeleteTarget] = useState<StaffDispatcher | null>(null);
 
   // Branch dropdown
@@ -85,7 +70,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
       if (Math.abs(delta) < 2) return;
       el.style.transform = `translateY(${delta}px)`;
       el.style.transition = "none";
-      el.getBoundingClientRect(); // force reflow
+      el.getBoundingClientRect();
       el.style.transform = "";
       el.style.transition = "transform 350ms cubic-bezier(0.2, 0, 0, 1)";
     });
@@ -98,7 +83,6 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
     });
   }
 
-  // Client-side filtering — instant
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return items.filter((d) => {
@@ -156,21 +140,11 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
     setPage(1);
   }
 
-  /* ── Drawer ──────────────────────────────────────────────── */
-
-  const drawerRef = useRef<HTMLDivElement>(null);
-  const closeDrawer = useCallback(() => setDrawerDispatcher(null), []);
-  useClickOutside(drawerRef, closeDrawer);
-
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) { if (e.key === "Escape") closeDrawer(); }
-    if (drawerDispatcher) {
-      document.addEventListener("keydown", handleKey);
-      return () => document.removeEventListener("keydown", handleKey);
-    }
-  }, [drawerDispatcher, closeDrawer]);
-
-  /* ── Render ──────────────────────────────────────────────── */
+  function handleFieldSaved(dispatcherId: string, isComplete: boolean) {
+    setItems((prev) => prev.map((d) =>
+      d.id === dispatcherId ? { ...d, isComplete } : d,
+    ));
+  }
 
   const branchLabel = selectedBranch || "All Branches";
 
@@ -185,17 +159,26 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
               Manage dispatchers and salary rules across all branches.
             </p>
           </div>
-          <button
-            disabled
-            className="px-4 py-2 text-[0.84rem] font-medium text-white bg-brand rounded-[0.375rem] opacity-60 cursor-not-allowed"
-          >
-            Add Dispatcher
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { router.refresh(); toast.success("All changes synced", { duration: 3000 }); }}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-[0.84rem] font-medium text-on-surface-variant bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
+            >
+              <Save size={14} />
+              Save
+            </button>
+            <button
+              disabled
+              className="px-4 py-2 text-[0.84rem] font-medium text-white bg-brand rounded-[0.375rem] opacity-60 cursor-not-allowed"
+            >
+              Add Dispatcher
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="px-8 pb-16 space-y-4">
-        {/* ── Filters ─────────────────────────────────────── */}
+        {/* Filters */}
         <div className="flex items-center gap-3">
           <div ref={branchRef} className="relative">
             <button
@@ -244,76 +227,57 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
           </span>
         </div>
 
-        {/* ── Table ───────────────────────────────────────── */}
+        {/* Table */}
         {paged.length === 0 ? (
           <div className="bg-white rounded-[0.75rem] p-12 text-center shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)]">
             <p className="text-[0.9rem] text-on-surface-variant">No dispatchers match your search.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)]">
-            {/* Column headers */}
-            <div className="grid grid-cols-[2.5fr_1fr_1.2fr_1fr_0.8fr] px-6 py-3">
-              {["Dispatcher", "Branch", "IC No", "Status", "Actions"].map((h, i) => (
-                <span key={h} className={`text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase ${i === 4 ? "text-right" : ""}`}>
+          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-hidden">
+            {/* Grouped column headers */}
+            {/* Row 1: group labels */}
+            <div className={`${ROW_GRID} px-5 pt-2.5 pb-0`}>
+              <span /><span /><span /><span />
+              <span />
+              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#12B981", borderColor: "rgba(18, 185, 129, 0.3)" }}>Incentive</span>
+              <span />
+              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#D4A017", borderColor: "rgba(251, 192, 36, 0.35)" }}>Petrol</span>
+              <span /><span />
+            </div>
+            {/* Row 2: sub-column labels */}
+            <div className={`${ROW_GRID} px-5 pt-1 pb-2 border-b border-outline-variant/15`}>
+              {[
+                "Dispatcher", "Branch", "IC No", "Tiers",
+                "",
+                "Eligible", "Min Orders", "Amount (RM)",
+                "",
+                "Eligible", "Min Orders", "Amount (RM)",
+                "Status", "",
+              ].map((h, i) => (
+                <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center ${i === 0 ? "text-left!" : ""}`}>
                   {h}
                 </span>
               ))}
             </div>
 
+            {/* Rows */}
             {paged.map((d) => (
               <div
                 key={d.id}
                 ref={(el) => { if (el) rowRefs.current.set(d.id, el); else rowRefs.current.delete(d.id); }}
-                onClick={() => setDrawerDispatcher(d)}
-                className={`grid grid-cols-[2.5fr_1fr_1.2fr_1fr_0.8fr] items-center px-6 py-[0.9rem] cursor-pointer transition-colors ${
-                  d.isPinned ? "bg-brand/6 hover:bg-brand/10" : "hover:bg-surface-hover"
-                }`}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Avatar name={d.name} gender={d.gender} />
-                  <div className="min-w-0">
-                    <p className="text-[0.9rem] font-medium text-on-surface truncate">{d.name}</p>
-                    <p className="text-[0.72rem] text-on-surface-variant">{d.extId}</p>
-                  </div>
-                </div>
-
-                <span className="inline-block px-2 py-0.5 text-[0.8rem] font-medium text-on-surface-variant bg-surface-low rounded-[0.375rem] w-fit">
-                  {d.branchCode}
-                </span>
-
-                <span className="text-[0.84rem] tabular-nums text-on-surface-variant font-mono">{d.icNo}</span>
-
-                <span className={`inline-flex items-center gap-1 text-[0.8rem] font-medium ${d.isComplete ? "text-green-600" : "text-amber-500"}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${d.isComplete ? "bg-green-500" : "bg-amber-400"}`} />
-                  {d.isComplete ? "Complete" : "Incomplete"}
-                </span>
-
-                <div className="flex items-center gap-1 justify-end">
-                  <button
-                    onClick={(e) => handlePin(e, d)}
-                    className={`p-1.5 rounded-[0.375rem] transition-all ${
-                      d.isPinned
-                        ? "text-brand hover:bg-brand/10 hover:scale-110"
-                        : "text-on-surface-variant hover:text-brand hover:bg-brand/10 hover:scale-110"
-                    }`}
-                    title={d.isPinned ? "Unpin" : "Pin to top"}
-                  >
-                    <Pin size={15} fill={d.isPinned ? "currentColor" : "none"} />
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDeleteTarget(d); }}
-                    className="p-1.5 rounded-[0.375rem] text-on-surface-variant hover:text-critical hover:bg-critical/5 transition-colors"
-                    title="Delete dispatcher"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                </div>
+                <DispatcherRow
+                  dispatcher={d}
+                  onPin={handlePin}
+                  onDelete={setDeleteTarget}
+                  onFieldSaved={handleFieldSaved}
+                />
               </div>
             ))}
           </div>
         )}
 
-        {/* ── Pagination ──────────────────────────────────── */}
+        {/* Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between">
             <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
@@ -327,9 +291,23 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-[0.72rem] font-medium text-on-surface-variant tabular-nums px-1">
-                {safePage} / {totalPages}
-              </span>
+              {getPageNumbers(safePage, totalPages).map((p, i) =>
+                p === "..." ? (
+                  <span key={`ellipsis-${i}`} className="text-[0.72rem] text-on-surface-variant px-1">...</span>
+                ) : (
+                  <button
+                    key={p}
+                    onClick={() => setPage(p as number)}
+                    className={`w-7 h-7 flex items-center justify-center rounded-[0.375rem] text-[0.72rem] font-medium tabular-nums transition-colors ${
+                      safePage === p
+                        ? "bg-brand text-white"
+                        : "text-on-surface-variant hover:bg-surface-hover"
+                    }`}
+                  >
+                    {p}
+                  </button>
+                )
+              )}
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={safePage === totalPages}
@@ -342,7 +320,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
         )}
       </main>
 
-      {/* ── Delete Dialog ───────────────────────────────────── */}
+      {/* Delete Dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-on-surface/40" onClick={() => setDeleteTarget(null)} />
@@ -360,31 +338,6 @@ export function StaffClient({ dispatchers: serverData, branchCodes }: StaffClien
               <button onClick={confirmDelete} className="px-4 py-2 text-[0.84rem] font-medium text-white bg-critical rounded-[0.375rem] hover:bg-critical/90 transition-colors">
                 Delete
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Drawer ──────────────────────────────────────────── */}
-      {drawerDispatcher && (
-        <div className="fixed inset-0 z-40">
-          <div className="absolute inset-0 bg-on-surface/30" />
-          <div
-            ref={drawerRef}
-            className="absolute right-0 top-0 bottom-0 w-120 max-w-full bg-white shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] flex flex-col animate-slide-in-right"
-          >
-            <div className="flex items-center gap-3 px-6 py-5 border-b border-outline-variant/20">
-              <Avatar name={drawerDispatcher.name} gender={drawerDispatcher.gender} />
-              <div className="flex-1 min-w-0">
-                <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface truncate">{drawerDispatcher.name}</h2>
-                <p className="text-[0.75rem] text-on-surface-variant">{drawerDispatcher.extId}</p>
-              </div>
-              <button onClick={closeDrawer} className="p-1.5 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="flex-1 px-6 py-8 overflow-y-auto">
-              <p className="text-[0.9rem] text-on-surface-variant">Dispatcher settings coming soon.</p>
             </div>
           </div>
         </div>

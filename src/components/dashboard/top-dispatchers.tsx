@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DispatcherRow } from "@/lib/db/overview";
 
-type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy";
+type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy" | "penalty" | "advance";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
@@ -45,7 +45,25 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "baseSalary", label: "BASE SALARY" },
   { key: "incentive", label: "INCENTIVE" },
   { key: "petrolSubsidy", label: "PETROL" },
+  { key: "penalty", label: "PENALTY" },
+  { key: "advance", label: "ADVANCE" },
 ];
+
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  const pages: (number | "...")[] = [];
+  const start = Math.max(1, current - 2);
+  const end = Math.min(total, current + 2);
+  if (start > 1) {
+    pages.push(1);
+    if (start > 2) pages.push("...");
+  }
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (end < total) {
+    if (end < total - 1) pages.push("...");
+    pages.push(total);
+  }
+  return pages;
+}
 
 function DispatcherTable({
   title,
@@ -127,7 +145,7 @@ function DispatcherTable({
       {/* Table */}
       <div className="flex flex-col">
         {/* Column headers */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] px-2 pb-2">
+        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] px-2 pb-2">
           {COLUMNS.map(({ key, label }) => (
             <button
               key={key}
@@ -147,7 +165,7 @@ function DispatcherTable({
           sorted.map((d) => (
             <div
               key={d.id}
-              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr] items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
+              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">
@@ -182,6 +200,16 @@ function DispatcherTable({
               <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
                 RM {fmt(d.petrolSubsidy)}
               </span>
+
+              {/* Penalty */}
+              <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
+                RM {fmt(d.penalty ?? 0)}
+              </span>
+
+              {/* Advance */}
+              <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
+                RM {fmt(d.advance ?? 0)}
+              </span>
             </div>
           ))
         )}
@@ -201,9 +229,23 @@ function DispatcherTable({
             >
               <ChevronLeft size={14} />
             </button>
-            <span className="text-[0.72rem] font-medium text-on-surface-variant tabular-nums px-1">
-              {page} / {totalPages}
-            </span>
+            {getPageNumbers(page, totalPages).map((p, i) =>
+              p === "..." ? (
+                <span key={`ellipsis-${i}`} className="text-[0.72rem] text-on-surface-variant px-1">...</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => setPage(p as number)}
+                  className={`w-7 h-7 flex items-center justify-center rounded-[0.375rem] text-[0.72rem] font-medium tabular-nums transition-colors ${
+                    page === p
+                      ? "bg-brand text-white"
+                      : "text-on-surface-variant hover:bg-surface-hover"
+                  }`}
+                >
+                  {p}
+                </button>
+              )
+            )}
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}

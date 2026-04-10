@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Manrope } from "next/font/google";
 import { Toaster } from "sonner";
+import { ToastCloseIcon } from "@/components/ui/toast-close-icon";
 import "./globals.css";
 
 const inter = Inter({
@@ -36,7 +37,9 @@ export default function RootLayout({
         <Toaster
           position="top-right"
           duration={10000}
-          icons={{ success: undefined, error: undefined }}
+          closeButton
+          theme="light"
+          icons={{ success: undefined, error: undefined, close: <ToastCloseIcon /> }}
           toastOptions={{
             style: {
               background: "#ffffff",

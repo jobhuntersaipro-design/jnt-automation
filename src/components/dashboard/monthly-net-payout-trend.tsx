@@ -16,11 +16,15 @@ import { CHART_COLORS } from "@/lib/chart-colors";
 type ActiveLine = null | "actual" | "baseSalary";
 
 function fmtY(value: number) {
-  return `RM ${(value / 1_000_000).toFixed(3)}M`;
+  if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `RM ${(value / 1_000).toFixed(0)}K`;
+  return `RM ${value}`;
 }
 
 function fmtFull(value: number) {
-  return `RM ${(value / 1_000_000).toFixed(3)}M`;
+  if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(3)}M`;
+  if (value >= 1_000) return `RM ${(value / 1_000).toFixed(1)}K`;
+  return `RM ${value.toFixed(2)}`;
 }
 
 function CustomTooltip({
