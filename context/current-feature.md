@@ -1,37 +1,18 @@
-# Current Feature: Upload Phase 2 — Excel Parsing + Salary Calculation
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- QStash worker parses Excel file from R2 using exceljs (columns A, K, L, M, N, Q)
-- Known vs unknown dispatcher split — known dispatchers proceed, unknown flagged
-- Status set to CONFIRM_SETTINGS after parsing with known/unknown counts
-- After agent confirms → salary calculation runs for known dispatchers
-- Salary engine: base salary (weight tier commissions) + incentive + petrol subsidy
-- Parsed data + preview results stored in Vercel KV (2h/1h TTL)
-- CONFIRM_SETTINGS card on Payroll page shows dispatcher counts + "Review Staff Settings" / "Use Current Settings & Calculate" buttons
-- Unit tests cover all salary calculation scenarios (weight tiers, incentive, petrol, net salary)
-
 ## Notes
-
-- Spec: `context/features/upload-phase-2-spec.md`
-- Dependencies: `exceljs`, `@vercel/kv`
-- Env vars: `KV_URL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`
-- Excel has 60+ sheets — select "sheet1" explicitly, fallback to first worksheet
-- Edge cases: empty rows skip, billingWeight as string strip non-numeric, Excel serial dates, empty dispatcherId skip
-- Phase A (QStash worker): parse + split + store in KV + set CONFIRM_SETTINGS
-- Phase B (after confirm): read KV + calculate salaries + store preview in KV + set READY_TO_CONFIRM or NEEDS_ATTENTION
-- Penalty/advance = 0 at calculation time (set in preview later)
-- Files to create: `src/lib/upload/{parser,calculator,dispatcher-check,pipeline}.ts`, `src/lib/upload/__tests__/calculator.test.ts`, `src/app/api/upload/[uploadId]/calculate/route.ts`
-- Files to modify: `src/app/api/upload/worker/route.ts`, `src/components/payroll/confirm-settings-card.tsx`
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-12: **Upload Phase 2 — Excel Parsing + Salary Calculation** — Completed. QStash worker parses Excel from R2 via exceljs (columns A/K/L/M/N/Q, "sheet1" targeting, serial date handling, string weight stripping). Known vs unknown dispatcher split — known proceed to salary calculation, unknown flagged with names/IDs. Both Phase A (parse+split) and Phase B (calculate) run asynchronously via QStash worker with `{ phase: "calculate" }` discriminator. Salary engine: weight tier commissions (flat rate per parcel) + monthly incentive (order threshold) + daily petrol subsidy (per qualifying day). Results saved as SalaryRecord + bulk SalaryLineItem via createMany. Parsed data stored in Vercel KV (2h TTL) between phases. CONFIRM_SETTINGS card shows dispatcher counts + unknown dispatcher warning list with amber UI. NEEDS_ATTENTION state for uploads with skipped unknown dispatchers. Status polling endpoint returns KV metadata (knownCount, unknownDispatchers). Review fixes: IDOR in replaceUpload (tenant ownership verification before cascade delete), null-date petrol subsidy bug (skip unknown-date deliveries), N+1 write optimization (createMany for line items), KV cleanup (metaKey + dead previewKey removed). Dependencies: `exceljs`, `@vercel/kv`. Env vars: `KV_REST_API_URL`, `KV_REST_API_TOKEN`. 34 unit tests. Files: `src/lib/upload/{parser,calculator,dispatcher-check,pipeline}.ts`, `src/lib/upload/__tests__/calculator.test.ts`, `src/app/api/upload/[uploadId]/calculate/route.ts`, `src/app/api/upload/worker/route.ts`, `src/app/api/upload/[uploadId]/status/route.ts`, `src/components/payroll/{confirm-settings-card,payroll-state-machine,status-cards}.tsx`, `src/lib/db/upload.ts`, `src/app/api/upload/init/route.ts`. Spec: `context/features/upload-phase-2-spec.md`.
 - 2026-04-11: **Payroll Phase 1 — Page Shell + State Machine + Upload History** — Completed. Unified Payroll page at `/payroll` replaces separate Upload nav item (nav: Overview | Payroll | Staff). Top section: branch + month/year selectors with state-machine UI rendering based on upload status (NONE → UPLOADING → PROCESSING → CONFIRM_SETTINGS → SAVED/FAILED). Drag-and-drop upload zone for .xlsx/.xls files with presigned R2 URL upload. Processing card with 2s polling and elapsed timer. CONFIRM_SETTINGS card with "Review Staff Settings" (opens `/staff` in new tab) + "Use Current Settings & Calculate" buttons. SAVED state shows "View in history ↓" scroll link. FAILED state shows error message + retry button. Custom duplicate-upload confirmation dialog (replaces `window.confirm`). Bottom section: payroll history list grouped by branch with multi-select branch filter + search by branch/month/year. View + Export buttons per record (Phase 3/4). Stale job detection on page load marks PROCESSING uploads >5min as FAILED. Fixed `markStaleUploadsFailed` — `updateMany` doesn't support nested relation filters, switched to findMany+updateMany by ID. API routes: `GET /api/payroll` (history with dispatcher count + total net payout), `GET /api/payroll/[branchCode]/[month]/[year]` (upload state). DB layer: `src/lib/db/payroll.ts`. Files: `src/app/(dashboard)/payroll/page.tsx`, `src/app/api/payroll/{route,[branchCode]/[month]/[year]/route}.ts`, `src/components/payroll/{payroll-client,payroll-state-machine,upload-zone,processing-card,confirm-settings-card,status-cards,payroll-history}.tsx`, `src/lib/db/payroll.ts`. Spec: `context/features/payroll-phase-1-spec.md`.
 - 2026-04-11: **Upload Phase 1 — File Upload + QStash Background Processing** — Completed. Backend API layer for Excel file upload flow. `POST /api/upload/init` creates Upload row + generates R2 presigned URL for client-side upload; detects duplicate branch+month uploads with confirmation flow and transactional cascade replacement. `POST /api/upload/[uploadId]/process` queues QStash background job and sets PROCESSING status. `GET /api/upload/[uploadId]/status` for 2s polling. `POST /api/upload/worker` signature-verified QStash worker shell (processing logic deferred to Phase 2). Stale detection marks PROCESSING uploads >5 min as FAILED. Prisma migration adds `UploadStatus` enum (UPLOADING, PROCESSING, CONFIRM_SETTINGS, NEEDS_ATTENTION, READY_TO_CONFIRM, FAILED, SAVED), `status`, `errorMessage`, `updatedAt` to Upload model. Existing uploads backfilled as SAVED. DB query layer at `src/lib/db/upload.ts`. Dependencies: `@upstash/qstash`, `@aws-sdk/s3-request-presigner`. Env vars: `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `NEXT_PUBLIC_APP_URL`. Also: staff delete dialog loading state + disabled buttons during deletion. Spec: `context/features/upload-phase-1-spec.md`.
 - 2026-04-11: **Staff History Tab — Per-Month Salary Snapshots** — Completed. History drawer accessible via clock icon or dispatcher name click — shows per-month salary records with inline editing of past snapshots (weight tiers, incentive, petrol subsidy). Recalculation uses existing SalaryLineItem rows; penalty/advance preserved. Confirmation dialog shows only changed fields with before/after values. `wasRecalculated` derived from `updatedAt > createdAt`. Latest month auto-expanded. Save-on-click replaces save-on-blur for inline table — dirty tracking with "Unsaved" status indicator, Save button shows count + transitions to "Saved" for 3s. Branch editable via dropdown with chevron hint. Dashed border hover effects on all editable fields. Green toggle for incentive, yellow toggle for petrol in drawer. Up/down stepper buttons on amount fields. Prisma migration adds `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` (Json?) and `updatedAt` to SalaryRecord. API routes: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`, `PATCH /api/staff/[id]/settings` (branchCode). Files: `src/components/staff/{history-tab,history-month-row,dispatcher-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/[id]/{history,recalculate}/route.ts`, `src/app/api/staff/[id]/settings/route.ts`, `prisma/schema.prisma`. Spec: `context/features/staff-history-tab-spec.md`.
