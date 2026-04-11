@@ -8,6 +8,7 @@ import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { DispatcherRow } from "./dispatcher-row";
 import { AddDispatcherDrawer } from "./add-dispatcher-drawer";
 import { DefaultsDrawer } from "./defaults-drawer";
+import { DispatcherDrawer } from "./dispatcher-drawer";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 
 const PAGE_SIZE = 20;
@@ -66,9 +67,13 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
   const [showDefaults, setShowDefaults] = useState(false);
+  const [drawerDispatcher, setDrawerDispatcher] = useState<StaffDispatcher | null>(null);
   const [newlyAddedIds, setNewlyAddedIds] = useState<Set<string>>(new Set());
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [errorIds, setErrorIds] = useState<Set<string>>(new Set());
+  const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
+  const [saveTrigger, setSaveTrigger] = useState(0);
+  const [saveButtonState, setSaveButtonState] = useState<"idle" | "saving" | "saved">("idle");
 
   // Branch dropdown
   const [branchOpen, setBranchOpen] = useState(false);
@@ -165,12 +170,10 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   }
 
   function handleDispatcherAdded(dispatcher: StaffDispatcher) {
-    // Prepend new dispatcher to top (before sort) so it appears first
     setItems((prev) => [{ ...dispatcher, isPinned: true }, ...prev.map((d) => d)]);
     setNewlyAddedIds((prev) => new Set(prev).add(dispatcher.id));
     setShowAddDrawer(false);
     setPage(1);
-    // Pin it server-side so it stays at top after refresh
     fetch(`/api/staff/${dispatcher.id}/pin`, { method: "PATCH" }).then(() => router.refresh());
   }
 
@@ -209,13 +212,21 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
     });
   }
 
+  const handleDirtyChange = useCallback((dispatcherId: string, isDirty: boolean) => {
+    setDirtyIds((prev) => {
+      const next = new Set(prev);
+      if (isDirty) next.add(dispatcherId);
+      else next.delete(dispatcherId);
+      return next;
+    });
+  }, []);
+
   function handleAcknowledge(dispatcherId: string) {
     setNewlyAddedIds((prev) => {
       const next = new Set(prev);
       next.delete(dispatcherId);
       return next;
     });
-    // Unpin the dispatcher — check if it's actually pinned first
     const item = items.find((d) => d.id === dispatcherId);
     if (item?.isPinned) {
       capturePositions();
@@ -234,7 +245,32 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
     ));
   }
 
+  function handleSaveAll() {
+    if (errorIds.size > 0 || newlyAddedIds.size > 0) {
+      const msgs: string[] = [];
+      if (errorIds.size > 0) msgs.push(`${errorIds.size} validation error${errorIds.size !== 1 ? "s" : ""}`);
+      if (newlyAddedIds.size > 0) msgs.push(`${newlyAddedIds.size} unacknowledged dispatcher${newlyAddedIds.size !== 1 ? "s" : ""}`);
+      toast.error(`Fix before saving: ${msgs.join(", ")}`);
+      return;
+    }
+    if (dirtyIds.size === 0) {
+      toast.success("No changes to save", { duration: 3000 });
+      return;
+    }
+    setSaveButtonState("saving");
+    setSaveTrigger((t) => t + 1);
+    // Wait for saves to complete, then refresh
+    setTimeout(() => {
+      router.refresh();
+      setSaveButtonState("saved");
+      toast.success("All changes saved", { duration: 3000 });
+      setTimeout(() => setSaveButtonState("idle"), 3000);
+    }, 1200);
+  }
+
   const branchLabel = selectedBranch || "All Branches";
+  const hasIssues = errorIds.size > 0 || newlyAddedIds.size > 0;
+  const issueCount = errorIds.size + newlyAddedIds.size;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -260,7 +296,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
             >
               Add Dispatcher
             </button>
-            {errorIds.size > 0 || newlyAddedIds.size > 0 ? (
+            {hasIssues ? (
               <button
                 onClick={() => {
                   const msgs: string[] = [];
@@ -271,15 +307,35 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-critical rounded-[0.375rem] cursor-not-allowed transition-colors"
               >
                 <Save size={14} />
-                {errorIds.size + newlyAddedIds.size} Issue{errorIds.size + newlyAddedIds.size !== 1 ? "s" : ""}
+                {issueCount} Issue{issueCount !== 1 ? "s" : ""}
+              </button>
+            ) : saveButtonState === "saving" ? (
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-green-600 rounded-[0.375rem] opacity-60 transition-colors"
+              >
+                <div className="w-3.5 h-3.5 border-[1.5px] border-white border-t-transparent rounded-full animate-spin" />
+                Saving...
+              </button>
+            ) : saveButtonState === "saved" ? (
+              <button
+                disabled
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-green-600 rounded-[0.375rem] transition-colors"
+              >
+                <Check size={14} />
+                Saved
               </button>
             ) : (
               <button
-                onClick={() => { router.refresh(); toast.success("All changes synced", { duration: 3000 }); }}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-green-600 rounded-[0.375rem] hover:bg-green-700 transition-colors"
+                onClick={handleSaveAll}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white rounded-[0.375rem] transition-colors ${
+                  dirtyIds.size > 0
+                    ? "bg-brand hover:bg-brand/90"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
               >
                 <Save size={14} />
-                Save
+                {dirtyIds.size > 0 ? `Save (${dirtyIds.size})` : "Save"}
               </button>
             )}
           </div>
@@ -405,6 +461,8 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                   dispatcher={d}
                   dataVersion={dataVersion}
                   defaults={defaults}
+                  branchCodes={branchCodes}
+                  saveTrigger={saveTrigger}
                   isNew={newlyAddedIds.has(d.id)}
                   isChecked={checkedIds.has(d.id)}
                   onCheck={handleCheck}
@@ -414,6 +472,8 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                   onAvatarChange={handleAvatarChange}
                   onAcknowledge={handleAcknowledge}
                   onErrorChange={handleErrorChange}
+                  onOpenDrawer={setDrawerDispatcher}
+                  onDirtyChange={handleDirtyChange}
                 />
               </div>
             ))}
@@ -462,6 +522,14 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
           </div>
         )}
       </main>
+
+      {/* Dispatcher Drawer (History) */}
+      {drawerDispatcher && (
+        <DispatcherDrawer
+          dispatcher={drawerDispatcher}
+          onClose={() => setDrawerDispatcher(null)}
+        />
+      )}
 
       {/* Defaults Drawer */}
       {showDefaults && (

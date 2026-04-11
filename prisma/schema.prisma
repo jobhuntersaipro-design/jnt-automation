@@ -193,10 +193,16 @@ model SalaryRecord {
   advance       Float @default(0)
   netSalary     Float
 
+  // Snapshots of rules used for this salary calculation (JSON)
+  weightTiersSnapshot Json?  // Array<{ tier, minWeight, maxWeight, commission }>
+  incentiveSnapshot   Json?  // { orderThreshold, incentiveAmount }
+  petrolSnapshot      Json?  // { isEligible, dailyThreshold, subsidyAmount }
+
   lineItems  SalaryLineItem[]
   dispatcher Dispatcher       @relation(fields: [dispatcherId], references: [id])
   upload     Upload           @relation(fields: [uploadId], references: [id], onDelete: Cascade)
   createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
 
   @@unique([dispatcherId, uploadId])
   @@index([dispatcherId])

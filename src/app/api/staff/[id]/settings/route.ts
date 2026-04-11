@@ -32,6 +32,7 @@ interface WeightTierInput {
 
 interface SettingsBody {
   icNo?: string;
+  branchCode?: string;
   weightTiers?: WeightTierInput[];
   incentiveRule?: { orderThreshold: number; incentiveAmount: number };
   petrolRule?: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
@@ -59,6 +60,21 @@ export async function PATCH(
   }
 
   const body: SettingsBody = await req.json();
+
+  // Update branch
+  if (body.branchCode) {
+    const branch = await prisma.branch.findFirst({
+      where: { agentId: session.user.id, code: body.branchCode },
+      select: { id: true },
+    });
+    if (!branch) {
+      return NextResponse.json({ error: "Branch not found" }, { status: 400 });
+    }
+    await prisma.dispatcher.update({
+      where: { id },
+      data: { branchId: branch.id },
+    });
+  }
 
   // Update IC number + derived gender
   if (body.icNo !== undefined) {

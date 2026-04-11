@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Pin, Trash2, Pencil, Camera, X, Upload, Trash } from "lucide-react";
+import { Pin, Trash2, Pencil, Camera, X, Upload, Trash, Clock, ChevronDown } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
@@ -29,10 +29,9 @@ function validateIc(ic: string): string | null {
 }
 
 /** Decimal input — "cents" mode auto-formats as RM (typing 521 → 5.21) with +/- buttons */
-function DecimalInput({ value, onChange, onBlur, className, onClick, cents }: {
+function DecimalInput({ value, onChange, className, onClick, cents }: {
   value: number;
   onChange: (n: number) => void;
-  onBlur: () => void;
   className?: string;
   onClick?: (e: React.MouseEvent) => void;
   cents?: boolean;
@@ -63,7 +62,7 @@ function DecimalInput({ value, onChange, onBlur, className, onClick, cents }: {
           }
         }}
         onFocus={() => { setFocused(true); setRaw(String(value)); }}
-        onBlur={() => { setFocused(false); onBlur(); }}
+        onBlur={() => setFocused(false)}
         onClick={onClick}
         className={className}
       />
@@ -88,7 +87,7 @@ function DecimalInput({ value, onChange, onBlur, className, onClick, cents }: {
           onChange(parseInt(digits || "0", 10) / 100);
         }}
         onFocus={() => { setFocused(true); setRaw(Math.round(value * 100).toString()); }}
-        onBlur={() => { setFocused(false); onBlur(); }}
+        onBlur={() => setFocused(false)}
         className={className}
       />
       <div className="absolute right-0 top-0 bottom-0 flex flex-col opacity-0 group-hover/decimal:opacity-100 transition-opacity">
@@ -100,12 +99,14 @@ function DecimalInput({ value, onChange, onBlur, className, onClick, cents }: {
 }
 
 /** Grid: check | name | branch | IC | tiers | sep | incentive(3) | sep | petrol(3) | status | actions */
-export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.4fr] items-center gap-x-1.5";
+export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.5fr] items-center gap-x-1.5";
 
 interface DispatcherRowProps {
   dispatcher: StaffDispatcher;
   dataVersion: number;
   defaults: AgentDefaults;
+  branchCodes: string[];
+  saveTrigger: number;
   isNew?: boolean;
   isChecked?: boolean;
   onCheck: (dispatcherId: string, checked: boolean) => void;
@@ -115,15 +116,17 @@ interface DispatcherRowProps {
   onAvatarChange: (dispatcherId: string, avatarUrl: string | null) => void;
   onAcknowledge: (dispatcherId: string) => void;
   onErrorChange: (dispatcherId: string, hasError: boolean) => void;
+  onOpenDrawer: (d: StaffDispatcher) => void;
+  onDirtyChange: (dispatcherId: string, isDirty: boolean) => void;
 }
 
 const INPUT_CLASS =
-  "w-full px-1.5 py-1 text-[0.78rem] tabular-nums text-center bg-transparent border border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/40 focus:border-brand/40 focus:bg-white focus:outline-none transition-colors";
+  "w-full px-1.5 py-1 text-[0.78rem] tabular-nums text-center bg-transparent border border-dashed border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/50 hover:bg-brand/5 focus:border-brand/40 focus:border-solid focus:bg-white focus:outline-none transition-all";
 
 const AVATAR_ACCEPTED = ".jpg,.jpeg,.png,.webp";
 const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
 
-export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange }: DispatcherRowProps) {
+export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, saveTrigger, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange, onOpenDrawer, onDirtyChange }: DispatcherRowProps) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -170,6 +173,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
 
   const [icNo, setIcNo] = useState(dispatcher.rawIcNo);
   const [icError, setIcError] = useState<string | null>(null);
+  const [branchCode, setBranchCode] = useState(dispatcher.branchCode);
   const [orderThreshold, setOrderThreshold] = useState(dispatcher.incentiveRule?.orderThreshold ?? 2000);
   const [incentiveAmount, setIncentiveAmount] = useState(dispatcher.incentiveRule?.incentiveAmount ?? 0);
   const [incentiveEnabled, setIncentiveEnabled] = useState((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
@@ -184,6 +188,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
   useEffect(() => {
     setIcNo(dispatcher.rawIcNo);
     setAvatarUrl(dispatcher.avatarUrl);
+    setBranchCode(dispatcher.branchCode);
     setOrderThreshold(dispatcher.incentiveRule?.orderThreshold ?? 2000);
     setIncentiveAmount(dispatcher.incentiveRule?.incentiveAmount ?? 0);
     setIncentiveEnabled((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
@@ -195,6 +200,32 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
     onErrorChange(dispatcher.id, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataVersion]);
+
+  // Dirty tracking
+  const isDirty = useMemo(() => {
+    if (icNo !== dispatcher.rawIcNo) return true;
+    if (branchCode !== dispatcher.branchCode) return true;
+    const origOT = dispatcher.incentiveRule?.orderThreshold ?? 2000;
+    const origIA = dispatcher.incentiveRule?.incentiveAmount ?? 0;
+    const origEnabled = origOT > 0;
+    if (incentiveEnabled !== origEnabled) return true;
+    if (incentiveEnabled && (orderThreshold !== origOT || incentiveAmount !== origIA)) return true;
+    if (isEligible !== (dispatcher.petrolRule?.isEligible ?? false)) return true;
+    if (dailyThreshold !== (dispatcher.petrolRule?.dailyThreshold ?? 70)) return true;
+    if (subsidyAmount !== (dispatcher.petrolRule?.subsidyAmount ?? 15)) return true;
+    const origTiers = dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS;
+    for (let i = 0; i < 3; i++) {
+      if (origTiers[i].commission !== weightTiers[i].commission) return true;
+      if (origTiers[i].minWeight !== weightTiers[i].minWeight) return true;
+      if (origTiers[i].maxWeight !== weightTiers[i].maxWeight) return true;
+    }
+    return false;
+  }, [icNo, branchCode, orderThreshold, incentiveAmount, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, dispatcher]);
+
+  // Report dirty state to parent
+  useEffect(() => {
+    onDirtyChange(dispatcher.id, isDirty);
+  }, [isDirty, dispatcher.id, onDirtyChange]);
 
   // Tier popover
   const [editingTier, setEditingTier] = useState<number | null>(null);
@@ -214,9 +245,22 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
 
   const [saving, setSaving] = useState(false);
 
-  const save = useCallback(async (payload: Record<string, unknown>) => {
+  const save = useCallback(async () => {
+    // Validate IC
+    if (icNo && validateIc(icNo)) return;
+
     setSaving(true);
     try {
+      const payload: Record<string, unknown> = {};
+      if (icNo !== dispatcher.rawIcNo) payload.icNo = icNo;
+      if (branchCode !== dispatcher.branchCode) payload.branchCode = branchCode;
+      payload.weightTiers = weightTiers;
+      payload.incentiveRule = {
+        orderThreshold: incentiveEnabled ? orderThreshold : 0,
+        incentiveAmount,
+      };
+      payload.petrolRule = { isEligible, dailyThreshold, subsidyAmount };
+
       const res = await fetch(`/api/staff/${dispatcher.id}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -230,29 +274,24 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
     } finally {
       setSaving(false);
     }
-  }, [dispatcher.id, onFieldSaved]);
+  }, [dispatcher.id, dispatcher.rawIcNo, dispatcher.branchCode, icNo, branchCode, weightTiers, incentiveEnabled, orderThreshold, incentiveAmount, isEligible, dailyThreshold, subsidyAmount, onFieldSaved]);
 
-  function handleIcBlur() {
-    const err = validateIc(icNo);
+  // Save on trigger (when parent Save button is clicked)
+  const prevTrigger = useRef(0);
+  useEffect(() => {
+    if (saveTrigger > 0 && saveTrigger !== prevTrigger.current) {
+      prevTrigger.current = saveTrigger;
+      if (isDirty) {
+        save();
+      }
+    }
+  }, [saveTrigger, isDirty, save]);
+
+  function handleIcChange(val: string) {
+    setIcNo(val);
+    const err = validateIc(val);
     setIcError(err);
     onErrorChange(dispatcher.id, !!err);
-    if (!err && icNo !== dispatcher.rawIcNo) {
-      save({ icNo });
-    }
-  }
-
-  function handleIncentiveBlur() {
-    save({ incentiveRule: { orderThreshold, incentiveAmount } });
-  }
-
-  function handlePetrolToggle() {
-    const next = !isEligible;
-    setIsEligible(next);
-    save({ petrolRule: { isEligible: next, dailyThreshold, subsidyAmount } });
-  }
-
-  function handlePetrolBlur() {
-    save({ petrolRule: { isEligible, dailyThreshold, subsidyAmount } });
   }
 
   function handleTierFieldChange(tierIndex: number, field: "minWeight" | "maxWeight" | "commission", value: string) {
@@ -262,10 +301,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
       const num = parseFloat(cleaned);
       return { ...t, [field]: isNaN(num) ? 0 : num };
     }));
-  }
-
-  function handleTierBlur() {
-    save({ weightTiers });
   }
 
   const liveGender = deriveGenderClient(icNo);
@@ -307,7 +342,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
   return (
     <div className={`${ROW_GRID} px-5 py-[0.6rem] ${
       dispatcher.isPinned ? "bg-brand/4 hover:bg-brand/8" : "hover:bg-surface-hover"
-    } transition-colors`}>
+    } transition-colors group/row`}>
       {/* Checkbox */}
       <div className="flex justify-center">
         <input
@@ -343,10 +378,15 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
           )}
         </button>
         <input ref={avatarInputRef} type="file" accept={AVATAR_ACCEPTED} onChange={handleAvatarSelect} className="hidden" />
-        <div className="min-w-0">
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onOpenDrawer(dispatcher); }}
+          className="min-w-0 text-left hover:opacity-70 transition-opacity"
+          title="Open history"
+        >
           <p className="text-[0.82rem] font-medium text-on-surface truncate">{dispatcher.name}</p>
           <p className="text-[0.66rem] text-on-surface-variant">{dispatcher.extId}</p>
-        </div>
+        </button>
       </div>
 
       {/* Avatar lightbox */}
@@ -400,22 +440,28 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
         document.body,
       )}
 
-      {/* Branch */}
-      <span className="text-[0.78rem] font-medium text-on-surface-variant text-center">{dispatcher.branchCode}</span>
+      {/* Branch — dropdown */}
+      <div className="flex items-center justify-center group/branch" onClick={(e) => e.stopPropagation()}>
+        <div className="relative w-full">
+          <select
+            value={branchCode}
+            onChange={(e) => setBranchCode(e.target.value)}
+            className="w-full px-1 py-1 pr-5 text-[0.78rem] font-medium text-on-surface-variant text-center bg-transparent border border-dashed border-transparent rounded-lg hover:border-outline-variant/50 hover:bg-brand/5 focus:bg-transparent focus:border-transparent focus:outline-none focus:ring-0 transition-all cursor-pointer appearance-none"
+          >
+            {branchCodes.map((code) => (
+              <option key={code} value={code}>{code}</option>
+            ))}
+          </select>
+          <ChevronDown size={10} className="absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant/0 group-hover/branch:text-on-surface-variant/50 transition-colors pointer-events-none" />
+        </div>
+      </div>
 
       {/* IC No */}
-      <div className="self-center">
+      <div>
         <input
           type="text"
           value={icNo}
-          onChange={(e) => {
-            const val = e.target.value;
-            setIcNo(val);
-            const err = validateIc(val);
-            setIcError(err);
-            onErrorChange(dispatcher.id, !!err);
-          }}
-          onBlur={handleIcBlur}
+          onChange={(e) => handleIcChange(e.target.value)}
           onClick={(e) => e.stopPropagation()}
           placeholder="—"
           maxLength={12}
@@ -435,7 +481,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
           {weightTiers.map((tier) => (
             <span
               key={tier.tier}
-              className="px-1.5 py-0.5 text-[0.7rem] tabular-nums font-medium bg-surface-low text-on-surface-variant rounded-lg"
+              className="px-1.5 py-0.5 text-[0.7rem] tabular-nums font-medium bg-surface-low text-on-surface-variant rounded-lg group-hover/tiers:bg-surface-hover transition-colors"
             >
               RM{tier.commission.toFixed(2)}
             </span>
@@ -465,33 +511,39 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
                 <div key={tier.tier} className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center">
                   <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={tier.minWeight}
                     disabled={i === 0}
-                    onChange={(e) => handleTierFieldChange(i, "minWeight", e.target.value)}
-                    onBlur={handleTierBlur}
-                    className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(",", ".");
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "minWeight", v);
+                    }}
+                    className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
                   />
                   {i === 2 ? (
                     <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
                   ) : (
                     <input
-                      type="number"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
                       value={tier.maxWeight ?? ""}
-                      onChange={(e) => handleTierFieldChange(i, "maxWeight", e.target.value)}
-                      onBlur={handleTierBlur}
-                      className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40"
+                      onChange={(e) => {
+                        const v = e.target.value.replace(",", ".");
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "maxWeight", v);
+                      }}
+                      className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                     />
                   )}
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
+                    inputMode="decimal"
                     value={tier.commission}
-                    onChange={(e) => handleTierFieldChange(i, "commission", e.target.value)}
-                    onBlur={handleTierBlur}
-                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40"
+                    onChange={(e) => {
+                      const v = e.target.value.replace(",", ".");
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "commission", v);
+                    }}
+                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                   />
                 </div>
               ))}
@@ -509,13 +561,11 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
         setIncentiveEnabled(next);
         if (!next) {
           setOrderThreshold(0);
-          save({ incentiveRule: { orderThreshold: 0, incentiveAmount } });
         } else {
           const dt = defaults.incentiveRule;
           setOrderThreshold(dt.orderThreshold);
           const amt = incentiveAmount || dt.incentiveAmount;
           setIncentiveAmount(amt);
-          save({ incentiveRule: { orderThreshold: dt.orderThreshold, incentiveAmount: amt } });
         }
       }} />
 
@@ -528,7 +578,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
             const v = e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
             setOrderThreshold(v === "" ? 0 : parseInt(v, 10));
           }}
-          onBlur={handleIncentiveBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
         />
@@ -540,7 +589,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
         <DecimalInput
           value={incentiveAmount}
           onChange={setIncentiveAmount}
-          onBlur={handleIncentiveBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
           cents
@@ -553,7 +601,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
       <div className="h-6 rounded-full" style={{ backgroundColor: "rgba(251, 192, 36, 0.2)" }} />
 
       {/* ── Petrol: Eligible, Min Orders, Amount ── */}
-      <Toggle color="#FBC024" checked={isEligible} onChange={handlePetrolToggle} />
+      <Toggle color="#FBC024" checked={isEligible} onChange={() => setIsEligible((p) => !p)} />
 
       {isEligible ? (
         <input
@@ -564,7 +612,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
             const v = e.target.value.replace(/\D/g, "").replace(/^0+(?=\d)/, "");
             setDailyThreshold(v === "" ? 0 : parseInt(v, 10));
           }}
-          onBlur={handlePetrolBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
         />
@@ -576,7 +623,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
         <DecimalInput
           value={subsidyAmount}
           onChange={setSubsidyAmount}
-          onBlur={handlePetrolBlur}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
           cents
@@ -605,6 +651,11 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
             />
             New
           </button>
+        ) : isDirty ? (
+          <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-amber-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            Unsaved
+          </span>
         ) : (
           <span className={`inline-flex items-center gap-1 text-[0.72rem] font-medium ${dispatcher.isComplete ? "text-green-600" : "text-critical"}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${dispatcher.isComplete ? "bg-green-500" : "bg-critical"}`} />
@@ -619,12 +670,19 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, isNew, isChec
           onClick={(e) => onPin(e, dispatcher)}
           className={`p-1 rounded-lg transition-all ${
             dispatcher.isPinned
-              ? "text-brand hover:bg-brand/10"
+              ? "text-brand hover:bg-brand/10 [&_svg]:fill-current"
               : "text-on-surface-variant hover:text-brand hover:bg-brand/10"
           }`}
           title={dispatcher.isPinned ? "Unpin" : "Pin to top"}
         >
-          <Pin size={12} fill={dispatcher.isPinned ? "currentColor" : "none"} />
+          <Pin size={12} />
+        </button>
+        <button
+          onClick={(e) => { e.stopPropagation(); onOpenDrawer(dispatcher); }}
+          className="p-1 rounded-lg text-on-surface-variant hover:text-brand hover:bg-brand/10 transition-colors"
+          title="Salary history"
+        >
+          <Clock size={12} />
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onDelete(dispatcher); }}

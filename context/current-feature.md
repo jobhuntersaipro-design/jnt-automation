@@ -1,12 +1,32 @@
-# Current Feature
+# Current Feature: Staff Page — Settings History Tab
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+- Add a History tab to the existing dispatcher drawer alongside the Settings tab
+- Show per-month snapshots from confirmed SalaryRecords (month, net salary, status badge)
+- Inline editing of past month snapshots (weight tiers, incentive, petrol subsidy)
+- Recalculate confirmation dialog showing only changed fields with before/after values
+- Server-side recalculation using existing SalaryLineItem rows (preserves penalty/advance)
+- "Download Updated Payslip" button appears on recalculated rows (PDF via POST)
+- DB migration: add `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` JSON columns to SalaryRecord
+- API: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`
+- Empty state when dispatcher has no salary records (History tab disabled)
+- Only one month panel expanded at a time
+
 ## Notes
+
+- Recalculation uses existing `SalaryLineItem` rows, NOT the original Excel file
+- `penalty` and `advance` are preserved from the original record — never changed during recalculation
+- `wasRecalculated` derived from `updatedAt > createdAt` — no extra DB column needed
+- History scoped by `dispatcher.branch.agentId === session.user.id`
+- Payslip download: `POST /api/payroll/payslip/[salaryRecordId]` → PDF named `payslip_[extId]_[month]_[year].pdf`
+- Files to create: `history-tab.tsx`, `history-month-row.tsx`, `history/route.ts`, `recalculate/route.ts`
+- Files to modify: `dispatcher-drawer.tsx` (add History tab)
+- Full spec: `context/staff-history-tab-spec.md`
 
 ## History
 
