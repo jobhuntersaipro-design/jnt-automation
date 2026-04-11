@@ -1,4 +1,6 @@
-import { kv } from "@vercel/kv";
+import { Redis } from "@upstash/redis";
+
+const redis = Redis.fromEnv();
 import { prisma } from "@/lib/prisma";
 import { updateUploadStatus } from "@/lib/db/upload";
 import { parseExcelFromR2 } from "./parser";
@@ -39,14 +41,14 @@ export async function processUpload(uploadId: string) {
   const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
   // 3. Store parsed rows + split in KV for Phase B
-  await kv.set(parsedKey(uploadId), { rows, known, unknown }, { ex: 7200 });
+  await redis.set(parsedKey(uploadId), { rows, known, unknown }, { ex: 7200 });
 
   // 4. Store metadata separately for polling endpoint
   const meta: UploadMeta = {
     knownCount: known.length,
     unknownDispatchers: unknown,
   };
-  await kv.set(metaKey(uploadId), meta, { ex: 7200 });
+  await redis.set(metaKey(uploadId), meta, { ex: 7200 });
 
   // 5. Set status to CONFIRM_SETTINGS
   await updateUploadStatus(uploadId, "CONFIRM_SETTINGS");
@@ -55,7 +57,7 @@ export async function processUpload(uploadId: string) {
 // ─── Phase B: Calculate (runs after agent confirms settings) ──────
 
 export async function calculateAfterConfirm(uploadId: string) {
-  const cached = await kv.get<{
+  const cached = await redis.get<{
     rows: ParsedRow[];
     known: string[];
     unknown: UnknownDispatcher[];
@@ -179,8 +181,8 @@ export async function calculateAfterConfirm(uploadId: string) {
 
   // Clean up KV
   await Promise.all([
-    kv.del(parsedKey(uploadId)),
-    kv.del(metaKey(uploadId)),
+    redis.del(parsedKey(uploadId)),
+    redis.del(metaKey(uploadId)),
   ]);
 }
 
@@ -191,5 +193,5 @@ export async function calculateAfterConfirm(uploadId: string) {
 export async function getUploadMeta(
   uploadId: string,
 ): Promise<UploadMeta | null> {
-  return kv.get<UploadMeta>(metaKey(uploadId));
+  return redis.get<UploadMeta>(metaKey(uploadId));
 }
