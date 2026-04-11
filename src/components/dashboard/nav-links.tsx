@@ -8,7 +8,6 @@ const navItems = [
   { href: "/dashboard", label: "Overview" },
   { href: "/payroll", label: "Payroll" },
   { href: "/staff", label: "Staff" },
-  { href: "/upload", label: "Upload" },
 ];
 
 export function NavLinks() {

@@ -123,12 +123,21 @@ export async function getUploadStatus(uploadId: string, agentId: string) {
 export async function markStaleUploadsFailed(agentId: string) {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-  await prisma.upload.updateMany({
+  // updateMany doesn't support nested relation filters,
+  // so find stale IDs first, then bulk-update by ID list
+  const stale = await prisma.upload.findMany({
     where: {
       branch: { agentId },
       status: "PROCESSING",
       updatedAt: { lt: fiveMinutesAgo },
     },
+    select: { id: true },
+  });
+
+  if (stale.length === 0) return;
+
+  await prisma.upload.updateMany({
+    where: { id: { in: stale.map((u) => u.id) } },
     data: {
       status: "FAILED",
       errorMessage: "Processing timed out. Please retry.",

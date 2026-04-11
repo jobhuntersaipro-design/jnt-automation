@@ -1,12 +1,32 @@
-# Current Feature
+# Current Feature: Payroll Phase 1 — Page Shell + State Machine + Upload History
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+- Replace "Upload" nav item with "Payroll"
+- Top section: branch + month selector + upload zone with state-based rendering (NONE → UPLOADING → PROCESSING → CONFIRM_SETTINGS → NEEDS_ATTENTION → READY_TO_CONFIRM → SAVED → FAILED)
+- Bottom section: history list of all past confirmed payrolls grouped by branch
+- Branch + dispatcher filter on history list
+- Stale job detection on page load (PROCESSING >5min → FAILED)
+- Duplicate upload warning with confirmation dialog
+- Upload zone: drag-and-drop .xlsx/.xls, presigned URL upload to R2
+- Processing card with 2s polling
+- CONFIRM_SETTINGS card with "Review Staff Settings" + "Use Current Settings & Calculate" buttons
+- SAVED state shows "View in history ↓" scroll link
+- FAILED state shows error + retry button
+- API: `GET /api/payroll` (history), `GET /api/payroll/[branchCode]/[month]/[year]` (upload state)
+
 ## Notes
+
+- Spec: `context/features/payroll-phase-1-spec.md`
+- Upload zone reuses existing upload init/process/status APIs from Upload Phase 1
+- "View" in history → `/payroll/[uploadId]` (Phase 3, not this phase)
+- "Export" in history → CSV / Google Sheets (Phase 4, not this phase)
+- CONFIRM_SETTINGS: "Review Staff Settings" opens `/staff` in new tab; "Use Current Settings" calls `POST /api/upload/[uploadId]/calculate`
+- History list format: branch group → month rows with dispatcher count + total net payout + View + Export buttons
 
 ## History
 
