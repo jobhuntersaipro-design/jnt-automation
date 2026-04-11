@@ -1,12 +1,30 @@
-# Current Feature
+# Current Feature: Upload Phase 1 — File Upload + QStash Background Processing
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+- Agent drops Excel file in Payroll page upload zone
+- File uploads to Cloudflare R2 immediately via presigned URL
+- Processing queued via QStash — returns immediately, no timeout risk
+- Client polls status every 2s — updates UI in real-time
+- Crash/timeout recovery with retry
+- Duplicate upload warning before replacing existing confirmed month
+- QStash worker shell (processing logic deferred to Phase 2)
+
 ## Notes
+
+- New dependency: `@upstash/qstash`
+- New env vars: `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
+- DB migration: add `status` (UploadStatus enum) and `errorMessage` to Upload model
+- Status flow: UPLOADING → PROCESSING → CONFIRM_SETTINGS / NEEDS_ATTENTION / FAILED → READY_TO_CONFIRM → SAVED
+- Stale detection: PROCESSING uploads older than 5 min auto-marked FAILED on page load
+- Duplicate handling: branch + month already SAVED → confirmation dialog → cascade delete old records
+- API routes: `POST /api/upload/init`, `POST /api/upload/[uploadId]/process`, `GET /api/upload/[uploadId]/status`, `POST /api/upload/worker`
+- Files: `src/app/api/upload/{init,worker}/route.ts`, `src/app/api/upload/[uploadId]/{process,status}/route.ts`, `src/lib/db/upload.ts`
+- Spec: `context/features/upload-phase-1-spec.md`
 
 ## History
 

@@ -63,6 +63,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<StaffDispatcher | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [showAddDrawer, setShowAddDrawer] = useState(false);
@@ -145,15 +146,17 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
 
   async function confirmDelete() {
     if (!deleteTarget) return;
+    setDeleting(true);
     try {
       const res = await fetch(`/api/staff/${deleteTarget.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setItems((prev) => prev.filter((d) => d.id !== deleteTarget.id));
       toast.success(`${deleteTarget.name} deleted`);
+      setDeleteTarget(null);
     } catch {
       toast.error("Failed to delete dispatcher");
     } finally {
-      setDeleteTarget(null);
+      setDeleting(false);
     }
   }
 
@@ -557,7 +560,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
       {/* Delete Dialog */}
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-on-surface/40" onClick={() => setDeleteTarget(null)} />
+          <div className="absolute inset-0 bg-on-surface/40" onClick={() => !deleting && setDeleteTarget(null)} />
           <div className="relative bg-white rounded-[0.75rem] p-6 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] max-w-sm w-full mx-4">
             <h3 className="font-heading font-semibold text-[1.1rem] text-on-surface">
               Delete {deleteTarget.name}?
@@ -566,11 +569,11 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
               This will permanently delete this dispatcher and all their salary rules. This cannot be undone.
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
-              <button onClick={() => setDeleteTarget(null)} className="px-4 py-2 text-[0.84rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors">
+              <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="px-4 py-2 text-[0.84rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors disabled:opacity-60">
                 Cancel
               </button>
-              <button onClick={confirmDelete} className="px-4 py-2 text-[0.84rem] font-medium text-white bg-critical rounded-[0.375rem] hover:bg-critical/90 transition-colors">
-                Delete
+              <button onClick={confirmDelete} disabled={deleting} className="px-4 py-2 text-[0.84rem] font-medium text-white bg-critical rounded-[0.375rem] hover:bg-critical/90 transition-colors disabled:opacity-60">
+                {deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

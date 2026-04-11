@@ -162,6 +162,16 @@ model PetrolRule {
 
 // ─── Uploads & Results ───────────────────────────────────────
 
+enum UploadStatus {
+  UPLOADING
+  PROCESSING
+  CONFIRM_SETTINGS
+  NEEDS_ATTENTION
+  READY_TO_CONFIRM
+  FAILED
+  SAVED
+}
+
 model Upload {
   id            String         @id @default(cuid())
   branchId      String
@@ -169,13 +179,17 @@ model Upload {
   r2Key         String
   month         Int            // 1–12
   year          Int
+  status        UploadStatus   @default(UPLOADING)
+  errorMessage  String?
   branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
   salaryRecords SalaryRecord[]
   createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@unique([branchId, month, year])
   @@index([branchId])
   @@index([month, year])
+  @@index([status])
 }
 
 model SalaryRecord {
