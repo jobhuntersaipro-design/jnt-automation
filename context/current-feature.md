@@ -1,35 +1,18 @@
-# Current Feature: Upload Phase 1 — File Upload + QStash Background Processing
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Agent drops Excel file in Payroll page upload zone
-- File uploads to Cloudflare R2 immediately via presigned URL
-- Processing queued via QStash — returns immediately, no timeout risk
-- Client polls status every 2s — updates UI in real-time
-- Crash/timeout recovery with retry
-- Duplicate upload warning before replacing existing confirmed month
-- QStash worker shell (processing logic deferred to Phase 2)
-
 ## Notes
-
-- New dependency: `@upstash/qstash`
-- New env vars: `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`
-- DB migration: add `status` (UploadStatus enum) and `errorMessage` to Upload model
-- Status flow: UPLOADING → PROCESSING → CONFIRM_SETTINGS / NEEDS_ATTENTION / FAILED → READY_TO_CONFIRM → SAVED
-- Stale detection: PROCESSING uploads older than 5 min auto-marked FAILED on page load
-- Duplicate handling: branch + month already SAVED → confirmation dialog → cascade delete old records
-- API routes: `POST /api/upload/init`, `POST /api/upload/[uploadId]/process`, `GET /api/upload/[uploadId]/status`, `POST /api/upload/worker`
-- Files: `src/app/api/upload/{init,worker}/route.ts`, `src/app/api/upload/[uploadId]/{process,status}/route.ts`, `src/lib/db/upload.ts`
-- Spec: `context/features/upload-phase-1-spec.md`
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-11: **Upload Phase 1 — File Upload + QStash Background Processing** — Completed. Backend API layer for Excel file upload flow. `POST /api/upload/init` creates Upload row + generates R2 presigned URL for client-side upload; detects duplicate branch+month uploads with confirmation flow and transactional cascade replacement. `POST /api/upload/[uploadId]/process` queues QStash background job and sets PROCESSING status. `GET /api/upload/[uploadId]/status` for 2s polling. `POST /api/upload/worker` signature-verified QStash worker shell (processing logic deferred to Phase 2). Stale detection marks PROCESSING uploads >5 min as FAILED. Prisma migration adds `UploadStatus` enum (UPLOADING, PROCESSING, CONFIRM_SETTINGS, NEEDS_ATTENTION, READY_TO_CONFIRM, FAILED, SAVED), `status`, `errorMessage`, `updatedAt` to Upload model. Existing uploads backfilled as SAVED. DB query layer at `src/lib/db/upload.ts`. Dependencies: `@upstash/qstash`, `@aws-sdk/s3-request-presigner`. Env vars: `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `NEXT_PUBLIC_APP_URL`. Also: staff delete dialog loading state + disabled buttons during deletion. Spec: `context/features/upload-phase-1-spec.md`.
 - 2026-04-11: **Staff History Tab — Per-Month Salary Snapshots** — Completed. History drawer accessible via clock icon or dispatcher name click — shows per-month salary records with inline editing of past snapshots (weight tiers, incentive, petrol subsidy). Recalculation uses existing SalaryLineItem rows; penalty/advance preserved. Confirmation dialog shows only changed fields with before/after values. `wasRecalculated` derived from `updatedAt > createdAt`. Latest month auto-expanded. Save-on-click replaces save-on-blur for inline table — dirty tracking with "Unsaved" status indicator, Save button shows count + transitions to "Saved" for 3s. Branch editable via dropdown with chevron hint. Dashed border hover effects on all editable fields. Green toggle for incentive, yellow toggle for petrol in drawer. Up/down stepper buttons on amount fields. Prisma migration adds `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` (Json?) and `updatedAt` to SalaryRecord. API routes: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`, `PATCH /api/staff/[id]/settings` (branchCode). Files: `src/components/staff/{history-tab,history-month-row,dispatcher-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/[id]/{history,recalculate}/route.ts`, `src/app/api/staff/[id]/settings/route.ts`, `prisma/schema.prisma`. Spec: `context/features/staff-history-tab-spec.md`.
 - 2026-04-10: **Staff Phase 3 — Add Dispatcher, Avatar Upload, Agent Defaults** — Completed. Add Dispatcher drawer with name, extId, IC number, branch fields — creation seeds 3 default weight tiers, incentive rule, and petrol rule in a single transaction. Avatar upload/remove via Cloudflare R2 (JPG/PNG/WebP, max 2MB) with lightbox preview on click (upload, remove, close controls). Agent-level defaults drawer to view/edit default salary rules and bulk-apply to all or selected dispatchers. Completeness = name + IC + extId (incentive amount irrelevant). extId uniqueness enforced per branch (409). Prisma migration for `AgentDefault` model. API routes: `POST /api/staff` (create dispatcher), `POST/DELETE /api/staff/[id]/avatar` (R2 upload/remove), `GET/PUT /api/staff/defaults`, `POST /api/staff/apply-defaults`. R2 client at `src/lib/r2.ts`. Row-level checkbox selection for bulk operations. Files: `src/components/staff/{add-dispatcher-drawer,avatar-upload,defaults-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/{route,defaults/route,apply-defaults/route,[id]/avatar/route}.ts`, `src/lib/db/staff.ts`, `src/lib/r2.ts`, `prisma/schema.prisma`.
 - 2026-04-10: **Staff Phase 2 — Inline Dispatcher Settings + UI Fixes** — Completed. Replaced drawer with inline-editable fields per row: IC number (12-digit validation with error message), incentive (eligible toggle, min orders, amount), petrol subsidy (eligible toggle, daily threshold, subsidy amount) — all auto-save on blur via `PATCH /api/staff/[id]/settings`. Weight tiers shown as compact RM chips (`RM1.00 RM1.40 RM2.20`) with pencil icon on hover; click opens popover with all 3 tiers editable (min/max weight + commission). Incentive colored `#12B981`, petrol `#FBC024` with matching toggles and vertical separator bars. Toggled-off fields show "—". Gender derived from IC (odd=Male, even=Female). Grouped column headers with colored labels. API: `GET` + `PATCH /api/staff/[id]/settings` with `agentId` ownership, upsert for rules, completeness recomputation. Also: toast close button + swipe-to-dismiss, chart focus outline removed, Y-axis K format (<1M), dispatcher performance penalty/advance columns + box pagination (50/page), branch distribution tighter Y-axis, Google profile picture fix. Files: `src/components/staff/dispatcher-row.tsx`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/settings/route.ts`, `src/lib/db/staff.ts`, `src/lib/utils/gender.ts`, `src/components/staff/{dispatcher-drawer,incentive-section,petrol-section,weight-tier-section}.tsx`, `src/components/ui/toast-close-icon.tsx`, `src/app/globals.css`, `src/app/layout.tsx`, `src/auth.ts`, dashboard chart components.
