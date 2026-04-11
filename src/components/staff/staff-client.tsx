@@ -75,6 +75,8 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   const [dirtyIds, setDirtyIds] = useState<Set<string>>(new Set());
   const [saveTrigger, setSaveTrigger] = useState(0);
   const [saveButtonState, setSaveButtonState] = useState<"idle" | "saving" | "saved">("idle");
+  const pendingSavesRef = useRef(0);
+  const saveResolveRef = useRef<(() => void) | null>(null);
 
   // Branch dropdown
   const [branchOpen, setBranchOpen] = useState(false);
@@ -170,6 +172,14 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
     setItems((prev) => prev.map((d) =>
       d.id === dispatcherId ? { ...d, isComplete } : d,
     ));
+    // Track save completions for handleSaveAll
+    if (pendingSavesRef.current > 0) {
+      pendingSavesRef.current -= 1;
+      if (pendingSavesRef.current <= 0 && saveResolveRef.current) {
+        saveResolveRef.current();
+        saveResolveRef.current = null;
+      }
+    }
   }
 
   function handleDispatcherAdded(dispatcher: StaffDispatcher) {
@@ -261,14 +271,20 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
       return;
     }
     setSaveButtonState("saving");
+    pendingSavesRef.current = dirtyIds.size;
+    // Wait for all saves to complete via onFieldSaved callbacks
+    const allSaved = new Promise<void>((resolve) => {
+      saveResolveRef.current = resolve;
+    });
     setSaveTrigger((t) => t + 1);
-    // Wait for saves to complete, then refresh
-    setTimeout(() => {
+    // Timeout fallback in case a save never calls onFieldSaved
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 10000));
+    Promise.race([allSaved, timeout]).then(() => {
       router.refresh();
       setSaveButtonState("saved");
       toast.success("All changes saved", { duration: 3000 });
       setTimeout(() => setSaveButtonState("idle"), 3000);
-    }, 1200);
+    });
   }
 
   const branchLabel = selectedBranch || "All Branches";

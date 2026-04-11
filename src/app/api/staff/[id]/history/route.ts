@@ -6,61 +6,66 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const session = await auth();
+    if (!session?.user?.id || !session.user.isApproved) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    // Verify dispatcher belongs to this agent
+    const dispatcher = await prisma.dispatcher.findFirst({
+      where: { id, branch: { agentId: session.user.id } },
+      select: { id: true },
+    });
+
+    if (!dispatcher) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    const records = await prisma.salaryRecord.findMany({
+      where: { dispatcherId: id },
+      select: {
+        id: true,
+        month: true,
+        year: true,
+        netSalary: true,
+        baseSalary: true,
+        incentive: true,
+        petrolSubsidy: true,
+        penalty: true,
+        advance: true,
+        totalOrders: true,
+        weightTiersSnapshot: true,
+        incentiveSnapshot: true,
+        petrolSnapshot: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+    });
+
+    const history = records.map((r) => ({
+      salaryRecordId: r.id,
+      month: r.month,
+      year: r.year,
+      netSalary: r.netSalary,
+      baseSalary: r.baseSalary,
+      incentive: r.incentive,
+      petrolSubsidy: r.petrolSubsidy,
+      penalty: r.penalty,
+      advance: r.advance,
+      totalOrders: r.totalOrders,
+      wasRecalculated: r.updatedAt.getTime() > r.createdAt.getTime() + 1000,
+      weightTiersSnapshot: r.weightTiersSnapshot,
+      incentiveSnapshot: r.incentiveSnapshot,
+      petrolSnapshot: r.petrolSnapshot,
+    }));
+
+    return NextResponse.json(history);
+  } catch (err) {
+    console.error("[staff/history] GET error", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const { id } = await params;
-
-  // Verify dispatcher belongs to this agent
-  const dispatcher = await prisma.dispatcher.findFirst({
-    where: { id, branch: { agentId: session.user.id } },
-    select: { id: true },
-  });
-
-  if (!dispatcher) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  const records = await prisma.salaryRecord.findMany({
-    where: { dispatcherId: id },
-    select: {
-      id: true,
-      month: true,
-      year: true,
-      netSalary: true,
-      baseSalary: true,
-      incentive: true,
-      petrolSubsidy: true,
-      penalty: true,
-      advance: true,
-      totalOrders: true,
-      weightTiersSnapshot: true,
-      incentiveSnapshot: true,
-      petrolSnapshot: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: [{ year: "desc" }, { month: "desc" }],
-  });
-
-  const history = records.map((r) => ({
-    salaryRecordId: r.id,
-    month: r.month,
-    year: r.year,
-    netSalary: r.netSalary,
-    baseSalary: r.baseSalary,
-    incentive: r.incentive,
-    petrolSubsidy: r.petrolSubsidy,
-    penalty: r.penalty,
-    advance: r.advance,
-    totalOrders: r.totalOrders,
-    wasRecalculated: r.updatedAt.getTime() > r.createdAt.getTime() + 1000,
-    weightTiersSnapshot: r.weightTiersSnapshot,
-    incentiveSnapshot: r.incentiveSnapshot,
-    petrolSnapshot: r.petrolSnapshot,
-  }));
-
-  return NextResponse.json(history);
 }

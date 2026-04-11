@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
-import { getAgentDefaults } from "@/lib/db/staff";
+import { computeIsComplete, getAgentDefaults } from "@/lib/db/staff";
 
 export async function POST(req: NextRequest) {
+  try {
   const session = await auth();
   if (!session?.user?.id || !session.user.isApproved) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -100,11 +101,15 @@ export async function POST(req: NextRequest) {
       avatarUrl: dispatcher.avatarUrl,
       isPinned: false,
       branchCode: branch.code,
-      isComplete: true,
+      isComplete: computeIsComplete(dispatcher.name, dispatcher.icNo, dispatcher.extId),
       rawIcNo: dispatcher.icNo,
       weightTiers: wt,
       incentiveRule: ir,
       petrolRule: pr,
     },
   }, { status: 201 });
+  } catch (err) {
+    console.error("[staff] POST error", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

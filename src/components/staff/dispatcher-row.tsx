@@ -198,29 +198,56 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
     setWeightTiers(dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS);
     setIcError(null);
     onErrorChange(dispatcher.id, false);
+    // Reset baseline to match new server state
+    baselineRef.current = {
+      icNo: dispatcher.rawIcNo,
+      branchCode: dispatcher.branchCode,
+      incentiveEnabled: (dispatcher.incentiveRule?.orderThreshold ?? 0) > 0,
+      orderThreshold: dispatcher.incentiveRule?.orderThreshold ?? 2000,
+      incentiveAmount: dispatcher.incentiveRule?.incentiveAmount ?? 0,
+      isEligible: dispatcher.petrolRule?.isEligible ?? false,
+      dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
+      subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
+      weightTiers: dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
+    };
+    setBaselineVersion((v) => v + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataVersion]);
 
-  // Dirty tracking
+  // Counter to force isDirty recalculation when baseline changes (refs don't trigger useMemo)
+  const [baselineVersion, setBaselineVersion] = useState(0);
+
+  // Baseline for dirty tracking — updated on save success and server refresh
+  const baselineRef = useRef({
+    icNo: dispatcher.rawIcNo,
+    branchCode: dispatcher.branchCode,
+    incentiveEnabled: (dispatcher.incentiveRule?.orderThreshold ?? 0) > 0,
+    orderThreshold: dispatcher.incentiveRule?.orderThreshold ?? 2000,
+    incentiveAmount: dispatcher.incentiveRule?.incentiveAmount ?? 0,
+    isEligible: dispatcher.petrolRule?.isEligible ?? false,
+    dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
+    subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
+    weightTiers: dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
+  });
+
+  // Dirty tracking — compare against baseline (last saved or server-refreshed state)
   const isDirty = useMemo(() => {
-    if (icNo !== dispatcher.rawIcNo) return true;
-    if (branchCode !== dispatcher.branchCode) return true;
-    const origOT = dispatcher.incentiveRule?.orderThreshold ?? 2000;
-    const origIA = dispatcher.incentiveRule?.incentiveAmount ?? 0;
-    const origEnabled = origOT > 0;
-    if (incentiveEnabled !== origEnabled) return true;
-    if (incentiveEnabled && (orderThreshold !== origOT || incentiveAmount !== origIA)) return true;
-    if (isEligible !== (dispatcher.petrolRule?.isEligible ?? false)) return true;
-    if (dailyThreshold !== (dispatcher.petrolRule?.dailyThreshold ?? 70)) return true;
-    if (subsidyAmount !== (dispatcher.petrolRule?.subsidyAmount ?? 15)) return true;
-    const origTiers = dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS;
+    const b = baselineRef.current;
+    if (icNo !== b.icNo) return true;
+    if (branchCode !== b.branchCode) return true;
+    if (incentiveEnabled !== b.incentiveEnabled) return true;
+    if (incentiveEnabled && (orderThreshold !== b.orderThreshold || incentiveAmount !== b.incentiveAmount)) return true;
+    if (isEligible !== b.isEligible) return true;
+    if (dailyThreshold !== b.dailyThreshold) return true;
+    if (subsidyAmount !== b.subsidyAmount) return true;
     for (let i = 0; i < 3; i++) {
-      if (origTiers[i].commission !== weightTiers[i].commission) return true;
-      if (origTiers[i].minWeight !== weightTiers[i].minWeight) return true;
-      if (origTiers[i].maxWeight !== weightTiers[i].maxWeight) return true;
+      if (b.weightTiers[i].commission !== weightTiers[i].commission) return true;
+      if (b.weightTiers[i].minWeight !== weightTiers[i].minWeight) return true;
+      if (b.weightTiers[i].maxWeight !== weightTiers[i].maxWeight) return true;
     }
     return false;
-  }, [icNo, branchCode, orderThreshold, incentiveAmount, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, dispatcher]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [icNo, branchCode, orderThreshold, incentiveAmount, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, baselineVersion]);
 
   // Report dirty state to parent
   useEffect(() => {
@@ -268,6 +295,19 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
       });
       if (!res.ok) throw new Error();
       const result = await res.json();
+      // Update baseline so isDirty flips to false immediately
+      baselineRef.current = {
+        icNo,
+        branchCode,
+        incentiveEnabled,
+        orderThreshold: incentiveEnabled ? orderThreshold : 0,
+        incentiveAmount,
+        isEligible,
+        dailyThreshold,
+        subsidyAmount,
+        weightTiers,
+      };
+      setBaselineVersion((v) => v + 1);
       onFieldSaved(dispatcher.id, result.isComplete);
     } catch {
       toast.error("Failed to save. Please try again.");
