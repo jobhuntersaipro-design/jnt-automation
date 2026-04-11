@@ -1,37 +1,18 @@
-# Current Feature: Staff Page — Settings History Tab
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Add a History tab to the existing dispatcher drawer alongside the Settings tab
-- Show per-month snapshots from confirmed SalaryRecords (month, net salary, status badge)
-- Inline editing of past month snapshots (weight tiers, incentive, petrol subsidy)
-- Recalculate confirmation dialog showing only changed fields with before/after values
-- Server-side recalculation using existing SalaryLineItem rows (preserves penalty/advance)
-- "Download Updated Payslip" button appears on recalculated rows (PDF via POST)
-- DB migration: add `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` JSON columns to SalaryRecord
-- API: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`
-- Empty state when dispatcher has no salary records (History tab disabled)
-- Only one month panel expanded at a time
-
 ## Notes
-
-- Recalculation uses existing `SalaryLineItem` rows, NOT the original Excel file
-- `penalty` and `advance` are preserved from the original record — never changed during recalculation
-- `wasRecalculated` derived from `updatedAt > createdAt` — no extra DB column needed
-- History scoped by `dispatcher.branch.agentId === session.user.id`
-- Payslip download: `POST /api/payroll/payslip/[salaryRecordId]` → PDF named `payslip_[extId]_[month]_[year].pdf`
-- Files to create: `history-tab.tsx`, `history-month-row.tsx`, `history/route.ts`, `recalculate/route.ts`
-- Files to modify: `dispatcher-drawer.tsx` (add History tab)
-- Full spec: `context/staff-history-tab-spec.md`
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-11: **Staff History Tab — Per-Month Salary Snapshots** — Completed. History drawer accessible via clock icon or dispatcher name click — shows per-month salary records with inline editing of past snapshots (weight tiers, incentive, petrol subsidy). Recalculation uses existing SalaryLineItem rows; penalty/advance preserved. Confirmation dialog shows only changed fields with before/after values. `wasRecalculated` derived from `updatedAt > createdAt`. Latest month auto-expanded. Save-on-click replaces save-on-blur for inline table — dirty tracking with "Unsaved" status indicator, Save button shows count + transitions to "Saved" for 3s. Branch editable via dropdown with chevron hint. Dashed border hover effects on all editable fields. Green toggle for incentive, yellow toggle for petrol in drawer. Up/down stepper buttons on amount fields. Prisma migration adds `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` (Json?) and `updatedAt` to SalaryRecord. API routes: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`, `PATCH /api/staff/[id]/settings` (branchCode). Files: `src/components/staff/{history-tab,history-month-row,dispatcher-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/[id]/{history,recalculate}/route.ts`, `src/app/api/staff/[id]/settings/route.ts`, `prisma/schema.prisma`. Spec: `context/features/staff-history-tab-spec.md`.
 - 2026-04-10: **Staff Phase 3 — Add Dispatcher, Avatar Upload, Agent Defaults** — Completed. Add Dispatcher drawer with name, extId, IC number, branch fields — creation seeds 3 default weight tiers, incentive rule, and petrol rule in a single transaction. Avatar upload/remove via Cloudflare R2 (JPG/PNG/WebP, max 2MB) with lightbox preview on click (upload, remove, close controls). Agent-level defaults drawer to view/edit default salary rules and bulk-apply to all or selected dispatchers. Completeness = name + IC + extId (incentive amount irrelevant). extId uniqueness enforced per branch (409). Prisma migration for `AgentDefault` model. API routes: `POST /api/staff` (create dispatcher), `POST/DELETE /api/staff/[id]/avatar` (R2 upload/remove), `GET/PUT /api/staff/defaults`, `POST /api/staff/apply-defaults`. R2 client at `src/lib/r2.ts`. Row-level checkbox selection for bulk operations. Files: `src/components/staff/{add-dispatcher-drawer,avatar-upload,defaults-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/{route,defaults/route,apply-defaults/route,[id]/avatar/route}.ts`, `src/lib/db/staff.ts`, `src/lib/r2.ts`, `prisma/schema.prisma`.
 - 2026-04-10: **Staff Phase 2 — Inline Dispatcher Settings + UI Fixes** — Completed. Replaced drawer with inline-editable fields per row: IC number (12-digit validation with error message), incentive (eligible toggle, min orders, amount), petrol subsidy (eligible toggle, daily threshold, subsidy amount) — all auto-save on blur via `PATCH /api/staff/[id]/settings`. Weight tiers shown as compact RM chips (`RM1.00 RM1.40 RM2.20`) with pencil icon on hover; click opens popover with all 3 tiers editable (min/max weight + commission). Incentive colored `#12B981`, petrol `#FBC024` with matching toggles and vertical separator bars. Toggled-off fields show "—". Gender derived from IC (odd=Male, even=Female). Grouped column headers with colored labels. API: `GET` + `PATCH /api/staff/[id]/settings` with `agentId` ownership, upsert for rules, completeness recomputation. Also: toast close button + swipe-to-dismiss, chart focus outline removed, Y-axis K format (<1M), dispatcher performance penalty/advance columns + box pagination (50/page), branch distribution tighter Y-axis, Google profile picture fix. Files: `src/components/staff/dispatcher-row.tsx`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/settings/route.ts`, `src/lib/db/staff.ts`, `src/lib/utils/gender.ts`, `src/components/staff/{dispatcher-drawer,incentive-section,petrol-section,weight-tier-section}.tsx`, `src/components/ui/toast-close-icon.tsx`, `src/app/globals.css`, `src/app/layout.tsx`, `src/auth.ts`, dashboard chart components.
 - 2026-04-08: **Staff Phase 1 — UI Layout + Dispatcher List** — Completed. Staff page at `/staff` with full dispatcher list from Neon DB via Prisma. Single `StaffClient` client component handles all UI: branch filter (single-select dropdown), search by name/ID, pagination (20/page) — all client-side filtering for instant response. Pin/unpin dispatchers with FLIP animation + optimistic updates + `router.refresh()` background sync. Delete with confirmation dialog + cascade. Side drawer shell (Phase 2 content). IC masked (last 4 digits), `isComplete` status dot, gender-based avatar ring via CSS vars. Loading skeleton. API routes: `PATCH /api/staff/[id]/pin`, `DELETE /api/staff/[id]` — both with `agentId` ownership + `isApproved` gate. Proxy matcher expanded to cover `/staff`, `/payroll`, `/upload`. Dashboard layout `isApproved` defence-in-depth. Vitest setup (`vitest.config.ts`, `test`/`test:watch` scripts). Files: `src/app/(dashboard)/staff/page.tsx`, `src/lib/db/staff.ts`, `src/components/staff/staff-client.tsx`, `src/app/api/staff/[id]/pin/route.ts`, `src/app/api/staff/[id]/route.ts`, `src/app/(dashboard)/staff/loading.tsx`. Spec files added: `context/features/staff-phase-{1,2,3}-spec.md`.
