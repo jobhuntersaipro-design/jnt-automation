@@ -1,37 +1,18 @@
-# Current Feature: Payroll Phase 1 — Page Shell + State Machine + Upload History
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-- Replace "Upload" nav item with "Payroll"
-- Top section: branch + month selector + upload zone with state-based rendering (NONE → UPLOADING → PROCESSING → CONFIRM_SETTINGS → NEEDS_ATTENTION → READY_TO_CONFIRM → SAVED → FAILED)
-- Bottom section: history list of all past confirmed payrolls grouped by branch
-- Branch + dispatcher filter on history list
-- Stale job detection on page load (PROCESSING >5min → FAILED)
-- Duplicate upload warning with confirmation dialog
-- Upload zone: drag-and-drop .xlsx/.xls, presigned URL upload to R2
-- Processing card with 2s polling
-- CONFIRM_SETTINGS card with "Review Staff Settings" + "Use Current Settings & Calculate" buttons
-- SAVED state shows "View in history ↓" scroll link
-- FAILED state shows error + retry button
-- API: `GET /api/payroll` (history), `GET /api/payroll/[branchCode]/[month]/[year]` (upload state)
-
 ## Notes
-
-- Spec: `context/features/payroll-phase-1-spec.md`
-- Upload zone reuses existing upload init/process/status APIs from Upload Phase 1
-- "View" in history → `/payroll/[uploadId]` (Phase 3, not this phase)
-- "Export" in history → CSV / Google Sheets (Phase 4, not this phase)
-- CONFIRM_SETTINGS: "Review Staff Settings" opens `/staff` in new tab; "Use Current Settings" calls `POST /api/upload/[uploadId]/calculate`
-- History list format: branch group → month rows with dispatcher count + total net payout + View + Export buttons
 
 ## History
 
 > Sorted from latest to earliest.
 
+- 2026-04-11: **Payroll Phase 1 — Page Shell + State Machine + Upload History** — Completed. Unified Payroll page at `/payroll` replaces separate Upload nav item (nav: Overview | Payroll | Staff). Top section: branch + month/year selectors with state-machine UI rendering based on upload status (NONE → UPLOADING → PROCESSING → CONFIRM_SETTINGS → SAVED/FAILED). Drag-and-drop upload zone for .xlsx/.xls files with presigned R2 URL upload. Processing card with 2s polling and elapsed timer. CONFIRM_SETTINGS card with "Review Staff Settings" (opens `/staff` in new tab) + "Use Current Settings & Calculate" buttons. SAVED state shows "View in history ↓" scroll link. FAILED state shows error message + retry button. Custom duplicate-upload confirmation dialog (replaces `window.confirm`). Bottom section: payroll history list grouped by branch with multi-select branch filter + search by branch/month/year. View + Export buttons per record (Phase 3/4). Stale job detection on page load marks PROCESSING uploads >5min as FAILED. Fixed `markStaleUploadsFailed` — `updateMany` doesn't support nested relation filters, switched to findMany+updateMany by ID. API routes: `GET /api/payroll` (history with dispatcher count + total net payout), `GET /api/payroll/[branchCode]/[month]/[year]` (upload state). DB layer: `src/lib/db/payroll.ts`. Files: `src/app/(dashboard)/payroll/page.tsx`, `src/app/api/payroll/{route,[branchCode]/[month]/[year]/route}.ts`, `src/components/payroll/{payroll-client,payroll-state-machine,upload-zone,processing-card,confirm-settings-card,status-cards,payroll-history}.tsx`, `src/lib/db/payroll.ts`. Spec: `context/features/payroll-phase-1-spec.md`.
 - 2026-04-11: **Upload Phase 1 — File Upload + QStash Background Processing** — Completed. Backend API layer for Excel file upload flow. `POST /api/upload/init` creates Upload row + generates R2 presigned URL for client-side upload; detects duplicate branch+month uploads with confirmation flow and transactional cascade replacement. `POST /api/upload/[uploadId]/process` queues QStash background job and sets PROCESSING status. `GET /api/upload/[uploadId]/status` for 2s polling. `POST /api/upload/worker` signature-verified QStash worker shell (processing logic deferred to Phase 2). Stale detection marks PROCESSING uploads >5 min as FAILED. Prisma migration adds `UploadStatus` enum (UPLOADING, PROCESSING, CONFIRM_SETTINGS, NEEDS_ATTENTION, READY_TO_CONFIRM, FAILED, SAVED), `status`, `errorMessage`, `updatedAt` to Upload model. Existing uploads backfilled as SAVED. DB query layer at `src/lib/db/upload.ts`. Dependencies: `@upstash/qstash`, `@aws-sdk/s3-request-presigner`. Env vars: `QSTASH_URL`, `QSTASH_TOKEN`, `QSTASH_CURRENT_SIGNING_KEY`, `QSTASH_NEXT_SIGNING_KEY`, `NEXT_PUBLIC_APP_URL`. Also: staff delete dialog loading state + disabled buttons during deletion. Spec: `context/features/upload-phase-1-spec.md`.
 - 2026-04-11: **Staff History Tab — Per-Month Salary Snapshots** — Completed. History drawer accessible via clock icon or dispatcher name click — shows per-month salary records with inline editing of past snapshots (weight tiers, incentive, petrol subsidy). Recalculation uses existing SalaryLineItem rows; penalty/advance preserved. Confirmation dialog shows only changed fields with before/after values. `wasRecalculated` derived from `updatedAt > createdAt`. Latest month auto-expanded. Save-on-click replaces save-on-blur for inline table — dirty tracking with "Unsaved" status indicator, Save button shows count + transitions to "Saved" for 3s. Branch editable via dropdown with chevron hint. Dashed border hover effects on all editable fields. Green toggle for incentive, yellow toggle for petrol in drawer. Up/down stepper buttons on amount fields. Prisma migration adds `weightTiersSnapshot`, `incentiveSnapshot`, `petrolSnapshot` (Json?) and `updatedAt` to SalaryRecord. API routes: `GET /api/staff/[id]/history`, `POST /api/staff/[id]/recalculate`, `PATCH /api/staff/[id]/settings` (branchCode). Files: `src/components/staff/{history-tab,history-month-row,dispatcher-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/[id]/{history,recalculate}/route.ts`, `src/app/api/staff/[id]/settings/route.ts`, `prisma/schema.prisma`. Spec: `context/features/staff-history-tab-spec.md`.
 - 2026-04-10: **Staff Phase 3 — Add Dispatcher, Avatar Upload, Agent Defaults** — Completed. Add Dispatcher drawer with name, extId, IC number, branch fields — creation seeds 3 default weight tiers, incentive rule, and petrol rule in a single transaction. Avatar upload/remove via Cloudflare R2 (JPG/PNG/WebP, max 2MB) with lightbox preview on click (upload, remove, close controls). Agent-level defaults drawer to view/edit default salary rules and bulk-apply to all or selected dispatchers. Completeness = name + IC + extId (incentive amount irrelevant). extId uniqueness enforced per branch (409). Prisma migration for `AgentDefault` model. API routes: `POST /api/staff` (create dispatcher), `POST/DELETE /api/staff/[id]/avatar` (R2 upload/remove), `GET/PUT /api/staff/defaults`, `POST /api/staff/apply-defaults`. R2 client at `src/lib/r2.ts`. Row-level checkbox selection for bulk operations. Files: `src/components/staff/{add-dispatcher-drawer,avatar-upload,defaults-drawer,dispatcher-row,staff-client}.tsx`, `src/app/api/staff/{route,defaults/route,apply-defaults/route,[id]/avatar/route}.ts`, `src/lib/db/staff.ts`, `src/lib/r2.ts`, `prisma/schema.prisma`.
