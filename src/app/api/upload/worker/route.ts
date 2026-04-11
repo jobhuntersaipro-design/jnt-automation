@@ -1,18 +1,19 @@
 import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
 import { updateUploadStatus } from "@/lib/db/upload";
+import { processUpload, calculateAfterConfirm } from "@/lib/upload/pipeline";
 
 async function handler(req: Request) {
-  const { uploadId } = (await req.json()) as { uploadId: string };
+  const { uploadId, phase } = (await req.json()) as {
+    uploadId: string;
+    phase?: "calculate";
+  };
 
   try {
-    // TODO: Upload Phase 2 — parse Excel, calculate salaries, store results
-    // For now, mark as FAILED with a placeholder message
-    await updateUploadStatus(
-      uploadId,
-      "FAILED",
-      "Processing not yet implemented (Upload Phase 2).",
-    );
-
+    if (phase === "calculate") {
+      await calculateAfterConfirm(uploadId);
+    } else {
+      await processUpload(uploadId);
+    }
     return new Response("ok");
   } catch (error) {
     const message =

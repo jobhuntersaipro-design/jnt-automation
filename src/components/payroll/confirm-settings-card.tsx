@@ -2,11 +2,17 @@
 
 import { ExternalLink } from "lucide-react";
 
+interface UnknownDispatcher {
+  extId: string;
+  name: string;
+}
+
 interface ConfirmSettingsCardProps {
   branchCode: string;
   month: number;
   year: number;
-  uploadId: string;
+  knownCount?: number;
+  unknownDispatchers?: UnknownDispatcher[];
   onConfirm: () => void;
   isConfirming: boolean;
 }
@@ -15,11 +21,15 @@ export function ConfirmSettingsCard({
   branchCode,
   month,
   year,
-  uploadId: _uploadId,
+  knownCount,
+  unknownDispatchers,
   onConfirm,
   isConfirming,
 }: ConfirmSettingsCardProps) {
   const monthName = new Date(year, month - 1).toLocaleString("en", { month: "long" });
+  const unknownCount = unknownDispatchers?.length ?? 0;
+  const totalCount = (knownCount ?? 0) + unknownCount;
+  const hasCounts = knownCount != null;
 
   return (
     <div className="flex flex-col items-center justify-center gap-4 p-10 rounded-lg bg-surface-card border border-outline-variant/15">
@@ -32,11 +42,38 @@ export function ConfirmSettingsCard({
         <p className="text-[0.95rem] font-semibold text-on-surface">
           File parsed successfully
         </p>
+        {hasCounts && (
+          <p className="text-[0.85rem] text-on-surface-variant mt-1">
+            {totalCount} dispatcher{totalCount !== 1 ? "s" : ""} found
+            {unknownCount > 0
+              ? ` (${knownCount} known, ${unknownCount} new)`
+              : ""}
+          </p>
+        )}
         <p className="text-[0.85rem] text-on-surface-variant mt-1">
           Before calculating salaries, please confirm staff settings are up to date for{" "}
           <span className="font-medium text-on-surface">{branchCode} &mdash; {monthName} {year}</span>.
         </p>
       </div>
+
+      {unknownCount > 0 && unknownDispatchers && (
+        <div className="w-full max-w-sm rounded-md bg-amber-50 border border-amber-200/60 px-4 py-3">
+          <p className="text-[0.8rem] font-medium text-amber-800 mb-1.5">
+            New dispatchers (not yet in system):
+          </p>
+          <ul className="text-[0.78rem] text-amber-700 space-y-0.5">
+            {unknownDispatchers.map((d) => (
+              <li key={d.extId}>
+                {d.name} <span className="text-amber-600/70">({d.extId})</span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-[0.75rem] text-amber-600 mt-2">
+            These dispatchers will be skipped. Add them on the Staff page to include them.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mt-1">
         <a
           href="/staff"

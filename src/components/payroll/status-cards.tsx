@@ -37,9 +37,10 @@ interface SavedCardProps {
   month: number;
   year: number;
   onScrollToHistory: () => void;
+  warning?: string;
 }
 
-export function SavedCard({ month, year, onScrollToHistory }: SavedCardProps) {
+export function SavedCard({ month, year, onScrollToHistory, warning }: SavedCardProps) {
   const monthName = new Date(year, month - 1).toLocaleString("en", { month: "long" });
 
   return (
@@ -51,6 +52,11 @@ export function SavedCard({ month, year, onScrollToHistory }: SavedCardProps) {
         <p className="text-[0.95rem] font-semibold text-on-surface">
           {monthName} {year} payroll confirmed
         </p>
+        {warning && (
+          <p className="text-[0.8rem] text-amber-700 mt-1.5 max-w-md">
+            {warning}
+          </p>
+        )}
       </div>
       <button
         onClick={onScrollToHistory}

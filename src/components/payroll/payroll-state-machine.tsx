@@ -10,11 +10,18 @@ import { FailedCard, SavedCard, UploadingCard } from "./status-cards";
 
 type UploadState = "NONE" | "UPLOADING" | "PROCESSING" | "CONFIRM_SETTINGS" | "NEEDS_ATTENTION" | "READY_TO_CONFIRM" | "FAILED" | "SAVED";
 
+interface UnknownDispatcher {
+  extId: string;
+  name: string;
+}
+
 interface UploadInfo {
   id: string;
   status: UploadState;
   errorMessage?: string | null;
   fileName?: string;
+  knownCount?: number;
+  unknownDispatchers?: UnknownDispatcher[];
 }
 
 interface DuplicateInfo {
@@ -87,8 +94,14 @@ export function PayrollStateMachine({
         const data = await res.json();
         if (data.status !== state) {
           setState(data.status);
-          setUpload((prev) => prev ? { ...prev, status: data.status, errorMessage: data.errorMessage } : null);
-          if (data.status === "SAVED") {
+          setUpload((prev) => prev ? {
+            ...prev,
+            status: data.status,
+            errorMessage: data.errorMessage,
+            knownCount: data.knownCount,
+            unknownDispatchers: data.unknownDispatchers,
+          } : null);
+          if (data.status === "SAVED" || data.status === "NEEDS_ATTENTION") {
             onUploadComplete();
           }
         }
@@ -350,7 +363,8 @@ export function PayrollStateMachine({
                 branchCode={branchCode}
                 month={month}
                 year={year}
-                uploadId={upload?.id ?? ""}
+                knownCount={upload?.knownCount}
+                unknownDispatchers={upload?.unknownDispatchers}
                 onConfirm={handleConfirm}
                 isConfirming={isConfirming}
               />
@@ -374,7 +388,16 @@ export function PayrollStateMachine({
               />
             );
 
-          // NEEDS_ATTENTION and READY_TO_CONFIRM are Phase 2 — show placeholder
+          case "NEEDS_ATTENTION":
+            return (
+              <SavedCard
+                month={month}
+                year={year}
+                onScrollToHistory={onScrollToHistory}
+                warning="Some dispatchers were skipped because they are not in the system. Add them on the Staff page and re-upload to include them."
+              />
+            );
+
           default:
             return (
               <div className="flex flex-col items-center justify-center gap-2 p-10 rounded-lg bg-surface-card border border-outline-variant/15">

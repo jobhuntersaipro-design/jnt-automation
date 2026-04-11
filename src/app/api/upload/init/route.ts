@@ -100,6 +100,7 @@ export async function POST(req: NextRequest) {
 
   const uploadId = await replaceUpload({
     existingUploadId,
+    agentId: session.user.id,
     branchId: branch.id,
     fileName,
     r2Key,

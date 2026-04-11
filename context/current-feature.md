@@ -1,12 +1,32 @@
-# Current Feature
+# Current Feature: Upload Phase 2 — Excel Parsing + Salary Calculation
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+- QStash worker parses Excel file from R2 using exceljs (columns A, K, L, M, N, Q)
+- Known vs unknown dispatcher split — known dispatchers proceed, unknown flagged
+- Status set to CONFIRM_SETTINGS after parsing with known/unknown counts
+- After agent confirms → salary calculation runs for known dispatchers
+- Salary engine: base salary (weight tier commissions) + incentive + petrol subsidy
+- Parsed data + preview results stored in Vercel KV (2h/1h TTL)
+- CONFIRM_SETTINGS card on Payroll page shows dispatcher counts + "Review Staff Settings" / "Use Current Settings & Calculate" buttons
+- Unit tests cover all salary calculation scenarios (weight tiers, incentive, petrol, net salary)
+
 ## Notes
+
+- Spec: `context/features/upload-phase-2-spec.md`
+- Dependencies: `exceljs`, `@vercel/kv`
+- Env vars: `KV_URL`, `KV_REST_API_URL`, `KV_REST_API_TOKEN`, `KV_REST_API_READ_ONLY_TOKEN`
+- Excel has 60+ sheets — select "sheet1" explicitly, fallback to first worksheet
+- Edge cases: empty rows skip, billingWeight as string strip non-numeric, Excel serial dates, empty dispatcherId skip
+- Phase A (QStash worker): parse + split + store in KV + set CONFIRM_SETTINGS
+- Phase B (after confirm): read KV + calculate salaries + store preview in KV + set READY_TO_CONFIRM or NEEDS_ATTENTION
+- Penalty/advance = 0 at calculation time (set in preview later)
+- Files to create: `src/lib/upload/{parser,calculator,dispatcher-check,pipeline}.ts`, `src/lib/upload/__tests__/calculator.test.ts`, `src/app/api/upload/[uploadId]/calculate/route.ts`
+- Files to modify: `src/app/api/upload/worker/route.ts`, `src/components/payroll/confirm-settings-card.tsx`
 
 ## History
 

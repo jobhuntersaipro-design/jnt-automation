@@ -57,6 +57,7 @@ export async function createUpload(args: {
  */
 export async function replaceUpload(args: {
   existingUploadId: string;
+  agentId: string;
   branchId: string;
   fileName: string;
   r2Key: string;
@@ -64,6 +65,13 @@ export async function replaceUpload(args: {
   year: number;
 }) {
   return prisma.$transaction(async (tx) => {
+    // Verify ownership before deleting
+    const existing = await tx.upload.findFirst({
+      where: { id: args.existingUploadId, branch: { agentId: args.agentId } },
+      select: { id: true },
+    });
+    if (!existing) throw new Error("Upload not found");
+
     // Cascade deletes SalaryRecords + SalaryLineItems
     await tx.upload.delete({ where: { id: args.existingUploadId } });
 
