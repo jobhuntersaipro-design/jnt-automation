@@ -6,14 +6,13 @@ import { updateUploadStatus } from "@/lib/db/upload";
 import { parseExcelFromR2 } from "./parser";
 import { splitDispatchers } from "./dispatcher-check";
 import { calculateSalary } from "./calculator";
-import type { ParsedRow } from "./parser";
-import type { SalaryResult, DispatcherRules } from "./calculator";
+import type { SalaryResult, DispatcherRules, WeightTierInput, IncentiveRuleInput, PetrolRuleInput } from "./calculator";
 import type { UnknownDispatcher } from "./dispatcher-check";
 
-/** KV key for parsed data (Phase A output). TTL = 2 hours. */
-const parsedKey = (uploadId: string) => `parsed:${uploadId}`;
 /** KV key for parsing metadata (dispatcher counts). TTL = 2 hours. */
 const metaKey = (uploadId: string) => `meta:${uploadId}`;
+/** KV key for preview data (Phase B output, before confirmation). TTL = 2 hours. */
+const previewKey = (uploadId: string) => `preview:${uploadId}`;
 
 export interface UploadMeta {
   knownCount: number;
@@ -40,41 +39,30 @@ export async function processUpload(uploadId: string) {
   // 2. Split known vs unknown
   const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
-  // 3. Store parsed rows + split in KV for Phase B
-  await redis.set(parsedKey(uploadId), { rows, known, unknown }, { ex: 7200 });
-
-  // 4. Store metadata separately for polling endpoint
+  // 3. Store metadata for polling endpoint
   const meta: UploadMeta = {
     knownCount: known.length,
     unknownDispatchers: unknown,
   };
   await redis.set(metaKey(uploadId), meta, { ex: 7200 });
 
-  // 5. Set status to CONFIRM_SETTINGS
+  // 4. Set status to CONFIRM_SETTINGS
   await updateUploadStatus(uploadId, "CONFIRM_SETTINGS");
 }
 
 // ─── Phase B: Calculate (runs after agent confirms settings) ──────
 
 export async function calculateAfterConfirm(uploadId: string) {
-  const cached = await redis.get<{
-    rows: ParsedRow[];
-    known: string[];
-    unknown: UnknownDispatcher[];
-  }>(parsedKey(uploadId));
-
-  if (!cached) {
-    throw new Error("Parsed data expired. Please re-upload the file.");
-  }
-
-  const { rows, known, unknown } = cached;
-
   const upload = await prisma.upload.findUnique({
     where: { id: uploadId },
     include: { branch: { select: { agentId: true } } },
   });
 
   if (!upload) throw new Error("Upload not found");
+
+  // Re-parse from R2 (avoids storing 100K+ rows in KV which exceeds 10MB limit)
+  const rows = await parseExcelFromR2(upload.r2Key);
+  const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
   // Load dispatchers with their salary rules
   const dispatchers = await prisma.dispatcher.findMany({
@@ -120,70 +108,35 @@ export async function calculateAfterConfirm(uploadId: string) {
     results.push(calculateSalary(rules, dispatcherRows));
   }
 
-  // Save salary records + line items in a transaction
-  await prisma.$transaction(async (tx) => {
-    // Delete any existing salary records for this upload (idempotent re-run)
-    await tx.salaryRecord.deleteMany({ where: { uploadId } });
+  // Store compact preview in KV (without lineItems to stay under 10MB limit).
+  // Line items are re-derived from R2 at confirmation time.
+  const compactResults: PreviewResult[] = results.map((r) => ({
+    dispatcherId: r.dispatcherId,
+    extId: r.extId,
+    totalOrders: r.totalOrders,
+    baseSalary: r.baseSalary,
+    incentive: r.incentive,
+    petrolSubsidy: r.petrolSubsidy,
+    penalty: r.penalty,
+    advance: r.advance,
+    netSalary: r.netSalary,
+    lineItems: [], // omitted — re-parsed from R2 at confirmation
+    weightTiersSnapshot: r.weightTiersSnapshot,
+    incentiveSnapshot: r.incentiveSnapshot,
+    petrolSnapshot: r.petrolSnapshot,
+  }));
 
-    // Create salary records (without nested lineItems to avoid N+1)
-    const created = await Promise.all(
-      results.map((result) =>
-        tx.salaryRecord.create({
-          data: {
-            dispatcherId: result.dispatcherId,
-            uploadId,
-            month: upload.month,
-            year: upload.year,
-            totalOrders: result.totalOrders,
-            baseSalary: result.baseSalary,
-            incentive: result.incentive,
-            petrolSubsidy: result.petrolSubsidy,
-            penalty: result.penalty,
-            advance: result.advance,
-            netSalary: result.netSalary,
-            weightTiersSnapshot: JSON.parse(JSON.stringify(result.weightTiersSnapshot)),
-            incentiveSnapshot: JSON.parse(JSON.stringify(result.incentiveSnapshot)),
-            petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
-          },
-          select: { id: true, dispatcherId: true },
-        }),
-      ),
-    );
+  await redis.set(
+    previewKey(uploadId),
+    { results: compactResults, unknownDispatchers: unknown },
+    { ex: 7200 },
+  );
 
-    // Bulk-insert all line items in one createMany call
-    const recordIdByDispatcher = new Map(
-      created.map((r) => [r.dispatcherId, r.id]),
-    );
+  // Set READY_TO_CONFIRM — user reviews rules + preview before saving
+  await updateUploadStatus(uploadId, "READY_TO_CONFIRM");
 
-    const allLineItems = results.flatMap((result) => {
-      const salaryRecordId = recordIdByDispatcher.get(result.dispatcherId);
-      if (!salaryRecordId) return [];
-      return result.lineItems.map((li) => ({
-        salaryRecordId,
-        waybillNumber: li.waybillNumber,
-        weight: li.weight,
-        commission: li.commission,
-        deliveryDate: li.deliveryDate,
-      }));
-    });
-
-    if (allLineItems.length > 0) {
-      await tx.salaryLineItem.createMany({ data: allLineItems });
-    }
-  });
-
-  // Set final status
-  if (unknown.length > 0) {
-    await updateUploadStatus(uploadId, "NEEDS_ATTENTION");
-  } else {
-    await updateUploadStatus(uploadId, "SAVED");
-  }
-
-  // Clean up KV
-  await Promise.all([
-    redis.del(parsedKey(uploadId)),
-    redis.del(metaKey(uploadId)),
-  ]);
+  // Clean up metadata KV
+  await redis.del(metaKey(uploadId));
 }
 
 /**
@@ -195,3 +148,62 @@ export async function getUploadMeta(
 ): Promise<UploadMeta | null> {
   return redis.get<UploadMeta>(metaKey(uploadId));
 }
+
+// ─── Preview KV helpers ─────────────────────────────────────────
+
+export interface SerializedLineItem {
+  waybillNumber: string;
+  weight: number;
+  commission: number;
+  deliveryDate: string | null;
+}
+
+export interface PreviewResult {
+  dispatcherId: string;
+  extId: string;
+  totalOrders: number;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  penalty: number;
+  advance: number;
+  netSalary: number;
+  lineItems: SerializedLineItem[];
+  weightTiersSnapshot: WeightTierInput[];
+  incentiveSnapshot: IncentiveRuleInput;
+  petrolSnapshot: PetrolRuleInput;
+}
+
+export interface PreviewData {
+  results: PreviewResult[];
+  unknownDispatchers: UnknownDispatcher[];
+}
+
+/**
+ * Get preview data from KV. Returns null if expired.
+ */
+export async function getPreviewData(
+  uploadId: string,
+): Promise<PreviewData | null> {
+  return redis.get<PreviewData>(previewKey(uploadId));
+}
+
+/**
+ * Update preview data in KV (e.g. after penalty/advance edits).
+ */
+export async function updatePreviewData(
+  uploadId: string,
+  data: PreviewData,
+): Promise<void> {
+  await redis.set(previewKey(uploadId), data, { ex: 7200 });
+}
+
+/**
+ * Delete preview data from KV (after confirmation).
+ */
+export async function deletePreviewData(
+  uploadId: string,
+): Promise<void> {
+  await redis.del(previewKey(uploadId));
+}
+

@@ -7,6 +7,7 @@ import { UploadZone } from "./upload-zone";
 import { ProcessingCard } from "./processing-card";
 import { ConfirmSettingsCard } from "./confirm-settings-card";
 import { FailedCard, SavedCard, UploadingCard } from "./status-cards";
+import { ReadyToConfirm } from "./ready-to-confirm";
 
 type UploadState = "NONE" | "UPLOADING" | "PROCESSING" | "CONFIRM_SETTINGS" | "NEEDS_ATTENTION" | "READY_TO_CONFIRM" | "FAILED" | "SAVED";
 
@@ -398,17 +399,23 @@ export function PayrollStateMachine({
               />
             );
 
+          case "READY_TO_CONFIRM":
+            return upload?.id ? (
+              <ReadyToConfirm
+                uploadId={upload.id}
+                branchCode={branchCode}
+                month={month}
+                year={year}
+                onConfirmed={() => {
+                  // Refetch state to get correct SAVED vs NEEDS_ATTENTION
+                  fetchState();
+                  onUploadComplete();
+                }}
+              />
+            ) : null;
+
           default:
-            return (
-              <div className="flex flex-col items-center justify-center gap-2 p-10 rounded-lg bg-surface-card border border-outline-variant/15">
-                <p className="text-[0.85rem] text-on-surface-variant">
-                  Status: {state}
-                </p>
-                <p className="text-[0.8rem] text-on-surface-variant/60">
-                  This step will be available in a future update.
-                </p>
-              </div>
-            );
+            return null;
         }
       })()}
     </>
