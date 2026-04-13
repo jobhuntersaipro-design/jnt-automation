@@ -19,9 +19,15 @@ model Agent {
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
-  defaults     AgentDefault?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  defaults              AgentDefault?
+  companyRegistrationNo    String?
+  companyAddress           String?
+  stampImageUrl            String?    // R2 URL for company stamp on payslips
+  googleSheetsAccessToken  String?
+  googleSheetsRefreshToken String?
+  googleSheetsTokenExpiry  DateTime?
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
 }
 
 model AgentDefault {

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { Settings } from "lucide-react";
 import type { PreviewResult } from "@/lib/upload/pipeline";
 
 interface DispatcherNameMap {
@@ -27,11 +28,10 @@ function formatRM(amount: number): string {
 }
 
 /**
- * Calculator-style deduction input: digits shift left as you type.
- * Type 5 → 0.05, type 2 → 0.52, type 0 → 5.20, etc.
+ * Calculator-style input: digits shift left as you type.
  * Uses dots (.) for decimal separator.
  */
-function DeductionInput({
+function CalcInput({
   value,
   onSave,
 }: {
@@ -41,6 +41,11 @@ function DeductionInput({
   const [cents, setCents] = useState(Math.round(value * 100));
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync external value changes
+  useEffect(() => {
+    setCents(Math.round(value * 100));
+  }, [value]);
 
   const displayValue = (cents / 100).toFixed(2);
 
@@ -64,10 +69,6 @@ function DeductionInput({
     }
   }, [cents, value, onSave]);
 
-  const handleFocus = useCallback(() => {
-    setFocused(true);
-  }, []);
-
   return (
     <input
       ref={inputRef}
@@ -77,13 +78,95 @@ function DeductionInput({
       readOnly
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
-      onFocus={handleFocus}
+      onFocus={() => setFocused(true)}
       className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-colors cursor-text ${
         focused
           ? "border-brand outline-none ring-1 ring-brand/30"
           : "border-outline-variant/30"
       }`}
     />
+  );
+}
+
+/**
+ * Weight tier popover — inline in the preview table.
+ */
+function TierPopover({
+  dispatcherName,
+  tiers,
+  onApply,
+  onClose,
+}: {
+  dispatcherName: string;
+  tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>;
+  onApply: (tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>) => void;
+  onClose: () => void;
+}) {
+  const [localTiers, setLocalTiers] = useState(tiers.map((t) => ({ ...t })));
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  const handleCommissionChange = (tierIdx: number, val: string) => {
+    const v = val.replace(",", ".");
+    if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;
+    setLocalTiers((prev) =>
+      prev.map((t, i) => (i === tierIdx ? { ...t, commission: v === "" ? 0 : parseFloat(v) || 0 } : t)),
+    );
+  };
+
+  return (
+    <div
+      ref={popoverRef}
+      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-4 w-72"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-[0.75rem] font-semibold text-on-surface mb-3">
+        Weight Tiers — {dispatcherName}
+      </p>
+      <div className="space-y-2">
+        {localTiers.map((tier, i) => (
+          <div key={tier.tier} className="flex items-center gap-3">
+            <span className="text-[0.72rem] font-semibold text-on-surface-variant w-6">T{tier.tier}</span>
+            <span className="text-[0.72rem] text-on-surface-variant flex-1">
+              {tier.minWeight}–{tier.maxWeight === null ? "∞" : tier.maxWeight}kg
+            </span>
+            <div className="flex items-center gap-1">
+              <span className="text-[0.72rem] text-on-surface-variant">RM</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={tier.commission}
+                onChange={(e) => handleCommissionChange(i, e.target.value)}
+                className="w-16 px-2 py-1 text-[0.78rem] tabular-nums text-right bg-white border border-outline-variant/30 rounded-md text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-outline-variant/15">
+        <button
+          onClick={onClose}
+          className="px-3 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-md transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={() => onApply(localTiers)}
+          className="px-3 py-1 text-[0.75rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors"
+        >
+          Apply
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -95,21 +178,24 @@ export function PreviewTable({
   onResultsUpdate,
 }: PreviewTableProps) {
   const [updating, setUpdating] = useState<string | null>(null);
+  const [tierPopover, setTierPopover] = useState<string | null>(null);
 
-  const handleDeductionChange = useCallback(
-    async (dispatcherId: string, field: "penalty" | "advance", value: number) => {
+  const handleFieldChange = useCallback(
+    async (dispatcherId: string, field: "penalty" | "advance" | "incentive" | "petrolSubsidy", value: number) => {
       const result = results.find((r) => r.dispatcherId === dispatcherId);
       if (!result) return;
 
       const penalty = field === "penalty" ? value : result.penalty;
       const advance = field === "advance" ? value : result.advance;
+      const incentive = field === "incentive" ? value : result.incentive;
+      const petrolSubsidy = field === "petrolSubsidy" ? value : result.petrolSubsidy;
 
       setUpdating(dispatcherId);
       try {
         const res = await fetch(`/api/upload/${uploadId}/preview`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dispatcherId, penalty, advance }),
+          body: JSON.stringify({ dispatcherId, penalty, advance, incentive, petrolSubsidy }),
         });
 
         if (!res.ok) {
@@ -122,13 +208,48 @@ export function PreviewTable({
 
         const updated = results.map((r) =>
           r.dispatcherId === dispatcherId
-            ? { ...r, penalty, advance, netSalary: updatedNetSalary }
+            ? { ...r, penalty, advance, incentive, petrolSubsidy, netSalary: updatedNetSalary }
             : r,
         );
         onResultsUpdate(updated);
         onSummaryUpdate(updatedSummary);
       } catch {
-        toast.error("Failed to update deduction");
+        toast.error("Failed to update");
+      } finally {
+        setUpdating(null);
+      }
+    },
+    [results, uploadId, onResultsUpdate, onSummaryUpdate],
+  );
+
+  const handleTierApply = useCallback(
+    async (dispatcherId: string, newTiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>) => {
+      setTierPopover(null);
+      setUpdating(dispatcherId);
+      try {
+        const res = await fetch(`/api/upload/${uploadId}/preview`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dispatcherId, weightTiers: newTiers }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json();
+          toast.error(data.error || "Failed to update tiers");
+          return;
+        }
+
+        const { updatedBaseSalary, updatedNetSalary, updatedSummary } = await res.json();
+
+        const updated = results.map((r) =>
+          r.dispatcherId === dispatcherId
+            ? { ...r, baseSalary: updatedBaseSalary, netSalary: updatedNetSalary, weightTiersSnapshot: newTiers }
+            : r,
+        );
+        onResultsUpdate(updated);
+        onSummaryUpdate(updatedSummary);
+      } catch {
+        toast.error("Failed to update tiers");
       } finally {
         setUpdating(null);
       }
@@ -149,7 +270,8 @@ export function PreviewTable({
               <th className="py-3 px-3 font-medium text-right">Petrol</th>
               <th className="py-3 px-3 font-medium text-right">Penalty</th>
               <th className="py-3 px-3 font-medium text-right">Advance</th>
-              <th className="py-3 px-4 font-medium text-right">Net Salary</th>
+              <th className="py-3 px-3 font-medium text-right">Net Salary</th>
+              <th className="py-3 px-3 font-medium text-center w-12">Tiers</th>
             </tr>
           </thead>
           <tbody>
@@ -173,26 +295,49 @@ export function PreviewTable({
                   <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
                     {formatRM(r.baseSalary)}
                   </td>
-                  <td className={`py-2.5 px-3 text-right tabular-nums ${r.incentive > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                    {formatRM(r.incentive)}
-                  </td>
-                  <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolSubsidy > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                    {formatRM(r.petrolSubsidy)}
+                  <td className="py-2.5 px-3 text-right">
+                    <CalcInput
+                      value={r.incentive}
+                      onSave={(val) => handleFieldChange(r.dispatcherId, "incentive", val)}
+                    />
                   </td>
                   <td className="py-2.5 px-3 text-right">
-                    <DeductionInput
+                    <CalcInput
+                      value={r.petrolSubsidy}
+                      onSave={(val) => handleFieldChange(r.dispatcherId, "petrolSubsidy", val)}
+                    />
+                  </td>
+                  <td className="py-2.5 px-3 text-right">
+                    <CalcInput
                       value={r.penalty}
-                      onSave={(val) => handleDeductionChange(r.dispatcherId, "penalty", val)}
+                      onSave={(val) => handleFieldChange(r.dispatcherId, "penalty", val)}
                     />
                   </td>
                   <td className="py-2.5 px-3 text-right">
-                    <DeductionInput
+                    <CalcInput
                       value={r.advance}
-                      onSave={(val) => handleDeductionChange(r.dispatcherId, "advance", val)}
+                      onSave={(val) => handleFieldChange(r.dispatcherId, "advance", val)}
                     />
                   </td>
-                  <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
+                  <td className="py-2.5 px-3 text-right tabular-nums font-semibold text-brand">
                     {formatRM(r.netSalary)}
+                  </td>
+                  <td className="py-2.5 px-3 text-center relative">
+                    <button
+                      onClick={() => setTierPopover(tierPopover === r.dispatcherId ? null : r.dispatcherId)}
+                      className="p-1.5 text-on-surface-variant/50 hover:text-brand hover:bg-brand/5 rounded-md transition-colors"
+                      title="Edit weight tiers"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                    {tierPopover === r.dispatcherId && (
+                      <TierPopover
+                        dispatcherName={info?.name ?? r.extId}
+                        tiers={r.weightTiersSnapshot}
+                        onApply={(tiers) => handleTierApply(r.dispatcherId, tiers)}
+                        onClose={() => setTierPopover(null)}
+                      />
+                    )}
                   </td>
                 </tr>
               );

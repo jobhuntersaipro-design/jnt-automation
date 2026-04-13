@@ -121,11 +121,10 @@ export async function POST(
     }
 
     // Transaction: delete old + bulk create records + bulk create line items
+    // Use chunked line item inserts to avoid transaction timeout
     await prisma.$transaction(async (tx) => {
       await tx.salaryRecord.deleteMany({ where: { uploadId } });
 
-      // Create records one at a time to get IDs (createMany doesn't return IDs)
-      // but do it sequentially to avoid batch timeout
       const recordIdByDispatcher = new Map<string, string>();
       for (const data of salaryRecordData) {
         const record = await tx.salaryRecord.create({
@@ -135,7 +134,7 @@ export async function POST(
         recordIdByDispatcher.set(record.dispatcherId, record.id);
       }
 
-      // Bulk insert all line items
+      // Build all line items
       const allLineItems: {
         salaryRecordId: string;
         waybillNumber: string;
@@ -153,15 +152,19 @@ export async function POST(
         }
       }
 
-      if (allLineItems.length > 0) {
-        await tx.salaryLineItem.createMany({ data: allLineItems });
+      // Insert line items in chunks of 5000 to avoid timeout
+      const CHUNK_SIZE = 5000;
+      for (let i = 0; i < allLineItems.length; i += CHUNK_SIZE) {
+        await tx.salaryLineItem.createMany({
+          data: allLineItems.slice(i, i + CHUNK_SIZE),
+        });
       }
 
       await tx.upload.update({
         where: { id: uploadId },
         data: { status: "SAVED" },
       });
-    }, { timeout: 30000 });
+    }, { timeout: 120000 });
 
     // Clean up KV
     await deletePreviewData(uploadId);

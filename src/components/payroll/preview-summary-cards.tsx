@@ -23,13 +23,13 @@ function SummaryCard({
 }) {
   if (isHero) {
     return (
-      <div className="rounded-xl p-5 text-white"
+      <div className="rounded-xl p-4 text-white flex flex-col justify-center"
         style={{ background: "linear-gradient(135deg, #0056D2, #0056d2)" }}
       >
         <p className="text-[0.72rem] uppercase tracking-wider text-white/70 font-medium">
           {label}
         </p>
-        <p className="text-[1.5rem] font-bold tracking-tight mt-1 tabular-nums">
+        <p className="text-[1.25rem] font-bold tracking-tight mt-1 tabular-nums">
           {value}
         </p>
       </div>
@@ -37,11 +37,11 @@ function SummaryCard({
   }
 
   return (
-    <div className="rounded-xl bg-surface-card p-4 border-l-4 border-tertiary">
+    <div className="rounded-xl bg-surface-card p-4 border-l-4 border-tertiary flex flex-col justify-center">
       <p className="text-[0.72rem] uppercase tracking-wider text-on-surface-variant font-medium">
         {label}
       </p>
-      <p className="text-[1.1rem] font-semibold text-on-surface mt-1 tabular-nums">
+      <p className="text-[0.95rem] font-semibold text-on-surface mt-0.5 tabular-nums whitespace-nowrap">
         {value}
       </p>
     </div>

@@ -12,6 +12,7 @@ interface SettingsClientProps {
   imageUrl: string | null;
   hasPassword: boolean;
   connectedProviders: string[];
+  googleSheetsConnected: boolean;
 }
 
 export function SettingsClient({
@@ -20,11 +21,13 @@ export function SettingsClient({
   imageUrl,
   hasPassword,
   connectedProviders,
+  googleSheetsConnected,
 }: SettingsClientProps) {
   return (
     <div className="flex flex-col gap-10">
       <ProfileSection initialName={initialName} email={email} imageUrl={imageUrl} />
       <SecuritySection hasPassword={hasPassword} connectedProviders={connectedProviders} />
+      <GoogleSheetsSection connected={googleSheetsConnected} />
       <DangerZoneSection />
     </div>
   );
@@ -292,6 +295,70 @@ function SecuritySection({
               {isGoogleLinked ? "Connected" : "Connect"}
             </button>
           </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Google Sheets ──────────────────────────────────────── */
+
+function GoogleSheetsSection({ connected }: { connected: boolean }) {
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [isConnected, setIsConnected] = useState(connected);
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    const res = await fetch("/api/auth/google-sheets/disconnect", { method: "DELETE" });
+    setDisconnecting(false);
+
+    if (!res.ok) {
+      toast.error("Failed to disconnect Google Sheets.");
+      return;
+    }
+
+    setIsConnected(false);
+    toast.success("Google Sheets disconnected.");
+  }
+
+  return (
+    <section>
+      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-4">
+        Google Sheets
+      </h2>
+      <div className="bg-surface-card rounded-lg p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">
+              <path d="M14.727 6.727H14V0H4.91c-.905 0-1.637.732-1.637 1.636v20.728c0 .904.732 1.636 1.636 1.636h14.182c.904 0 1.636-.732 1.636-1.636V6.727h-6.727z" fill="#23A566" transform="scale(0.85) translate(2, 2)" />
+              <path d="M14.727 0v6.727h6.727L14.727 0z" fill="#8ED1B1" transform="scale(0.85) translate(2, 2)" />
+              <path d="M6.545 13.636h10.91v1.091H6.545zm0 2.727h10.91v1.091H6.545zm0 2.727h7.636v1.091H6.545z" fill="#fff" transform="scale(0.85) translate(2, 2)" />
+            </svg>
+            <div>
+              <span className="text-sm text-on-surface font-medium">Google Sheets</span>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                {isConnected
+                  ? "Connected — you can export payroll data to Google Sheets."
+                  : "Not connected. Connect to export payroll data to Google Sheets."}
+              </p>
+            </div>
+          </div>
+          {isConnected ? (
+            <button
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="text-xs font-medium px-3 py-1.5 rounded-md border border-outline-variant text-on-surface-variant hover:bg-surface-hover transition-colors disabled:opacity-50"
+            >
+              {disconnecting ? "Disconnecting..." : "Disconnect"}
+            </button>
+          ) : (
+            <a
+              href="/api/auth/google-sheets/connect"
+              className="text-xs font-medium px-3 py-1.5 rounded-md bg-primary text-white hover:opacity-90 transition-opacity"
+            >
+              Connect Google Sheets
+            </a>
+          )}
         </div>
       </div>
     </section>

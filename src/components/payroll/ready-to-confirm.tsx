@@ -32,12 +32,11 @@ interface DispatcherNameMap {
   [dispatcherId: string]: { name: string; avatarUrl: string | null };
 }
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2;
 
 const STEPS = [
-  { num: 1, label: "Staff Settings" },
-  { num: 2, label: "Preview" },
-  { num: 3, label: "Confirm & Save" },
+  { num: 1, label: "Preview" },
+  { num: 2, label: "Confirm & Save" },
 ] as const;
 
 function StepIndicator({ current }: { current: Step }) {
@@ -198,15 +197,15 @@ export function ReadyToConfirm({
               Back
             </button>
           )}
-          {step < 3 && (
+          {step === 1 && (
             <button
-              onClick={() => setStep((step + 1) as Step)}
+              onClick={() => setStep(2)}
               className="px-4 py-1.5 text-[0.82rem] font-medium text-white bg-brand hover:bg-brand/90 rounded-md transition-colors"
             >
-              {step === 1 ? "Proceed to Preview" : "Review & Confirm"} →
+              Review & Confirm →
             </button>
           )}
-          {step === 3 && (
+          {step === 2 && (
             <button
               onClick={handleConfirm}
               disabled={isConfirming}
@@ -218,20 +217,8 @@ export function ReadyToConfirm({
         </div>
       </div>
 
-      {/* Step 1: Staff Settings (Rules Summary) */}
+      {/* Step 1: Preview */}
       {step === 1 && (
-        <RulesSummary
-          branchCode={branchCode}
-          month={month}
-          year={year}
-          rows={rulesRows}
-          hasPreviousData={hasPreviousData}
-          allTiers={allTiers}
-        />
-      )}
-
-      {/* Step 2: Preview */}
-      {step === 2 && (
         <>
           <PreviewSummaryCards
             totalNetPayout={summary.totalNetPayout}
@@ -259,8 +246,8 @@ export function ReadyToConfirm({
         </>
       )}
 
-      {/* Step 3: Confirm & Save */}
-      {step === 3 && (
+      {/* Step 2: Confirm & Save */}
+      {step === 2 && (
         <div className="rounded-lg bg-surface-card border border-outline-variant/15 p-8">
           <div className="max-w-md mx-auto">
             <h3 className="text-[1rem] font-semibold text-on-surface text-center">
@@ -305,8 +292,7 @@ export function ReadyToConfirm({
             </div>
 
             <p className="mt-6 text-[0.78rem] text-on-surface-variant/70 text-center">
-              Salary rules will be locked at current settings.
-              This cannot be undone without re-uploading.
+              You can edit and recalculate saved payroll data at any time.
             </p>
           </div>
         </div>

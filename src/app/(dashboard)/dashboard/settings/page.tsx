@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   const agent = await prisma.agent.findUnique({
     where: { id: session.user.id },
-    select: { name: true, email: true, password: true },
+    select: { name: true, email: true, password: true, googleSheetsRefreshToken: true },
   });
 
   if (!agent) redirect("/auth/login");
@@ -34,6 +34,7 @@ export default async function SettingsPage() {
           imageUrl={session.user.image ?? null}
           hasPassword={hasPassword}
           connectedProviders={connectedProviders}
+          googleSheetsConnected={!!agent.googleSheetsRefreshToken}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle } from "lucide-react";
 import { UploadZone } from "./upload-zone";
@@ -33,6 +34,19 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
   const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicateInfo | null>(null);
   const [isReplacing, setIsReplacing] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
+  const searchParams = useSearchParams();
+
+  // Show toast for Google Sheets connection callback
+  useEffect(() => {
+    if (searchParams.get("google_sheets") === "connected") {
+      toast.success("Google Sheets connected");
+      window.history.replaceState({}, "", "/payroll");
+    }
+    if (searchParams.get("error") === "google_sheets_failed") {
+      toast.error("Failed to connect Google Sheets");
+      window.history.replaceState({}, "", "/payroll");
+    }
+  }, [searchParams]);
 
   const refreshHistory = useCallback(async () => {
     try {

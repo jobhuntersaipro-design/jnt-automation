@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Eye, ChevronDown, ChevronRight } from "lucide-react";
+import { ExportDropdown } from "./export-buttons";
 
 export interface PayrollRecord {
   uploadId: string;
@@ -49,7 +51,7 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
       </h3>
 
       {/* Table header */}
-      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_6rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60">
+      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60">
         <span>Month</span>
         <span className="text-center">Staff</span>
         <span className="text-right">Net Salary</span>
@@ -63,7 +65,7 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
         {visible.map((item) => (
           <div
             key={item.uploadId}
-            className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_6rem] gap-x-3 items-center px-4 py-2.5 rounded-md hover:bg-surface-hover transition-colors"
+            className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 items-center px-4 py-2.5 rounded-md hover:bg-surface-hover transition-colors"
           >
             <span className="text-[0.85rem] font-medium text-on-surface">
               {MONTH_ABBR[item.month - 1]} {item.year}
@@ -81,20 +83,14 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
               {item.totalDeductions > 0 ? `- RM ${formatRM(item.totalDeductions)}` : "—"}
             </span>
             <div className="flex items-center gap-1 justify-end">
-              <button
+              <Link
+                href={`/payroll/${item.uploadId}`}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-brand hover:bg-brand/5 rounded transition-colors"
-                title="View payroll details (coming soon)"
               >
                 <Eye className="w-3 h-3" />
                 View
-              </button>
-              <button
-                className="inline-flex items-center gap-0.5 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors"
-                title="Export options (coming soon)"
-              >
-                Export
-                <ChevronDown className="w-2.5 h-2.5" />
-              </button>
+              </Link>
+              <ExportDropdown uploadId={item.uploadId} />
             </div>
           </div>
         ))}

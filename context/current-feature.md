@@ -1,12 +1,34 @@
-# Current Feature
+# Current Feature — Payroll Phase 3 + 4: Salary Table, Edit, Payslips, Export
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+### Phase 3 (code complete, pending browser test)
+- `/payroll/[uploadId]` page showing finalized salary table (read-only by default)
+- "Edit & Recalculate" mode — all fields editable, net salary + summary cards update live
+- "Save & Regenerate" — updates SalaryRecords + snapshots in a single transaction
+- Multi-select payslip PDF generation as ZIP download
+- PDF matches ST XIANG payslip format exactly (see `context/WhatsApp Image 2026-03-28 at 16.20.38.jpeg`)
+
+### Phase 4 (not started)
+- "Export CSV" — instant download of salary data per upload
+- "Export to Google Sheets" — one-time OAuth per agent, push data to new Sheet
+- Export available from payroll history list and salary table page
+- Google Sheets token management (store, refresh, disconnect)
+- Settings page section for Google Sheets connect/disconnect
+
 ## Notes
+
+- Phase 3 spec: `context/features/payroll-phase-3-spec.md`
+- Phase 4 spec: `context/features/payroll-phase-4-spec.md`
+- Payslip reference image: `context/WhatsApp Image 2026-03-28 at 16.20.38.jpeg`
+- Phase 3 API routes are under `/api/payroll/upload/[uploadId]/` to avoid slug conflict with existing `/api/payroll/[branchCode]/...`
+- Phase 4 export routes also need the `/api/payroll/upload/[uploadId]/export/` prefix
+- Phase 4 requires new Agent fields: `googleSheetsAccessToken`, `googleSheetsRefreshToken`, `googleSheetsTokenExpiry`
+- Phase 4 env vars: `GOOGLE_SHEETS_CLIENT_ID`, `GOOGLE_SHEETS_CLIENT_SECRET`, `GOOGLE_SHEETS_REDIRECT_URI`
 
 ## History
 

@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
           },
         });
       }
-    }, { timeout: 30000 });
+    }, { timeout: 120000 });
   }
 
   // Handle duplicate check or replacement

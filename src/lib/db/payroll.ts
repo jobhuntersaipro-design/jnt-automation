@@ -40,6 +40,73 @@ export async function getPayrollHistory(agentId: string) {
 }
 
 /**
+ * Get all salary records for a specific upload, with dispatcher info and upload metadata.
+ * Used for the /payroll/[uploadId] salary table page.
+ */
+export async function getSalaryRecordsByUpload(uploadId: string, agentId: string) {
+  const upload = await prisma.upload.findFirst({
+    where: {
+      id: uploadId,
+      branch: { agentId },
+      status: "SAVED",
+    },
+    select: {
+      id: true,
+      month: true,
+      year: true,
+      branch: { select: { code: true } },
+    },
+  });
+
+  if (!upload) return null;
+
+  const records = await prisma.salaryRecord.findMany({
+    where: { uploadId },
+    include: {
+      dispatcher: {
+        select: { id: true, extId: true, name: true, avatarUrl: true, icNo: true },
+      },
+    },
+    orderBy: { dispatcher: { name: "asc" } },
+  });
+
+  const summary = {
+    totalNetPayout: records.reduce((sum, r) => sum + r.netSalary, 0),
+    totalBaseSalary: records.reduce((sum, r) => sum + r.baseSalary, 0),
+    totalIncentive: records.reduce((sum, r) => sum + r.incentive, 0),
+    totalPetrolSubsidy: records.reduce((sum, r) => sum + r.petrolSubsidy, 0),
+    totalDeductions: records.reduce((sum, r) => sum + r.penalty + r.advance, 0),
+  };
+
+  return {
+    upload: {
+      id: upload.id,
+      month: upload.month,
+      year: upload.year,
+      branchCode: upload.branch.code,
+    },
+    records: records.map((r) => ({
+      dispatcherId: r.dispatcherId,
+      extId: r.dispatcher.extId,
+      name: r.dispatcher.name,
+      avatarUrl: r.dispatcher.avatarUrl,
+      icNo: r.dispatcher.icNo,
+      totalOrders: r.totalOrders,
+      baseSalary: r.baseSalary,
+      incentive: r.incentive,
+      petrolSubsidy: r.petrolSubsidy,
+      penalty: r.penalty,
+      advance: r.advance,
+      netSalary: r.netSalary,
+      weightTiersSnapshot: r.weightTiersSnapshot,
+      incentiveSnapshot: r.incentiveSnapshot,
+      petrolSnapshot: r.petrolSnapshot,
+    })),
+    summary,
+  };
+}
+
+/**
  * Get the current upload state for a specific branch + month + year.
  * Returns null if no upload exists (NONE state).
  */
