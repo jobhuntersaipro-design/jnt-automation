@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, X, Search } from "lucide-react";
+import { ArrowLeft, Pencil, X, Search, Settings } from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
 import { ExportButtons } from "./export-buttons";
 
@@ -120,6 +120,56 @@ function EditableCell({
   );
 }
 
+/**
+ * Weight tier popover for the view page — view-only display of tier config.
+ */
+function ViewTierPopover({
+  dispatcherName,
+  tiers,
+  onClose,
+}: {
+  dispatcherName: string;
+  tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>;
+  onClose: () => void;
+}) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={popoverRef}
+      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-4 w-64"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <p className="text-[0.75rem] font-semibold text-on-surface mb-2">
+        Weight Tiers — {dispatcherName}
+      </p>
+      <div className="space-y-1.5">
+        {tiers.map((tier) => (
+          <div key={tier.tier} className="flex items-center gap-3">
+            <span className="text-[0.72rem] font-semibold text-on-surface-variant w-6">T{tier.tier}</span>
+            <span className="text-[0.72rem] text-on-surface-variant flex-1">
+              {tier.minWeight}–{tier.maxWeight === null ? "∞" : tier.maxWeight}kg
+            </span>
+            <span className="text-[0.72rem] font-medium text-on-surface tabular-nums">
+              RM {tier.commission.toFixed(2)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function SalaryTable({
   uploadId,
   branchCode,
@@ -138,6 +188,7 @@ export function SalaryTable({
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [tierPopover, setTierPopover] = useState<string | null>(null);
 
   // Snapshot of records before edit mode for cancel/diff
   const [preEditRecords, setPreEditRecords] = useState(initialRecords);
@@ -405,6 +456,7 @@ export function SalaryTable({
                 <th className="py-3 px-3 font-medium text-right">Penalty</th>
                 <th className="py-3 px-3 font-medium text-right">Advance</th>
                 <th className="py-3 px-4 font-medium text-right">Net Salary</th>
+                <th className="py-3 px-3 font-medium text-center w-12">Tiers</th>
               </tr>
             </thead>
             <tbody>
@@ -489,11 +541,27 @@ export function SalaryTable({
                   <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
                     {formatRM(r.netSalary)}
                   </td>
+                  <td className="py-2.5 px-3 text-center relative">
+                    <button
+                      onClick={() => setTierPopover(tierPopover === r.dispatcherId ? null : r.dispatcherId)}
+                      className="p-1.5 text-on-surface-variant/50 hover:text-brand hover:bg-brand/5 rounded-md transition-colors"
+                      title="View weight tiers"
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                    {tierPopover === r.dispatcherId ? (
+                      <ViewTierPopover
+                        dispatcherName={r.name}
+                        tiers={(r.weightTiersSnapshot ?? []) as Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>}
+                        onClose={() => setTierPopover(null)}
+                      />
+                    ) : null}
+                  </td>
                 </tr>
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={editMode ? 8 : 9} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
+                  <td colSpan={editMode ? 9 : 10} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
                     No dispatchers found.
                   </td>
                 </tr>

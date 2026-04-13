@@ -115,40 +115,67 @@ function TierPopover({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [onClose]);
 
-  const handleCommissionChange = (tierIdx: number, val: string) => {
+  const handleFieldChange = (tierIdx: number, field: "minWeight" | "maxWeight" | "commission", val: string) => {
     const v = val.replace(",", ".");
     if (v !== "" && !/^\d*\.?\d*$/.test(v)) return;
     setLocalTiers((prev) =>
-      prev.map((t, i) => (i === tierIdx ? { ...t, commission: v === "" ? 0 : parseFloat(v) || 0 } : t)),
+      prev.map((t, i) => {
+        if (i !== tierIdx) return t;
+        const parsed = v === "" ? 0 : parseFloat(v) || 0;
+        if (field === "maxWeight") return { ...t, maxWeight: v === "" ? null : parsed };
+        return { ...t, [field]: parsed };
+      }),
     );
   };
+
+  const inputCls = "w-14 px-1.5 py-1 text-[0.75rem] tabular-nums text-center bg-white border border-outline-variant/30 rounded-md text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40";
 
   return (
     <div
       ref={popoverRef}
-      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-4 w-72"
+      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-4 w-80"
       onClick={(e) => e.stopPropagation()}
     >
-      <p className="text-[0.75rem] font-semibold text-on-surface mb-3">
+      <p className="text-[0.75rem] font-semibold text-on-surface mb-2">
         Weight Tiers — {dispatcherName}
       </p>
-      <div className="space-y-2">
+      {/* Column labels */}
+      <div className="grid grid-cols-[1.5rem_1fr_1fr_1fr] gap-x-2 mb-1">
+        <span />
+        <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Min (kg)</span>
+        <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Max (kg)</span>
+        <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
+      </div>
+      <div className="space-y-1.5">
         {localTiers.map((tier, i) => (
-          <div key={tier.tier} className="flex items-center gap-3">
-            <span className="text-[0.72rem] font-semibold text-on-surface-variant w-6">T{tier.tier}</span>
-            <span className="text-[0.72rem] text-on-surface-variant flex-1">
-              {tier.minWeight}–{tier.maxWeight === null ? "∞" : tier.maxWeight}kg
-            </span>
-            <div className="flex items-center gap-1">
-              <span className="text-[0.72rem] text-on-surface-variant">RM</span>
+          <div key={tier.tier} className="grid grid-cols-[1.5rem_1fr_1fr_1fr] gap-x-2 items-center">
+            <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={tier.minWeight}
+              disabled={i === 0}
+              onChange={(e) => handleFieldChange(i, "minWeight", e.target.value)}
+              className={`${inputCls} ${i === 0 ? "opacity-40 bg-surface" : ""}`}
+            />
+            {tier.maxWeight === null ? (
+              <div className="text-[0.78rem] text-on-surface-variant/50 text-center">∞</div>
+            ) : (
               <input
                 type="text"
                 inputMode="decimal"
-                value={tier.commission}
-                onChange={(e) => handleCommissionChange(i, e.target.value)}
-                className="w-16 px-2 py-1 text-[0.78rem] tabular-nums text-right bg-white border border-outline-variant/30 rounded-md text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40"
+                value={tier.maxWeight}
+                onChange={(e) => handleFieldChange(i, "maxWeight", e.target.value)}
+                className={inputCls}
               />
-            </div>
+            )}
+            <input
+              type="text"
+              inputMode="decimal"
+              value={tier.commission}
+              onChange={(e) => handleFieldChange(i, "commission", e.target.value)}
+              className={inputCls}
+            />
           </div>
         ))}
       </div>

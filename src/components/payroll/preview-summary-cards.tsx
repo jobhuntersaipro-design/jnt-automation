@@ -29,7 +29,7 @@ function SummaryCard({
         <p className="text-[0.72rem] uppercase tracking-wider text-white/70 font-medium">
           {label}
         </p>
-        <p className="text-[1.25rem] font-bold tracking-tight mt-1 tabular-nums">
+        <p className="text-[1.15rem] font-bold tracking-tight mt-1 tabular-nums whitespace-nowrap">
           {value}
         </p>
       </div>
