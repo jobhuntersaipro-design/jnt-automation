@@ -93,7 +93,7 @@ export async function PATCH(
     advance: number;
   };
 
-  if (typeof penalty !== "number" || typeof advance !== "number" || penalty < 0 || advance < 0) {
+  if (typeof penalty !== "number" || typeof advance !== "number" || penalty < 0 || advance < 0 || penalty > 99999.99 || advance > 99999.99) {
     return NextResponse.json({ error: "Invalid penalty or advance value" }, { status: 400 });
   }
 

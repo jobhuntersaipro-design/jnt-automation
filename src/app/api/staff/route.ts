@@ -19,11 +19,11 @@ export async function POST(req: NextRequest) {
     branchCode?: string;
   };
 
-  if (!name?.trim() || !extId?.trim() || !icNo?.trim() || !branchCode) {
-    return NextResponse.json({ error: "All fields are required" }, { status: 400 });
+  if (!name?.trim() || !extId?.trim() || !branchCode) {
+    return NextResponse.json({ error: "Name, ID, and branch are required" }, { status: 400 });
   }
 
-  if (!/^\d{12}$/.test(icNo)) {
+  if (icNo && icNo.trim() && !/^\d{12}$/.test(icNo)) {
     return NextResponse.json({ error: "IC number must be 12 digits" }, { status: 400 });
   }
 
@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const gender = deriveGender(icNo);
+  const safeIcNo = icNo?.trim() || "";
+  const gender = safeIcNo ? deriveGender(safeIcNo) : "UNKNOWN" as const;
   const trimmedName = name.trim();
   const trimmedExtId = extId.trim();
 
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       data: {
         name: trimmedName,
         extId: trimmedExtId,
-        icNo,
+        icNo: safeIcNo,
         gender,
         branchId: branch.id,
       },

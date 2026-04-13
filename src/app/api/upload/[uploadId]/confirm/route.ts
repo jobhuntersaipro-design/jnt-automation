@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { getPreviewData, deletePreviewData } from "@/lib/upload/pipeline";
@@ -63,42 +64,78 @@ export async function POST(
 
     // Build line items by re-calculating (uses preview penalty/advance values)
     const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d]));
-    const previewMap = new Map(preview.results.map((r) => [r.dispatcherId, r]));
 
+    // Build all salary records and line items OUTSIDE the transaction
+    // to minimize transaction duration
+    const salaryRecordData = preview.results.map((result) => ({
+      dispatcherId: result.dispatcherId,
+      uploadId,
+      month: fullUpload.month,
+      year: fullUpload.year,
+      totalOrders: result.totalOrders,
+      baseSalary: result.baseSalary,
+      incentive: result.incentive,
+      petrolSubsidy: result.petrolSubsidy,
+      penalty: result.penalty,
+      advance: result.advance,
+      netSalary: result.netSalary,
+      weightTiersSnapshot: JSON.parse(JSON.stringify(result.weightTiersSnapshot)),
+      incentiveSnapshot: JSON.parse(JSON.stringify(result.incentiveSnapshot)),
+      petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
+    }));
+
+    // Pre-compute all line items keyed by dispatcherId
+    const lineItemsByDispatcher = new Map<string, { waybillNumber: string; weight: number; commission: number; deliveryDate: Date | null }[]>();
+    for (const result of preview.results) {
+      const d = dispatcherMap.get(result.dispatcherId);
+      if (!d || !d.incentiveRule || !d.petrolRule) continue;
+
+      const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
+      const rules: DispatcherRules = {
+        dispatcherId: d.id,
+        extId: d.extId,
+        weightTiers: d.weightTiers.map((t) => ({
+          tier: t.tier,
+          minWeight: t.minWeight,
+          maxWeight: t.maxWeight,
+          commission: t.commission,
+        })),
+        incentiveRule: {
+          orderThreshold: d.incentiveRule.orderThreshold,
+          incentiveAmount: d.incentiveRule.incentiveAmount,
+        },
+        petrolRule: {
+          isEligible: d.petrolRule.isEligible,
+          dailyThreshold: d.petrolRule.dailyThreshold,
+          subsidyAmount: d.petrolRule.subsidyAmount,
+        },
+      };
+
+      const calcResult = calculateSalary(rules, dispatcherRows);
+      lineItemsByDispatcher.set(d.id, calcResult.lineItems.map((li) => ({
+        waybillNumber: li.waybillNumber,
+        weight: li.weight,
+        commission: li.commission,
+        deliveryDate: li.deliveryDate,
+      })));
+    }
+
+    // Transaction: delete old + bulk create records + bulk create line items
     await prisma.$transaction(async (tx) => {
-      // Delete any existing salary records for this upload (idempotent re-run)
       await tx.salaryRecord.deleteMany({ where: { uploadId } });
 
-      // Create salary records with snapshots + line items
-      const created = await Promise.all(
-        preview.results.map((result) =>
-          tx.salaryRecord.create({
-            data: {
-              dispatcherId: result.dispatcherId,
-              uploadId,
-              month: fullUpload.month,
-              year: fullUpload.year,
-              totalOrders: result.totalOrders,
-              baseSalary: result.baseSalary,
-              incentive: result.incentive,
-              petrolSubsidy: result.petrolSubsidy,
-              penalty: result.penalty,
-              advance: result.advance,
-              netSalary: result.netSalary,
-              weightTiersSnapshot: JSON.parse(JSON.stringify(result.weightTiersSnapshot)),
-              incentiveSnapshot: JSON.parse(JSON.stringify(result.incentiveSnapshot)),
-              petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
-            },
-            select: { id: true, dispatcherId: true },
-          }),
-        ),
-      );
+      // Create records one at a time to get IDs (createMany doesn't return IDs)
+      // but do it sequentially to avoid batch timeout
+      const recordIdByDispatcher = new Map<string, string>();
+      for (const data of salaryRecordData) {
+        const record = await tx.salaryRecord.create({
+          data,
+          select: { id: true, dispatcherId: true },
+        });
+        recordIdByDispatcher.set(record.dispatcherId, record.id);
+      }
 
-      // Re-derive line items from parsed rows + dispatcher rules
-      const recordIdByDispatcher = new Map(
-        created.map((r) => [r.dispatcherId, r.id]),
-      );
-
+      // Bulk insert all line items
       const allLineItems: {
         salaryRecordId: string;
         waybillNumber: string;
@@ -108,39 +145,11 @@ export async function POST(
       }[] = [];
 
       for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
-        const d = dispatcherMap.get(dispatcherId);
-        if (!d || !d.incentiveRule || !d.petrolRule) continue;
-
-        const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
-        const rules: DispatcherRules = {
-          dispatcherId: d.id,
-          extId: d.extId,
-          weightTiers: d.weightTiers.map((t) => ({
-            tier: t.tier,
-            minWeight: t.minWeight,
-            maxWeight: t.maxWeight,
-            commission: t.commission,
-          })),
-          incentiveRule: {
-            orderThreshold: d.incentiveRule.orderThreshold,
-            incentiveAmount: d.incentiveRule.incentiveAmount,
-          },
-          petrolRule: {
-            isEligible: d.petrolRule.isEligible,
-            dailyThreshold: d.petrolRule.dailyThreshold,
-            subsidyAmount: d.petrolRule.subsidyAmount,
-          },
-        };
-
-        const result = calculateSalary(rules, dispatcherRows);
-        for (const li of result.lineItems) {
-          allLineItems.push({
-            salaryRecordId,
-            waybillNumber: li.waybillNumber,
-            weight: li.weight,
-            commission: li.commission,
-            deliveryDate: li.deliveryDate,
-          });
+        const items = lineItemsByDispatcher.get(dispatcherId);
+        if (items) {
+          for (const li of items) {
+            allLineItems.push({ salaryRecordId, ...li });
+          }
         }
       }
 
@@ -148,16 +157,17 @@ export async function POST(
         await tx.salaryLineItem.createMany({ data: allLineItems });
       }
 
-      // Update upload status
-      const hasUnknown = preview.unknownDispatchers.length > 0;
       await tx.upload.update({
         where: { id: uploadId },
-        data: { status: hasUnknown ? "NEEDS_ATTENTION" : "SAVED" },
+        data: { status: "SAVED" },
       });
-    });
+    }, { timeout: 30000 });
 
     // Clean up KV
     await deletePreviewData(uploadId);
+
+    // Bust dashboard cache so new data shows immediately
+    revalidatePath("/dashboard");
 
     return NextResponse.json({
       success: true,

@@ -112,11 +112,20 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return items.filter((d) => {
-      if (selectedBranch && d.branchCode !== selectedBranch) return false;
-      if (q && !d.name.toLowerCase().includes(q) && !d.extId.toLowerCase().includes(q)) return false;
-      return true;
-    });
+    return items
+      .filter((d) => {
+        if (selectedBranch && d.branchCode !== selectedBranch) return false;
+        if (q && !d.name.toLowerCase().includes(q) && !d.extId.toLowerCase().includes(q)) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        // Pinned first, then new (empty IC) first, then alphabetical
+        if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
+        const aNew = a.rawIcNo === "";
+        const bNew = b.rawIcNo === "";
+        if (aNew !== bNew) return aNew ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
   }, [items, selectedBranch, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -188,6 +197,9 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
     setShowAddDrawer(false);
     setPage(1);
     fetch(`/api/staff/${dispatcher.id}/pin`, { method: "PATCH" }).then(() => router.refresh());
+    toast.success(`${dispatcher.name} added`, {
+      action: { label: "Go to Payroll", onClick: () => router.push("/payroll") },
+    });
   }
 
   async function confirmBulkDelete() {

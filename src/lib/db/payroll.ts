@@ -21,7 +21,7 @@ export async function getPayrollHistory(agentId: string) {
         select: { salaryRecords: true },
       },
       salaryRecords: {
-        select: { netSalary: true },
+        select: { netSalary: true, baseSalary: true, penalty: true, advance: true },
       },
     },
     orderBy: [{ year: "desc" }, { month: "desc" }],
@@ -34,6 +34,8 @@ export async function getPayrollHistory(agentId: string) {
     year: u.year,
     dispatcherCount: u._count.salaryRecords,
     totalNetPayout: u.salaryRecords.reduce((sum, r) => sum + r.netSalary, 0),
+    totalBaseSalary: u.salaryRecords.reduce((sum, r) => sum + r.baseSalary, 0),
+    totalDeductions: u.salaryRecords.reduce((sum, r) => sum + r.penalty + r.advance, 0),
   }));
 }
 

@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import { PayrollStateMachine } from "./payroll-state-machine";
+import { toast } from "sonner";
+import { AlertTriangle } from "lucide-react";
+import { UploadZone } from "./upload-zone";
+import { ActiveUploadList, type ActiveUpload } from "./active-upload-list";
 import { PayrollHistory, type PayrollRecord } from "./payroll-history";
 
 interface PayrollClientProps {
@@ -10,23 +12,27 @@ interface PayrollClientProps {
   branchCodes: string[];
 }
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+interface DuplicateInfo {
+  clientId: string;
+  fileName: string;
+  r2Key: string;
+  existingUploadId: string;
+  branchCode: string;
+  month: number;
+  year: number;
+  message: string;
+}
+
+function genId() {
+  return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
 
 export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProps) {
-  const now = new Date();
-  const [selectedBranch, setSelectedBranch] = useState(branchCodes[0] ?? "");
-  const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
   const [history, setHistory] = useState<PayrollRecord[]>(initialHistory);
-  const [branchDropdownOpen, setBranchDropdownOpen] = useState(false);
+  const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicateInfo | null>(null);
+  const [isReplacing, setIsReplacing] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
-
-  const handleScrollToHistory = useCallback(() => {
-    historyRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
 
   const refreshHistory = useCallback(async () => {
     try {
@@ -36,19 +42,220 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         setHistory(data);
       }
     } catch {
-      // Silent — history will be stale but not broken
+      // Silent
     }
   }, []);
 
-  // Year range: 2024 to current year + 1
-  const years = Array.from({ length: now.getFullYear() - 2024 + 2 }, (_, i) => 2024 + i);
+  const updateUpload = useCallback((id: string, updates: Partial<ActiveUpload>) => {
+    setActiveUploads((prev) =>
+      prev.map((u) => (u.id === id ? { ...u, ...updates } : u))
+    );
+  }, []);
+
+  const removeUpload = useCallback((id: string) => {
+    setActiveUploads((prev) => prev.filter((u) => u.id !== id));
+  }, []);
+
+  const processFile = useCallback(async (file: File) => {
+    const clientId = genId();
+
+    // Add to active list immediately
+    setActiveUploads((prev) => [
+      ...prev,
+      { id: clientId, fileName: file.name, status: "UPLOADING" },
+    ]);
+
+    try {
+      // 1. Get presigned URL (auto-detect mode — no branch/month/year)
+      const initRes = await fetch("/api/upload/init", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName: file.name }),
+      });
+
+      if (!initRes.ok) {
+        const data = await initRes.json();
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.id === clientId
+              ? { ...u, status: "FAILED", errorMessage: data.error || "Failed to initialize" }
+              : u
+          )
+        );
+        return;
+      }
+
+      const { r2Key, presignedUrl } = await initRes.json();
+
+      // 2. Upload to R2
+      const contentType = file.name.endsWith(".xlsx")
+        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        : "application/vnd.ms-excel";
+
+      const uploadRes = await fetch(presignedUrl, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": contentType },
+      });
+
+      if (!uploadRes.ok) {
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.id === clientId
+              ? { ...u, status: "FAILED", errorMessage: "Failed to upload file to storage" }
+              : u
+          )
+        );
+        return;
+      }
+
+      // 3. Detect branch + month/year, create Upload, trigger processing
+      setActiveUploads((prev) =>
+        prev.map((u) => (u.id === clientId ? { ...u, status: "DETECTING" } : u))
+      );
+
+      const detectRes = await fetch("/api/upload/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ r2Key, fileName: file.name }),
+      });
+
+      const detectData = await detectRes.json();
+
+      if (!detectRes.ok) {
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.id === clientId
+              ? { ...u, status: "FAILED", errorMessage: detectData.error || "Detection failed" }
+              : u
+          )
+        );
+        return;
+      }
+
+      if (detectData.isDuplicate) {
+        // Show duplicate confirmation dialog
+        setDuplicatePrompt({
+          clientId,
+          fileName: file.name,
+          r2Key,
+          existingUploadId: detectData.existingUploadId,
+          branchCode: detectData.branchCode,
+          month: detectData.month,
+          year: detectData.year,
+          message: detectData.message,
+        });
+        setActiveUploads((prev) =>
+          prev.map((u) =>
+            u.id === clientId
+              ? {
+                  ...u,
+                  branchCode: detectData.branchCode,
+                  month: detectData.month,
+                  year: detectData.year,
+                  status: "DUPLICATE",
+                }
+              : u
+          )
+        );
+        return;
+      }
+
+      // Success — processing started
+      setActiveUploads((prev) =>
+        prev.map((u) =>
+          u.id === clientId
+            ? {
+                ...u,
+                uploadId: detectData.uploadId,
+                r2Key,
+                branchCode: detectData.branchCode,
+                month: detectData.month,
+                year: detectData.year,
+                status: "PROCESSING",
+              }
+            : u
+        )
+      );
+    } catch {
+      setActiveUploads((prev) =>
+        prev.map((u) =>
+          u.id === clientId
+            ? { ...u, status: "FAILED", errorMessage: "An unexpected error occurred" }
+            : u
+        )
+      );
+    }
+  }, []);
+
+  const handleFilesSelected = useCallback(
+    (files: File[]) => {
+      for (const file of files) {
+        processFile(file);
+      }
+    },
+    [processFile]
+  );
+
+  const handleDuplicateConfirm = useCallback(async () => {
+    if (!duplicatePrompt) return;
+    setIsReplacing(true);
+
+    try {
+      const detectRes = await fetch("/api/upload/detect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          r2Key: duplicatePrompt.r2Key,
+          fileName: duplicatePrompt.fileName,
+          confirmReplace: true,
+          existingUploadId: duplicatePrompt.existingUploadId,
+        }),
+      });
+
+      const data = await detectRes.json();
+      if (!detectRes.ok) {
+        toast.error(data.error || "Failed to replace upload");
+        return;
+      }
+
+      setActiveUploads((prev) =>
+        prev.map((u) =>
+          u.id === duplicatePrompt.clientId
+            ? {
+                ...u,
+                uploadId: data.uploadId,
+                branchCode: data.branchCode,
+                month: data.month,
+                year: data.year,
+                status: "PROCESSING",
+                errorMessage: undefined,
+              }
+            : u
+        )
+      );
+
+      setDuplicatePrompt(null);
+    } catch {
+      toast.error("An unexpected error occurred");
+    } finally {
+      setIsReplacing(false);
+    }
+  }, [duplicatePrompt]);
+
+  const handleDuplicateCancel = useCallback(() => {
+    if (duplicatePrompt) {
+      removeUpload(duplicatePrompt.clientId);
+      setDuplicatePrompt(null);
+    }
+  }, [duplicatePrompt, removeUpload]);
 
   return (
     <main className="flex-1 overflow-y-auto px-16 py-8">
       <div className="max-w-4xl mx-auto flex flex-col gap-10">
         {/* Page header */}
         <div>
-          <h1 className="text-[1.6rem] font-bold text-on-surface tracking-tight font-[family-name:var(--font-manrope)]">
+          <h1 className="text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
             Payroll
           </h1>
           <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
@@ -56,88 +263,62 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
           </p>
         </div>
 
-        {/* Top section — Current Upload */}
+        {/* Upload section */}
         <section className="flex flex-col gap-4">
-          {/* Branch + Month/Year selectors */}
-          <div className="flex items-center gap-3">
-            {/* Branch selector */}
-            <div className="relative">
-              <button
-                onClick={() => setBranchDropdownOpen(!branchDropdownOpen)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.85rem] font-medium text-on-surface bg-surface-card border border-outline-variant/20 rounded-md hover:bg-surface-hover transition-colors min-w-[100px]"
-              >
-                {selectedBranch || "Select branch"}
-                <ChevronDown className="w-3.5 h-3.5 text-on-surface-variant ml-auto" />
-              </button>
-              {branchDropdownOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setBranchDropdownOpen(false)} />
-                  <div className="absolute top-full left-0 mt-1 z-20 bg-surface-card border border-outline-variant/20 rounded-md shadow-lg py-1 min-w-[100px]">
-                    {branchCodes.map((code) => (
-                      <button
-                        key={code}
-                        onClick={() => {
-                          setSelectedBranch(code);
-                          setBranchDropdownOpen(false);
-                        }}
-                        className={`w-full px-3 py-1.5 text-left text-[0.82rem] hover:bg-surface-hover transition-colors ${
-                          code === selectedBranch ? "font-semibold text-brand" : "text-on-surface-variant"
-                        }`}
-                      >
-                        {code}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
+          <UploadZone onFilesSelected={handleFilesSelected} />
 
-            {/* Month selector */}
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="px-3 py-1.5 text-[0.85rem] font-medium text-on-surface bg-surface-card border border-outline-variant/20 rounded-md hover:bg-surface-hover transition-colors outline-none cursor-pointer"
-            >
-              {MONTH_NAMES.map((name, i) => (
-                <option key={i} value={i + 1}>
-                  {name}
-                </option>
-              ))}
-            </select>
-
-            {/* Year selector */}
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="px-3 py-1.5 text-[0.85rem] font-medium text-on-surface bg-surface-card border border-outline-variant/20 rounded-md hover:bg-surface-hover transition-colors outline-none cursor-pointer"
-            >
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* State machine */}
-          {selectedBranch && (
-            <PayrollStateMachine
-              key={`${selectedBranch}-${selectedMonth}-${selectedYear}`}
-              branchCode={selectedBranch}
-              month={selectedMonth}
-              year={selectedYear}
-              onScrollToHistory={handleScrollToHistory}
-              onUploadComplete={refreshHistory}
-            />
-          )}
+          <ActiveUploadList
+            uploads={activeUploads}
+            onUpdateUpload={updateUpload}
+            onRemoveUpload={removeUpload}
+            onUploadComplete={refreshHistory}
+          />
         </section>
+
+        {/* Duplicate upload confirmation dialog */}
+        {duplicatePrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-on-surface/40" onClick={handleDuplicateCancel} />
+            <div className="relative bg-surface-card rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-4.5 h-4.5 text-amber-600" />
+                </div>
+                <div>
+                  <h3 className="text-[0.95rem] font-semibold text-on-surface">
+                    Replace existing payroll?
+                  </h3>
+                  <p className="text-[0.82rem] text-on-surface-variant mt-1.5 leading-relaxed">
+                    {duplicatePrompt.message}
+                  </p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={handleDuplicateCancel}
+                  disabled={isReplacing}
+                  className="px-4 py-2 text-[0.82rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-md transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDuplicateConfirm}
+                  disabled={isReplacing}
+                  className="px-4 py-2 text-[0.82rem] font-medium text-white bg-critical hover:bg-critical/90 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isReplacing ? "Replacing\u2026" : "Replace & Upload"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Divider */}
         <div className="h-px bg-outline-variant/20" />
 
-        {/* Bottom section — Payroll History */}
+        {/* Payroll History */}
         <section ref={historyRef}>
-          <h2 className="text-[1.1rem] font-semibold text-on-surface mb-4 font-[family-name:var(--font-manrope)]">
+          <h2 className="text-[1.1rem] font-semibold text-on-surface mb-4 font-(family-name:--font-manrope)">
             Payroll History
           </h2>
           <PayrollHistory records={history} branchCodes={branchCodes} />

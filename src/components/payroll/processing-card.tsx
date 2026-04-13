@@ -8,9 +8,11 @@ interface ProcessingCardProps {
   month: number;
   year: number;
   startedAt: number; // timestamp ms
+  onCancel?: () => void;
+  isCancelling?: boolean;
 }
 
-export function ProcessingCard({ branchCode, month, year, startedAt }: ProcessingCardProps) {
+export function ProcessingCard({ branchCode, month, year, startedAt, onCancel, isCancelling }: ProcessingCardProps) {
   const [elapsed, setElapsed] = useState(0);
   const monthName = new Date(year, month - 1).toLocaleString("en", { month: "long" });
 
@@ -41,6 +43,15 @@ export function ProcessingCard({ branchCode, month, year, startedAt }: Processin
           Started {formatElapsed(elapsed)}
         </p>
       </div>
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          disabled={isCancelling}
+          className="text-[0.8rem] font-medium text-on-surface-variant hover:text-critical transition-colors disabled:opacity-50"
+        >
+          {isCancelling ? "Cancelling\u2026" : "Cancel"}
+        </button>
+      )}
     </div>
   );
 }

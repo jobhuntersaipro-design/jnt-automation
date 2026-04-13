@@ -145,7 +145,7 @@ function DispatcherTable({
       {/* Table */}
       <div className="flex flex-col">
         {/* Column headers */}
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] px-2 pb-2">
+        <div className="grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2">
           {COLUMNS.map(({ key, label }) => (
             <button
               key={key}
@@ -165,7 +165,7 @@ function DispatcherTable({
           sorted.map((d) => (
             <div
               key={d.id}
-              className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
+              className="grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">

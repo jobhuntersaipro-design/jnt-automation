@@ -22,7 +22,7 @@ const TIER_DEFAULTS = [
 ];
 
 function validateIc(ic: string): string | null {
-  if (!ic) return "IC number is required";
+  if (!ic) return null; // IC is optional
   if (!/^\d*$/.test(ic)) return "Digits only";
   if (ic.length !== 12) return "Must be 12 digits";
   return null;
@@ -695,6 +695,11 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
           <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-amber-600">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
             Unsaved
+          </span>
+        ) : dispatcher.rawIcNo === "" ? (
+          <span className="inline-flex items-center gap-1 text-[0.72rem] font-medium text-amber-600">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            New
           </span>
         ) : (
           <span className={`inline-flex items-center gap-1 text-[0.72rem] font-medium ${dispatcher.isComplete ? "text-green-600" : "text-critical"}`}>

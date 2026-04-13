@@ -10,8 +10,8 @@ describe("computeIsComplete", () => {
     expect(computeIsComplete("", "990101145678", "D001")).toBe(false);
   });
 
-  it("returns false when icNo is empty", () => {
-    expect(computeIsComplete("Ali", "", "D001")).toBe(false);
+  it("returns true when icNo is empty (IC is optional)", () => {
+    expect(computeIsComplete("Ali", "", "D001")).toBe(true);
   });
 
   it("returns false when extId is empty", () => {

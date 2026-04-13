@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getUploadStatus } from "@/lib/db/upload";
-import { getUploadMeta } from "@/lib/upload/pipeline";
+import { getUploadMeta, getPreviewData } from "@/lib/upload/pipeline";
 
 export async function GET(
   _req: NextRequest,
@@ -25,6 +25,17 @@ export async function GET(
     meta = await getUploadMeta(uploadId);
   }
 
+  // Include unknown dispatcher data when in NEEDS_ATTENTION state (from preview KV)
+  let unknownFromPreview = null;
+  let knownCountFromPreview = null;
+  if (upload.status === "NEEDS_ATTENTION") {
+    const preview = await getPreviewData(uploadId);
+    if (preview) {
+      unknownFromPreview = preview.unknownDispatchers;
+      knownCountFromPreview = preview.results.length;
+    }
+  }
+
   return NextResponse.json({
     status: upload.status,
     errorMessage: upload.errorMessage,
@@ -34,6 +45,10 @@ export async function GET(
     ...(meta && {
       knownCount: meta.knownCount,
       unknownDispatchers: meta.unknownDispatchers,
+    }),
+    ...(unknownFromPreview && {
+      knownCount: knownCountFromPreview,
+      unknownDispatchers: unknownFromPreview,
     }),
   });
 }

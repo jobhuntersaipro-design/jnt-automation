@@ -69,13 +69,27 @@ export function SavedCard({ month, year, onScrollToHistory, warning }: SavedCard
   );
 }
 
-export function UploadingCard() {
+interface UploadingCardProps {
+  onCancel?: () => void;
+  isCancelling?: boolean;
+}
+
+export function UploadingCard({ onCancel, isCancelling }: UploadingCardProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 p-10 rounded-lg bg-surface-card border border-outline-variant/15">
       <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
       <p className="text-[0.85rem] text-on-surface-variant">
         Uploading file&hellip;
       </p>
+      {onCancel && (
+        <button
+          onClick={onCancel}
+          disabled={isCancelling}
+          className="text-[0.8rem] font-medium text-on-surface-variant hover:text-critical transition-colors disabled:opacity-50"
+        >
+          {isCancelling ? "Cancelling\u2026" : "Cancel"}
+        </button>
+      )}
     </div>
   );
 }

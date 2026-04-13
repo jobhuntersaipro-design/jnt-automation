@@ -16,7 +16,7 @@ type Metric = "netPayout" | "totalOrders";
 
 // Extract alphabetic prefix from branch code: "KPG001" → "KPG"
 function branchLabel(code: string) {
-  return code.replace(/\d+$/, "");
+  return code;
 }
 
 function fmtValue(value: number, metric: Metric) {

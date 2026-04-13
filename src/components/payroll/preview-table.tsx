@@ -26,6 +26,11 @@ function formatRM(amount: number): string {
   return amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/**
+ * Calculator-style deduction input: digits shift left as you type.
+ * Type 5 → 0.05, type 2 → 0.52, type 0 → 5.20, etc.
+ * Uses dots (.) for decimal separator.
+ */
 function DeductionInput({
   value,
   onSave,
@@ -33,33 +38,51 @@ function DeductionInput({
   value: number;
   onSave: (val: number) => void;
 }) {
-  const [localValue, setLocalValue] = useState(value.toString());
+  const [cents, setCents] = useState(Math.round(value * 100));
+  const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const displayValue = (cents / 100).toFixed(2);
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key >= "0" && e.key <= "9") {
+      e.preventDefault();
+      setCents((prev) => Math.min(prev * 10 + parseInt(e.key), 9_999_999));
+    } else if (e.key === "Backspace") {
+      e.preventDefault();
+      setCents((prev) => Math.floor(prev / 10));
+    } else if (e.key === "Enter") {
+      inputRef.current?.blur();
+    }
+  }, []);
+
   const handleBlur = useCallback(() => {
-    const num = parseFloat(localValue);
-    if (isNaN(num) || num < 0) {
-      setLocalValue(value.toString());
-      return;
+    setFocused(false);
+    const val = Math.round(cents) / 100;
+    if (val !== value) {
+      onSave(val);
     }
-    if (num !== value) {
-      onSave(Math.round(num * 100) / 100);
-    }
-  }, [localValue, value, onSave]);
+  }, [cents, value, onSave]);
+
+  const handleFocus = useCallback(() => {
+    setFocused(true);
+  }, []);
 
   return (
     <input
       ref={inputRef}
-      type="number"
-      min="0"
-      step="0.01"
-      value={localValue}
-      onChange={(e) => setLocalValue(e.target.value)}
+      type="text"
+      inputMode="numeric"
+      value={displayValue}
+      readOnly
+      onKeyDown={handleKeyDown}
       onBlur={handleBlur}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") inputRef.current?.blur();
-      }}
-      className="w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border border-outline-variant/30 bg-surface focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand/30 transition-colors"
+      onFocus={handleFocus}
+      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-colors cursor-text ${
+        focused
+          ? "border-brand outline-none ring-1 ring-brand/30"
+          : "border-outline-variant/30"
+      }`}
     />
   );
 }
@@ -97,7 +120,6 @@ export function PreviewTable({
 
         const { updatedNetSalary, updatedSummary } = await res.json();
 
-        // Update local results
         const updated = results.map((r) =>
           r.dispatcherId === dispatcherId
             ? { ...r, penalty, advance, netSalary: updatedNetSalary }
@@ -140,25 +162,10 @@ export function PreviewTable({
                   className={`border-t border-outline-variant/8 hover:bg-surface-container-high/50 transition-colors ${isUpdating ? "opacity-60" : ""}`}
                 >
                   <td className="py-2.5 px-4">
-                    <div className="flex items-center gap-2.5">
-                      {info?.avatarUrl ? (
-                        <img
-                          src={info.avatarUrl}
-                          alt=""
-                          className="w-7 h-7 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-7 h-7 rounded-full bg-surface-container-high flex items-center justify-center text-[0.65rem] font-medium text-on-surface-variant">
-                          {(info?.name ?? r.extId).charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-on-surface leading-tight">
-                          {info?.name ?? r.extId}
-                        </p>
-                        <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
-                      </div>
-                    </div>
+                    <p className="font-medium text-on-surface leading-tight">
+                      {info?.name ?? r.extId}
+                    </p>
+                    <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
                   </td>
                   <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
                     {r.totalOrders.toLocaleString()}

@@ -6,36 +6,35 @@ import { FileSpreadsheet } from "lucide-react";
 const ALLOWED_EXTENSIONS = new Set(["xlsx", "xls"]);
 
 interface UploadZoneProps {
-  branchCode: string;
-  month: number;
-  year: number;
-  onFileSelected: (file: File) => void;
+  onFilesSelected: (files: File[]) => void;
+  disabled?: boolean;
 }
 
-export function UploadZone({ branchCode, month, year, onFileSelected }: UploadZoneProps) {
+export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
 
-  const monthName = new Date(year, month - 1).toLocaleString("en", { month: "long" });
-
-  const validateAndSelect = useCallback((file: File) => {
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    if (!ext || !ALLOWED_EXTENSIONS.has(ext)) {
-      return;
+  const validateAndSelect = useCallback((fileList: FileList) => {
+    const valid: File[] = [];
+    for (const file of Array.from(fileList)) {
+      const ext = file.name.split(".").pop()?.toLowerCase();
+      if (ext && ALLOWED_EXTENSIONS.has(ext)) {
+        valid.push(file);
+      }
     }
-    onFileSelected(file);
-  }, [onFileSelected]);
+    if (valid.length > 0) onFilesSelected(valid);
+  }, [onFilesSelected]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) validateAndSelect(file);
-  }, [validateAndSelect]);
+    if (disabled) return;
+    if (e.dataTransfer.files.length > 0) validateAndSelect(e.dataTransfer.files);
+  }, [validateAndSelect, disabled]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
-  }, []);
+    if (!disabled) setIsDragging(true);
+  }, [disabled]);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -43,15 +42,17 @@ export function UploadZone({ branchCode, month, year, onFileSelected }: UploadZo
   }, []);
 
   const handleClick = useCallback(() => {
+    if (disabled) return;
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xlsx,.xls";
+    input.multiple = true;
     input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (file) validateAndSelect(file);
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files.length > 0) validateAndSelect(files);
     };
     input.click();
-  }, [validateAndSelect]);
+  }, [validateAndSelect, disabled]);
 
   return (
     <div
@@ -59,10 +60,12 @@ export function UploadZone({ branchCode, month, year, onFileSelected }: UploadZo
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onClick={handleClick}
-      className={`relative flex flex-col items-center justify-center gap-3 p-10 rounded-lg border-2 border-dashed cursor-pointer transition-colors ${
-        isDragging
-          ? "border-brand bg-brand/5"
-          : "border-outline-variant/40 hover:border-brand/50 hover:bg-surface-hover/50"
+      className={`relative flex flex-col items-center justify-center gap-3 p-10 rounded-lg border-2 border-dashed transition-colors ${
+        disabled
+          ? "border-outline-variant/20 opacity-60 cursor-not-allowed"
+          : isDragging
+            ? "border-brand bg-brand/5 cursor-pointer"
+            : "border-outline-variant/40 hover:border-brand/50 hover:bg-surface-hover/50 cursor-pointer"
       }`}
     >
       <FileSpreadsheet className="w-10 h-10 text-on-surface-variant/60" />
@@ -71,10 +74,10 @@ export function UploadZone({ branchCode, month, year, onFileSelected }: UploadZo
           Upload delivery data
         </p>
         <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
-          {branchCode} &mdash; {monthName} {year}
+          Branch and month will be detected automatically
         </p>
         <p className="text-[0.8rem] text-on-surface-variant/70 mt-1">
-          Drag &amp; drop or click to browse
+          Drag &amp; drop or click to browse &mdash; multiple files supported
         </p>
         <p className="text-[0.75rem] text-on-surface-variant/50 mt-0.5">
           .xlsx / .xls only

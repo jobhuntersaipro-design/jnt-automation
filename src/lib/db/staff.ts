@@ -150,10 +150,10 @@ export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> 
 
 export function computeIsComplete(
   name: string,
-  icNo: string,
+  _icNo: string,
   extId: string,
 ): boolean {
-  return name.length > 0 && icNo.length > 0 && extId.length > 0;
+  return name.length > 0 && extId.length > 0;
 }
 
 export function maskIc(ic: string): string {

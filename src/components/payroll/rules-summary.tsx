@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import type { RulesSummaryRow, Change } from "@/lib/payroll/snapshot";
 import type { WeightTierInput } from "@/lib/upload/calculator";
 
@@ -12,11 +10,15 @@ interface RulesSummaryProps {
   rows: RulesSummaryRow[];
   hasPreviousData: boolean;
   allTiers: Record<string, WeightTierInput[]>;
-  onProceed: () => void;
 }
 
 function formatRM(amount: number): string {
   return `RM ${amount.toFixed(2)}`;
+}
+
+function formatWeight(w: number | null): string {
+  if (w == null) return "∞";
+  return `${w}kg`;
 }
 
 function ChangeIndicator({ changes }: { changes: Change[] }) {
@@ -27,8 +29,8 @@ function ChangeIndicator({ changes }: { changes: Change[] }) {
       {changes.map((c, i) => {
         if (c.type === "NEW") {
           return (
-            <span key={i} className="text-[0.75rem] font-medium text-blue-600">
-              🆕 New
+            <span key={i} className="text-[0.72rem] font-medium text-blue-600">
+              New
             </span>
           );
         }
@@ -40,7 +42,7 @@ function ChangeIndicator({ changes }: { changes: Change[] }) {
             : String(c.from);
 
         return (
-          <span key={i} className="text-[0.75rem] text-amber-700">
+          <span key={i} className="text-[0.72rem] text-amber-700">
             ⚠ {c.label} was {fromStr}
           </span>
         );
@@ -49,82 +51,40 @@ function ChangeIndicator({ changes }: { changes: Change[] }) {
   );
 }
 
-function TiersPopover({
-  allTiers,
-  rows,
-}: {
-  allTiers: Record<string, WeightTierInput[]>;
-  rows: RulesSummaryRow[];
-}) {
-  const [open, setOpen] = useState(false);
+/** Build a key from weight tier ranges (not commissions) for grouping */
+function tierRangeKey(tiers: WeightTierInput[]): string {
+  return tiers
+    .sort((a, b) => a.tier - b.tier)
+    .map((t) => `${t.minWeight}-${t.maxWeight ?? "∞"}`)
+    .join("|");
+}
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="text-[0.82rem] font-medium text-brand hover:text-brand/80 transition-colors"
-      >
-        View Tiers
-      </button>
-    );
+interface TierGroup {
+  rangeKey: string;
+  tiers: WeightTierInput[]; // representative tiers for the header
+  dispatchers: {
+    row: RulesSummaryRow;
+    tiers: WeightTierInput[];
+  }[];
+}
+
+function groupByTierRanges(
+  rows: RulesSummaryRow[],
+  allTiers: Record<string, WeightTierInput[]>,
+): TierGroup[] {
+  const groups = new Map<string, TierGroup>();
+
+  for (const row of rows) {
+    const tiers = allTiers[row.dispatcherId] ?? [];
+    const key = tierRangeKey(tiers);
+
+    if (!groups.has(key)) {
+      groups.set(key, { rangeKey: key, tiers, dispatchers: [] });
+    }
+    groups.get(key)!.dispatchers.push({ row, tiers });
   }
 
-  return (
-    <div className="w-full mt-3 rounded-md border border-outline-variant/20 bg-surface-container-low overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-surface-container-low">
-        <span className="text-[0.78rem] font-semibold text-on-surface uppercase tracking-wider">
-          Weight Tiers
-        </span>
-        <button
-          onClick={() => setOpen(false)}
-          className="text-[0.78rem] text-on-surface-variant hover:text-on-surface transition-colors"
-        >
-          <ChevronUp className="w-4 h-4" />
-        </button>
-      </div>
-      <div className="px-4 pb-3">
-        <table className="w-full text-[0.8rem]">
-          <thead>
-            <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant">
-              <th className="py-1.5 pr-3 font-medium">Dispatcher</th>
-              <th className="py-1.5 px-3 font-medium">Tier 1</th>
-              <th className="py-1.5 px-3 font-medium">Tier 2</th>
-              <th className="py-1.5 px-3 font-medium">Tier 3</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const tiers = allTiers[row.dispatcherId] ?? [];
-              return (
-                <tr key={row.dispatcherId} className="border-t border-outline-variant/10">
-                  <td className="py-1.5 pr-3 text-on-surface font-medium">{row.name}</td>
-                  {[1, 2, 3].map((tierNum) => {
-                    const tier = tiers.find((t) => t.tier === tierNum);
-                    const tierChange = row.changes.find(
-                      (c) => c.type === "TIER_CHANGED" && c.tier === tierNum,
-                    );
-                    return (
-                      <td
-                        key={tierNum}
-                        className={`py-1.5 px-3 tabular-nums ${tierChange ? "text-amber-700 font-medium" : "text-on-surface-variant"}`}
-                      >
-                        {tier ? formatRM(tier.commission) : "—"}
-                        {tierChange && (
-                          <span className="text-[0.7rem] text-amber-600 ml-1">
-                            (was {formatRM(tierChange.from as number)})
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+  return [...groups.values()];
 }
 
 export function RulesSummary({
@@ -134,15 +94,15 @@ export function RulesSummary({
   rows,
   hasPreviousData,
   allTiers,
-  onProceed,
 }: RulesSummaryProps) {
   const monthName = new Date(year, month - 1).toLocaleString("en", { month: "long" });
+  const groups = groupByTierRanges(rows, allTiers);
 
   return (
     <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden">
       <div className="px-6 py-5">
         <h3 className="text-[1rem] font-semibold text-on-surface">
-          Rules Summary &mdash; {branchCode}, {monthName} {year}
+          Staff Settings &mdash; {branchCode}, {monthName} {year}
         </h3>
         <p className="text-[0.82rem] text-on-surface-variant mt-1">
           Review salary rules that will be applied this month.
@@ -152,61 +112,97 @@ export function RulesSummary({
         </p>
       </div>
 
-      <div className="px-6 pb-4 overflow-x-auto">
-        <table className="w-full text-[0.82rem]">
-          <thead>
-            <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant border-b border-outline-variant/15">
-              <th className="pb-2 pr-4 font-medium">Dispatcher</th>
-              <th className="pb-2 px-4 font-medium">Incentive</th>
-              <th className="pb-2 px-4 font-medium">Petrol</th>
-              {hasPreviousData && (
-                <th className="pb-2 pl-4 font-medium">Changes</th>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.dispatcherId}
-                className="border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-container-high/50 transition-colors"
-              >
-                <td className="py-2.5 pr-4">
-                  <span className="font-medium text-on-surface">{row.name}</span>
-                  <span className="text-on-surface-variant/60 ml-1.5 text-[0.75rem]">
-                    {row.extId}
-                  </span>
-                </td>
-                <td className="py-2.5 px-4 tabular-nums text-on-surface">
-                  {formatRM(row.incentiveAmount)}
-                </td>
-                <td className="py-2.5 px-4">
-                  {row.petrolEligible ? (
-                    <span className="text-on-surface tabular-nums">
-                      ✅ {formatRM(row.petrolAmount)}/day
-                    </span>
-                  ) : (
-                    <span className="text-on-surface-variant/50">❌</span>
-                  )}
-                </td>
-                {hasPreviousData && (
-                  <td className="py-2.5 pl-4">
-                    <ChangeIndicator changes={row.changes} />
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="px-6 pb-5 space-y-4">
+        {groups.map((group) => {
+          const t1 = group.tiers.find((t) => t.tier === 1);
+          const t2 = group.tiers.find((t) => t.tier === 2);
+          const t3 = group.tiers.find((t) => t.tier === 3);
 
-      <div className="px-6 pb-5 flex items-center justify-between">
-        <TiersPopover allTiers={allTiers} rows={rows} />
-        <button
-          onClick={onProceed}
-          className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.85rem] font-medium text-white bg-brand hover:bg-brand/90 rounded-md transition-colors"
-        >
-          Proceed to Preview →
-        </button>
+          return (
+            <div key={group.rangeKey} className="rounded-md border border-outline-variant/10 overflow-hidden">
+              {/* Tier range header */}
+              <div className="px-4 py-2 bg-surface-container-low flex items-center gap-3 text-[0.72rem] uppercase tracking-wider font-medium text-on-surface-variant">
+                {t1 && <span>T1 ({formatWeight(t1.minWeight)}–{formatWeight(t1.maxWeight)})</span>}
+                {t2 && (
+                  <>
+                    <span className="text-outline-variant">·</span>
+                    <span>T2 ({formatWeight(t2.minWeight)}–{formatWeight(t2.maxWeight)})</span>
+                  </>
+                )}
+                {t3 && (
+                  <>
+                    <span className="text-outline-variant">·</span>
+                    <span>T3 (≥{formatWeight(t3.minWeight)})</span>
+                  </>
+                )}
+              </div>
+
+              {/* Dispatchers in this group */}
+              <table className="w-full text-[0.82rem]">
+                <thead>
+                  <tr className="text-left text-[0.68rem] uppercase tracking-wider text-on-surface-variant border-b border-outline-variant/10">
+                    <th className="py-1.5 pl-4 pr-2 font-medium">Dispatcher</th>
+                    <th className="py-1.5 px-2 font-medium">T1</th>
+                    <th className="py-1.5 px-2 font-medium">T2</th>
+                    <th className="py-1.5 px-2 font-medium">T3</th>
+                    <th className="py-1.5 px-2 font-medium">Incentive</th>
+                    <th className="py-1.5 px-2 font-medium">Petrol</th>
+                    {hasPreviousData && <th className="py-1.5 pl-2 pr-4 font-medium">Changes</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.dispatchers.map(({ row, tiers }) => (
+                    <tr
+                      key={row.dispatcherId}
+                      className="border-b border-outline-variant/6 last:border-b-0 hover:bg-surface-container-high/40 transition-colors"
+                    >
+                      <td className="py-2 pl-4 pr-2">
+                        <span className="font-medium text-on-surface">{row.name}</span>
+                        <span className="text-on-surface-variant/50 ml-1 text-[0.72rem]">{row.extId}</span>
+                      </td>
+                      {[1, 2, 3].map((tierNum) => {
+                        const tier = tiers.find((t) => t.tier === tierNum);
+                        const tierChange = row.changes.find(
+                          (c) => c.type === "TIER_CHANGED" && c.tier === tierNum,
+                        );
+                        return (
+                          <td
+                            key={tierNum}
+                            className={`py-2 px-2 tabular-nums ${tierChange ? "text-amber-700 font-medium" : "text-on-surface-variant"}`}
+                          >
+                            {tier ? formatRM(tier.commission) : "—"}
+                            {tierChange && (
+                              <span className="text-[0.68rem] text-amber-600 ml-0.5">
+                                (was {formatRM(tierChange.from as number)})
+                              </span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="py-2 px-2 tabular-nums text-on-surface">
+                        {formatRM(row.incentiveAmount)}
+                      </td>
+                      <td className="py-2 px-2">
+                        {row.petrolEligible ? (
+                          <span className="text-on-surface tabular-nums text-[0.78rem]">
+                            {formatRM(row.petrolAmount)}/d
+                          </span>
+                        ) : (
+                          <span className="text-on-surface-variant/40">—</span>
+                        )}
+                      </td>
+                      {hasPreviousData && (
+                        <td className="py-2 pl-2 pr-4">
+                          <ChangeIndicator changes={row.changes} />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

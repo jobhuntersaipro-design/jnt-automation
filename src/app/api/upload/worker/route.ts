@@ -19,7 +19,12 @@ async function handler(req: Request) {
     const message =
       error instanceof Error ? error.message : "Unknown processing error";
 
-    await updateUploadStatus(uploadId, "FAILED", message);
+    // Upload may have been deleted (cancelled/replaced) while worker was running
+    try {
+      await updateUploadStatus(uploadId, "FAILED", message);
+    } catch {
+      // Upload no longer exists — nothing to update
+    }
     return new Response("error", { status: 500 });
   }
 }

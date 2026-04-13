@@ -1,10 +1,18 @@
+import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient;
+  pool: Pool;
+};
 
 function createPrismaClient() {
-  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
+  // Reuse pool across hot reloads to avoid stacking event listeners
+  if (!globalForPrisma.pool) {
+    globalForPrisma.pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+  }
+  const adapter = new PrismaPg(globalForPrisma.pool);
   return new PrismaClient({ adapter });
 }
 

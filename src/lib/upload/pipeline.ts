@@ -132,7 +132,106 @@ export async function calculateAfterConfirm(uploadId: string) {
     { ex: 7200 },
   );
 
-  // Set READY_TO_CONFIRM — user reviews rules + preview before saving
+  // Set status based on whether there are unknown dispatchers
+  const hasUnknown = unknown.length > 0;
+  await updateUploadStatus(
+    uploadId,
+    hasUnknown ? "NEEDS_ATTENTION" : "READY_TO_CONFIRM",
+  );
+
+  // Clean up metadata KV
+  await redis.del(metaKey(uploadId));
+}
+
+// ─── Process Unknown (runs after agent sets up new dispatchers) ──
+
+/**
+ * Calculate salary only for previously-unknown dispatchers,
+ * then merge results into the existing KV preview.
+ */
+export async function processUnknown(uploadId: string, unknownExtIds: string[]) {
+  const upload = await prisma.upload.findUnique({
+    where: { id: uploadId },
+    include: { branch: { select: { agentId: true } } },
+  });
+
+  if (!upload) throw new Error("Upload not found");
+
+  // Re-parse from R2
+  const rows = await parseExcelFromR2(upload.r2Key);
+
+  // Load the newly-created dispatchers with their rules
+  const dispatchers = await prisma.dispatcher.findMany({
+    where: {
+      branch: { agentId: upload.branch.agentId },
+      extId: { in: unknownExtIds },
+    },
+    include: {
+      weightTiers: { orderBy: { tier: "asc" } },
+      incentiveRule: true,
+      petrolRule: true,
+    },
+  });
+
+  // Calculate salary for each new dispatcher
+  const newResults: PreviewResult[] = [];
+  for (const d of dispatchers) {
+    if (!d.incentiveRule || !d.petrolRule) continue;
+
+    const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
+    if (dispatcherRows.length === 0) continue;
+
+    const rules: DispatcherRules = {
+      dispatcherId: d.id,
+      extId: d.extId,
+      weightTiers: d.weightTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
+      incentiveRule: {
+        orderThreshold: d.incentiveRule.orderThreshold,
+        incentiveAmount: d.incentiveRule.incentiveAmount,
+      },
+      petrolRule: {
+        isEligible: d.petrolRule.isEligible,
+        dailyThreshold: d.petrolRule.dailyThreshold,
+        subsidyAmount: d.petrolRule.subsidyAmount,
+      },
+    };
+
+    const result = calculateSalary(rules, dispatcherRows);
+    newResults.push({
+      dispatcherId: result.dispatcherId,
+      extId: result.extId,
+      totalOrders: result.totalOrders,
+      baseSalary: result.baseSalary,
+      incentive: result.incentive,
+      petrolSubsidy: result.petrolSubsidy,
+      penalty: result.penalty,
+      advance: result.advance,
+      netSalary: result.netSalary,
+      lineItems: [],
+      weightTiersSnapshot: result.weightTiersSnapshot,
+      incentiveSnapshot: result.incentiveSnapshot,
+      petrolSnapshot: result.petrolSnapshot,
+    });
+  }
+
+  // Merge with existing preview data
+  const existing = await getPreviewData(uploadId);
+  const mergedResults = existing
+    ? [...existing.results, ...newResults]
+    : newResults;
+
+  await redis.set(
+    previewKey(uploadId),
+    { results: mergedResults, unknownDispatchers: [] },
+    { ex: 7200 },
+  );
+
+  // Update status
   await updateUploadStatus(uploadId, "READY_TO_CONFIRM");
 
   // Clean up metadata KV
@@ -205,5 +304,15 @@ export async function deletePreviewData(
   uploadId: string,
 ): Promise<void> {
   await redis.del(previewKey(uploadId));
+}
+
+/**
+ * Delete all KV data for an upload (meta + preview).
+ * Used when cancelling/deleting an upload.
+ */
+export async function deleteUploadData(
+  uploadId: string,
+): Promise<void> {
+  await redis.del(metaKey(uploadId), previewKey(uploadId));
 }
 

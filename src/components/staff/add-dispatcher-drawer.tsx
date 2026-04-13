@@ -24,8 +24,7 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required";
     if (!extId.trim()) errs.extId = "Dispatcher ID is required";
-    if (!icNo.trim()) errs.icNo = "IC number is required";
-    else if (!/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
+    if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
     if (!branchCode) errs.branchCode = "Branch is required";
     return errs;
   }

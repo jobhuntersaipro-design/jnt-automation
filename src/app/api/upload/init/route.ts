@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     confirmReplace?: boolean;
   };
 
-  if (!fileName || !branchCode || !month || !year) {
-    return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+  if (!fileName) {
+    return NextResponse.json({ error: "fileName is required" }, { status: 400 });
   }
 
   // Validate file extension
@@ -36,6 +36,27 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  const contentType = ext === "xlsx"
+    ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    : "application/vnd.ms-excel";
+
+  // ─── Auto-detect mode: no branch/month/year provided ───────────
+  // Just generate a presigned URL for R2 upload — no Upload row yet.
+  // The client will call POST /api/upload/detect after uploading to R2.
+  if (!branchCode || !month || !year) {
+    const r2Key = `uploads/${agentId}/pending/${Date.now()}-${fileName}`;
+
+    const presignedUrl = await getSignedUrl(
+      r2,
+      new PutObjectCommand({ Bucket: R2_BUCKET, Key: r2Key, ContentType: contentType }),
+      { expiresIn: 300 },
+    );
+
+    return NextResponse.json({ r2Key, presignedUrl });
+  }
+
+  // ─── Manual mode: branch/month/year provided (legacy) ──────────
 
   if (month < 1 || month > 12 || year < 2000 || year > 2100) {
     return NextResponse.json({ error: "Invalid month or year" }, { status: 400 });
@@ -71,18 +92,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Generate presigned URL for client-side upload
     const presignedUrl = await getSignedUrl(
       r2,
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: r2Key,
-        ContentType:
-          ext === "xlsx"
-            ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            : "application/vnd.ms-excel",
-      }),
-      { expiresIn: 300 }, // 5 minutes
+      new PutObjectCommand({ Bucket: R2_BUCKET, Key: r2Key, ContentType: contentType }),
+      { expiresIn: 300 },
     );
 
     return NextResponse.json({
@@ -110,14 +123,7 @@ export async function POST(req: NextRequest) {
 
   const presignedUrl = await getSignedUrl(
     r2,
-    new PutObjectCommand({
-      Bucket: R2_BUCKET,
-      Key: r2Key,
-      ContentType:
-        ext === "xlsx"
-          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          : "application/vnd.ms-excel",
-    }),
+    new PutObjectCommand({ Bucket: R2_BUCKET, Key: r2Key, ContentType: contentType }),
     { expiresIn: 300 },
   );
 
