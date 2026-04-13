@@ -1,38 +1,18 @@
-# Current Feature — Payroll Phase 3 + 4: Salary Table, Edit, Payslips, Export
+# Current Feature
 
 ## Status
 
-In Progress
+Not Started
 
 ## Goals
 
-### Phase 3 (code complete, pending browser test)
-- `/payroll/[uploadId]` page showing finalized salary table (read-only by default)
-- "Edit & Recalculate" mode — all fields editable, net salary + summary cards update live
-- "Save & Regenerate" — updates SalaryRecords + snapshots in a single transaction
-- Multi-select payslip PDF generation as ZIP download
-- PDF matches ST XIANG payslip format exactly (see `context/WhatsApp Image 2026-03-28 at 16.20.38.jpeg`)
-
-### Phase 4 (not started)
-- "Export CSV" — instant download of salary data per upload
-- "Export to Google Sheets" — one-time OAuth per agent, push data to new Sheet
-- Export available from payroll history list and salary table page
-- Google Sheets token management (store, refresh, disconnect)
-- Settings page section for Google Sheets connect/disconnect
-
 ## Notes
-
-- Phase 3 spec: `context/features/payroll-phase-3-spec.md`
-- Phase 4 spec: `context/features/payroll-phase-4-spec.md`
-- Payslip reference image: `context/WhatsApp Image 2026-03-28 at 16.20.38.jpeg`
-- Phase 3 API routes are under `/api/payroll/upload/[uploadId]/` to avoid slug conflict with existing `/api/payroll/[branchCode]/...`
-- Phase 4 export routes also need the `/api/payroll/upload/[uploadId]/export/` prefix
-- Phase 4 requires new Agent fields: `googleSheetsAccessToken`, `googleSheetsRefreshToken`, `googleSheetsTokenExpiry`
-- Phase 4 env vars: `GOOGLE_SHEETS_CLIENT_ID`, `GOOGLE_SHEETS_CLIENT_SECRET`, `GOOGLE_SHEETS_REDIRECT_URI`
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-13: **Payroll Phase 3+4 — Salary Table, Edit & Recalculate, Payslip PDF, CSV/Google Sheets Export** — Completed. `/payroll/[uploadId]` salary table page with read-only + edit modes. Edit & Recalculate: inline editable incentive, petrol, penalty, advance with live net salary + summary card updates. Save & Regenerate commits changes to DB with rebuilt snapshots. Multi-select payslip PDF generation (single PDF or ZIP for multiple) matching ST XIANG payslip format — company header, employee particulars, addition/deduction table with tier breakdown. CSV export (instant download). Google Sheets export with one-time OAuth per agent, token storage + auto-refresh, Settings page connect/disconnect. Export available from payroll history list dropdown and salary table header. Prisma migrations add Agent fields: `companyRegistrationNo`, `companyAddress`, `stampImageUrl`, `googleSheetsAccessToken`, `googleSheetsRefreshToken`, `googleSheetsTokenExpiry`. Additional fixes: transaction timeout 30s→120s with chunked line item inserts, nav reordered Overview|Staff|Payroll, wizard simplified to 2-step (Preview + Confirm), summary cards compacted, preview table redesigned with inline editable fields + weight tier popover, IDOR fixes on dispatcherId in payslips/recalculate/preview routes, Zod validation on recalculate input, payslip cap at 50, isApproved defence-in-depth, payroll loading skeleton. Dependencies: `@react-pdf/renderer`, `jszip`. Env vars: `GOOGLE_SHEETS_CLIENT_ID`, `GOOGLE_SHEETS_CLIENT_SECRET`, `GOOGLE_SHEETS_REDIRECT_URI`. API routes: `GET /api/payroll/upload/[uploadId]/salary-records`, `POST /api/payroll/upload/[uploadId]/recalculate`, `POST /api/payroll/upload/[uploadId]/payslips`, `GET /api/payroll/upload/[uploadId]/export/csv`, `POST /api/payroll/upload/[uploadId]/export/sheets`, `GET/DELETE /api/auth/google-sheets/{connect,callback,disconnect}`. Files: `src/app/(dashboard)/payroll/[uploadId]/page.tsx`, `src/components/payroll/{salary-table,export-buttons}.tsx`, `src/lib/payroll/{pdf-generator,csv-generator,zip-generator,tier-counter}.ts`, `src/lib/google-sheets.ts`, API routes, settings components. Specs: `context/features/payroll-phase-3-spec.md`, `context/features/payroll-phase-4-spec.md`.
 
 - 2026-04-13: **Upload Phase 3 — Auto-detect, Multi-file Upload, Cancel/Delete, Wizard UI** — Completed. Major payroll upload UX overhaul. Auto-detection: branch code (col K) and month/year (col L) auto-detected from Excel file — no manual selectors needed. New branches auto-created. Unknown dispatchers auto-created with default salary rules, shown with "New" badge on Staff page. Multi-file upload: drag & drop multiple files, each gets its own status line ("Processing April 2026 for PHG379...") with cancel button. Active upload list with expandable detail for actionable states. Cancel/delete upload: `DELETE /api/upload/[uploadId]` cleans up DB + KV + R2. Cancel button on all mid-flow states. UPLOADING timeout (60s → auto-fail). New dispatcher flow: CONFIRM_SETTINGS shows unknown dispatchers with checkboxes — must confirm all before calculating. "Add on Staff Page" link. Staff page sorts new dispatchers to top. IC made optional. Multi-step wizard: replaced all-at-once layout with 3-step flow (Staff Settings → Preview → Confirm & Save) with step indicator, back/next navigation. Rules summary grouped by weight tier config. Preview table: removed avatars, calculator-style deduction input (type 5→0.05, 2→0.52). Confirm step shows full summary breakdown. Bug fixes: transaction timeout (moved computation outside tx, 30s timeout), worker race condition (handles deleted uploads gracefully), pg Pool instead of single Client (fixes concurrent query deprecation), duplicate upload shows amber status instead of error. Dashboard: full branch codes in distribution chart, wider dispatcher performance columns, `revalidatePath("/dashboard")` after payroll save. Payroll history: each row shows month/staff/net/base/deductions, last 3 months per branch with "See more", view+export always visible. Staff page: "Go to Payroll" toast after adding dispatcher. API routes: `DELETE /api/upload/[uploadId]`, `POST /api/upload/detect`, `POST /api/upload/[uploadId]/setup-dispatchers`, `POST /api/upload/[uploadId]/process-unknown`. Files: `src/components/payroll/{active-upload-list,payroll-client,upload-zone,confirm-settings-card,ready-to-confirm,rules-summary,preview-table,payroll-history,processing-card,status-cards,new-dispatcher-modal}.tsx`, `src/app/api/upload/{detect,[uploadId],[uploadId]/setup-dispatchers,[uploadId]/process-unknown}/route.ts`, `src/lib/upload/pipeline.ts`, `src/lib/prisma.ts`, `src/lib/db/{payroll,staff,upload}.ts`, dashboard components. Spec: `context/features/upload-phase-3-spec.md`.
 
