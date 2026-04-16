@@ -23,6 +23,7 @@ model Agent {
   defaults              AgentDefault?
   paymentRecords        PaymentRecord[]
   notifications         Notification[]
+  employees             Employee[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -102,6 +103,7 @@ model Branch {
   agentId     String
   code        String       // raw branch code from J&T data e.g. "PHG379"
   dispatchers Dispatcher[]
+  employees   Employee[]
   uploads     Upload[]
   agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt   DateTime     @default(now())
@@ -126,6 +128,7 @@ model Dispatcher {
   incentiveRule IncentiveRule?
   petrolRule    PetrolRule?
   salaryRecords SalaryRecord[]
+  employees     Employee[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -169,6 +172,48 @@ model PetrolRule {
   dailyThreshold Int        @default(70)
   subsidyAmount  Float      @default(15)
   dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+}
+
+// ─── Employees (Supervisor / Admin / Store Keeper) ──────────
+
+enum EmployeeType {
+  SUPERVISOR
+  ADMIN
+  STORE_KEEPER
+}
+
+model Employee {
+  id          String       @id @default(cuid())
+  agentId     String
+  extId       String?      // employee ID (optional external identifier)
+  name        String
+  icNo        String?      // optional until payslip needed
+  gender      Gender       @default(UNKNOWN)
+  avatarUrl   String?
+  type        EmployeeType
+  branchId    String?
+
+  // Supervisor/Admin fields
+  basicPay        Float?
+  petrolAllowance Float    @default(0)
+  kpiAllowance    Float    @default(0)
+  otherAllowance  Float    @default(0)
+
+  // Store Keeper fields
+  hourlyWage  Float?
+
+  // Dispatcher link
+  dispatcherId String?
+  dispatcher   Dispatcher? @relation(fields: [dispatcherId], references: [id], onDelete: SetNull)
+
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  agent  Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([agentId])
+  @@index([branchId])
 }
 
 // ─── Uploads & Results ───────────────────────────────────────

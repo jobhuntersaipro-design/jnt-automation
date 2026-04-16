@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { X, ChevronDown, Check } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { X, ChevronDown, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffDispatcher } from "@/lib/db/staff";
 
@@ -9,16 +9,28 @@ interface AddDispatcherDrawerProps {
   branchCodes: string[];
   onClose: () => void;
   onAdded: (dispatcher: StaffDispatcher) => void;
+  onBranchAdded?: (code: string) => void;
 }
 
-export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispatcherDrawerProps) {
+export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, onAdded, onBranchAdded }: AddDispatcherDrawerProps) {
   const [name, setName] = useState("");
   const [extId, setExtId] = useState("");
   const [icNo, setIcNo] = useState("");
-  const [branchCode, setBranchCode] = useState(branchCodes[0] ?? "");
+  const [localBranches, setLocalBranches] = useState(initialBranchCodes);
+  const [branchCode, setBranchCode] = useState(initialBranchCodes[0] ?? "");
   const [branchOpen, setBranchOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Add branch inline state
+  const [showAddBranch, setShowAddBranch] = useState(false);
+  const [newBranchCode, setNewBranchCode] = useState("");
+  const [addingBranch, setAddingBranch] = useState(false);
+  const newBranchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (showAddBranch) newBranchInputRef.current?.focus();
+  }, [showAddBranch]);
 
   function validate() {
     const errs: Record<string, string> = {};
@@ -29,6 +41,48 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
     return errs;
   }
 
+  async function handleAddBranch() {
+    if (!newBranchCode.trim()) return;
+    setAddingBranch(true);
+    try {
+      const res = await fetch("/api/branches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: newBranchCode.trim() }),
+      });
+
+      if (res.status === 409) {
+        toast.error("Branch already exists");
+        return;
+      }
+
+      if (res.status === 403) {
+        const data = await res.json();
+        toast.error(data.error || "Branch limit reached");
+        return;
+      }
+
+      if (!res.ok) {
+        toast.error("Failed to add branch");
+        return;
+      }
+
+      const { branch } = await res.json();
+      setLocalBranches((prev) => [...prev, branch.code]);
+      setBranchCode(branch.code);
+      setShowAddBranch(false);
+      setNewBranchCode("");
+      setBranchOpen(false);
+      setErrors((p) => ({ ...p, branchCode: "" }));
+      onBranchAdded?.(branch.code);
+      toast.success(`Branch ${branch.code} added`);
+    } catch {
+      toast.error("Failed to add branch");
+    } finally {
+      setAddingBranch(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const errs = validate();
@@ -37,13 +91,6 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
 
     setSubmitting(true);
     try {
-      // We need the branchId, but we only have branchCode.
-      // The API will look up by code — let's pass branchCode and resolve server-side.
-      // Actually, the spec says branchId. Let's fetch it.
-      // For simplicity, pass branchCode and have the API resolve it.
-      // But our API expects branchId. Let's adjust: we'll get branches with IDs from the server.
-      // For now, we pass branchCode and handle in API...
-      // Actually let's just make the parent pass branch objects with id+code.
       const res = await fetch("/api/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -122,11 +169,11 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
             </label>
             <input
               type="text"
-              value={icNo}
+              value={icNo ? icNo.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
               onChange={(e) => { setIcNo(e.target.value.replace(/\D/g, "").slice(0, 12)); setErrors((p) => ({ ...p, icNo: "" })); }}
               placeholder="12-digit IC number"
-              maxLength={12}
-              className={`w-full px-3 py-2 text-[0.84rem] font-mono bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
+              maxLength={14}
+              className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.icNo && <p className="text-[0.68rem] text-critical mt-1">{errors.icNo}</p>}
           </div>
@@ -149,7 +196,7 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
               </button>
               {branchOpen && (
                 <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-full py-1">
-                  {branchCodes.map((code) => (
+                  {localBranches.map((code) => (
                     <button
                       key={code}
                       type="button"
@@ -160,6 +207,50 @@ export function AddDispatcherDrawer({ branchCodes, onClose, onAdded }: AddDispat
                       {branchCode === code && <Check size={13} className="text-brand" />}
                     </button>
                   ))}
+
+                  {/* Add Branch row */}
+                  <div className="border-t border-outline-variant/15 mt-1 pt-1">
+                    {showAddBranch ? (
+                      <div className="px-3 py-1.5 flex items-center gap-2">
+                        <input
+                          ref={newBranchInputRef}
+                          type="text"
+                          value={newBranchCode}
+                          onChange={(e) => setNewBranchCode(e.target.value.toUpperCase())}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") { e.preventDefault(); handleAddBranch(); }
+                            if (e.key === "Escape") { setShowAddBranch(false); setNewBranchCode(""); }
+                          }}
+                          placeholder="e.g. PHG1234"
+                          className="flex-1 px-2 py-1 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddBranch}
+                          disabled={addingBranch || !newBranchCode.trim()}
+                          className="px-2 py-1 text-[0.72rem] font-medium text-white bg-brand rounded-[0.375rem] hover:bg-brand/90 disabled:opacity-50 transition-colors"
+                        >
+                          {addingBranch ? "..." : "Add"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowAddBranch(false); setNewBranchCode(""); }}
+                          className="p-1 text-on-surface-variant hover:text-on-surface transition-colors"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBranch(true)}
+                        className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.84rem] text-brand hover:bg-surface-low transition-colors"
+                      >
+                        <Plus size={14} />
+                        Add Branch
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

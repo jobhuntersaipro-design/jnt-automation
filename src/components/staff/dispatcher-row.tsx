@@ -500,12 +500,12 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
       <div>
         <input
           type="text"
-          value={icNo}
-          onChange={(e) => handleIcChange(e.target.value)}
+          value={icNo ? icNo.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+          onChange={(e) => handleIcChange(e.target.value.replace(/\D/g, "").slice(0, 12))}
           onClick={(e) => e.stopPropagation()}
           placeholder="—"
-          maxLength={12}
-          className={`${INPUT_CLASS} font-mono ${icError ? "border-critical/50!" : ""}`}
+          maxLength={14}
+          className={`${INPUT_CLASS} tabular-nums ${icError ? "border-critical/50!" : ""}`}
         />
         {icError && (
           <p className="text-[0.62rem] text-critical mt-0.5 text-center">{icError}</p>

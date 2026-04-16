@@ -1,4 +1,4 @@
-# Current Feature — Backlog Sprint
+# Current Feature — Employees Phase 1: Employee Settings
 
 ## Status
 
@@ -6,34 +6,25 @@ In Progress
 
 ## Goals
 
-Implement all backlog items from `context/features/backlog-spec.md` in priority order:
-
-| # | Feature | Size | Status |
-|---|---------|------|--------|
-| 3 | Settings — profile pic + company details + stamp upload + member since | Medium | Done |
-| 10 | Petrol subsidy days tracking | Small | Done |
-| 11 | Overview dispatcher performance UI updates | Small | Done |
-| 5 | Superadmin panel + manual payment history + agent view | Large | Done |
-| 6 | Branch limits | Small | Done |
-| 1 | Notifications | Medium | Done |
-| 2 | Overview export + settings in export | Medium | Done |
-| 7 | First-timer tutorial | Medium | Done |
-| 8 | Mobile responsiveness | Large | Done |
-| 9 | Payment / access management | Deferred | Do NOT start yet |
-
-Item #4 (auth security fixes) already completed on 2026-04-08.
+- Add Employee model to database (Supervisor, Admin, Store Keeper types)
+- `/staff` page with employee list — add, edit, delete employees
+- 3 employee types with different salary fields (Supervisor/Admin: basic pay; Store Keeper: hourly wage)
+- "Also a Dispatcher" toggle to link employee to existing dispatcher by IC
+- IC number optional until payslip generation
+- Status badges: Complete / Missing IC
+- Filter by employee type + search by name/IC
+- Edit drawer for add/edit with type-specific fields
+- Data isolation — agent only sees own employees
 
 ## Notes
 
-- Full backlog spec: `context/features/backlog-spec.md`
-- Payslip PDF fixes: removed EMPLOYER'S CONTRIBUTION section, removed empty row below TOTAL, stamp 1:1 ratio with `objectFit: contain`, footer aligned (PREPARED BY + APPROVED BY same line)
-- Stamp image uploaded to R2 (`stamps/st-xiang-stamp.jpeg`) and set on both agents
-- Duplicate upload dialog: now queues multiple duplicates sequentially, cancel cleans up R2 + removes from list
-- Confirm route optimized: pre-group rows by extId, build line items from snapshot (skip re-calculation), line items outside transaction, chunk 5000→20000
-- Staff "First Seen" column replaces Status — shows earliest salary record month or NEW
-- Nav bar name now reads from DB (Settings page name) instead of Google OAuth profile
-- Loading skeletons added for admin, settings, salary table pages
-- Payroll history: branch dividers + more spacing between branch name and table
+- Full spec: `context/features/employees-phase-1-spec.md`
+- Supervisor & Admin share same fields: Basic Pay, Petrol Allowance, KPI Allowance, Other Allowance
+- Store Keeper uses Hourly Wage instead of Basic Pay, plus KPI/Petrol/Other Allowances
+- IC syncs between employee and linked dispatcher (one source of truth)
+- Missing IC only blocks payslip PDF generation, not salary entry
+- Employee model includes `dispatcherId` FK to link to existing Dispatcher
+- Existing `/staff` page handles dispatchers — need to integrate employees alongside or in separate tab
 
 ## History
 

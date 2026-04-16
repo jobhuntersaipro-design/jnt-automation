@@ -9,7 +9,9 @@ import { DispatcherRow } from "./dispatcher-row";
 import { AddDispatcherDrawer } from "./add-dispatcher-drawer";
 import { DefaultsDrawer } from "./defaults-drawer";
 import { DispatcherDrawer } from "./dispatcher-drawer";
+import { EmployeeList } from "./employee-list";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
+import type { StaffEmployee } from "@/lib/db/employees";
 
 const PAGE_SIZE = 20;
 
@@ -17,6 +19,7 @@ interface StaffClientProps {
   dispatchers: StaffDispatcher[];
   branchCodes: string[];
   defaults: AgentDefaults;
+  employees: StaffEmployee[];
 }
 
 function sortItems(list: StaffDispatcher[]) {
@@ -44,8 +47,12 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
   return pages;
 }
 
-export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: StaffClientProps) {
+type Tab = "dispatchers" | "employees";
+
+export function StaffClient({ dispatchers: serverData, branchCodes: initialBranchCodes, defaults, employees }: StaffClientProps) {
+  const [activeTab, setActiveTab] = useState<Tab>("dispatchers");
   const router = useRouter();
+  const [localBranchCodes, setLocalBranchCodes] = useState<string[]>(initialBranchCodes);
 
   const [items, setItems] = useState(serverData);
   const [dataVersion, setDataVersion] = useState(0);
@@ -60,6 +67,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   }, [serverData]);
 
   const [selectedBranch, setSelectedBranch] = useState("");
+  const [filterNew, setFilterNew] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [deleteTarget, setDeleteTarget] = useState<StaffDispatcher | null>(null);
@@ -115,6 +123,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
     return items
       .filter((d) => {
         if (selectedBranch && d.branchCode !== selectedBranch) return false;
+        if (filterNew && d.firstSeen !== "NEW") return false;
         if (q && !d.name.toLowerCase().includes(q) && !d.extId.toLowerCase().includes(q)) return false;
         return true;
       })
@@ -126,7 +135,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
         if (aNew !== bNew) return aNew ? -1 : 1;
         return a.name.localeCompare(b.name);
       });
-  }, [items, selectedBranch, search]);
+  }, [items, selectedBranch, filterNew, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -311,23 +320,27 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
           <div className="shrink-0">
             <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">Staff</h1>
             <p className="text-[0.72rem] text-on-surface-variant mt-0.5 hidden sm:block">
-              Manage dispatchers and salary rules across all branches.
+              Manage dispatchers, employees and salary rules across all branches.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowDefaults(true)}
-              data-tutorial="defaults-button"
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
-            >
-              Defaults
-            </button>
-            <button
-              onClick={() => setShowAddDrawer(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-brand rounded-[0.375rem] hover:bg-brand/90 transition-colors"
-            >
-              Add Dispatcher
-            </button>
+            {activeTab === "dispatchers" && (
+              <>
+                <button
+                  onClick={() => setShowDefaults(true)}
+                  data-tutorial="defaults-button"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
+                >
+                  Defaults
+                </button>
+                <button
+                  onClick={() => setShowAddDrawer(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-white bg-brand rounded-[0.375rem] hover:bg-brand/90 transition-colors"
+                >
+                  Add Dispatcher
+                </button>
+              </>
+            )}
             {hasIssues ? (
               <button
                 onClick={() => {
@@ -372,9 +385,36 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
             )}
           </div>
         </div>
+        {/* Tab Switcher */}
+        <div className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
+          <button
+            onClick={() => setActiveTab("dispatchers")}
+            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
+              activeTab === "dispatchers"
+                ? "bg-white text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Dispatchers
+          </button>
+          <button
+            onClick={() => setActiveTab("employees")}
+            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
+              activeTab === "employees"
+                ? "bg-white text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Employees
+          </button>
+        </div>
       </header>
 
       <main className="px-4 lg:px-8 pb-16 space-y-4">
+        {activeTab === "employees" ? (
+          <EmployeeList employees={employees} dispatchers={serverData} branchCodes={localBranchCodes} onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])} />
+        ) : (
+        <>
         {/* Filters */}
         <div className="flex items-center gap-3">
           <div ref={branchRef} className="relative">
@@ -394,7 +434,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                   All Branches
                   {!selectedBranch && <Check size={13} className="text-brand" />}
                 </button>
-                {branchCodes.map((code) => (
+                {localBranchCodes.map((code) => (
                   <button
                     key={code}
                     onClick={() => handleBranchSelect(code)}
@@ -477,9 +517,20 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                 "Eligible", "Min Orders", "Amount (RM)",
                 "First Seen", "",
               ].map((h, i) => (
-                <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center ${i === 0 ? "text-left!" : ""}`}>
-                  {h}
-                </span>
+                h === "First Seen" ? (
+                  <button
+                    key={`${h}-${i}`}
+                    type="button"
+                    onClick={() => { setFilterNew((v) => !v); setPage(1); }}
+                    className={`text-[0.62rem] font-medium tracking-[0.05em] uppercase text-center cursor-pointer hover:text-brand transition-colors ${filterNew ? "text-brand underline underline-offset-2" : "text-on-surface-variant"}`}
+                  >
+                    {filterNew ? "NEW Only" : "First Seen"}
+                  </button>
+                ) : (
+                  <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center ${i === 0 ? "text-left!" : ""}`}>
+                    {h}
+                  </span>
+                )
               ))}
             </div>
 
@@ -493,7 +544,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                   dispatcher={d}
                   dataVersion={dataVersion}
                   defaults={defaults}
-                  branchCodes={branchCodes}
+                  branchCodes={localBranchCodes}
                   saveTrigger={saveTrigger}
                   isNew={newlyAddedIds.has(d.id)}
                   isChecked={checkedIds.has(d.id)}
@@ -553,6 +604,8 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
             </div>
           </div>
         )}
+        </>
+        )}
       </main>
 
       {/* Dispatcher Drawer (History) */}
@@ -580,9 +633,10 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
       {/* Add Dispatcher Drawer */}
       {showAddDrawer && (
         <AddDispatcherDrawer
-          branchCodes={branchCodes}
+          branchCodes={localBranchCodes}
           onClose={() => setShowAddDrawer(false)}
           onAdded={handleDispatcherAdded}
+          onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])}
         />
       )}
 
