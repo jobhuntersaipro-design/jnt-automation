@@ -1,34 +1,18 @@
-# Current Feature — Employees Phase 1: Employee Settings
+# Current Feature
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- Add Employee model to database (Supervisor, Admin, Store Keeper types)
-- `/staff` page with employee list — add, edit, delete employees
-- 3 employee types with different salary fields (Supervisor/Admin: basic pay; Store Keeper: hourly wage)
-- "Also a Dispatcher" toggle to link employee to existing dispatcher by IC
-- IC number optional until payslip generation
-- Status badges: Complete / Missing IC
-- Filter by employee type + search by name/IC
-- Edit drawer for add/edit with type-specific fields
-- Data isolation — agent only sees own employees
-
 ## Notes
-
-- Full spec: `context/features/employees-phase-1-spec.md`
-- Supervisor & Admin share same fields: Basic Pay, Petrol Allowance, KPI Allowance, Other Allowance
-- Store Keeper uses Hourly Wage instead of Basic Pay, plus KPI/Petrol/Other Allowances
-- IC syncs between employee and linked dispatcher (one source of truth)
-- Missing IC only blocks payslip PDF generation, not salary entry
-- Employee model includes `dispatcherId` FK to link to existing Dispatcher
-- Existing `/staff` page handles dispatchers — need to integrate employees alongside or in separate tab
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-16: **Employees Phase 1 — Employee Settings** — Completed. New `Employee` model with `EmployeeType` enum (SUPERVISOR, ADMIN, STORE_KEEPER), `extId`, `branchId` fields. Two Prisma migrations applied. Employees tab on Staff page with Dispatchers | Employees tab switcher. Employee list with type filter (All / Supervisor / Admin / Store Keeper), search by name/IC/ID, pagination (20/page), edit/delete actions. Add/edit employee drawer with: name, position type, employee ID, branch (with inline "Add Branch"), IC number (optional, dash-formatted 1234-5678-9012), calculator-style currency inputs (type 5→0.05, 2→0.52) for basic pay/hourly wage + petrol/KPI/other allowances, "Also a Dispatcher" toggle with searchable dispatcher list (2-row layout: name + ID/branch). IC syncs to linked dispatcher (agentId-scoped). Status badges: Complete / Missing IC. Branch creation API (`POST /api/branches`) with code length limit + branch limit enforcement. Server-side validation: type enum, numeric bounds (0–999,999), IC format, branch ownership. Dispatcher "First Seen" column header now toggleable as NEW-only filter. Additional: IC inputs use `tabular-nums` instead of `font-mono` for consistent placeholder font. Prisma schema: `Employee` model with relations to `Agent`, `Branch`, `Dispatcher`. API routes: `GET/POST /api/employees`, `PATCH/DELETE /api/employees/[id]`, `POST /api/branches`. Files: `src/lib/db/employees.ts`, `src/components/staff/{employee-list,employee-drawer}.tsx`, `src/components/staff/{staff-client,add-dispatcher-drawer,dispatcher-row}.tsx`, `src/app/(dashboard)/staff/page.tsx`, API routes. Spec: `context/features/employees-phase-1-spec.md`.
 
 - 2026-04-16: **Backlog Sprint — Overview Export, Tutorial, Mobile Responsiveness** — Completed. (1) **Overview Export (#2)**: CSV + Google Sheets export for dispatcher performance and branch summary data from the Overview page. Dispatcher export includes one row per dispatcher per month with salary record snapshots (weight tier ranges/rates, incentive threshold/amount, petrol eligible/threshold/amount). Branch export shows branch code, month, dispatcher count, total orders, total net payout. Export respects current branch + date filters. Reuses existing Google Sheets OAuth flow. API routes: `GET /api/overview/export/csv`, `POST /api/overview/export/sheets`. Files: `src/lib/db/overview-export.ts`, `src/lib/overview/csv-generator.ts`, `src/components/dashboard/overview-export.tsx`, API routes. (2) **First-timer Tutorial (#7)**: Custom tooltip overlay (no external dependency) shown once per agent on first login. Steps per page: Overview (5 steps), Staff (5 steps), Payroll (7 steps), Admin (2 steps for superadmin). Target elements via `data-tutorial` attributes. Skip/replay controls. Persisted via `Agent.hasSeenTutorial` field. Replay button in Settings page. API routes: `POST/DELETE /api/tutorial`. Prisma migration adds `hasSeenTutorial` Boolean. Files: `src/components/tutorial/tutorial-overlay.tsx`, `src/lib/tutorial/steps.ts`, `src/components/settings/settings-client.tsx`. (3) **Mobile Responsiveness (#8)**: Hamburger nav menu on mobile (`lg:` breakpoint), responsive padding/spacing across all pages, 2x2 summary card grid on mobile, single-column chart layout, horizontal scroll on staff table and payroll history, responsive headers (stacked on small screens). Files: `src/components/dashboard/mobile-nav.tsx`, layout, dashboard, staff, payroll, settings, admin pages updated.
 
