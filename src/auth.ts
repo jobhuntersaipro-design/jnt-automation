@@ -46,7 +46,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true;
     },
 
-    async jwt({ token, user, profile }) {
+    async jwt({ token, user, profile, trigger, session: updateData }) {
       if (user?.id) {
         token.id = user.id;
         const profilePic = (profile as { picture?: string })?.picture;
@@ -59,6 +59,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.isSuperAdmin = agent?.isSuperAdmin ?? false;
         if (agent?.name) token.name = agent.name;
       }
+      // Allow session updates (e.g. after name change in Settings)
+      if (trigger === "update" && updateData) {
+        if ((updateData as { name?: string }).name) {
+          token.name = (updateData as { name: string }).name;
+        }
+      }
       return token;
     },
 
@@ -67,12 +73,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.image = token.picture as string | null;
       session.user.isApproved = token.isApproved as boolean;
       session.user.isSuperAdmin = token.isSuperAdmin as boolean;
-      // Always read name from DB so Settings changes reflect immediately
-      const agent = await prisma.agent.findUnique({
-        where: { id: token.id as string },
-        select: { name: true },
-      });
-      if (agent?.name) session.user.name = agent.name;
+      session.user.name = token.name as string;
       return session;
     },
   },

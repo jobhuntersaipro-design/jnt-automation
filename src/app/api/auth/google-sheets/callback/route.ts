@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export async function GET(req: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || req.nextUrl.origin;
@@ -12,7 +18,11 @@ export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
 
-  if (!code || state !== session.user.id) {
+  // Verify and consume the nonce
+  const storedNonce = await redis.get<string>(`oauth-state:${session.user.id}`);
+  await redis.del(`oauth-state:${session.user.id}`);
+
+  if (!code || !state || !storedNonce || state !== storedNonce) {
     return NextResponse.redirect(
       new URL("/payroll?error=google_sheets_failed", baseUrl),
     );
@@ -25,7 +35,6 @@ export async function GET(req: NextRequest) {
     `${baseUrl}/api/auth/google-sheets/callback`;
 
   try {
-    // Exchange code for tokens
     const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },

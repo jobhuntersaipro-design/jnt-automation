@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { unstable_cache } from "next/cache";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MonthlyNetPayoutTrend } from "@/components/dashboard/monthly-net-payout-trend";
 import { BranchDistribution } from "@/components/dashboard/branch-distribution";
@@ -9,16 +8,8 @@ import { TopDispatchers } from "@/components/dashboard/top-dispatchers";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { OverviewExport } from "@/components/dashboard/overview-export";
 import { ChartErrorBoundary } from "@/components/ui/chart-error-boundary";
-import {
-  getSummaryStats,
-  getMonthlyPayoutTrend,
-  getBranchDistribution,
-  getSalaryBreakdown,
-  getIncentiveHitRate,
-  getTopDispatchers,
-  type Filters,
-} from "@/lib/db/overview";
-import { auth } from "@/auth";
+import { fetchDashboardData } from "@/lib/db/overview-cached";
+import type { Filters } from "@/lib/db/overview";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -59,23 +50,8 @@ export default async function DashboardPage({
   const effective = await getEffectiveAgentId();
   const agentId = effective!.agentId;
 
-  // Cache key includes agentId + filters so each tenant and filter combo gets its own bucket.
-  // Defined inside the page function (not module scope) so agentId is available for the key.
-  const fetchDashboardData = unstable_cache(
-    () => Promise.all([
-      getSummaryStats(agentId, filters),
-      getMonthlyPayoutTrend(agentId, filters),
-      getBranchDistribution(agentId, filters),
-      getSalaryBreakdown(agentId, filters),
-      getIncentiveHitRate(agentId, filters),
-      getTopDispatchers(agentId, filters),
-    ]),
-    [`dashboard-overview:${agentId}:${JSON.stringify(filters)}`],
-    { revalidate: 5 * 60 },
-  );
-
   const [[summary, trend, branchDist, breakdown, hitRate, dispatchers], allBranches] = await Promise.all([
-    fetchDashboardData(),
+    fetchDashboardData(agentId, filters),
     prisma.branch.findMany({ where: { agentId }, select: { code: true } }),
   ]);
 
@@ -96,11 +72,8 @@ export default async function DashboardPage({
           </div>
 
           <Suspense>
-            <div className="flex items-center gap-2 overflow-x-auto" data-tutorial="filters">
+            <div className="flex items-center gap-2" data-tutorial="filters">
               <DashboardFilters branchCodes={branchCodes} />
-              <div data-tutorial="export">
-                <OverviewExport />
-              </div>
             </div>
           </Suspense>
         </div>
@@ -132,7 +105,14 @@ export default async function DashboardPage({
 
         <div data-tutorial="dispatcher-table">
           <ChartErrorBoundary>
-            <TopDispatchers data={dispatchers} />
+            <TopDispatchers
+              data={dispatchers}
+              action={
+                <div key="export" data-tutorial="export">
+                  <OverviewExport />
+                </div>
+              }
+            />
           </ChartErrorBoundary>
         </div>
       </main>

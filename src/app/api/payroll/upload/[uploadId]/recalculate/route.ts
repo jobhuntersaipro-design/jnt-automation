@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
@@ -24,14 +24,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { uploadId } = await params;
 
-  const upload = await verifyUploadOwnership(uploadId, session.user.id);
+  const upload = await verifyUploadOwnership(uploadId, effective.agentId);
   if (!upload) {
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });
   }
@@ -56,7 +56,7 @@ export async function POST(
     const dispatchers = await prisma.dispatcher.findMany({
       where: {
         id: { in: dispatcherIds },
-        branch: { agentId: session.user.id },
+        branch: { agentId: effective.agentId },
       },
       include: {
         weightTiers: { orderBy: { tier: "asc" } },
@@ -122,7 +122,7 @@ export async function POST(
 
     // Notify
     await createNotification({
-      agentId: session.user.id,
+      agentId: effective.agentId,
       type: "recalculate",
       message: "Payroll recalculated",
       detail: `${updates.length} record${updates.length > 1 ? "s" : ""} updated`,

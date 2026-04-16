@@ -163,12 +163,20 @@ export async function getAgentView(agentId: string) {
       year: true,
       branch: { select: { code: true } },
       _count: { select: { salaryRecords: true } },
-      salaryRecords: {
-        select: { netSalary: true },
-      },
     },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
+
+  // Aggregate net salary per upload in a single query instead of loading all records
+  const uploadIds = uploads.map((u) => u.id);
+  const uploadSums = uploadIds.length > 0
+    ? await prisma.salaryRecord.groupBy({
+        by: ["uploadId"],
+        where: { uploadId: { in: uploadIds } },
+        _sum: { netSalary: true },
+      })
+    : [];
+  const uploadNetMap = new Map(uploadSums.map((r) => [r.uploadId, r._sum.netSalary ?? 0]));
 
   return {
     agent: {
@@ -205,7 +213,7 @@ export async function getAgentView(agentId: string) {
       month: u.month,
       year: u.year,
       dispatcherCount: u._count.salaryRecords,
-      totalNetPayout: u.salaryRecords.reduce((s, r) => s + r.netSalary, 0),
+      totalNetPayout: uploadNetMap.get(u.id) ?? 0,
     })),
   };
 }

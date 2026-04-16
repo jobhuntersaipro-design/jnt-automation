@@ -87,18 +87,20 @@ export async function POST(
 
   // Create all dispatchers in a single transaction
   const createdCount = await prisma.$transaction(async (tx) => {
+    // Batch-check which extIds already exist in this branch
+    const extIds = dispatchers.map((d) => d.extId.trim());
+    const existingDispatchers = await tx.dispatcher.findMany({
+      where: { branchId: branch.id, extId: { in: extIds } },
+      select: { extId: true },
+    });
+    const existingExtIds = new Set(existingDispatchers.map((d) => d.extId));
+
     let count = 0;
 
     for (const d of dispatchers) {
+      if (existingExtIds.has(d.extId.trim())) continue; // skip if already exists (idempotency)
+
       const gender = deriveGender(d.icNo);
-
-      // Check extId uniqueness within branch
-      const existing = await tx.dispatcher.findFirst({
-        where: { branchId: branch.id, extId: d.extId.trim() },
-        select: { id: true },
-      });
-
-      if (existing) continue; // skip if already exists (idempotency)
 
       const dispatcher = await tx.dispatcher.create({
         data: {

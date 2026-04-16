@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Building2, Users, FileText, Eye } from "lucide-react";
 import type { AgentView } from "@/lib/db/admin";
 
@@ -19,7 +20,7 @@ type Tab = "overview" | "staff" | "payroll";
 export function AgentViewClient({ data }: { data: AgentView }) {
   const [tab, setTab] = useState<Tab>("overview");
 
-  const { agent, summary } = data;
+  const { agent } = data;
   const memberSince = new Date(agent.createdAt).toLocaleDateString("en-MY", {
     month: "long",
     year: "numeric",
@@ -103,7 +104,7 @@ function OverviewTab({ data }: { data: AgentView }) {
             key={label}
             className={`rounded-lg p-4 ${
               highlight
-                ? "bg-gradient-to-br from-brand to-brand/80 text-white"
+                ? "bg-linear-to-br from-brand to-brand/80 text-white"
                 : "bg-surface-card border border-outline-variant/15"
             }`}
           >
@@ -163,9 +164,11 @@ function OverviewTab({ data }: { data: AgentView }) {
             {data.agent.stampImageUrl && (
               <div>
                 <p className="text-[0.68rem] font-medium text-on-surface-variant uppercase tracking-wider mb-1">Stamp</p>
-                <img
+                <Image
                   src={data.agent.stampImageUrl}
                   alt="Company stamp"
+                  width={64}
+                  height={64}
                   className="w-16 h-16 object-contain rounded border border-outline-variant/20"
                 />
               </div>

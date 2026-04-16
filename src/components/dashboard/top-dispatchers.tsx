@@ -70,11 +70,13 @@ function DispatcherTable({
   subtitle,
   defaultDir,
   data,
+  action,
 }: {
   title: string;
   subtitle: string;
   defaultDir: SortDir;
   data: DispatcherRow[];
+  action?: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("netSalary");
@@ -127,7 +129,9 @@ function DispatcherTable({
           </h2>
           <p className="text-[0.9rem] text-on-surface-variant mt-0.5">{subtitle}</p>
         </div>
-        <div className="relative shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {action}
+          <div className="relative">
           <Search
             size={14}
             className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none"
@@ -139,6 +143,7 @@ function DispatcherTable({
             onChange={(e) => handleSearch(e.target.value)}
             className="pl-8 pr-3 py-1.5 text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-36 transition-shadow"
           />
+          </div>
         </div>
       </div>
 
@@ -260,13 +265,14 @@ function DispatcherTable({
   );
 }
 
-export function TopDispatchers({ data }: { data: DispatcherRow[] }) {
+export function TopDispatchers({ data, action }: { data: DispatcherRow[]; action?: React.ReactNode }) {
   return (
     <DispatcherTable
       title="Dispatcher Performance"
       subtitle="Sort by any column — highest net salary by default"
       defaultDir="desc"
       data={data}
+      action={action}
     />
   );
 }

@@ -120,7 +120,7 @@ export async function exportToGoogleSheets(
   // 2. Build values
   const headers = [
     "Dispatcher ID", "Dispatcher Name", "Branch", "Total Orders",
-    "Base Salary", "Incentive", "Petrol Subsidy", "Penalty", "Advance", "Net Salary",
+    "Base Salary (RM)", "Incentive (RM)", "Petrol Subsidy (RM)", "Penalty (RM)", "Advance (RM)", "Net Salary (RM)",
   ];
 
   const dataRows = records.map((r) => [

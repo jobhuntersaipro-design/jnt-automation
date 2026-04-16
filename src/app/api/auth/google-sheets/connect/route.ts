@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { Redis } from "@upstash/redis";
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -10,7 +16,6 @@ export async function GET(req: NextRequest) {
   }
 
   const clientId = process.env.GOOGLE_SHEETS_CLIENT_ID;
-  // Use the configured redirect URI, or derive from current origin for dev
   const redirectUri =
     process.env.GOOGLE_SHEETS_REDIRECT_URI ||
     `${baseUrl}/api/auth/google-sheets/callback`;
@@ -20,6 +25,10 @@ export async function GET(req: NextRequest) {
       new URL("/payroll?error=google_sheets_failed", baseUrl),
     );
   }
+
+  // Generate a random nonce for CSRF protection
+  const nonce = crypto.randomUUID();
+  await redis.set(`oauth-state:${session.user.id}`, nonce, { ex: 600 });
 
   const scopes = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -33,7 +42,7 @@ export async function GET(req: NextRequest) {
     scope: scopes,
     access_type: "offline",
     prompt: "consent",
-    state: session.user.id,
+    state: nonce,
   });
 
   const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;

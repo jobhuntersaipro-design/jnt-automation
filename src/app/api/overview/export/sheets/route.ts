@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getDispatcherExportData, getBranchExportData } from "@/lib/db/overview-export";
 import { getValidAccessToken } from "@/lib/google-sheets";
@@ -10,6 +11,11 @@ const MONTH_NAMES = [
 ];
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id || !session.user.isApproved) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const effective = await getEffectiveAgentId();
   if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -24,9 +30,10 @@ export async function POST(req: NextRequest) {
     toYear: body.toYear,
   };
 
+  // Use real session user for Google Sheets tokens (not impersonated agent)
   let accessToken: string;
   try {
-    accessToken = await getValidAccessToken(effective.agentId);
+    accessToken = await getValidAccessToken(session.user.id);
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (msg === "NOT_CONNECTED" || msg === "TOKEN_REVOKED") {
@@ -77,10 +84,10 @@ export async function POST(req: NextRequest) {
   // Build dispatcher values
   const dispatcherHeaders = [
     "Name", "Month", "Branch", "Total Orders",
-    "Base Salary", "Incentive", "Petrol Subsidy", "Penalty", "Advance", "Net Salary",
-    "T1 Range", "T1 Rate", "T2 Range", "T2 Rate", "T3 Range", "T3 Rate",
-    "Incentive Threshold", "Incentive Amount",
-    "Petrol Eligible", "Petrol Threshold", "Petrol Amount",
+    "Base Salary (RM)", "Incentive (RM)", "Petrol Subsidy (RM)", "Penalty (RM)", "Advance (RM)", "Net Salary (RM)",
+    "T1 Range (kg)", "T1 Rate (RM)", "T2 Range (kg)", "T2 Rate (RM)", "T3 Range (kg)", "T3 Rate (RM)",
+    "Incentive Threshold (orders)", "Incentive Amount (RM)",
+    "Petrol Eligible", "Petrol Threshold (orders/day)", "Petrol Amount (RM/day)",
   ];
   const dispatcherData = dispatcherRows.map((r) => [
     r.name, r.month, r.branch, r.totalOrders,
@@ -93,7 +100,7 @@ export async function POST(req: NextRequest) {
 
   // Build branch values
   const branchHeaders = [
-    "Branch", "Month", "Dispatcher Count", "Total Orders", "Total Net Payout",
+    "Branch", "Month", "Dispatcher Count", "Total Orders", "Total Net Payout (RM)",
   ];
   const branchData = branchRows.map((r) => [
     r.branch, r.month, r.dispatcherCount, r.totalOrders, r.totalNetPayout,

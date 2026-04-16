@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       { hostname: "lh3.googleusercontent.com" },
+      { hostname: "**.r2.dev" },
+      { hostname: "**.cloudflarestorage.com" },
     ],
   },
 };

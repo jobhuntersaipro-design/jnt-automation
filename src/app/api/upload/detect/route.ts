@@ -119,8 +119,9 @@ export async function POST(req: NextRequest) {
     const defaults = await getAgentDefaults(agentId);
 
     await prisma.$transaction(async (tx) => {
+      // Upsert all unknown dispatchers
+      const upsertedDispatchers: { id: string }[] = [];
       for (const d of unknown) {
-        // Upsert to handle race conditions — no-op if already exists
         const dispatcher = await tx.dispatcher.upsert({
           where: { branchId_extId: { branchId: branch.id, extId: d.extId } },
           update: {},
@@ -132,13 +133,23 @@ export async function POST(req: NextRequest) {
           },
           select: { id: true },
         });
+        upsertedDispatchers.push(dispatcher);
+      }
 
-        // Only seed rules if this dispatcher has no weight tiers yet (newly created)
-        const existingTiers = await tx.weightTier.count({
-          where: { dispatcherId: dispatcher.id },
-        });
-        if (existingTiers > 0) continue;
+      // Batch-check which dispatchers already have weight tiers
+      const tierCounts = await tx.weightTier.groupBy({
+        by: ["dispatcherId"],
+        where: { dispatcherId: { in: upsertedDispatchers.map((d) => d.id) } },
+        _count: true,
+      });
+      const hasTiers = new Set(tierCounts.map((r) => r.dispatcherId));
 
+      // Only seed rules for dispatchers without existing tiers
+      for (let i = 0; i < upsertedDispatchers.length; i++) {
+        const dispatcher = upsertedDispatchers[i];
+        if (hasTiers.has(dispatcher.id)) continue;
+
+        const d = unknown[i];
         await tx.weightTier.createMany({
           data: defaults.weightTiers.map((t) => ({
             dispatcherId: dispatcher.id,

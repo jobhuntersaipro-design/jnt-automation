@@ -1,18 +1,29 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import {
   getStepsForPath,
   getPageSequence,
-  getPageIndexForPath,
   type TutorialStep,
 } from "@/lib/tutorial/steps";
 
 interface TutorialOverlayProps {
   hasSeenTutorial: boolean;
   isSuperAdmin: boolean;
+}
+
+function clampPosition(
+  pos: { top: number; left: number },
+  tooltipWidth: number,
+  tooltipHeight: number,
+) {
+  const margin = 12;
+  return {
+    top: Math.max(margin, Math.min(pos.top, window.innerHeight + window.scrollY - tooltipHeight - margin)),
+    left: Math.max(margin, Math.min(pos.left, window.innerWidth - tooltipWidth - margin)),
+  };
 }
 
 function getTooltipPosition(
@@ -25,191 +36,177 @@ function getTooltipPosition(
   const scrollY = window.scrollY;
   const scrollX = window.scrollX;
 
+  let pos: { top: number; left: number };
+
   switch (placement) {
     case "bottom":
-      return {
+      pos = {
         top: rect.bottom + scrollY + gap,
-        left: Math.max(8, rect.left + scrollX + rect.width / 2 - tooltipWidth / 2),
+        left: rect.left + scrollX + rect.width / 2 - tooltipWidth / 2,
       };
+      break;
     case "top":
-      return {
+      pos = {
         top: rect.top + scrollY - tooltipHeight - gap,
-        left: Math.max(8, rect.left + scrollX + rect.width / 2 - tooltipWidth / 2),
+        left: rect.left + scrollX + rect.width / 2 - tooltipWidth / 2,
       };
+      break;
     case "left":
-      return {
+      pos = {
         top: rect.top + scrollY + rect.height / 2 - tooltipHeight / 2,
         left: rect.left + scrollX - tooltipWidth - gap,
       };
+      break;
     case "right":
-      return {
+      pos = {
         top: rect.top + scrollY + rect.height / 2 - tooltipHeight / 2,
         left: rect.right + scrollX + gap,
       };
+      break;
   }
+
+  return clampPosition(pos, tooltipWidth, tooltipHeight);
 }
 
 export function TutorialOverlay({ hasSeenTutorial, isSuperAdmin }: TutorialOverlayProps) {
   const pathname = usePathname();
-  const router = useRouter();
   const [active, setActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [steps, setSteps] = useState<TutorialStep[]>([]);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
-  // Track which page in the sequence we navigated to, so we can compute global step index
-  const pageIndexRef = useRef(0);
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  // Track which pages have been completed this session
+  const [seenPages, setSeenPages] = useState<Set<string>>(new Set());
 
   const pages = getPageSequence(isSuperAdmin);
-  const totalStepsAllPages = pages.reduce((sum, p) => sum + p.steps.length, 0);
+  const steps = useMemo(() => getStepsForPath(pathname, isSuperAdmin), [pathname, isSuperAdmin]);
 
-  // Compute global step number (across all pages)
-  const globalStepIndex = (() => {
-    let count = 0;
-    for (let i = 0; i < pageIndexRef.current; i++) {
-      count += pages[i]?.steps.length ?? 0;
+  // Determine the canonical page path for tracking
+  const pagePath = useMemo(() => {
+    const page = pages.find((p) => pathname.startsWith(p.path));
+    return page?.path ?? pathname;
+  }, [pathname, pages]);
+
+  // Reset and auto-activate when pathname changes to a new unseen page
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
+    setTargetRect(null);
+    setCurrentStep(0);
+    if (!hasSeenTutorial && !seenPages.has(pagePath) && steps.length > 0) {
+      setActive(true);
     }
-    return count + currentStep;
-  })();
+  }
 
-  // Activate tutorial on first visit
+  // Activate tutorial on initial mount if not seen
   useEffect(() => {
-    if (!hasSeenTutorial) {
+    if (!hasSeenTutorial && !seenPages.has(pagePath) && steps.length > 0) {
       const timer = setTimeout(() => setActive(true), 800);
       return () => clearTimeout(timer);
     }
-  }, [hasSeenTutorial]);
+  }, [hasSeenTutorial, pagePath, seenPages, steps.length]);
 
-  // Update steps when path changes
-  useEffect(() => {
-    if (!active) return;
-    const pageSteps = getStepsForPath(pathname, isSuperAdmin);
-    const pageIdx = getPageIndexForPath(pathname, isSuperAdmin);
-    if (pageIdx >= 0) pageIndexRef.current = pageIdx;
-    setSteps(pageSteps);
-    setCurrentStep(0);
+  const handleDismiss = useCallback(async () => {
+    setActive(false);
     setTargetRect(null);
-  }, [pathname, active, isSuperAdmin]);
 
-  // Find and highlight current target
+    // Mark this page as seen
+    setSeenPages((prev) => {
+      const next = new Set(prev);
+      next.add(pagePath);
+
+      // If all pages have been seen, persist to DB
+      const allPagePaths = pages.map((p) => p.path);
+      const allSeen = allPagePaths.every((p) => next.has(p));
+      if (allSeen) {
+        fetch("/api/tutorial", { method: "POST" }).catch(() => {});
+      }
+
+      return next;
+    });
+  }, [pagePath, pages]);
+
+  // Find and highlight current target element
   useEffect(() => {
     if (!active || steps.length === 0) return;
 
     const step = steps[currentStep];
     if (!step) return;
 
-    const findTarget = () => {
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15;
+
+    const tryFind = () => {
+      if (cancelled) return;
       const el = document.querySelector(step.target);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "nearest" });
         setTimeout(() => {
-          const rect = el.getBoundingClientRect();
-          setTargetRect(rect);
-        }, 300);
-      } else {
-        // Target not found — skip this step
-        if (currentStep < steps.length - 1) {
-          setCurrentStep((s) => s + 1);
-        } else {
-          // All steps on this page exhausted, try next page
-          navigateToNextPage();
-        }
+          if (cancelled) return;
+          setTargetRect(el.getBoundingClientRect());
+        }, 350);
+        return;
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(tryFind, 200);
       }
     };
 
-    findTarget();
+    setTimeout(tryFind, 100);
+    return () => { cancelled = true; };
   }, [active, steps, currentStep]);
-
-  const handleDismiss = useCallback(async () => {
-    setActive(false);
-    setTargetRect(null);
-    try {
-      await fetch("/api/tutorial", { method: "POST" });
-    } catch {
-      // Silent fail
-    }
-  }, []);
-
-  const navigateToNextPage = useCallback(() => {
-    const currentPageIdx = pageIndexRef.current;
-    if (currentPageIdx < pages.length - 1) {
-      const nextPage = pages[currentPageIdx + 1];
-      setTargetRect(null);
-      router.push(nextPage.path);
-      // pageIndexRef and steps will update via the pathname effect
-    } else {
-      // Last page done — finish tutorial
-      handleDismiss();
-    }
-  }, [pages, router, handleDismiss]);
-
-  const navigateToPrevPage = useCallback(() => {
-    const currentPageIdx = pageIndexRef.current;
-    if (currentPageIdx > 0) {
-      const prevPage = pages[currentPageIdx - 1];
-      setTargetRect(null);
-      // We'll navigate and need to jump to the last step on that page
-      // Set a flag so the pathname effect knows to go to the last step
-      goToLastStepRef.current = true;
-      router.push(prevPage.path);
-    }
-  }, [pages, router]);
-
-  const goToLastStepRef = useRef(false);
-
-  // Handle "go to last step" after navigating back
-  useEffect(() => {
-    if (goToLastStepRef.current && steps.length > 0) {
-      goToLastStepRef.current = false;
-      setCurrentStep(steps.length - 1);
-    }
-  }, [steps]);
 
   const handleNext = useCallback(() => {
     if (currentStep < steps.length - 1) {
       setCurrentStep((s) => s + 1);
-      setTargetRect(null);
     } else {
-      // Last step on this page — go to next page
-      navigateToNextPage();
+      handleDismiss();
     }
-  }, [currentStep, steps.length, navigateToNextPage]);
+  }, [currentStep, steps.length, handleDismiss]);
 
   const handlePrev = useCallback(() => {
     if (currentStep > 0) {
       setCurrentStep((s) => s - 1);
-      setTargetRect(null);
-    } else {
-      // First step on this page — go back to previous page's last step
-      navigateToPrevPage();
     }
-  }, [currentStep, navigateToPrevPage]);
+  }, [currentStep]);
 
-  if (!active || steps.length === 0 || !targetRect) return null;
+  if (!active || steps.length === 0) return null;
+
+  // While searching for target, show just the backdrop (non-dismissing)
+  if (!targetRect) {
+    return (
+      <div className="fixed inset-0 z-9999" style={{ pointerEvents: "auto" }}>
+        <div className="absolute inset-0 bg-on-surface/30 transition-opacity duration-300" />
+      </div>
+    );
+  }
 
   const step = steps[currentStep];
   const tooltipWidth = 320;
-  const tooltipHeight = 160;
+  const tooltipHeight = 180;
   const pos = getTooltipPosition(targetRect, step.placement, tooltipWidth, tooltipHeight);
 
   const pad = 8;
+  const rawTop = targetRect.top - pad;
+  const rawLeft = targetRect.left - pad;
+  const rawWidth = targetRect.width + pad * 2;
+  const rawHeight = targetRect.height + pad * 2;
   const highlightStyle = {
-    top: targetRect.top - pad,
-    left: targetRect.left - pad,
-    width: targetRect.width + pad * 2,
-    height: targetRect.height + pad * 2,
+    top: Math.max(0, rawTop),
+    left: Math.max(0, rawLeft),
+    width: rawLeft < 0 ? rawWidth + rawLeft : rawWidth,
+    height: rawTop < 0 ? rawHeight + rawTop : rawHeight,
   };
 
-  const isLastStep = globalStepIndex >= totalStepsAllPages - 1;
-  const isFirstStep = globalStepIndex === 0;
-
-  // Current page label for context
-  const currentPage = pages[pageIndexRef.current];
+  const isLastStep = currentStep >= steps.length - 1;
+  const isFirstStep = currentStep === 0;
 
   return (
-    <div className="fixed inset-0 z-[9999]" style={{ pointerEvents: "auto" }}>
-      {/* Backdrop */}
-      <div className="absolute inset-0 bg-on-surface/50 transition-opacity duration-300" onClick={handleDismiss} />
+    <div className="fixed inset-0 z-9999" style={{ pointerEvents: "auto" }}>
+      {/* Backdrop — clicking does NOT dismiss */}
+      <div className="absolute inset-0 bg-on-surface/50 transition-opacity duration-300" />
 
       {/* Highlight ring */}
       <div
@@ -223,7 +220,7 @@ export function TutorialOverlay({ hasSeenTutorial, isSuperAdmin }: TutorialOverl
         className="absolute bg-white rounded-xl shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] p-5 transition-all duration-300"
         style={{
           top: pos.top,
-          left: Math.min(pos.left, window.innerWidth - tooltipWidth - 16),
+          left: pos.left,
           width: tooltipWidth,
           zIndex: 10000,
         }}
@@ -231,14 +228,14 @@ export function TutorialOverlay({ hasSeenTutorial, isSuperAdmin }: TutorialOverl
         {/* Close */}
         <button
           onClick={handleDismiss}
-          className="absolute top-3 right-3 p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors"
+          className="absolute top-3 right-3 p-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors"
         >
           <X size={14} />
         </button>
 
         {/* Step counter */}
-        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-brand mb-1.5">
-          {currentPage?.label} &middot; Step {globalStepIndex + 1} of {totalStepsAllPages}
+        <p className="text-[0.65rem] font-semibold uppercase tracking-[0.05em] text-primary mb-1.5">
+          Step {currentStep + 1} of {steps.length}
         </p>
 
         <h3 className="font-heading font-semibold text-[1rem] text-on-surface mb-1.5">
@@ -254,47 +251,39 @@ export function TutorialOverlay({ hasSeenTutorial, isSuperAdmin }: TutorialOverl
             onClick={handleDismiss}
             className="text-[0.77rem] font-medium text-on-surface-variant hover:text-on-surface transition-colors"
           >
-            Skip tutorial
+            Skip
           </button>
           <div className="flex items-center gap-2">
             {!isFirstStep && (
               <button
                 onClick={handlePrev}
-                className="px-3 py-1.5 text-[0.77rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-low rounded-md transition-colors"
+                className="px-3 py-1.5 text-[0.77rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high rounded-md transition-colors"
               >
                 Back
               </button>
             )}
             <button
               onClick={handleNext}
-              className="px-4 py-1.5 text-[0.77rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors"
+              className="px-4 py-1.5 text-[0.77rem] font-medium text-white bg-primary rounded-md hover:bg-primary/90 transition-colors"
             >
               {isLastStep ? "Done" : "Next"}
             </button>
           </div>
         </div>
 
-        {/* Progress dots — grouped by page */}
-        <div className="flex items-center justify-center gap-1 mt-3">
-          {pages.map((page, pi) => (
-            <div key={pi} className="flex items-center gap-1">
-              {pi > 0 && <div className="w-1 h-px bg-outline-variant/30 mx-0.5" />}
-              {page.steps.map((_, si) => {
-                const idx = pages.slice(0, pi).reduce((s, p) => s + p.steps.length, 0) + si;
-                return (
-                  <div
-                    key={si}
-                    className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                      idx === globalStepIndex
-                        ? "bg-brand"
-                        : idx < globalStepIndex
-                          ? "bg-brand/40"
-                          : "bg-outline-variant/40"
-                    }`}
-                  />
-                );
-              })}
-            </div>
+        {/* Progress dots */}
+        <div className="flex items-center justify-center gap-1.5 mt-3">
+          {steps.map((_, i) => (
+            <div
+              key={i}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                i === currentStep
+                  ? "bg-primary"
+                  : i < currentStep
+                    ? "bg-primary/40"
+                    : "bg-outline-variant/40"
+              }`}
+            />
           ))}
         </div>
       </div>

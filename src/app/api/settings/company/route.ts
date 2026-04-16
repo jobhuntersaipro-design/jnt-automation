@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { z } from "zod";
+
+const schema = z.object({
+  companyRegistrationNo: z.string().max(50).nullish(),
+  companyAddress: z.string().max(500).nullish(),
+});
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
@@ -14,24 +20,12 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { companyRegistrationNo, companyAddress } = body;
-
-  if (
-    companyRegistrationNo !== undefined &&
-    companyRegistrationNo !== null &&
-    typeof companyRegistrationNo !== "string"
-  ) {
-    return NextResponse.json({ error: "Invalid companyRegistrationNo" }, { status: 400 });
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  if (
-    companyAddress !== undefined &&
-    companyAddress !== null &&
-    typeof companyAddress !== "string"
-  ) {
-    return NextResponse.json({ error: "Invalid companyAddress" }, { status: 400 });
-  }
-
+  const { companyRegistrationNo, companyAddress } = parsed.data;
   const data: { companyRegistrationNo?: string | null; companyAddress?: string | null } = {};
   if (companyRegistrationNo !== undefined) data.companyRegistrationNo = companyRegistrationNo;
   if (companyAddress !== undefined) data.companyAddress = companyAddress;

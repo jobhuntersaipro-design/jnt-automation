@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getSalaryRecordsByUpload } from "@/lib/db/payroll";
 
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { uploadId } = await params;
-  const data = await getSalaryRecordsByUpload(uploadId, session.user.id);
+  const data = await getSalaryRecordsByUpload(uploadId, effective.agentId);
 
   if (!data) {
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });

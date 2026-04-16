@@ -310,36 +310,40 @@ export async function getBranchDistribution(agentId: string, filters: Filters): 
   const months = buildMonthRange(filters.fromMonth, filters.fromYear, filters.toMonth, filters.toYear);
 
   // Note: intentionally ignores selectedBranchCodes — always shows all branches for comparison.
-  const [branches, aggregated] = await Promise.all([
+  const [branches, records] = await Promise.all([
     prisma.branch.findMany({
       where: { agentId },
       select: {
         code: true,
         _count: { select: { dispatchers: true } },
-        dispatchers: { select: { id: true } },
       },
     }),
-    prisma.salaryRecord.groupBy({
-      by: ["dispatcherId"],
+    prisma.salaryRecord.findMany({
       where: {
         dispatcher: { branch: { agentId } },
         OR: months.map(({ month, year }) => ({ month, year })),
       },
-      _sum: { netSalary: true, totalOrders: true },
+      select: {
+        netSalary: true,
+        totalOrders: true,
+        dispatcher: { select: { branch: { select: { code: true } } } },
+      },
     }),
   ]);
 
-  const dispatcherTotals = new Map(
-    aggregated.map((r) => [r.dispatcherId, { netSalary: r._sum.netSalary ?? 0, totalOrders: r._sum.totalOrders ?? 0 }]),
-  );
+  // Aggregate salary records by branch code
+  const branchTotals = new Map<string, { netPayout: number; totalOrders: number }>();
+  for (const r of records) {
+    const code = r.dispatcher.branch.code;
+    const prev = branchTotals.get(code) ?? { netPayout: 0, totalOrders: 0 };
+    branchTotals.set(code, {
+      netPayout: prev.netPayout + r.netSalary,
+      totalOrders: prev.totalOrders + r.totalOrders,
+    });
+  }
 
   return branches.map((branch) => {
-    let netPayout = 0;
-    let totalOrders = 0;
-    for (const { id } of branch.dispatchers) {
-      const totals = dispatcherTotals.get(id);
-      if (totals) { netPayout += totals.netSalary; totalOrders += totals.totalOrders; }
-    }
-    return { name: branch.code, netPayout, totalOrders, dispatcherCount: branch._count.dispatchers };
+    const totals = branchTotals.get(branch.code) ?? { netPayout: 0, totalOrders: 0 };
+    return { name: branch.code, netPayout: totals.netPayout, totalOrders: totals.totalOrders, dispatcherCount: branch._count.dispatchers };
   });
 }

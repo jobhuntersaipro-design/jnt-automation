@@ -16,6 +16,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (searchParams.get("logged_out") === "1") {
@@ -23,9 +24,7 @@ function LoginForm() {
       router.replace("/auth/login", { scroll: false });
     }
     if (searchParams.get("error") === "OAuthAccountNotLinked") {
-      toast.error(
-        "You haven't linked your Google account. Please sign in with email & password, then connect Google in Settings."
-      );
+      setError("You haven't linked your Google account. Please sign in with email & password, then connect Google in Settings.");
       router.replace("/auth/login", { scroll: false });
     }
   }, [searchParams, router]);
@@ -35,6 +34,7 @@ function LoginForm() {
     setLoading(true);
 
     try {
+      setError("");
       const result = await signIn("credentials", {
         email,
         password,
@@ -48,8 +48,8 @@ function LoginForm() {
         return;
       }
 
-      if (result?.error) {
-        toast.error("Invalid email or password.");
+      if (result?.error || !result?.ok) {
+        setError("Invalid email or password.");
         return;
       }
 
@@ -60,7 +60,7 @@ function LoginForm() {
       if (code === "pending_approval") {
         router.push("/auth/pending");
       } else {
-        toast.error("Invalid email or password.");
+        setError("Invalid email or password.");
       }
     }
   }
@@ -154,6 +154,10 @@ function LoginForm() {
             Forgot password?
           </Link>
         </div>
+
+        {error && (
+          <p className="text-sm text-tertiary text-center">{error}</p>
+        )}
 
         <button
           type="submit"

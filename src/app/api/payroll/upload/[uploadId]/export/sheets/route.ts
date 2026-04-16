@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { getValidAccessToken, exportToGoogleSheets } from "@/lib/google-sheets";
@@ -8,14 +9,16 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const session = await auth();
+
   const { uploadId } = await params;
 
-  const upload = await verifyUploadOwnership(uploadId, session.user.id);
+  const upload = await verifyUploadOwnership(uploadId, effective.agentId);
   if (!upload) {
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });
   }
@@ -30,7 +33,7 @@ export async function POST(
   // Get valid access token
   let accessToken: string;
   try {
-    accessToken = await getValidAccessToken(session.user.id);
+    accessToken = await getValidAccessToken(session!.user!.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (message === "NOT_CONNECTED") {

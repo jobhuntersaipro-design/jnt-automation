@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
@@ -7,16 +7,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
 
-    // Verify dispatcher belongs to this agent
+    // Verify dispatcher belongs to this agent (or impersonated agent)
     const dispatcher = await prisma.dispatcher.findFirst({
-      where: { id, branch: { agentId: session.user.id } },
+      where: { id, branch: { agentId: effective.agentId } },
       select: { id: true },
     });
 

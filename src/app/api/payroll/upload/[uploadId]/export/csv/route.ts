@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { generatePayrollCSV } from "@/lib/payroll/csv-generator";
@@ -8,14 +8,14 @@ export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },
 ) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { uploadId } = await params;
 
-  const upload = await verifyUploadOwnership(uploadId, session.user.id);
+  const upload = await verifyUploadOwnership(uploadId, effective.agentId);
   if (!upload) {
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });
   }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
+import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { DeleteObjectCommand } from "@aws-sdk/client-s3";
 
@@ -8,8 +9,8 @@ import { DeleteObjectCommand } from "@aws-sdk/client-s3";
  * Delete an orphaned R2 object (e.g. when user cancels a duplicate upload).
  */
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -18,9 +19,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "r2Key is required" }, { status: 400 });
   }
 
-  // Only allow deleting keys under uploads/ prefix for this agent
   if (!r2Key.startsWith("uploads/")) {
     return NextResponse.json({ error: "Invalid key" }, { status: 400 });
+  }
+
+  // Verify the R2 key belongs to an upload owned by this agent
+  const upload = await prisma.upload.findFirst({
+    where: {
+      r2Key,
+      branch: { agentId: effective.agentId },
+    },
+    select: { id: true },
+  });
+
+  if (!upload) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {

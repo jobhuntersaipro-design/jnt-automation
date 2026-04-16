@@ -11,12 +11,6 @@ export interface TutorialStep {
 
 export const OVERVIEW_STEPS: TutorialStep[] = [
   {
-    target: "[data-tutorial='summary-cards']",
-    title: "Summary Cards",
-    description: "See your total payout, orders, and dispatcher count at a glance.",
-    placement: "bottom",
-  },
-  {
     target: "[data-tutorial='charts']",
     title: "Charts",
     description: "Track monthly salary trends and branch performance here.",
@@ -37,8 +31,8 @@ export const OVERVIEW_STEPS: TutorialStep[] = [
   {
     target: "[data-tutorial='export']",
     title: "Export",
-    description: "Export dispatcher performance including their salary settings to CSV or Google Sheets.",
-    placement: "bottom",
+    description: "Export dispatcher data to CSV or Google Sheets.",
+    placement: "left",
   },
 ];
 
@@ -56,21 +50,15 @@ export const STAFF_STEPS: TutorialStep[] = [
     placement: "bottom",
   },
   {
-    target: "[data-tutorial='pin-button']",
-    title: "Pin Dispatchers",
-    description: "Pin dispatchers that need special attention so they always appear at the top.",
-    placement: "left",
-  },
-  {
     target: "[data-tutorial='dispatcher-settings']",
-    title: "Settings",
-    description: "Click any dispatcher to edit their individual salary rules.",
-    placement: "left",
+    title: "Inline Settings",
+    description: "Edit weight tiers, incentive, and petrol rules directly in the table.",
+    placement: "bottom",
   },
   {
     target: "[data-tutorial='history-tab']",
     title: "History",
-    description: "View and edit past month settings per dispatcher — useful for investigating salary differences.",
+    description: "View and edit past month settings per dispatcher.",
     placement: "left",
   },
 ];
@@ -83,55 +71,22 @@ export const PAYROLL_STEPS: TutorialStep[] = [
     placement: "bottom",
   },
   {
-    target: "[data-tutorial='confirm-settings']",
-    title: "Confirm Settings",
-    description: "Always review staff settings before calculating — make sure rules are up to date.",
-    placement: "bottom",
-  },
-  {
-    target: "[data-tutorial='preview-table']",
-    title: "Preview",
-    description: "Review calculated salaries and enter any penalty or advance before confirming.",
-    placement: "top",
-  },
-  {
-    target: "[data-tutorial='confirm-save']",
-    title: "Confirm & Save",
-    description: "Once confirmed, salary records are locked and payslips can be generated.",
-    placement: "top",
-  },
-  {
     target: "[data-tutorial='payslips']",
     title: "Generate Payslips",
-    description: "Select dispatchers and download payslips as a ZIP file.",
-    placement: "top",
+    description: "After confirming, select dispatchers and download payslips as PDF.",
+    placement: "bottom",
   },
   {
     target: "[data-tutorial='recalculate']",
     title: "Edit & Recalculate",
     description: "If J&T sends penalty notices late, use this to update and regenerate.",
-    placement: "top",
+    placement: "bottom",
   },
   {
     target: "[data-tutorial='payroll-history']",
     title: "Payroll History",
     description: "Access any past confirmed month here to view, export, or regenerate payslips.",
     placement: "top",
-  },
-];
-
-export const ADMIN_STEPS: TutorialStep[] = [
-  {
-    target: "[data-tutorial='agent-list']",
-    title: "Agent List",
-    description: "Approve new agents, set their branch limits, and manage access here.",
-    placement: "bottom",
-  },
-  {
-    target: "[data-tutorial='payment-history']",
-    title: "Payment History",
-    description: "Log manual payments per agent to track their subscription status.",
-    placement: "bottom",
   },
 ];
 
@@ -142,22 +97,19 @@ export interface TutorialPage {
 }
 
 export function getPageSequence(isSuperAdmin: boolean): TutorialPage[] {
-  const pages: TutorialPage[] = [
+  // Admin tutorial removed — not needed
+  void isSuperAdmin;
+  return [
     { path: "/dashboard", label: "Overview", steps: OVERVIEW_STEPS },
     { path: "/staff", label: "Staff", steps: STAFF_STEPS },
     { path: "/payroll", label: "Payroll", steps: PAYROLL_STEPS },
   ];
-  if (isSuperAdmin) {
-    pages.push({ path: "/admin", label: "Admin", steps: ADMIN_STEPS });
-  }
-  return pages;
 }
 
-export function getStepsForPath(path: string, isSuperAdmin: boolean): TutorialStep[] {
+export function getStepsForPath(path: string, _isSuperAdmin: boolean): TutorialStep[] {
   if (path.startsWith("/dashboard")) return OVERVIEW_STEPS;
   if (path.startsWith("/staff")) return STAFF_STEPS;
   if (path.startsWith("/payroll")) return PAYROLL_STEPS;
-  if (path.startsWith("/admin") && isSuperAdmin) return ADMIN_STEPS;
   return [];
 }
 

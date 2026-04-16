@@ -118,34 +118,20 @@ export function OverviewExport() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-[rgba(195,198,214,0.2)] z-50 w-56 py-1 overflow-hidden">
-          <p className="px-3.5 pt-2 pb-1 text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-on-surface-variant">
-            CSV Download
-          </p>
+        <div className="absolute right-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-[rgba(195,198,214,0.2)] z-50 w-48 py-1 overflow-hidden">
           <button
             onClick={() => handleCSV("dispatcher")}
-            className="w-full text-left px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors flex items-center gap-2"
+            className="w-full text-left px-3.5 py-2.5 text-[0.8rem] text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
           >
-            <Download size={13} />
-            Dispatcher Performance
+            <Download size={14} className="text-on-surface-variant" />
+            CSV
           </button>
-          <button
-            onClick={() => handleCSV("branch")}
-            className="w-full text-left px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors flex items-center gap-2"
-          >
-            <Download size={13} />
-            Branch Summary
-          </button>
-          <div className="border-t border-outline-variant/20 my-1" />
-          <p className="px-3.5 pt-2 pb-1 text-[0.6rem] font-semibold uppercase tracking-[0.05em] text-on-surface-variant">
-            Google Sheets
-          </p>
           <button
             onClick={handleSheets}
-            className="w-full text-left px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors flex items-center gap-2"
+            className="w-full text-left px-3.5 py-2.5 text-[0.8rem] text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
           >
-            <FileSpreadsheet size={13} />
-            Export All to Sheets
+            <FileSpreadsheet size={14} className="text-on-surface-variant" />
+            Google Sheets
           </button>
         </div>
       )}
