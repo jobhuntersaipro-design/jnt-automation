@@ -1,16 +1,45 @@
-# Current Feature
+# Current Feature — Backlog Sprint
 
 ## Status
 
-Not Started
+In Progress
 
 ## Goals
 
+Implement all backlog items from `context/features/backlog-spec.md` in priority order:
+
+| # | Feature | Size | Status |
+|---|---------|------|--------|
+| 3 | Settings — profile pic + company details + stamp upload + member since | Medium | Done |
+| 10 | Petrol subsidy days tracking | Small | Done |
+| 11 | Overview dispatcher performance UI updates | Small | Done |
+| 5 | Superadmin panel + manual payment history + agent view | Large | Done |
+| 6 | Branch limits | Small | Done |
+| 1 | Notifications | Medium | Done |
+| 2 | Overview export + settings in export | Medium | Done |
+| 7 | First-timer tutorial | Medium | Done |
+| 8 | Mobile responsiveness | Large | Done |
+| 9 | Payment / access management | Deferred | Do NOT start yet |
+
+Item #4 (auth security fixes) already completed on 2026-04-08.
+
 ## Notes
+
+- Full backlog spec: `context/features/backlog-spec.md`
+- Payslip PDF fixes: removed EMPLOYER'S CONTRIBUTION section, removed empty row below TOTAL, stamp 1:1 ratio with `objectFit: contain`, footer aligned (PREPARED BY + APPROVED BY same line)
+- Stamp image uploaded to R2 (`stamps/st-xiang-stamp.jpeg`) and set on both agents
+- Duplicate upload dialog: now queues multiple duplicates sequentially, cancel cleans up R2 + removes from list
+- Confirm route optimized: pre-group rows by extId, build line items from snapshot (skip re-calculation), line items outside transaction, chunk 5000→20000
+- Staff "First Seen" column replaces Status — shows earliest salary record month or NEW
+- Nav bar name now reads from DB (Settings page name) instead of Google OAuth profile
+- Loading skeletons added for admin, settings, salary table pages
+- Payroll history: branch dividers + more spacing between branch name and table
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-16: **Backlog Sprint — Overview Export, Tutorial, Mobile Responsiveness** — Completed. (1) **Overview Export (#2)**: CSV + Google Sheets export for dispatcher performance and branch summary data from the Overview page. Dispatcher export includes one row per dispatcher per month with salary record snapshots (weight tier ranges/rates, incentive threshold/amount, petrol eligible/threshold/amount). Branch export shows branch code, month, dispatcher count, total orders, total net payout. Export respects current branch + date filters. Reuses existing Google Sheets OAuth flow. API routes: `GET /api/overview/export/csv`, `POST /api/overview/export/sheets`. Files: `src/lib/db/overview-export.ts`, `src/lib/overview/csv-generator.ts`, `src/components/dashboard/overview-export.tsx`, API routes. (2) **First-timer Tutorial (#7)**: Custom tooltip overlay (no external dependency) shown once per agent on first login. Steps per page: Overview (5 steps), Staff (5 steps), Payroll (7 steps), Admin (2 steps for superadmin). Target elements via `data-tutorial` attributes. Skip/replay controls. Persisted via `Agent.hasSeenTutorial` field. Replay button in Settings page. API routes: `POST/DELETE /api/tutorial`. Prisma migration adds `hasSeenTutorial` Boolean. Files: `src/components/tutorial/tutorial-overlay.tsx`, `src/lib/tutorial/steps.ts`, `src/components/settings/settings-client.tsx`. (3) **Mobile Responsiveness (#8)**: Hamburger nav menu on mobile (`lg:` breakpoint), responsive padding/spacing across all pages, 2x2 summary card grid on mobile, single-column chart layout, horizontal scroll on staff table and payroll history, responsive headers (stacked on small screens). Files: `src/components/dashboard/mobile-nav.tsx`, layout, dashboard, staff, payroll, settings, admin pages updated.
 
 - 2026-04-13: **Payroll Phase 3+4 — Salary Table, Edit & Recalculate, Payslip PDF, CSV/Google Sheets Export** — Completed. `/payroll/[uploadId]` salary table page with read-only + edit modes. Edit & Recalculate: inline editable incentive, petrol, penalty, advance with live net salary + summary card updates. Save & Regenerate commits changes to DB with rebuilt snapshots. Multi-select payslip PDF generation (single PDF or ZIP for multiple) matching ST XIANG payslip format — company header, employee particulars, addition/deduction table with tier breakdown. CSV export (instant download). Google Sheets export with one-time OAuth per agent, token storage + auto-refresh, Settings page connect/disconnect. Export available from payroll history list dropdown and salary table header. Prisma migrations add Agent fields: `companyRegistrationNo`, `companyAddress`, `stampImageUrl`, `googleSheetsAccessToken`, `googleSheetsRefreshToken`, `googleSheetsTokenExpiry`. Additional fixes: transaction timeout 30s→120s with chunked line item inserts, nav reordered Overview|Staff|Payroll, wizard simplified to 2-step (Preview + Confirm), summary cards compacted, preview table redesigned with inline editable fields + weight tier popover, IDOR fixes on dispatcherId in payslips/recalculate/preview routes, Zod validation on recalculate input, payslip cap at 50, isApproved defence-in-depth, payroll loading skeleton. Dependencies: `@react-pdf/renderer`, `jszip`. Env vars: `GOOGLE_SHEETS_CLIENT_ID`, `GOOGLE_SHEETS_CLIENT_SECRET`, `GOOGLE_SHEETS_REDIRECT_URI`. API routes: `GET /api/payroll/upload/[uploadId]/salary-records`, `POST /api/payroll/upload/[uploadId]/recalculate`, `POST /api/payroll/upload/[uploadId]/payslips`, `GET /api/payroll/upload/[uploadId]/export/csv`, `POST /api/payroll/upload/[uploadId]/export/sheets`, `GET/DELETE /api/auth/google-sheets/{connect,callback,disconnect}`. Files: `src/app/(dashboard)/payroll/[uploadId]/page.tsx`, `src/components/payroll/{salary-table,export-buttons}.tsx`, `src/lib/payroll/{pdf-generator,csv-generator,zip-generator,tier-counter}.ts`, `src/lib/google-sheets.ts`, API routes, settings components. Specs: `context/features/payroll-phase-3-spec.md`, `context/features/payroll-phase-4-spec.md`.
 

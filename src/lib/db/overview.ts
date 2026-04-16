@@ -246,6 +246,7 @@ export type DispatcherRow = {
   petrolSubsidy: number;
   penalty: number;
   advance: number;
+  deductions: number;
   netSalary: number;
 };
 
@@ -257,13 +258,12 @@ export async function getTopDispatchers(
   const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
   const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
 
-  // Aggregate and sort at the DB level; fetch only the top 20 dispatcher IDs
+  // Aggregate and sort at the DB level
   const aggregated = await prisma.salaryRecord.groupBy({
     by: ["dispatcherId"],
     where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
     _sum: { totalOrders: true, baseSalary: true, incentive: true, petrolSubsidy: true, penalty: true, advance: true, netSalary: true },
     orderBy: { _sum: { netSalary: "desc" } },
-    take: 20,
   });
 
   if (aggregated.length === 0) return [];
@@ -291,6 +291,7 @@ export async function getTopDispatchers(
       petrolSubsidy: r._sum.petrolSubsidy ?? 0,
       penalty: r._sum.penalty ?? 0,
       advance: r._sum.advance ?? 0,
+      deductions: (r._sum.penalty ?? 0) + (r._sum.advance ?? 0),
       netSalary: r._sum.netSalary ?? 0,
     }];
   });

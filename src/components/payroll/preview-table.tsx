@@ -285,7 +285,7 @@ export function PreviewTable({
   );
 
   return (
-    <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden">
+    <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden" data-tutorial="preview-table">
       <div className="overflow-x-auto">
         <table className="w-full text-[0.82rem]">
           <thead>
@@ -295,6 +295,7 @@ export function PreviewTable({
               <th className="py-3 px-3 font-medium text-right">Base Salary</th>
               <th className="py-3 px-3 font-medium text-right">Incentive</th>
               <th className="py-3 px-3 font-medium text-right">Petrol</th>
+              <th className="py-3 px-3 font-medium text-right">Days</th>
               <th className="py-3 px-3 font-medium text-right">Penalty</th>
               <th className="py-3 px-3 font-medium text-right">Advance</th>
               <th className="py-3 px-3 font-medium text-right">Net Salary</th>
@@ -333,6 +334,9 @@ export function PreviewTable({
                       value={r.petrolSubsidy}
                       onSave={(val) => handleFieldChange(r.dispatcherId, "petrolSubsidy", val)}
                     />
+                  </td>
+                  <td className={`py-2.5 px-3 text-right tabular-nums ${(r.petrolQualifyingDays ?? 0) > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
+                    {(r.petrolQualifyingDays ?? 0) > 0 ? r.petrolQualifyingDays : "—"}
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     <CalcInput

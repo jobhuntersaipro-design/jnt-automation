@@ -33,6 +33,7 @@ export interface SalaryResult {
   baseSalary: number;
   incentive: number;
   petrolSubsidy: number;
+  petrolQualifyingDays: number;
   penalty: number;
   advance: number;
   netSalary: number;
@@ -79,11 +80,13 @@ export function calculateSalary(
 
   // Step 3 — Petrol Subsidy (per qualifying day)
   let petrolSubsidy = 0;
+  let petrolQualifyingDays = 0;
   if (dispatcher.petrolRule.isEligible) {
     const byDate = groupByDate(deliveries);
     for (const [key, dayDeliveries] of Object.entries(byDate)) {
       if (key === "unknown") continue; // can't confirm daily threshold without a date
       if (dayDeliveries.length >= dispatcher.petrolRule.dailyThreshold) {
+        petrolQualifyingDays++;
         petrolSubsidy += dispatcher.petrolRule.subsidyAmount;
       }
     }
@@ -101,6 +104,7 @@ export function calculateSalary(
     baseSalary: round2(baseSalary),
     incentive: round2(incentive),
     petrolSubsidy: round2(petrolSubsidy),
+    petrolQualifyingDays,
     penalty,
     advance,
     netSalary: round2(netSalary),

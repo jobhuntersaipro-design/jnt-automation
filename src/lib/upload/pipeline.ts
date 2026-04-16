@@ -117,6 +117,7 @@ export async function calculateAfterConfirm(uploadId: string) {
     baseSalary: r.baseSalary,
     incentive: r.incentive,
     petrolSubsidy: r.petrolSubsidy,
+    petrolQualifyingDays: r.petrolQualifyingDays,
     penalty: r.penalty,
     advance: r.advance,
     netSalary: r.netSalary,
@@ -209,6 +210,7 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
       baseSalary: result.baseSalary,
       incentive: result.incentive,
       petrolSubsidy: result.petrolSubsidy,
+      petrolQualifyingDays: result.petrolQualifyingDays,
       penalty: result.penalty,
       advance: result.advance,
       netSalary: result.netSalary,
@@ -264,6 +266,7 @@ export interface PreviewResult {
   baseSalary: number;
   incentive: number;
   petrolSubsidy: number;
+  petrolQualifyingDays: number;
   penalty: number;
   advance: number;
   netSalary: number;

@@ -105,7 +105,7 @@ function UploadRow({
   const isActive = upload.status === "PROCESSING" || upload.status === "UPLOADING" || upload.status === "DETECTING";
   const needsAction = upload.status === "CONFIRM_SETTINGS" || upload.status === "NEEDS_ATTENTION" || upload.status === "READY_TO_CONFIRM";
   const canExpand = needsAction;
-  const canCancel = upload.status !== "SAVED" && upload.status !== "FAILED" && upload.status !== "DUPLICATE";
+  const canCancel = upload.status !== "SAVED" && upload.status !== "FAILED";
 
   // Poll for status changes when PROCESSING
   useEffect(() => {
@@ -148,7 +148,18 @@ function UploadRow({
 
   const handleCancel = useCallback(async () => {
     if (!upload.uploadId) {
-      // Not yet created server-side — just remove from list
+      // Not yet created server-side — clean up R2 if present, then remove from list
+      if (upload.r2Key) {
+        try {
+          await fetch("/api/upload/cleanup-r2", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ r2Key: upload.r2Key }),
+          });
+        } catch {
+          // Non-fatal
+        }
+      }
       onRemove();
       return;
     }

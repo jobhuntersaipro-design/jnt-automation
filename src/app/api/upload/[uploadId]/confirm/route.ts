@@ -4,9 +4,10 @@ import { auth } from "@/auth";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { getPreviewData, deletePreviewData } from "@/lib/upload/pipeline";
 import { parseExcelFromR2 } from "@/lib/upload/parser";
-import { calculateSalary } from "@/lib/upload/calculator";
-import type { DispatcherRules } from "@/lib/upload/calculator";
+import { getCommission } from "@/lib/upload/calculator";
+import type { WeightTierInput } from "@/lib/upload/calculator";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/db/notifications";
 
 export async function POST(
   _req: NextRequest,
@@ -41,7 +42,7 @@ export async function POST(
 
   const fullUpload = await prisma.upload.findUnique({
     where: { id: uploadId },
-    select: { month: true, year: true, r2Key: true, branchId: true },
+    select: { month: true, year: true, r2Key: true, branchId: true, branch: { select: { code: true } } },
   });
   if (!fullUpload) {
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });
@@ -51,22 +52,18 @@ export async function POST(
     // Re-parse Excel from R2 to get line items (not stored in KV to stay under 10MB limit)
     const rows = await parseExcelFromR2(fullUpload.r2Key);
 
-    // Load dispatchers with rules for line item calculation
-    const dispatcherIds = preview.results.map((r) => r.dispatcherId);
-    const dispatchers = await prisma.dispatcher.findMany({
-      where: { id: { in: dispatcherIds } },
-      include: {
-        weightTiers: { orderBy: { tier: "asc" } },
-        incentiveRule: true,
-        petrolRule: true,
-      },
-    });
+    // Pre-group rows by dispatcher extId ONCE (avoids O(n*m) repeated filtering)
+    const rowsByExtId = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const existing = rowsByExtId.get(row.dispatcherId);
+      if (existing) {
+        existing.push(row);
+      } else {
+        rowsByExtId.set(row.dispatcherId, [row]);
+      }
+    }
 
-    // Build line items by re-calculating (uses preview penalty/advance values)
-    const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d]));
-
-    // Build all salary records and line items OUTSIDE the transaction
-    // to minimize transaction duration
+    // Build salary records data from preview (already calculated — no need to recalculate)
     const salaryRecordData = preview.results.map((result) => ({
       dispatcherId: result.dispatcherId,
       uploadId,
@@ -76,6 +73,7 @@ export async function POST(
       baseSalary: result.baseSalary,
       incentive: result.incentive,
       petrolSubsidy: result.petrolSubsidy,
+      petrolQualifyingDays: result.petrolQualifyingDays ?? 0,
       penalty: result.penalty,
       advance: result.advance,
       netSalary: result.netSalary,
@@ -84,93 +82,84 @@ export async function POST(
       petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
     }));
 
-    // Pre-compute all line items keyed by dispatcherId
+    // Build line items directly from parsed rows + weight tier snapshots
+    // (skip full calculateSalary — we only need waybill, weight, commission, date)
     const lineItemsByDispatcher = new Map<string, { waybillNumber: string; weight: number; commission: number; deliveryDate: Date | null }[]>();
     for (const result of preview.results) {
-      const d = dispatcherMap.get(result.dispatcherId);
-      if (!d || !d.incentiveRule || !d.petrolRule) continue;
+      const dispatcherRows = rowsByExtId.get(result.extId) ?? [];
+      const tiers = result.weightTiersSnapshot as WeightTierInput[];
 
-      const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
-      const rules: DispatcherRules = {
-        dispatcherId: d.id,
-        extId: d.extId,
-        weightTiers: d.weightTiers.map((t) => ({
-          tier: t.tier,
-          minWeight: t.minWeight,
-          maxWeight: t.maxWeight,
-          commission: t.commission,
-        })),
-        incentiveRule: {
-          orderThreshold: d.incentiveRule.orderThreshold,
-          incentiveAmount: d.incentiveRule.incentiveAmount,
-        },
-        petrolRule: {
-          isEligible: d.petrolRule.isEligible,
-          dailyThreshold: d.petrolRule.dailyThreshold,
-          subsidyAmount: d.petrolRule.subsidyAmount,
-        },
-      };
+      const items = dispatcherRows.map((row) => ({
+        waybillNumber: row.waybillNumber,
+        weight: row.billingWeight,
+        commission: getCommission(row.billingWeight, tiers),
+        deliveryDate: row.deliveryDate,
+      }));
 
-      const calcResult = calculateSalary(rules, dispatcherRows);
-      lineItemsByDispatcher.set(d.id, calcResult.lineItems.map((li) => ({
-        waybillNumber: li.waybillNumber,
-        weight: li.weight,
-        commission: li.commission,
-        deliveryDate: li.deliveryDate,
-      })));
+      lineItemsByDispatcher.set(result.dispatcherId, items);
     }
 
-    // Transaction: delete old + bulk create records + bulk create line items
-    // Use chunked line item inserts to avoid transaction timeout
-    await prisma.$transaction(async (tx) => {
+    // Transaction: delete old + create salary records + mark as SAVED
+    // Line items inserted outside transaction to reduce lock duration
+    const recordIdByDispatcher = await prisma.$transaction(async (tx) => {
       await tx.salaryRecord.deleteMany({ where: { uploadId } });
 
-      const recordIdByDispatcher = new Map<string, string>();
+      const idMap = new Map<string, string>();
       for (const data of salaryRecordData) {
         const record = await tx.salaryRecord.create({
           data,
           select: { id: true, dispatcherId: true },
         });
-        recordIdByDispatcher.set(record.dispatcherId, record.id);
-      }
-
-      // Build all line items
-      const allLineItems: {
-        salaryRecordId: string;
-        waybillNumber: string;
-        weight: number;
-        commission: number;
-        deliveryDate: Date | null;
-      }[] = [];
-
-      for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
-        const items = lineItemsByDispatcher.get(dispatcherId);
-        if (items) {
-          for (const li of items) {
-            allLineItems.push({ salaryRecordId, ...li });
-          }
-        }
-      }
-
-      // Insert line items in chunks of 5000 to avoid timeout
-      const CHUNK_SIZE = 5000;
-      for (let i = 0; i < allLineItems.length; i += CHUNK_SIZE) {
-        await tx.salaryLineItem.createMany({
-          data: allLineItems.slice(i, i + CHUNK_SIZE),
-        });
+        idMap.set(record.dispatcherId, record.id);
       }
 
       await tx.upload.update({
         where: { id: uploadId },
         data: { status: "SAVED" },
       });
-    }, { timeout: 120000 });
+
+      return idMap;
+    }, { timeout: 60000 });
+
+    // Insert line items outside transaction in larger chunks
+    const CHUNK_SIZE = 20000;
+    const allLineItems: {
+      salaryRecordId: string;
+      waybillNumber: string;
+      weight: number;
+      commission: number;
+      deliveryDate: Date | null;
+    }[] = [];
+
+    for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
+      const items = lineItemsByDispatcher.get(dispatcherId);
+      if (items) {
+        for (const li of items) {
+          allLineItems.push({ salaryRecordId, ...li });
+        }
+      }
+    }
+
+    for (let i = 0; i < allLineItems.length; i += CHUNK_SIZE) {
+      await prisma.salaryLineItem.createMany({
+        data: allLineItems.slice(i, i + CHUNK_SIZE),
+      });
+    }
 
     // Clean up KV
     await deletePreviewData(uploadId);
 
     // Bust dashboard cache so new data shows immediately
     revalidatePath("/dashboard");
+
+    // Create notification
+    const monthName = new Date(fullUpload.year, fullUpload.month - 1).toLocaleString("en", { month: "long" });
+    await createNotification({
+      agentId: session.user.id,
+      type: "payroll",
+      message: "Payroll confirmed",
+      detail: `${fullUpload.branch.code} — ${monthName} ${fullUpload.year} · ${preview.results.length} staff`,
+    }).catch(() => {}); // non-fatal
 
     return NextResponse.json({
       success: true,

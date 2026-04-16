@@ -95,6 +95,7 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
       baseSalary: r.baseSalary,
       incentive: r.incentive,
       petrolSubsidy: r.petrolSubsidy,
+      petrolQualifyingDays: r.petrolQualifyingDays,
       penalty: r.penalty,
       advance: r.advance,
       netSalary: r.netSalary,

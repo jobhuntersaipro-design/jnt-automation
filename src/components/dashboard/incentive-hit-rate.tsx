@@ -1,12 +1,12 @@
 "use client";
 
+import { useContainerSize } from "@/lib/hooks/use-container-size";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
 import { CHART_COLORS } from "@/lib/chart-colors";
@@ -44,6 +44,7 @@ function TooltipContent({
 }
 
 export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
+  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
   const latest = data[data.length - 1];
   const prev = data.length >= 2 ? data[data.length - 2].rate : null;
   const delta = prev !== null && latest ? latest.rate - prev : null;
@@ -84,9 +85,9 @@ export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
         </div>
       </div>
 
-      <div style={{ height: "14rem" }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-          <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+      <div ref={chartRef} style={{ height: "14rem", width: "100%" }}>
+        {cw > 0 && ch > 0 ? (
+          <LineChart width={cw} height={ch} data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
             <XAxis
               dataKey="month"
@@ -114,7 +115,7 @@ export function IncentiveHitRate({ data }: { data: HitRatePoint[] }) {
               activeDot={{ r: 6, fill: CHART_COLORS.brand, strokeWidth: 0 }}
             />
           </LineChart>
-        </ResponsiveContainer>
+        ) : null}
       </div>
     </div>
   );

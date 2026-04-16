@@ -4,14 +4,21 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const navItems = [
+const BASE_ITEMS = [
   { href: "/dashboard", label: "Overview" },
   { href: "/staff", label: "Staff" },
   { href: "/payroll", label: "Payroll" },
 ];
 
-export function NavLinks() {
+export function NavLinks({ isSuperAdmin, impersonating }: { isSuperAdmin: boolean; impersonating?: boolean }) {
+  const navItems = isSuperAdmin
+    ? [...BASE_ITEMS, { href: "/admin", label: "Admin" }]
+    : BASE_ITEMS;
   const pathname = usePathname();
+
+  // During impersonation, use <a> tags to skip Next.js Router Cache
+  // so every page renders fresh with the impersonated agentId
+  const LinkOrA = impersonating ? "a" : Link;
 
   return (
     <nav className="flex items-center">
@@ -22,7 +29,7 @@ export function NavLinks() {
             {i > 0 && (
               <span className="w-px h-4 bg-outline-variant/40 mx-1 shrink-0" />
             )}
-            <Link
+            <LinkOrA
               href={href}
               className={`px-2.5 py-0.5 text-[1.02rem] border-b-2 transition-colors ${
                 isActive
@@ -31,7 +38,7 @@ export function NavLinks() {
               }`}
             >
               {label}
-            </Link>
+            </LinkOrA>
           </Fragment>
         );
       })}

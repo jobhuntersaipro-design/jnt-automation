@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DispatcherRow } from "@/lib/db/overview";
 
-type SortKey = "name" | "branch" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy" | "penalty" | "advance";
+type SortKey = "name" | "branch" | "totalOrders" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy" | "deductions";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
@@ -41,12 +41,12 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "name", label: "DISPATCHER" },
   { key: "branch", label: "BRANCH" },
+  { key: "totalOrders", label: "ORDERS" },
   { key: "netSalary", label: "NET SALARY" },
   { key: "baseSalary", label: "BASE SALARY" },
   { key: "incentive", label: "INCENTIVE" },
   { key: "petrolSubsidy", label: "PETROL" },
-  { key: "penalty", label: "PENALTY" },
-  { key: "advance", label: "ADVANCE" },
+  { key: "deductions", label: "DEDUCTIONS" },
 ];
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
@@ -143,9 +143,9 @@ function DispatcherTable({
       </div>
 
       {/* Table */}
-      <div className="flex flex-col">
+      <div className="flex flex-col overflow-x-auto">
         {/* Column headers */}
-        <div className="grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2">
+        <div className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2">
           {COLUMNS.map(({ key, label }) => (
             <button
               key={key}
@@ -165,7 +165,7 @@ function DispatcherTable({
           sorted.map((d) => (
             <div
               key={d.id}
-              className="grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
+              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">
@@ -179,6 +179,11 @@ function DispatcherTable({
               {/* Branch chip */}
               <span className="inline-block px-2 py-0.5 text-[0.85rem] font-medium text-on-surface-variant bg-surface-low rounded-[0.375rem] w-fit">
                 {d.branch}
+              </span>
+
+              {/* Total Orders */}
+              <span className="tabular-nums text-[0.875rem] text-on-surface">
+                {d.totalOrders.toLocaleString()}
               </span>
 
               {/* Net Salary */}
@@ -201,14 +206,9 @@ function DispatcherTable({
                 RM {fmt(d.petrolSubsidy)}
               </span>
 
-              {/* Penalty */}
-              <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
-                RM {fmt(d.penalty ?? 0)}
-              </span>
-
-              {/* Advance */}
-              <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
-                RM {fmt(d.advance ?? 0)}
+              {/* Deductions */}
+              <span className={`tabular-nums text-[0.875rem] ${d.deductions > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
+                {d.deductions > 0 ? `RM ${fmt(d.deductions)}` : "—"}
               </span>
             </div>
           ))

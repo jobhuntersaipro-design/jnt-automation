@@ -6,6 +6,7 @@ import { parseExcelFromR2 } from "@/lib/upload/parser";
 import { splitDispatchers } from "@/lib/upload/dispatcher-check";
 import { createUpload, replaceUpload, updateUploadStatus } from "@/lib/db/upload";
 import { getAgentDefaults } from "@/lib/db/staff";
+import { createNotification } from "@/lib/db/notifications";
 
 const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 
@@ -93,6 +94,19 @@ export async function POST(req: NextRequest) {
   });
 
   if (!branch) {
+    // Check branch limit before creating
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: { maxBranches: true, _count: { select: { branches: true } } },
+    });
+
+    if (agent && agent._count.branches >= agent.maxBranches) {
+      return NextResponse.json(
+        { error: "You've reached your branch limit. Contact support to upgrade." },
+        { status: 403 },
+      );
+    }
+
     branch = await prisma.branch.create({
       data: { code: detectedBranch, agentId },
       select: { id: true, code: true },
@@ -153,6 +167,16 @@ export async function POST(req: NextRequest) {
         });
       }
     }, { timeout: 120000 });
+
+    // Notify about new dispatchers
+    if (unknown.length > 0) {
+      await createNotification({
+        agentId,
+        type: "new_dispatcher",
+        message: `${unknown.length} new dispatcher${unknown.length > 1 ? "s" : ""} detected`,
+        detail: `${branch.code} — ${unknown.slice(0, 3).map((d) => d.name).join(", ")}${unknown.length > 3 ? ` +${unknown.length - 3} more` : ""}`,
+      }).catch(() => {});
+    }
   }
 
   // Handle duplicate check or replacement

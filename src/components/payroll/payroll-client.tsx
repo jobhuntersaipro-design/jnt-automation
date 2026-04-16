@@ -31,8 +31,9 @@ function genId() {
 export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProps) {
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
   const [history, setHistory] = useState<PayrollRecord[]>(initialHistory);
-  const [duplicatePrompt, setDuplicatePrompt] = useState<DuplicateInfo | null>(null);
+  const [duplicateQueue, setDuplicateQueue] = useState<DuplicateInfo[]>([]);
   const [isReplacing, setIsReplacing] = useState(false);
+  const duplicatePrompt = duplicateQueue[0] ?? null;
   const historyRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
 
@@ -148,8 +149,8 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
       }
 
       if (detectData.isDuplicate) {
-        // Show duplicate confirmation dialog
-        setDuplicatePrompt({
+        // Queue duplicate confirmation dialog
+        setDuplicateQueue((prev) => [...prev, {
           clientId,
           fileName: file.name,
           r2Key,
@@ -158,12 +159,13 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
           month: detectData.month,
           year: detectData.year,
           message: detectData.message,
-        });
+        }]);
         setActiveUploads((prev) =>
           prev.map((u) =>
             u.id === clientId
               ? {
                   ...u,
+                  r2Key,
                   branchCode: detectData.branchCode,
                   month: detectData.month,
                   year: detectData.year,
@@ -249,7 +251,8 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         )
       );
 
-      setDuplicatePrompt(null);
+      // Remove this prompt from queue — next one will show automatically
+      setDuplicateQueue((prev) => prev.slice(1));
     } catch {
       toast.error("An unexpected error occurred");
     } finally {
@@ -257,19 +260,33 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
     }
   }, [duplicatePrompt]);
 
-  const handleDuplicateCancel = useCallback(() => {
-    if (duplicatePrompt) {
-      removeUpload(duplicatePrompt.clientId);
-      setDuplicatePrompt(null);
+  const handleDuplicateCancel = useCallback(async () => {
+    if (!duplicatePrompt) return;
+
+    // Remove from active uploads list
+    removeUpload(duplicatePrompt.clientId);
+
+    // Clean up the orphaned R2 file
+    try {
+      await fetch("/api/upload/cleanup-r2", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ r2Key: duplicatePrompt.r2Key }),
+      });
+    } catch {
+      // Non-fatal — orphaned R2 objects can be cleaned up later
     }
+
+    // Remove this prompt from queue — next one will show automatically
+    setDuplicateQueue((prev) => prev.slice(1));
   }, [duplicatePrompt, removeUpload]);
 
   return (
-    <main className="flex-1 overflow-y-auto px-16 py-8">
-      <div className="max-w-4xl mx-auto flex flex-col gap-10">
+    <main className="flex-1 overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
+      <div className="max-w-4xl mx-auto flex flex-col gap-8 lg:gap-10">
         {/* Page header */}
         <div>
-          <h1 className="text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
+          <h1 className="text-[1.3rem] lg:text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
             Payroll
           </h1>
           <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
@@ -278,7 +295,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         </div>
 
         {/* Upload section */}
-        <section className="flex flex-col gap-4">
+        <section className="flex flex-col gap-4" data-tutorial="upload-zone">
           <UploadZone onFilesSelected={handleFilesSelected} />
 
           <ActiveUploadList
@@ -331,7 +348,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         <div className="h-px bg-outline-variant/20" />
 
         {/* Payroll History */}
-        <section ref={historyRef}>
+        <section ref={historyRef} data-tutorial="payroll-history">
           <h2 className="text-[1.1rem] font-semibold text-on-surface mb-4 font-(family-name:--font-manrope)">
             Payroll History
           </h2>

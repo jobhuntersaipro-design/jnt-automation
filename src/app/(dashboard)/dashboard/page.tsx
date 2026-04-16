@@ -7,6 +7,8 @@ import { SalaryBreakdown } from "@/components/dashboard/salary-breakdown";
 import { IncentiveHitRate } from "@/components/dashboard/incentive-hit-rate";
 import { TopDispatchers } from "@/components/dashboard/top-dispatchers";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
+import { OverviewExport } from "@/components/dashboard/overview-export";
+import { ChartErrorBoundary } from "@/components/ui/chart-error-boundary";
 import {
   getSummaryStats,
   getMonthlyPayoutTrend,
@@ -18,6 +20,8 @@ import {
 } from "@/lib/db/overview";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 type SearchParams = {
   branches?: string;
@@ -51,8 +55,9 @@ export default async function DashboardPage({
 
   const filters: Filters = { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear };
 
-  const session = await auth();
-  const agentId = session!.user.id;
+  const { getEffectiveAgentId } = await import("@/lib/impersonation");
+  const effective = await getEffectiveAgentId();
+  const agentId = effective!.agentId;
 
   // Cache key includes agentId + filters so each tenant and filter combo gets its own bucket.
   // Defined inside the page function (not module scope) so agentId is available for the key.
@@ -79,38 +84,57 @@ export default async function DashboardPage({
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Top bar */}
-      <header className="sticky top-0 z-10 px-8 pt-5 pb-4 bg-surface/80 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-6">
+      <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-6">
           <div className="shrink-0">
-            <h1 className="font-heading font-bold text-[1.36rem] text-on-surface tracking-tight">
+            <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">
               Overview
             </h1>
-            <p className="text-[0.72rem] text-on-surface-variant mt-0.5">
+            <p className="text-[0.72rem] text-on-surface-variant mt-0.5 hidden sm:block">
               All-time performance and salary distribution across branches and dispatchers.
             </p>
           </div>
 
           <Suspense>
-            <DashboardFilters branchCodes={branchCodes} />
+            <div className="flex items-center gap-2 overflow-x-auto" data-tutorial="filters">
+              <DashboardFilters branchCodes={branchCodes} />
+              <div data-tutorial="export">
+                <OverviewExport />
+              </div>
+            </div>
           </Suspense>
         </div>
       </header>
 
       {/* Content */}
-      <main className="px-8 pb-16 space-y-6">
-        <SummaryCards data={summary} filters={filters} />
-
-        <div className="grid grid-cols-2 gap-4">
-          <MonthlyNetPayoutTrend data={trend} />
-          <BranchDistribution data={branchDist} />
+      <main className="px-4 lg:px-8 pb-16 space-y-4 lg:space-y-6">
+        <div data-tutorial="summary-cards">
+          <SummaryCards data={summary} filters={filters} />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <SalaryBreakdown data={breakdown} />
-          <IncentiveHitRate data={hitRate} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-tutorial="charts">
+          <ChartErrorBoundary>
+            <MonthlyNetPayoutTrend data={trend} />
+          </ChartErrorBoundary>
+          <ChartErrorBoundary>
+            <BranchDistribution data={branchDist} />
+          </ChartErrorBoundary>
         </div>
 
-        <TopDispatchers data={dispatchers} />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartErrorBoundary>
+            <SalaryBreakdown data={breakdown} />
+          </ChartErrorBoundary>
+          <ChartErrorBoundary>
+            <IncentiveHitRate data={hitRate} />
+          </ChartErrorBoundary>
+        </div>
+
+        <div data-tutorial="dispatcher-table">
+          <ChartErrorBoundary>
+            <TopDispatchers data={dispatchers} />
+          </ChartErrorBoundary>
+        </div>
       </main>
     </div>
   );

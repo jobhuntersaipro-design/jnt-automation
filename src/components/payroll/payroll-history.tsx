@@ -46,12 +46,13 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
 
   return (
     <div>
-      <h3 className="text-[0.78rem] font-semibold text-on-surface-variant uppercase tracking-wider mb-2">
+      <h3 className="text-[0.78rem] font-semibold text-on-surface-variant uppercase tracking-wider mb-4">
         {branchCode}
       </h3>
 
+      <div className="overflow-x-auto">
       {/* Table header */}
-      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60">
+      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60 min-w-150">
         <span>Month</span>
         <span className="text-center">Staff</span>
         <span className="text-right">Net Salary</span>
@@ -94,6 +95,7 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
             </div>
           </div>
         ))}
+      </div>
       </div>
 
       {/* See more / less */}
@@ -222,9 +224,14 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
           No payroll records yet.
         </div>
       ) : (
-        <div className="flex flex-col gap-6">
-          {Array.from(grouped.entries()).map(([branchCode, items]) => (
-            <BranchGroup key={branchCode} branchCode={branchCode} items={items} />
+        <div className="flex flex-col gap-8">
+          {Array.from(grouped.entries()).map(([branchCode, items], idx, arr) => (
+            <div key={branchCode}>
+              <BranchGroup branchCode={branchCode} items={items} />
+              {idx < arr.length - 1 && (
+                <div className="h-px bg-outline-variant/25 mt-8" />
+              )}
+            </div>
           ))}
         </div>
       )}

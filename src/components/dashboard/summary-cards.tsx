@@ -77,7 +77,7 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
   const prevLabel = getPrevPeriodLabel(filters);
   return (
     <div className="flex flex-col gap-2">
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {/* Hero card */}
       <div
         className="rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden"

@@ -11,6 +11,8 @@ export type StaffDispatcher = {
   isPinned: boolean;
   branchCode: string;
   isComplete: boolean;
+  /** "NEW" if no salary records or first seen this month, otherwise "Jan 2026" */
+  firstSeen: string;
   /** Full IC (unmasked) for the drawer */
   rawIcNo: string;
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
@@ -45,26 +47,74 @@ export async function getDispatchers(
       },
       incentiveRule: { select: { orderThreshold: true, incentiveAmount: true } },
       petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
+      salaryRecords: {
+        select: { month: true, year: true },
+        orderBy: [{ year: "asc" }, { month: "asc" }],
+        take: 1,
+      },
     },
     orderBy: [{ isPinned: "desc" }, { name: "asc" }],
   });
 
-  return dispatchers.map((d) => ({
-    id: d.id,
-    extId: d.extId,
-    name: d.name,
-    icNo: maskIc(d.icNo),
-    gender: d.gender,
-    avatarUrl: d.avatarUrl,
-    isPinned: d.isPinned,
-    branchCode: d.branch.code,
-    isComplete: computeIsComplete(d.name, d.icNo, d.extId),
-    rawIcNo: d.icNo,
-    weightTiers: d.weightTiers,
-    incentiveRule: d.incentiveRule,
-    petrolRule: d.petrolRule,
-  }));
+  // Determine the latest uploaded month across all dispatchers
+  // to know what counts as "this month" (NEW)
+  let latestMonth = 0;
+  let latestYear = 0;
+  for (const d of dispatchers) {
+    for (const sr of d.salaryRecords) {
+      if (sr.year > latestYear || (sr.year === latestYear && sr.month > latestMonth)) {
+        latestYear = sr.year;
+        latestMonth = sr.month;
+      }
+    }
+  }
+  // Also check the latest across ALL salary records for this agent
+  const latestRecord = await prisma.salaryRecord.findFirst({
+    where: { dispatcher: { branch: { agentId } } },
+    orderBy: [{ year: "desc" }, { month: "desc" }],
+    select: { month: true, year: true },
+  });
+  if (latestRecord) {
+    if (latestRecord.year > latestYear || (latestRecord.year === latestYear && latestRecord.month > latestMonth)) {
+      latestYear = latestRecord.year;
+      latestMonth = latestRecord.month;
+    }
+  }
+
+  return dispatchers.map((d) => {
+    const earliest = d.salaryRecords[0];
+    let firstSeen: string;
+    if (!earliest) {
+      firstSeen = "NEW";
+    } else if (earliest.year === latestYear && earliest.month === latestMonth) {
+      firstSeen = "NEW";
+    } else {
+      firstSeen = `${MONTH_ABBR[earliest.month - 1]} ${earliest.year}`;
+    }
+
+    return {
+      id: d.id,
+      extId: d.extId,
+      name: d.name,
+      icNo: maskIc(d.icNo),
+      gender: d.gender,
+      avatarUrl: d.avatarUrl,
+      isPinned: d.isPinned,
+      branchCode: d.branch.code,
+      isComplete: computeIsComplete(d.name, d.icNo, d.extId),
+      firstSeen,
+      rawIcNo: d.icNo,
+      weightTiers: d.weightTiers,
+      incentiveRule: d.incentiveRule,
+      petrolRule: d.petrolRule,
+    };
+  });
 }
+
+const MONTH_ABBR = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
 
 export type DispatcherDetail = {
   id: string;

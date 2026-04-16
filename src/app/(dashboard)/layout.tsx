@@ -1,9 +1,15 @@
 import Image from "next/image";
 import { NavLinks } from "@/components/dashboard/nav-links";
+import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { AccountMenu } from "@/components/dashboard/account-menu";
+import { BfcacheFix } from "@/components/dashboard/bfcache-fix";
+import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
+import { TutorialOverlay } from "@/components/tutorial/tutorial-overlay";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 
 export default async function DashboardLayout({
   children,
@@ -14,35 +20,53 @@ export default async function DashboardLayout({
   if (!session?.user?.id) redirect("/auth/login");
   if (!session.user.isApproved) redirect("/auth/pending");
 
+  const effective = await getEffectiveAgentId();
+  const isImpersonating = effective?.impersonating ?? false;
+
+  const agent = await prisma.agent.findUnique({
+    where: { id: session.user.id },
+    select: { hasSeenTutorial: true },
+  });
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
+      <BfcacheFix />
+      {isImpersonating && (
+        <ImpersonationBanner agentName={effective!.impersonatedName!} />
+      )}
       {/* Top nav */}
-      <header className="h-16 shrink-0 flex items-center px-16 bg-surface-dim">
+      <header className="h-14 lg:h-16 shrink-0 flex items-center px-4 lg:px-16 bg-surface-dim relative">
+        <MobileNav isSuperAdmin={session?.user?.isSuperAdmin ?? false} impersonating={isImpersonating} />
+
         <a href="/dashboard" className="shrink-0">
           <Image
             src="/logo-blue.png"
             alt="EasyStaff"
             width={140}
             height={36}
-            className="h-12 w-auto"
+            className="h-10 lg:h-12 w-auto"
             priority />
         </a>
 
-        <div className="mx-2 shrink-0" />
+        <div className="mx-2 shrink-0 hidden lg:block" />
 
-        <NavLinks />
+        <div className="hidden lg:block">
+          <NavLinks isSuperAdmin={session?.user?.isSuperAdmin ?? false} impersonating={isImpersonating} />
+        </div>
 
         {/* Right side — icons + user */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
           <NotificationBell />
 
-          <div className="w-px h-5 bg-outline-variant/40 mx-1" />
+          <div className="w-px h-5 bg-outline-variant/40 mx-1 hidden sm:block" />
 
-          <AccountMenu
-            name={session?.user?.name ?? "User"}
-            imageUrl={session?.user?.image}
-            isSuperAdmin={session?.user?.isSuperAdmin ?? false}
-          />
+          <div className="hidden sm:block">
+            <AccountMenu
+              name={session?.user?.name ?? "User"}
+              imageUrl={session?.user?.image}
+              isSuperAdmin={session?.user?.isSuperAdmin ?? false}
+            />
+          </div>
         </div>
       </header>
 
@@ -50,6 +74,11 @@ export default async function DashboardLayout({
       <div className="flex-1 flex overflow-hidden">
         {children}
       </div>
+
+      <TutorialOverlay
+        hasSeenTutorial={agent?.hasSeenTutorial ?? true}
+        isSuperAdmin={session.user.isSuperAdmin ?? false}
+      />
     </div>
   );
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useContainerSize } from "@/lib/hooks/use-container-size";
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 import type { BranchPoint } from "@/lib/db/overview";
 import { CHART_COLORS } from "@/lib/chart-colors";
@@ -116,6 +116,7 @@ function CustomXTick({
 }
 
 export function BranchDistribution({ data }: { data: BranchPoint[] }) {
+  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
   const [metric, setMetric] = useState<Metric>("netPayout");
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
@@ -156,14 +157,15 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
       </div>
 
       {/* Chart */}
-      <div style={{ height: "250px" }}>
+      <div ref={chartRef} style={{ height: "250px", width: "100%" }}>
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No branch data available
           </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="110%" minWidth={0}>
+        ) : cw > 0 && ch > 0 ? (
             <BarChart
+              width={cw}
+              height={Math.round(ch * 1.1)}
               data={chartData}
               margin={{ top: 8, right: 8, bottom: 36, left: 0 }}
               barSize={64}
@@ -217,8 +219,7 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
                 }}
               />
             </BarChart>
-          </ResponsiveContainer>
-        )}
+        ) : null}
       </div>
     </div>
   );

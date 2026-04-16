@@ -4,6 +4,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
+import { createNotification } from "@/lib/db/notifications";
 
 const UpdateEntrySchema = z.object({
   dispatcherId: z.string().min(1),
@@ -118,6 +119,14 @@ export async function POST(
 
     revalidatePath("/payroll");
     revalidatePath("/dashboard");
+
+    // Notify
+    await createNotification({
+      agentId: session.user.id,
+      type: "recalculate",
+      message: "Payroll recalculated",
+      detail: `${updates.length} record${updates.length > 1 ? "s" : ""} updated`,
+    }).catch(() => {});
 
     return NextResponse.json({ success: true, updatedCount: updates.length });
   } catch (error) {

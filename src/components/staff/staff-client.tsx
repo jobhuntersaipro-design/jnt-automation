@@ -306,17 +306,18 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
   return (
     <div className="flex-1 overflow-y-auto">
       {/* Header */}
-      <header className="sticky top-0 z-10 px-8 pt-5 pb-4 bg-surface/80 backdrop-blur-md">
-        <div className="flex items-center justify-between gap-6">
+      <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
           <div className="shrink-0">
-            <h1 className="font-heading font-bold text-[1.36rem] text-on-surface tracking-tight">Staff</h1>
-            <p className="text-[0.72rem] text-on-surface-variant mt-0.5">
+            <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">Staff</h1>
+            <p className="text-[0.72rem] text-on-surface-variant mt-0.5 hidden sm:block">
               Manage dispatchers and salary rules across all branches.
             </p>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowDefaults(true)}
+              data-tutorial="defaults-button"
               className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
             >
               Defaults
@@ -373,7 +374,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
         </div>
       </header>
 
-      <main className="px-8 pb-16 space-y-4">
+      <main className="px-4 lg:px-8 pb-16 space-y-4">
         {/* Filters */}
         <div className="flex items-center gap-3">
           <div ref={branchRef} className="relative">
@@ -439,7 +440,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
             <p className="text-[0.9rem] text-on-surface-variant">No dispatchers match your search.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-hidden">
+          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto" data-tutorial="dispatcher-list">
             {/* Grouped column headers */}
             {/* Row 1: group labels */}
             <div className={`${ROW_GRID} px-5 pt-2.5 pb-0`}>
@@ -474,7 +475,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes, defaults }: 
                 "Eligible", "Min Orders", "Amount (RM)",
                 "",
                 "Eligible", "Min Orders", "Amount (RM)",
-                "Status", "",
+                "First Seen", "",
               ].map((h, i) => (
                 <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center ${i === 0 ? "text-left!" : ""}`}>
                   {h}

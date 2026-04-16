@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { signIn, signOut } from "next-auth/react";
-import { Eye, EyeOff, Trash2 } from "lucide-react";
+import { Eye, EyeOff, Trash2, Upload, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/ui/avatar";
 
@@ -13,6 +13,10 @@ interface SettingsClientProps {
   hasPassword: boolean;
   connectedProviders: string[];
   googleSheetsConnected: boolean;
+  companyRegistrationNo: string | null;
+  companyAddress: string | null;
+  stampImageUrl: string | null;
+  memberSince: string;
 }
 
 export function SettingsClient({
@@ -22,12 +26,22 @@ export function SettingsClient({
   hasPassword,
   connectedProviders,
   googleSheetsConnected,
+  companyRegistrationNo,
+  companyAddress,
+  stampImageUrl,
+  memberSince,
 }: SettingsClientProps) {
   return (
     <div className="flex flex-col gap-10">
-      <ProfileSection initialName={initialName} email={email} imageUrl={imageUrl} />
+      <ProfileSection initialName={initialName} email={email} imageUrl={imageUrl} memberSince={memberSince} />
+      <CompanySection
+        initialRegNo={companyRegistrationNo}
+        initialAddress={companyAddress}
+        initialStampUrl={stampImageUrl}
+      />
       <SecuritySection hasPassword={hasPassword} connectedProviders={connectedProviders} />
       <GoogleSheetsSection connected={googleSheetsConnected} />
+      <TutorialSection />
       <DangerZoneSection />
     </div>
   );
@@ -39,13 +53,21 @@ function ProfileSection({
   initialName,
   email,
   imageUrl,
+  memberSince,
 }: {
   initialName: string;
   email: string;
   imageUrl: string | null;
+  memberSince: string;
 }) {
   const [name, setName] = useState(initialName);
   const [saving, setSaving] = useState(false);
+  const [avatar, setAvatar] = useState<string | null>(imageUrl);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const memberDate = new Date(memberSince);
+  const memberStr = `Member since ${memberDate.toLocaleString("en-US", { month: "long", year: "numeric" })}`;
 
   async function handleSave() {
     if (!name.trim()) {
@@ -70,6 +92,50 @@ function ProfileSection({
     toast.success("Profile updated.");
   }
 
+  async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File must be under 2MB.");
+      return;
+    }
+
+    setUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/settings/avatar", {
+      method: "POST",
+      body: formData,
+    });
+    setUploading(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(data.error ?? "Failed to upload avatar.");
+      return;
+    }
+
+    const data = await res.json();
+    setAvatar(data.avatarUrl);
+    toast.success("Profile picture updated.");
+  }
+
+  async function handleAvatarRemove() {
+    setUploading(true);
+    const res = await fetch("/api/settings/avatar", { method: "DELETE" });
+    setUploading(false);
+
+    if (!res.ok) {
+      toast.error("Failed to remove profile picture.");
+      return;
+    }
+
+    setAvatar(null);
+    toast.success("Profile picture removed.");
+  }
+
   return (
     <section>
       <h2 className="font-manrope font-semibold text-lg text-on-surface mb-4">
@@ -77,10 +143,38 @@ function ProfileSection({
       </h2>
       <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-5">
         <div className="flex items-center gap-4">
-          <UserAvatar name={name || initialName} imageUrl={imageUrl} size="lg" />
-          <div>
+          <div className="relative group">
+            <UserAvatar name={name || initialName} imageUrl={avatar} size="lg" />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <Camera size={16} className="text-white" />
+            </button>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+          </div>
+          <div className="flex-1">
             <p className="text-sm font-medium text-on-surface">{name || initialName}</p>
             <p className="text-xs text-on-surface-variant">{email}</p>
+            <p className="text-xs text-on-surface-variant/60 mt-1">{memberStr}</p>
+          </div>
+          <div className="flex gap-2">
+            {avatar && (
+              <button
+                onClick={handleAvatarRemove}
+                disabled={uploading}
+                className="text-xs text-on-surface-variant hover:text-on-surface border border-outline-variant rounded-md px-2.5 py-1.5 transition-colors disabled:opacity-50"
+              >
+                Remove photo
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-col gap-1">
@@ -102,6 +196,193 @@ function ProfileSection({
           >
             {saving ? "Saving..." : "Save"}
           </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Company Details ────────────────────────────────────── */
+
+function CompanySection({
+  initialRegNo,
+  initialAddress,
+  initialStampUrl,
+}: {
+  initialRegNo: string | null;
+  initialAddress: string | null;
+  initialStampUrl: string | null;
+}) {
+  const [regNo, setRegNo] = useState(initialRegNo ?? "");
+  const [address, setAddress] = useState(initialAddress ?? "");
+  const [stampUrl, setStampUrl] = useState<string | null>(initialStampUrl);
+  const [saving, setSaving] = useState(false);
+  const [stampUploading, setStampUploading] = useState(false);
+  const stampFileRef = useRef<HTMLInputElement>(null);
+
+  const isDirty = regNo !== (initialRegNo ?? "") || address !== (initialAddress ?? "");
+
+  async function handleSave() {
+    setSaving(true);
+    const res = await fetch("/api/settings/company", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        companyRegistrationNo: regNo.trim() || null,
+        companyAddress: address.trim() || null,
+      }),
+    });
+    setSaving(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(data.error ?? "Failed to update company details.");
+      return;
+    }
+    toast.success("Company details updated.");
+  }
+
+  async function handleStampUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File must be under 2MB.");
+      return;
+    }
+
+    setStampUploading(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch("/api/settings/stamp", {
+      method: "POST",
+      body: formData,
+    });
+    setStampUploading(false);
+
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(data.error ?? "Failed to upload stamp.");
+      return;
+    }
+
+    const data = await res.json();
+    setStampUrl(data.stampImageUrl);
+    toast.success("Company stamp updated.");
+  }
+
+  async function handleStampRemove() {
+    setStampUploading(true);
+    const res = await fetch("/api/settings/stamp", { method: "DELETE" });
+    setStampUploading(false);
+
+    if (!res.ok) {
+      toast.error("Failed to remove stamp.");
+      return;
+    }
+
+    setStampUrl(null);
+    toast.success("Company stamp removed.");
+  }
+
+  const inputClass =
+    "w-full border border-outline-variant rounded-md px-3 py-2 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+
+  return (
+    <section>
+      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-4">
+        Company Details
+      </h2>
+      <p className="text-xs text-on-surface-variant mb-4">
+        These details appear on generated payslip PDFs. All fields are optional.
+      </p>
+      <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-5">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+            Registration Number
+          </label>
+          <input
+            type="text"
+            value={regNo}
+            onChange={(e) => setRegNo(e.target.value)}
+            placeholder="e.g. 202401013061"
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+            Company Address
+          </label>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder={"NO 1 GF, JALAN SEROJA JAYA 1\nTAMAN SEROJA JAYA 28380 KEMAYAN PAHANG"}
+            rows={3}
+            className={inputClass + " resize-none"}
+          />
+        </div>
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saving || !isDirty}
+            className="bg-primary text-white rounded-md px-5 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+
+        {/* Company Stamp */}
+        <div className="border-t border-outline-variant/20 pt-5 flex flex-col gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-on-surface">Company Stamp</h3>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Shown in the &quot;Approved By&quot; section of payslip PDFs.
+            </p>
+          </div>
+          <div className="flex items-center gap-4">
+            {stampUrl ? (
+              <div className="relative group">
+                <img
+                  src={stampUrl}
+                  alt="Company stamp"
+                  className="w-20 h-20 object-contain rounded-md border border-outline-variant/30"
+                />
+                <button
+                  onClick={handleStampRemove}
+                  disabled={stampUploading}
+                  className="absolute -top-2 -right-2 w-5 h-5 bg-critical text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => stampFileRef.current?.click()}
+                disabled={stampUploading}
+                className="w-20 h-20 border-2 border-dashed border-outline-variant/50 rounded-md flex flex-col items-center justify-center gap-1 text-on-surface-variant hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+              >
+                <Upload size={16} />
+                <span className="text-[10px]">Upload</span>
+              </button>
+            )}
+            {stampUrl && (
+              <button
+                onClick={() => stampFileRef.current?.click()}
+                disabled={stampUploading}
+                className="text-xs text-on-surface-variant hover:text-on-surface border border-outline-variant rounded-md px-2.5 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {stampUploading ? "Uploading..." : "Replace"}
+              </button>
+            )}
+          </div>
+          <input
+            ref={stampFileRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            onChange={handleStampUpload}
+            className="hidden"
+          />
         </div>
       </div>
     </section>
@@ -284,7 +565,7 @@ function SecuritySection({
               <span className="text-sm text-on-surface">Google</span>
             </div>
             <button
-              onClick={isGoogleLinked ? undefined : () => signIn("google", { redirectTo: "/dashboard/settings" })}
+              onClick={isGoogleLinked ? undefined : () => signIn("google", { redirectTo: "/settings" })}
               disabled={isGoogleLinked}
               className={`text-xs font-medium px-3 py-1.5 rounded-md ${
                 isGoogleLinked
@@ -359,6 +640,51 @@ function GoogleSheetsSection({ connected }: { connected: boolean }) {
               Connect Google Sheets
             </a>
           )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── Tutorial ───────────────────────────────────────────── */
+
+function TutorialSection() {
+  const [resetting, setResetting] = useState(false);
+
+  async function handleReplay() {
+    setResetting(true);
+    try {
+      const res = await fetch("/api/tutorial", { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Tutorial reset — it will play on your next page visit.");
+      } else {
+        toast.error("Failed to reset tutorial.");
+      }
+    } catch {
+      toast.error("Failed to reset tutorial.");
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold text-on-surface mb-4">Tutorial</h2>
+      <div className="bg-white rounded-xl p-6 shadow-sm border border-outline-variant/10">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-on-surface">Replay Tutorial</p>
+            <p className="text-xs text-on-surface-variant mt-0.5">
+              Show the step-by-step guide again on each page.
+            </p>
+          </div>
+          <button
+            onClick={handleReplay}
+            disabled={resetting}
+            className="text-xs font-medium px-3 py-1.5 rounded-md bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-hover transition-colors disabled:opacity-50"
+          >
+            {resetting ? "Resetting..." : "Replay"}
+          </button>
         </div>
       </div>
     </section>

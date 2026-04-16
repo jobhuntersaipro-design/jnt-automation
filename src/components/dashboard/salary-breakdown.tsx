@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useContainerSize } from "@/lib/hooks/use-container-size";
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
 } from "recharts";
 import { CHART_COLORS } from "@/lib/chart-colors";
 
@@ -64,6 +64,7 @@ type BreakdownPoint = {
 };
 
 export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
+  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
   const [hoveredKey, setHoveredKey] = useState<SegmentKey | null>(null);
 
   return (
@@ -103,9 +104,11 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
         </div>
       </div>
 
-      <div style={{ height: "14rem" }}>
-        <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+      <div ref={chartRef} style={{ height: "14rem", width: "100%" }}>
+        {cw > 0 && ch > 0 ? (
           <BarChart
+            width={cw}
+            height={ch}
             data={data}
             margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
             barSize={110}
@@ -140,7 +143,7 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
               />
             ))}
           </BarChart>
-        </ResponsiveContainer>
+        ) : null}
       </div>
     </div>
   );

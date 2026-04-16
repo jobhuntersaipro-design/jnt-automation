@@ -16,16 +16,21 @@ model Agent {
   name         String
   isApproved   Boolean        @default(false)
   isSuperAdmin Boolean        @default(false)
+  maxBranches  Int            @default(1)
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
   defaults              AgentDefault?
+  paymentRecords        PaymentRecord[]
+  notifications         Notification[]
   companyRegistrationNo    String?
   companyAddress           String?
+  avatarUrl                String?    // R2 URL for profile picture
   stampImageUrl            String?    // R2 URL for company stamp on payslips
   googleSheetsAccessToken  String?
   googleSheetsRefreshToken String?
   googleSheetsTokenExpiry  DateTime?
+  hasSeenTutorial          Boolean    @default(false)
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 }
@@ -212,6 +217,7 @@ model SalaryRecord {
   penalty       Float @default(0)
   advance       Float @default(0)
   netSalary     Float
+  petrolQualifyingDays Int @default(0)
 
   // Snapshots of rules used for this salary calculation (JSON)
   weightTiersSnapshot Json?  // Array<{ tier, minWeight, maxWeight, commission }>
@@ -241,4 +247,35 @@ model SalaryLineItem {
   salaryRecord   SalaryRecord @relation(fields: [salaryRecordId], references: [id], onDelete: Cascade)
 
   @@index([salaryRecordId])
+}
+
+// ─── Payment Records (Superadmin) ────────────────────────────
+
+model PaymentRecord {
+  id        String   @id @default(cuid())
+  agentId   String
+  amount    Float
+  date      DateTime
+  notes     String?
+  period    String?  // e.g. "March 2026 – February 2027"
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([agentId])
+}
+
+// ─── Notifications ───────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(cuid())
+  agentId   String
+  type      String   // "upload" | "payroll" | "new_dispatcher" | "recalculate"
+  message   String
+  detail    String
+  isRead    Boolean  @default(false)
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([agentId, isRead])
+  @@index([agentId, createdAt])
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useContainerSize } from "@/lib/hooks/use-container-size";
 import {
   LineChart,
   Line,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
 import type { TrendPoint } from "@/lib/db/overview";
@@ -89,6 +89,7 @@ function CustomTooltip({
 }
 
 export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
+  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
   const [activeLine, setActiveLine] = useState<ActiveLine>(null);
 
   const allValues = data.flatMap((d) => [d.actual, d.baseSalary]);
@@ -140,14 +141,13 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
         </div>
       </div>
 
-      <div style={{ height: "220px" }}>
+      <div ref={chartRef} style={{ height: "220px", width: "100%" }}>
         {data.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No data for selected range
           </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-            <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+        ) : cw > 0 && ch > 0 ? (
+            <LineChart width={cw} height={ch} data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
               <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
               <XAxis
                 dataKey="month"
@@ -214,8 +214,7 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
                 style={{ cursor: "pointer" }}
               />
             </LineChart>
-          </ResponsiveContainer>
-        )}
+        ) : null}
       </div>
     </div>
   );

@@ -18,6 +18,7 @@ export interface SalaryRecordRow {
   baseSalary: number;
   incentive: number;
   petrolSubsidy: number;
+  petrolQualifyingDays: number;
   penalty: number;
   advance: number;
   netSalary: number;
@@ -395,6 +396,7 @@ export function SalaryTable({
               <ExportButtons uploadId={uploadId} />
               <button
                 onClick={startEdit}
+                data-tutorial="recalculate"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -453,6 +455,7 @@ export function SalaryTable({
                 <th className="py-3 px-3 font-medium text-right">Base Salary</th>
                 <th className="py-3 px-3 font-medium text-right">Incentive</th>
                 <th className="py-3 px-3 font-medium text-right">Petrol</th>
+                <th className="py-3 px-3 font-medium text-right">Days</th>
                 <th className="py-3 px-3 font-medium text-right">Penalty</th>
                 <th className="py-3 px-3 font-medium text-right">Advance</th>
                 <th className="py-3 px-4 font-medium text-right">Net Salary</th>
@@ -501,6 +504,9 @@ export function SalaryTable({
                           onChange={(v) => updateField(r.dispatcherId, "petrolSubsidy", v)}
                         />
                       </td>
+                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
+                        {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
+                      </td>
                       <td className="py-2.5 px-3 text-right">
                         <EditableCell
                           value={r.penalty}
@@ -529,6 +535,9 @@ export function SalaryTable({
                       </td>
                       <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolSubsidy > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
                         {formatRM(r.petrolSubsidy)}
+                      </td>
+                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
+                        {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
                       </td>
                       <td className={`py-2.5 px-3 text-right tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                         {r.penalty > 0 ? formatRM(r.penalty) : "—"}

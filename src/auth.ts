@@ -53,10 +53,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (profilePic) token.picture = profilePic;
         const agent = await prisma.agent.findUnique({
           where: { id: user.id },
-          select: { isApproved: true, isSuperAdmin: true },
+          select: { isApproved: true, isSuperAdmin: true, name: true },
         });
         token.isApproved = agent?.isApproved ?? false;
         token.isSuperAdmin = agent?.isSuperAdmin ?? false;
+        if (agent?.name) token.name = agent.name;
       }
       return token;
     },
@@ -66,6 +67,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       session.user.image = token.picture as string | null;
       session.user.isApproved = token.isApproved as boolean;
       session.user.isSuperAdmin = token.isSuperAdmin as boolean;
+      // Always read name from DB so Settings changes reflect immediately
+      const agent = await prisma.agent.findUnique({
+        where: { id: token.id as string },
+        select: { name: true },
+      });
+      if (agent?.name) session.user.name = agent.name;
       return session;
     },
   },

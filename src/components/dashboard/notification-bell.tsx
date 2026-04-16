@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { Bell, Upload, BadgeDollarSign, UserPlus } from "lucide-react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { Bell, Upload, BadgeDollarSign, UserPlus, RefreshCw } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 
 type Notification = {
   id: string;
-  type: "upload" | "payroll" | "new_dispatcher";
+  type: "upload" | "payroll" | "new_dispatcher" | "recalculate";
   message: string;
   detail: string;
+  isRead: boolean;
   createdAt: string;
 };
 
@@ -16,6 +17,7 @@ const iconMap = {
   upload: { Icon: Upload, bg: "#0056D2" },
   payroll: { Icon: BadgeDollarSign, bg: "#16a34a" },
   new_dispatcher: { Icon: UserPlus, bg: "#ca8a04" },
+  recalculate: { Icon: RefreshCw, bg: "#7c3aed" },
 };
 
 function timeAgo(iso: string) {
@@ -32,9 +34,43 @@ function timeAgo(iso: string) {
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useClickOutside(ref, close);
+
+  const unreadCount = items.filter((n) => !n.isRead).length;
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data);
+        setLoaded(true);
+      }
+    } catch {
+      // Silent
+    }
+  }, []);
+
+  // Fetch when dropdown is opened
+  useEffect(() => {
+    if (open) {
+      fetchNotifications();
+      // Mark all as read
+      if (unreadCount > 0) {
+        fetch("/api/notifications", { method: "PATCH" }).then(() => {
+          setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        });
+      }
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleClear = useCallback(async () => {
+    await fetch("/api/notifications", { method: "DELETE" });
+    setItems([]);
+  }, []);
 
   return (
     <div ref={ref} className="relative">
@@ -43,8 +79,10 @@ export function NotificationBell() {
         className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors"
       >
         <Bell size={18} className="text-on-surface-variant" />
-        {items.length > 0 && (
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-critical" />
+        {unreadCount > 0 && (
+          <span className="absolute top-1 right-1 min-w-3.5 h-3.5 rounded-full bg-critical flex items-center justify-center text-[0.55rem] font-bold text-white px-0.5">
+            {unreadCount > 9 ? "9+" : unreadCount}
+          </span>
         )}
       </button>
 
@@ -53,26 +91,33 @@ export function NotificationBell() {
           <div className="flex items-start justify-between mb-4">
             <div>
               <h3 className="font-heading font-semibold text-[1rem] text-on-surface leading-tight">
-                System Notifications
+                Notifications
               </h3>
               <p className="text-[0.78rem] text-on-surface-variant mt-0.5">Recent activity</p>
             </div>
-            <button
-              onClick={() => setItems([])}
-              className="text-[0.78rem] font-medium text-on-surface-variant hover:text-on-surface transition-colors mt-0.5"
-            >
-              Clear All
-            </button>
+            {items.length > 0 && (
+              <button
+                onClick={handleClear}
+                className="text-[0.78rem] font-medium text-on-surface-variant hover:text-on-surface transition-colors mt-0.5"
+              >
+                Clear All
+              </button>
+            )}
           </div>
 
-          {items.length === 0 ? (
+          {!loaded ? (
+            <p className="text-[0.84rem] text-on-surface-variant py-2 text-center">
+              Loading...
+            </p>
+          ) : items.length === 0 ? (
             <p className="text-[0.84rem] text-on-surface-variant py-2 text-center">
               No notifications.
             </p>
           ) : (
-            <div className="flex flex-col gap-3.5">
-              {items.map((n: Notification) => {
-                const { Icon, bg } = iconMap[n.type];
+            <div className="flex flex-col gap-3.5 max-h-80 overflow-y-auto">
+              {items.map((n) => {
+                const mapping = iconMap[n.type as keyof typeof iconMap] ?? iconMap.upload;
+                const { Icon, bg } = mapping;
                 return (
                   <div key={n.id} className="flex items-start gap-3">
                     <div

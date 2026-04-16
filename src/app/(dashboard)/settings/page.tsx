@@ -9,7 +9,17 @@ export default async function SettingsPage() {
 
   const agent = await prisma.agent.findUnique({
     where: { id: session.user.id },
-    select: { name: true, email: true, password: true, googleSheetsRefreshToken: true },
+    select: {
+      name: true,
+      email: true,
+      password: true,
+      avatarUrl: true,
+      companyRegistrationNo: true,
+      companyAddress: true,
+      stampImageUrl: true,
+      googleSheetsRefreshToken: true,
+      createdAt: true,
+    },
   });
 
   if (!agent) redirect("/auth/login");
@@ -24,17 +34,21 @@ export default async function SettingsPage() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-2xl mx-auto py-10 px-6">
+      <div className="max-w-2xl mx-auto py-6 lg:py-10 px-4 lg:px-6">
         <h1 className="font-manrope font-semibold text-2xl text-on-surface mb-8">
           Settings
         </h1>
         <SettingsClient
           name={agent.name}
           email={agent.email}
-          imageUrl={session.user.image ?? null}
+          imageUrl={agent.avatarUrl ?? session.user.image ?? null}
           hasPassword={hasPassword}
           connectedProviders={connectedProviders}
           googleSheetsConnected={!!agent.googleSheetsRefreshToken}
+          companyRegistrationNo={agent.companyRegistrationNo}
+          companyAddress={agent.companyAddress}
+          stampImageUrl={agent.stampImageUrl}
+          memberSince={agent.createdAt.toISOString()}
         />
       </div>
     </div>

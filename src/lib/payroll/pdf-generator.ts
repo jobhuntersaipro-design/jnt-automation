@@ -73,10 +73,8 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: B,
   },
-  sepLabelCenter: { flex: 1, fontSize: 9, textAlign: "center" as const },
   sepLabelCenterBold: { flex: 1, fontSize: 9, textAlign: "center" as const, fontFamily: "Helvetica-Bold" },
   sepAmtBold: { width: 80, fontSize: 9, textAlign: "right" as const, fontFamily: "Helvetica-Bold" },
-  sepAmt: { width: 80, fontSize: 9, textAlign: "right" as const },
 
   // Remarks
   remarksRow: {
@@ -87,15 +85,12 @@ const s = StyleSheet.create({
   },
   remarksBold: { fontSize: 9, fontFamily: "Helvetica-Bold" },
 
-  // Empty padded cell
-  emptyCell: { paddingVertical: 3, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: B },
-
   // Footer
-  footer: { flexDirection: "row" as const, marginTop: 60, justifyContent: "space-between" as const },
+  footer: { flexDirection: "row" as const, marginTop: 60, justifyContent: "space-between" as const, alignItems: "flex-end" as const },
   sigBlock: { alignItems: "center" as const, width: 180 },
   sigDots: { fontSize: 9, marginBottom: 3 },
   sigLabel: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  stamp: { width: 70, height: 70, marginBottom: 8 },
+  stamp: { width: 70, height: 70, marginBottom: 8, objectFit: "contain" as const },
 });
 
 export interface PayslipData {
@@ -239,13 +234,6 @@ function PayslipDocument({ data }: { data: PayslipData }) {
             h(Text, { style: s.sepLabelCenterBold }, "TOTAL :-"),
             h(Text, { style: s.sepAmtBold }, formatRM(addTotal)),
           ),
-          // EMPLOYER'S CONTRIBUTION row (top border)
-          h(View, { style: s.sepRow },
-            h(Text, { style: s.sepLabelCenter }, "EMPLOYER'S CONTRIBUTION"),
-            h(Text, { style: s.sepAmt }, ""),
-          ),
-          // Empty cell below (top border)
-          h(View, { style: s.emptyCell }),
         ),
 
         // RIGHT HALF — Deduction
