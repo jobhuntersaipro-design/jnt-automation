@@ -135,10 +135,33 @@ export const ADMIN_STEPS: TutorialStep[] = [
   },
 ];
 
+export interface TutorialPage {
+  path: string;
+  label: string;
+  steps: TutorialStep[];
+}
+
+export function getPageSequence(isSuperAdmin: boolean): TutorialPage[] {
+  const pages: TutorialPage[] = [
+    { path: "/dashboard", label: "Overview", steps: OVERVIEW_STEPS },
+    { path: "/staff", label: "Staff", steps: STAFF_STEPS },
+    { path: "/payroll", label: "Payroll", steps: PAYROLL_STEPS },
+  ];
+  if (isSuperAdmin) {
+    pages.push({ path: "/admin", label: "Admin", steps: ADMIN_STEPS });
+  }
+  return pages;
+}
+
 export function getStepsForPath(path: string, isSuperAdmin: boolean): TutorialStep[] {
   if (path.startsWith("/dashboard")) return OVERVIEW_STEPS;
   if (path.startsWith("/staff")) return STAFF_STEPS;
   if (path.startsWith("/payroll")) return PAYROLL_STEPS;
   if (path.startsWith("/admin") && isSuperAdmin) return ADMIN_STEPS;
   return [];
+}
+
+export function getPageIndexForPath(path: string, isSuperAdmin: boolean): number {
+  const pages = getPageSequence(isSuperAdmin);
+  return pages.findIndex((p) => path.startsWith(p.path));
 }
