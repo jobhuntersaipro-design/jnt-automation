@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { applyDefaultsBodySchema } from "@/lib/validations/staff";
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const raw = await req.json();
     const parsed = applyDefaultsBodySchema.safeParse(raw);
@@ -16,8 +17,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
     const body = parsed.data;
-
-    const agentId = session.user.id;
 
     // Get dispatcher IDs — filtered to selection if provided, otherwise all
     const dispatchers = await prisma.dispatcher.findMany({

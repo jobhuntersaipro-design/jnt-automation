@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { computeIsComplete } from "@/lib/db/staff";
 import { deriveGender } from "@/lib/utils/gender";
@@ -10,14 +10,15 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
     const { getDispatcherById } = await import("@/lib/db/staff");
-    const detail = await getDispatcherById(session.user.id, id);
+    const detail = await getDispatcherById(agentId, id);
 
     if (!detail) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -35,16 +36,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     // Verify dispatcher belongs to this agent
     const dispatcher = await prisma.dispatcher.findFirst({
-      where: { id, branch: { agentId: session.user.id } },
+      where: { id, branch: { agentId } },
       select: { id: true, name: true, icNo: true, extId: true },
     });
 
@@ -66,7 +68,7 @@ export async function PATCH(
       // Update branch
       if (body.branchCode) {
         const branch = await tx.branch.findFirst({
-          where: { agentId: session.user.id, code: body.branchCode },
+          where: { agentId, code: body.branchCode },
           select: { id: true },
         });
         if (!branch) {

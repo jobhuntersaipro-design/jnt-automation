@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
@@ -12,15 +12,16 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     const dispatcher = await prisma.dispatcher.findFirst({
-      where: { id, branch: { agentId: session.user.id } },
+      where: { id, branch: { agentId } },
       select: { id: true },
     });
 
@@ -48,7 +49,7 @@ export async function POST(
     }
 
     const ext = detectedType === "image/jpeg" ? "jpg" : detectedType.split("/")[1];
-    const key = `avatars/${session.user.id}/${id}.${ext}`;
+    const key = `avatars/${agentId}/${id}.${ext}`;
 
     await r2.send(
       new PutObjectCommand({
@@ -78,15 +79,16 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     const dispatcher = await prisma.dispatcher.findFirst({
-      where: { id, branch: { agentId: session.user.id } },
+      where: { id, branch: { agentId } },
       select: { id: true, avatarUrl: true },
     });
 

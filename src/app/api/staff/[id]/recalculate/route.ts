@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { InputJsonValue } from "@/generated/prisma/internal/prismaNamespace";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { recalculateBodySchema } from "@/lib/validations/staff";
 
@@ -27,16 +27,17 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     // Verify dispatcher belongs to this agent
     const dispatcher = await prisma.dispatcher.findFirst({
-      where: { id, branch: { agentId: session.user.id } },
+      where: { id, branch: { agentId } },
       select: { id: true },
     });
 

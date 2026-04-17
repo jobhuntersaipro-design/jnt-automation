@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { computeIsComplete, getAgentDefaults } from "@/lib/db/staff";
 
 export async function POST(req: NextRequest) {
   try {
-  const session = await auth();
-  if (!session?.user?.id || !session.user.isApproved) {
+  const effective = await getEffectiveAgentId();
+  if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const agentId = effective.agentId;
 
   const body = await req.json();
   const { name, extId, icNo, branchCode } = body as {
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   // Verify branch belongs to this agent
   const branch = await prisma.branch.findFirst({
-    where: { code: branchCode, agentId: session.user.id },
+    where: { code: branchCode, agentId },
     select: { id: true, code: true },
   });
 
@@ -55,7 +56,7 @@ export async function POST(req: NextRequest) {
   const trimmedName = name.trim();
   const trimmedExtId = extId.trim();
 
-  const defs = await getAgentDefaults(session.user.id);
+  const defs = await getAgentDefaults(agentId);
   const wt = defs.weightTiers;
   const ir = defs.incentiveRule;
   const pr = defs.petrolRule;

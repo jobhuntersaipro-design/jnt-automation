@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { defaultsBodySchema } from "@/lib/validations/staff";
 
 export async function GET() {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const defaults = await prisma.agentDefault.findUnique({
-      where: { agentId: session.user.id },
+      where: { agentId },
     });
 
     if (!defaults) {
@@ -44,10 +45,11 @@ export async function GET() {
 
 export async function PUT(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const raw = await req.json();
     const parsed = defaultsBodySchema.safeParse(raw);
@@ -65,9 +67,9 @@ export async function PUT(req: NextRequest) {
     }
 
     await prisma.agentDefault.upsert({
-      where: { agentId: session.user.id },
+      where: { agentId },
       create: {
-        agentId: session.user.id,
+        agentId,
         tier1MinWeight: t1.minWeight, tier1MaxWeight: t1.maxWeight ?? 5, tier1Commission: t1.commission,
         tier2MinWeight: t2.minWeight, tier2MaxWeight: t2.maxWeight ?? 10, tier2Commission: t2.commission,
         tier3MinWeight: t3.minWeight, tier3Commission: t3.commission,
