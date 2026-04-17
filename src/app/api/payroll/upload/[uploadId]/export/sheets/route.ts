@@ -64,15 +64,25 @@ export async function POST(
     return NextResponse.json({ error: "Upload not found" }, { status: 404 });
   }
 
+  // Fetch salary records with line items for per-dispatcher tabs
   const records = await prisma.salaryRecord.findMany({
     where: { uploadId },
     include: {
       dispatcher: { select: { extId: true, name: true } },
+      lineItems: {
+        select: {
+          waybillNumber: true,
+          weight: true,
+          deliveryDate: true,
+        },
+        orderBy: { weight: "asc" },
+      },
     },
     orderBy: { dispatcher: { name: "asc" } },
   });
 
-  const rows = records.map((r) => ({
+  // Build summary rows (for the summary tab)
+  const summaryRows = records.map((r) => ({
     extId: r.dispatcher.extId,
     name: r.dispatcher.name,
     branchCode: fullUpload.branch.code,
@@ -85,13 +95,27 @@ export async function POST(
     netSalary: r.netSalary,
   }));
 
+  // Build per-dispatcher line item data
+  const dispatcherTabs = records.map((r) => ({
+    name: r.dispatcher.name,
+    lineItems: r.lineItems.map((li) => ({
+      orderDate: li.deliveryDate
+        ? li.deliveryDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
+        : "",
+      waybillNumber: li.waybillNumber,
+      dispatcherName: r.dispatcher.name,
+      weight: li.weight,
+    })),
+  }));
+
   try {
     const spreadsheetUrl = await exportToGoogleSheets(
       accessToken,
       fullUpload.branch.code,
       fullUpload.month,
       fullUpload.year,
-      rows,
+      summaryRows,
+      dispatcherTabs,
     );
 
     return NextResponse.json({ spreadsheetUrl });

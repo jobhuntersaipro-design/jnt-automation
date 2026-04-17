@@ -78,13 +78,34 @@ interface SheetRow {
   netSalary: number;
 }
 
+interface DispatcherLineItem {
+  orderDate: string;
+  waybillNumber: string;
+  dispatcherName: string;
+  weight: number;
+}
+
+interface DispatcherTab {
+  name: string;
+  lineItems: DispatcherLineItem[];
+}
+
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
 
 /**
+ * Sanitize sheet title — Google Sheets forbids: * : / \ ? [ ]
+ * and limits to 100 characters.
+ */
+function sanitizeSheetTitle(name: string): string {
+  return name.replace(/[*:/\\?[\]]/g, " ").trim().slice(0, 100);
+}
+
+/**
  * Create a Google Sheet with payroll data and return the spreadsheet URL.
+ * Includes a summary "Payroll" tab and per-dispatcher tabs with line items.
  */
 export async function exportToGoogleSheets(
   accessToken: string,
@@ -92,10 +113,27 @@ export async function exportToGoogleSheets(
   month: number,
   year: number,
   records: SheetRow[],
+  dispatcherTabs?: DispatcherTab[],
 ): Promise<string> {
   const title = `EasyStaff Payroll — ${branchCode} ${MONTH_NAMES[month - 1]} ${year}`;
 
-  // 1. Create spreadsheet
+  // Build sheet definitions: summary + per-dispatcher tabs
+  const sheetDefs: { properties: { title: string; sheetId: number } }[] = [
+    { properties: { title: "Payroll", sheetId: 0 } },
+  ];
+
+  if (dispatcherTabs) {
+    dispatcherTabs.forEach((tab, i) => {
+      sheetDefs.push({
+        properties: {
+          title: sanitizeSheetTitle(tab.name),
+          sheetId: i + 1,
+        },
+      });
+    });
+  }
+
+  // 1. Create spreadsheet with all sheets
   const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
     method: "POST",
     headers: {
@@ -104,7 +142,7 @@ export async function exportToGoogleSheets(
     },
     body: JSON.stringify({
       properties: { title },
-      sheets: [{ properties: { title: "Payroll" } }],
+      sheets: sheetDefs,
     }),
   });
 
@@ -115,9 +153,8 @@ export async function exportToGoogleSheets(
 
   const spreadsheet = await createRes.json();
   const spreadsheetId = spreadsheet.spreadsheetId;
-  const sheetId = spreadsheet.sheets[0].properties.sheetId;
 
-  // 2. Build values
+  // 2. Build summary tab values
   const headers = [
     "Dispatcher ID", "Dispatcher Name", "Branch", "Total Orders",
     "Base Salary (RM)", "Incentive (RM)", "Petrol Subsidy (RM)", "Penalty (RM)", "Advance (RM)", "Net Salary (RM)",
@@ -148,22 +185,85 @@ export async function exportToGoogleSheets(
     totals.penalty, totals.advance, totals.netSalary,
   ];
 
-  const values = [headers, ...dataRows, totalRow];
+  const summaryValues = [headers, ...dataRows, totalRow];
 
-  // 3. Write values
+  // 3. Build per-dispatcher tab values
+  const tabData: { range: string; values: (string | number)[][] }[] = [
+    { range: "Payroll!A1", values: summaryValues },
+  ];
+
+  if (dispatcherTabs) {
+    for (const tab of dispatcherTabs) {
+      const tabHeaders = ["Order Date", "Waybill Number", "Dispatcher Name", "Weight (kg)"];
+      const tabRows = tab.lineItems.map((li) => [
+        li.orderDate,
+        li.waybillNumber,
+        li.dispatcherName,
+        li.weight,
+      ]);
+      const sheetTitle = sanitizeSheetTitle(tab.name);
+      tabData.push({
+        range: `'${sheetTitle}'!A1`,
+        values: [tabHeaders, ...tabRows],
+      });
+    }
+  }
+
+  // 4. Write all values in one batch
   await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/Payroll!A1?valueInputOption=RAW`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
     {
-      method: "PUT",
+      method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ values }),
+      body: JSON.stringify({
+        valueInputOption: "RAW",
+        data: tabData,
+      }),
     },
   );
 
-  // 4. Format: bold header row + auto-resize columns
+  // 5. Format: bold headers + auto-resize on all sheets
+  const formatRequests: Record<string, unknown>[] = [];
+
+  for (const def of sheetDefs) {
+    const sid = def.properties.sheetId;
+    // Bold header row
+    formatRequests.push({
+      repeatCell: {
+        range: { sheetId: sid, startRowIndex: 0, endRowIndex: 1 },
+        cell: { userEnteredFormat: { textFormat: { bold: true } } },
+        fields: "userEnteredFormat.textFormat.bold",
+      },
+    });
+    // Auto-resize columns
+    formatRequests.push({
+      autoResizeDimensions: {
+        dimensions: {
+          sheetId: sid,
+          dimension: "COLUMNS",
+          startIndex: 0,
+          endIndex: sid === 0 ? 10 : 4,
+        },
+      },
+    });
+  }
+
+  // Bold totals row on summary sheet
+  formatRequests.push({
+    repeatCell: {
+      range: {
+        sheetId: 0,
+        startRowIndex: summaryValues.length - 1,
+        endRowIndex: summaryValues.length,
+      },
+      cell: { userEnteredFormat: { textFormat: { bold: true } } },
+      fields: "userEnteredFormat.textFormat.bold",
+    },
+  });
+
   await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
     {
@@ -172,46 +272,7 @@ export async function exportToGoogleSheets(
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        requests: [
-          {
-            repeatCell: {
-              range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
-              cell: {
-                userEnteredFormat: {
-                  textFormat: { bold: true },
-                },
-              },
-              fields: "userEnteredFormat.textFormat.bold",
-            },
-          },
-          {
-            repeatCell: {
-              range: {
-                sheetId,
-                startRowIndex: values.length - 1,
-                endRowIndex: values.length,
-              },
-              cell: {
-                userEnteredFormat: {
-                  textFormat: { bold: true },
-                },
-              },
-              fields: "userEnteredFormat.textFormat.bold",
-            },
-          },
-          {
-            autoResizeDimensions: {
-              dimensions: {
-                sheetId,
-                dimension: "COLUMNS",
-                startIndex: 0,
-                endIndex: 10,
-              },
-            },
-          },
-        ],
-      }),
+      body: JSON.stringify({ requests: formatRequests }),
     },
   );
 
