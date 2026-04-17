@@ -1,12 +1,33 @@
-# Current Feature
+# Employees Phase 3 — Employee Payslip Generation
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
+- [ ] Add `epfNo`, `socsoNo`, `incomeTaxNo` optional fields to Employee model + migration
+- [ ] Create employee payslip PDF templates matching ST XIANG format:
+  - Template 1: Employee-only (Supervisor/Admin) — EPF NO + SOCSO NO in particulars
+  - Template 2: Store Keeper only — SOCSO NO + INCOME TAX NO in particulars, WAGES (X HOUR) instead of BASIC PAY
+  - Template 3: Combined (Dispatcher + Employee) — parcel tiers + wages + allowances, EPF/SOCSO/EIS on total gross
+- [ ] "Generate Payslip" button per employee row in confirmed months
+- [ ] IC missing prompt before generation
+- [ ] Combined payslip checks dispatcher SalaryRecord exists for same month
+- [ ] Multi-select + ZIP download with floating action bar
+- [ ] Add EPF NO, SOCSO NO, Income Tax No fields to employee drawer
+- [ ] API routes: single payslip + bulk ZIP generation
+
 ## Notes
+
+- Deduction labels must be exact: `EMPLOYEE EPF (KWSP)`, `EMPLOYEE SOCSO(PERKESO)`, `EMPLOYMENT INSURANCE SCHEME (EIS)`
+- Employer contribution on LEFT side, Net pay on RIGHT side
+- KPI shown as `KPI` (not `KPI ALLOWANCE`), Other Allowance shown as `ALLOWANCE`
+- Penalty/PCB/Advance shown only if > 0
+- Company stamp bottom right
+- ZIP filename: `staff_payslips_[month]_[year].zip`
+- Individual: `[position]_[name]_[month]_[year].pdf`
+- Reference payslips: `NURUL EMYRA.pdf` and `MUHAMAMD FIKRI.pdf` in project root
 
 ## History
 
