@@ -285,7 +285,7 @@ export function PreviewTable({
   );
 
   return (
-    <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden" data-tutorial="preview-table">
+    <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden">
       <div className="overflow-x-auto">
         <table className="w-full text-[0.82rem]">
           <thead>

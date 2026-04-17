@@ -5,10 +5,8 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { BfcacheFix } from "@/components/dashboard/bfcache-fix";
 import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
-import { TutorialOverlay } from "@/components/tutorial/tutorial-overlay";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 
 export default async function DashboardLayout({
@@ -22,11 +20,6 @@ export default async function DashboardLayout({
 
   const effective = await getEffectiveAgentId();
   const isImpersonating = effective?.impersonating ?? false;
-
-  const agent = await prisma.agent.findUnique({
-    where: { id: session.user.id },
-    select: { hasSeenTutorial: true },
-  });
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
@@ -75,10 +68,6 @@ export default async function DashboardLayout({
         {children}
       </div>
 
-      <TutorialOverlay
-        hasSeenTutorial={agent?.hasSeenTutorial ?? true}
-        isSuperAdmin={session.user.isSuperAdmin ?? false}
-      />
     </div>
   );
 }

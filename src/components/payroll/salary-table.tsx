@@ -396,7 +396,6 @@ export function SalaryTable({
               <ExportButtons uploadId={uploadId} />
               <button
                 onClick={startEdit}
-                data-tutorial="recalculate"
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />

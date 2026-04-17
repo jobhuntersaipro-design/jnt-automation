@@ -72,7 +72,7 @@ export default async function DashboardPage({
           </div>
 
           <Suspense>
-            <div className="flex items-center gap-2" data-tutorial="filters">
+            <div className="flex items-center gap-2">
               <DashboardFilters branchCodes={branchCodes} />
             </div>
           </Suspense>
@@ -81,11 +81,11 @@ export default async function DashboardPage({
 
       {/* Content */}
       <main className="px-4 lg:px-8 pb-16 space-y-4 lg:space-y-6">
-        <div data-tutorial="summary-cards">
+        <div>
           <SummaryCards data={summary} filters={filters} />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" data-tutorial="charts">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ChartErrorBoundary>
             <MonthlyNetPayoutTrend data={trend} />
           </ChartErrorBoundary>
@@ -103,12 +103,12 @@ export default async function DashboardPage({
           </ChartErrorBoundary>
         </div>
 
-        <div data-tutorial="dispatcher-table">
+        <div>
           <ChartErrorBoundary>
             <TopDispatchers
               data={dispatchers}
               action={
-                <div key="export" data-tutorial="export">
+                <div key="export">
                   <OverviewExport />
                 </div>
               }

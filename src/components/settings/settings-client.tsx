@@ -41,7 +41,6 @@ export function SettingsClient({
       />
       <SecuritySection hasPassword={hasPassword} connectedProviders={connectedProviders} />
       <GoogleSheetsSection connected={googleSheetsConnected} />
-      <TutorialSection />
       <DangerZoneSection />
     </div>
   );
@@ -640,51 +639,6 @@ function GoogleSheetsSection({ connected }: { connected: boolean }) {
               Connect Google Sheets
             </a>
           )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── Tutorial ───────────────────────────────────────────── */
-
-function TutorialSection() {
-  const [resetting, setResetting] = useState(false);
-
-  async function handleReplay() {
-    setResetting(true);
-    try {
-      const res = await fetch("/api/tutorial", { method: "DELETE" });
-      if (res.ok) {
-        toast.success("Tutorial reset — it will play on your next page visit.");
-      } else {
-        toast.error("Failed to reset tutorial.");
-      }
-    } catch {
-      toast.error("Failed to reset tutorial.");
-    } finally {
-      setResetting(false);
-    }
-  }
-
-  return (
-    <section>
-      <h2 className="text-lg font-semibold text-on-surface mb-4">Tutorial</h2>
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-outline-variant/10">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-on-surface">Replay Tutorial</p>
-            <p className="text-xs text-on-surface-variant mt-0.5">
-              Show the step-by-step guide again on each page.
-            </p>
-          </div>
-          <button
-            onClick={handleReplay}
-            disabled={resetting}
-            className="text-xs font-medium px-3 py-1.5 rounded-md bg-white border border-outline-variant/30 text-on-surface hover:bg-surface-hover transition-colors disabled:opacity-50"
-          >
-            {resetting ? "Resetting..." : "Replay"}
-          </button>
         </div>
       </div>
     </section>

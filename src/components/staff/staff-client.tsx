@@ -329,8 +329,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
               <>
                 <button
                   onClick={() => setShowDefaults(true)}
-                  data-tutorial="defaults-button"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
+                                   className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
                 >
                   Defaults
                 </button>
@@ -493,7 +492,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
             <p className="text-[0.9rem] text-on-surface-variant">No dispatchers match your search.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto" data-tutorial="dispatcher-list">
+          <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto">
             {/* Grouped column headers */}
             {/* Row 1: group labels */}
             <div className={`${ROW_GRID} px-5 pt-2.5 pb-0`}>

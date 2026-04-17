@@ -380,7 +380,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
   }
 
   return (
-    <div data-tutorial="dispatcher-settings" className={`${ROW_GRID} px-5 py-[0.6rem] ${
+    <div className={`${ROW_GRID} px-5 py-[0.6rem] ${
       dispatcher.isPinned ? "bg-brand/4 hover:bg-brand/8" : "hover:bg-surface-hover"
     } transition-colors group/row`}>
       {/* Checkbox */}
@@ -712,7 +712,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
       <div className="flex items-center gap-0.5 justify-center">
         <button
           onClick={(e) => onPin(e, dispatcher)}
-          data-tutorial="pin-button"
           className={`p-1 rounded-lg transition-all ${
             dispatcher.isPinned
               ? "text-brand hover:bg-brand/10 [&_svg]:fill-current"
@@ -724,7 +723,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
         </button>
         <button
           onClick={(e) => { e.stopPropagation(); onOpenDrawer(dispatcher); }}
-          data-tutorial="history-tab"
           className="p-1 rounded-lg text-on-surface-variant hover:text-brand hover:bg-brand/10 transition-colors"
           title="Salary history"
         >

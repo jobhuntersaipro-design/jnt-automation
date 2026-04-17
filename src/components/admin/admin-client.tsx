@@ -105,7 +105,7 @@ export function AdminClient({ initialAgents }: { initialAgents: AdminAgent[] }) 
       )}
 
       {/* Agent list */}
-      <div className="flex flex-col gap-3" data-tutorial="agent-list">
+      <div className="flex flex-col gap-3">
         {filtered.map((agent) => (
           <AgentRow
             key={agent.id}
@@ -332,7 +332,7 @@ function AgentRow({
 
       {/* Expanded: Payment history */}
       {isExpanded && (
-        <div className="border-t border-outline-variant/15 px-5 py-4" data-tutorial="payment-history">
+        <div className="border-t border-outline-variant/15 px-5 py-4">
           <PaymentHistory agentId={agent.id} />
         </div>
       )}
