@@ -1,37 +1,18 @@
-# Current Feature: Employees Phase 2 — Employee Payroll + EPF/SOCSO/EIS
+# Current Feature
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- Payroll tab on Staff page for monthly employee salary entry
-- Agent selects month → enters variable fields (working hours for store keepers, KPI override, PCB, penalty)
-- EPF (11% employee / 13% or 12% employer), SOCSO (bracket lookup, capped RM4,000), EIS (0.2%, capped RM4,000) auto-calculated
-- Combined salary for employees who are also dispatchers (dispatcher gross + employee gross → unified EPF/SOCSO/EIS)
-- Net salary = Gross - EPF Employee - SOCSO Employee - EIS Employee - PCB - Penalty - Advance
-- Summary cards: Total Gross, EPF, SOCSO, EIS, Net Payout + Employer contributions
-- Confirm saves all EmployeeSalaryRecord rows to DB
-- Re-opening a saved month shows pre-filled values
-- Server-side EPF/SOCSO/EIS calculation (never trust client)
-
 ## Notes
-
-- Spec: `context/features/employees-phase-2-spec.md`
-- EPF rounds to nearest RM (no cents)
-- SOCSO uses bracket lookup table, capped at RM4,000
-- EIS rounds to nearest 5 cents, capped at RM4,000
-- Store keepers: gross = hours × wage + allowances
-- Supervisors/Admins: gross = basic pay + allowances
-- Combined (dispatcher+employee): total gross = dispatcher gross + employee gross, EPF/SOCSO/EIS on total
-- DB model: `EmployeeSalaryRecord` with earnings, statutory (employee+employer), deductions, net
-- API: `GET/POST /api/staff/payroll/[month]/[year]`, `GET /api/staff/payroll/history`
-- Files: `payroll-tab.tsx`, `payroll-summary-cards.tsx`, `statutory.ts`, `socso-table.ts`, API routes
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-16: **Employees Phase 2 — Employee Payroll + EPF/SOCSO/EIS** — Completed. Payroll tab on Staff page for monthly employee salary entry. Agent selects month/year, enters basic pay (or hourly wage + hours for store keepers), petrol/KPI/other allowances, PCB, penalty per employee via calculator-style inputs (digit shift: 5→0.05, 2→0.52). EPF auto-calculated using RM20 salary bracket ceiling (11% employee, 13%/12% employer), SOCSO First Category bracket lookup (cap RM6,000), EIS bracket lookup (cap RM6,000) — all matching official PERKESO/KWSP tables. All statutory fields (employee + employer) editable for manual override; auto-recalculate when gross changes. Combined salary for employees linked to dispatchers (dispatcher gross + employee gross → unified statutory). Summary cards: Total Net Payout (solid blue), Total Gross, EPF, SOCSO, EIS (grey borders). Table columns center-aligned with per-employee employer contributions shown below employee amounts in EPF/SOCSO/EIS columns. Confirm & Save persists `EmployeeSalaryRecord` rows to DB; re-opening saved month shows saved values. Employee drawer simplified to identity-only (name, ID, position, branch, IC, dispatcher toggle — no salary fields). Dispatcher toggle moved to top, auto-fills name/ID/branch, locks those fields when linked. Employee API routes updated to use `getEffectiveAgentId` for superadmin impersonation support. Prisma migration: `EmployeeSalaryRecord` model with earnings, statutory (employee+employer), deductions, net. API routes: `GET/POST /api/employee-payroll/[month]/[year]`, `GET /api/employee-payroll/history`. Files: `src/components/staff/{payroll-tab,payroll-summary-cards,employee-drawer,staff-client}.tsx`, `src/lib/payroll/{statutory,socso-table,eis-table}.ts`, `src/app/api/employee-payroll/`, `src/app/api/employees/`. Spec: `context/features/employees-phase-2-spec.md`.
 
 - 2026-04-16: **Employees Phase 1 — Employee Settings** — Completed. New `Employee` model with `EmployeeType` enum (SUPERVISOR, ADMIN, STORE_KEEPER), `extId`, `branchId` fields. Two Prisma migrations applied. Employees tab on Staff page with Dispatchers | Employees tab switcher. Employee list with type filter (All / Supervisor / Admin / Store Keeper), search by name/IC/ID, pagination (20/page), edit/delete actions. Add/edit employee drawer with: name, position type, employee ID, branch (with inline "Add Branch"), IC number (optional, dash-formatted 1234-5678-9012), calculator-style currency inputs (type 5→0.05, 2→0.52) for basic pay/hourly wage + petrol/KPI/other allowances, "Also a Dispatcher" toggle with searchable dispatcher list (2-row layout: name + ID/branch). IC syncs to linked dispatcher (agentId-scoped). Status badges: Complete / Missing IC. Branch creation API (`POST /api/branches`) with code length limit + branch limit enforcement. Server-side validation: type enum, numeric bounds (0–999,999), IC format, branch ownership. Dispatcher "First Seen" column header now toggleable as NEW-only filter. Additional: IC inputs use `tabular-nums` instead of `font-mono` for consistent placeholder font. Prisma schema: `Employee` model with relations to `Agent`, `Branch`, `Dispatcher`. API routes: `GET/POST /api/employees`, `PATCH/DELETE /api/employees/[id]`, `POST /api/branches`. Files: `src/lib/db/employees.ts`, `src/components/staff/{employee-list,employee-drawer}.tsx`, `src/components/staff/{staff-client,add-dispatcher-drawer,dispatcher-row}.tsx`, `src/app/(dashboard)/staff/page.tsx`, API routes. Spec: `context/features/employees-phase-1-spec.md`.
 
