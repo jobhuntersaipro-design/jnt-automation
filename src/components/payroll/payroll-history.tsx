@@ -50,9 +50,8 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
         {branchCode}
       </h3>
 
-      <div className="overflow-x-auto overflow-y-visible">
       {/* Table header */}
-      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60 min-w-150">
+      <div className="grid grid-cols-[7rem_5rem_1fr_1fr_1fr_10rem] gap-x-3 px-4 pb-1.5 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60">
         <span>Month</span>
         <span className="text-center">Staff</span>
         <span className="text-right">Net Salary</span>
@@ -95,7 +94,6 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
             </div>
           </div>
         ))}
-      </div>
       </div>
 
       {/* See more / less */}
