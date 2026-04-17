@@ -174,11 +174,17 @@ export function TutorialOverlay({ hasSeenTutorial, isSuperAdmin }: TutorialOverl
 
   if (!active || steps.length === 0) return null;
 
-  // While searching for target, show just the backdrop (non-dismissing)
+  // While searching for target, show backdrop with loading indicator
   if (!targetRect) {
     return (
       <div className="fixed inset-0 z-9999" style={{ pointerEvents: "auto" }}>
-        <div className="absolute inset-0 bg-on-surface/30 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-on-surface/30 animate-[fadeIn_300ms_ease-out]" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] px-6 py-4 flex items-center gap-3 animate-[fadeIn_200ms_ease-out]">
+            <div className="w-5 h-5 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="text-[0.84rem] text-on-surface-variant">Loading tutorial...</span>
+          </div>
+        </div>
       </div>
     );
   }
