@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
@@ -13,8 +12,6 @@ export async function POST(
   if (!effective) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-
-  const session = await auth();
 
   const { uploadId } = await params;
 
@@ -30,10 +27,10 @@ export async function POST(
     );
   }
 
-  // Get valid access token
+  // Use effective agent ID for Google Sheets tokens (supports superadmin impersonation)
   let accessToken: string;
   try {
-    accessToken = await getValidAccessToken(session!.user!.id);
+    accessToken = await getValidAccessToken(effective.agentId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     if (message === "NOT_CONNECTED") {
