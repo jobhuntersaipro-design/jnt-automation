@@ -10,6 +10,7 @@ import { AddDispatcherDrawer } from "./add-dispatcher-drawer";
 import { DefaultsDrawer } from "./defaults-drawer";
 import { DispatcherDrawer } from "./dispatcher-drawer";
 import { EmployeeList } from "./employee-list";
+import { PayrollTab } from "./payroll-tab";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 import type { StaffEmployee } from "@/lib/db/employees";
 
@@ -47,7 +48,7 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
   return pages;
 }
 
-type Tab = "dispatchers" | "employees";
+type Tab = "dispatchers" | "employees" | "payroll";
 
 export function StaffClient({ dispatchers: serverData, branchCodes: initialBranchCodes, defaults, employees }: StaffClientProps) {
   const [activeTab, setActiveTab] = useState<Tab>("dispatchers");
@@ -407,11 +408,23 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
           >
             Employees
           </button>
+          <button
+            onClick={() => setActiveTab("payroll")}
+            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
+              activeTab === "payroll"
+                ? "bg-white text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Payroll
+          </button>
         </div>
       </header>
 
       <main className="px-4 lg:px-8 pb-16 space-y-4">
-        {activeTab === "employees" ? (
+        {activeTab === "payroll" ? (
+          <PayrollTab />
+        ) : activeTab === "employees" ? (
           <EmployeeList employees={employees} dispatchers={serverData} branchCodes={localBranchCodes} onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])} />
         ) : (
         <>

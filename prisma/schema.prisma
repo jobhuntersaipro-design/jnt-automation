@@ -206,14 +206,56 @@ model Employee {
   dispatcherId String?
   dispatcher   Dispatcher? @relation(fields: [dispatcherId], references: [id], onDelete: SetNull)
 
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  agent  Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  branch        Branch?                @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  agent         Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  salaryRecords EmployeeSalaryRecord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([agentId])
   @@index([branchId])
+}
+
+model EmployeeSalaryRecord {
+  id         String @id @default(cuid())
+  employeeId String
+  month      Int
+  year       Int
+
+  // Earnings
+  basicPay        Float @default(0)
+  workingHours    Float @default(0) // store keeper only
+  hourlyWage      Float @default(0) // store keeper only
+  kpiAllowance    Float @default(0)
+  petrolAllowance Float @default(0)
+  otherAllowance  Float @default(0)
+  grossSalary     Float
+
+  // Statutory (employee share)
+  epfEmployee   Float
+  socsoEmployee Float
+  eisEmployee   Float
+  pcb           Float @default(0) // manual
+
+  // Statutory (employer share)
+  epfEmployer   Float
+  socsoEmployer Float
+  eisEmployer   Float
+
+  // Deductions
+  penalty Float @default(0)
+  advance Float @default(0) // combined dispatcher+employee case only
+
+  netSalary Float
+
+  employee  Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([employeeId, month, year])
+  @@index([employeeId])
+  @@index([month, year])
 }
 
 // ─── Uploads & Results ───────────────────────────────────────

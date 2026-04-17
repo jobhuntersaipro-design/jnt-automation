@@ -1,23 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     // Verify employee belongs to this agent
     const employee = await prisma.employee.findFirst({
-      where: { id, agentId: session.user.id },
+      where: { id, agentId: agentId },
       select: { id: true, type: true },
     });
 
@@ -51,7 +52,7 @@ export async function PATCH(
     // Validate dispatcher link belongs to agent
     if (dispatcherId) {
       const dispatcher = await prisma.dispatcher.findFirst({
-        where: { id: dispatcherId, branch: { agentId: session.user.id } },
+        where: { id: dispatcherId, branch: { agentId: agentId } },
         select: { id: true },
       });
       if (!dispatcher) {
@@ -87,7 +88,7 @@ export async function PATCH(
     if (branchCode !== undefined) {
       if (branchCode) {
         const branch = await prisma.branch.findFirst({
-          where: { code: branchCode, agentId: session.user.id },
+          where: { code: branchCode, agentId: agentId },
           select: { id: true },
         });
         if (!branch) {
@@ -118,7 +119,7 @@ export async function PATCH(
     // Sync IC to linked dispatcher if both are set (scoped by agentId)
     if (safeIcNo && updated.dispatcherId) {
       await prisma.dispatcher.updateMany({
-        where: { id: updated.dispatcherId, branch: { agentId: session.user.id } },
+        where: { id: updated.dispatcherId, branch: { agentId: agentId } },
         data: { icNo: safeIcNo, gender: deriveGender(safeIcNo) },
       });
     }
@@ -135,16 +136,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const { id } = await params;
 
     // Verify employee belongs to this agent
     const employee = await prisma.employee.findFirst({
-      where: { id, agentId: session.user.id },
+      where: { id, agentId: agentId },
       select: { id: true },
     });
 

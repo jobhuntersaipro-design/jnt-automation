@@ -3,20 +3,22 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { getEmployees } from "@/lib/db/employees";
+import { getEffectiveAgentId } from "@/lib/impersonation";
 import type { EmployeeType } from "@/generated/prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const url = new URL(req.url);
     const type = url.searchParams.get("type") as EmployeeType | null;
     const search = url.searchParams.get("search") || undefined;
 
-    const employees = await getEmployees(session.user.id, {
+    const employees = await getEmployees(agentId, {
       type: type || undefined,
       search,
     });
@@ -30,23 +32,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await auth();
-    if (!session?.user?.id || !session.user.isApproved) {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const agentId = effective.agentId;
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId } = body as {
+    const { name, extId, icNo, type, branchCode, dispatcherId } = body as {
       name?: string;
       extId?: string;
       icNo?: string;
       type?: EmployeeType;
       branchCode?: string;
-      basicPay?: number;
-      hourlyWage?: number;
-      petrolAllowance?: number;
-      kpiAllowance?: number;
-      otherAllowance?: number;
       dispatcherId?: string;
     };
 
@@ -58,22 +56,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid employee type is required" }, { status: 400 });
     }
 
-    if (type === "STORE_KEEPER" && (hourlyWage === undefined || hourlyWage === null)) {
-      return NextResponse.json({ error: "Hourly wage is required for Store Keeper" }, { status: 400 });
-    }
-
-    if ((type === "SUPERVISOR" || type === "ADMIN") && (basicPay === undefined || basicPay === null)) {
-      return NextResponse.json({ error: "Basic pay is required for Supervisor/Admin" }, { status: 400 });
-    }
-
-    // Validate numeric bounds
-    const numericFields = { basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance };
-    for (const [field, val] of Object.entries(numericFields)) {
-      if (val !== undefined && val !== null && (typeof val !== "number" || val < 0 || val > 999999)) {
-        return NextResponse.json({ error: `${field} must be between 0 and 999,999` }, { status: 400 });
-      }
-    }
-
     if (icNo && icNo.trim() && !/^\d{12}$/.test(icNo.trim())) {
       return NextResponse.json({ error: "IC number must be 12 digits" }, { status: 400 });
     }
@@ -81,7 +63,7 @@ export async function POST(req: NextRequest) {
     // Validate dispatcher link belongs to agent
     if (dispatcherId) {
       const dispatcher = await prisma.dispatcher.findFirst({
-        where: { id: dispatcherId, branch: { agentId: session.user.id } },
+        where: { id: dispatcherId, branch: { agentId: agentId } },
         select: { id: true },
       });
       if (!dispatcher) {
@@ -96,7 +78,7 @@ export async function POST(req: NextRequest) {
     let branchId: string | null = null;
     if (branchCode) {
       const branch = await prisma.branch.findFirst({
-        where: { code: branchCode, agentId: session.user.id },
+        where: { code: branchCode, agentId: agentId },
         select: { id: true },
       });
       if (!branch) {
@@ -107,18 +89,13 @@ export async function POST(req: NextRequest) {
 
     const employee = await prisma.employee.create({
       data: {
-        agentId: session.user.id,
+        agentId: agentId,
         extId: extId?.trim() || null,
         name: name.trim(),
         icNo: safeIcNo,
         gender,
         type,
         branchId,
-        basicPay: type === "STORE_KEEPER" ? null : (basicPay ?? 0),
-        hourlyWage: type === "STORE_KEEPER" ? (hourlyWage ?? 0) : null,
-        petrolAllowance: petrolAllowance ?? 0,
-        kpiAllowance: kpiAllowance ?? 0,
-        otherAllowance: otherAllowance ?? 0,
         dispatcherId: dispatcherId || null,
       },
       include: {

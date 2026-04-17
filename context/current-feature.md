@@ -1,12 +1,33 @@
-# Current Feature
+# Current Feature: Employees Phase 2 — Employee Payroll + EPF/SOCSO/EIS
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
+- Payroll tab on Staff page for monthly employee salary entry
+- Agent selects month → enters variable fields (working hours for store keepers, KPI override, PCB, penalty)
+- EPF (11% employee / 13% or 12% employer), SOCSO (bracket lookup, capped RM4,000), EIS (0.2%, capped RM4,000) auto-calculated
+- Combined salary for employees who are also dispatchers (dispatcher gross + employee gross → unified EPF/SOCSO/EIS)
+- Net salary = Gross - EPF Employee - SOCSO Employee - EIS Employee - PCB - Penalty - Advance
+- Summary cards: Total Gross, EPF, SOCSO, EIS, Net Payout + Employer contributions
+- Confirm saves all EmployeeSalaryRecord rows to DB
+- Re-opening a saved month shows pre-filled values
+- Server-side EPF/SOCSO/EIS calculation (never trust client)
+
 ## Notes
+
+- Spec: `context/features/employees-phase-2-spec.md`
+- EPF rounds to nearest RM (no cents)
+- SOCSO uses bracket lookup table, capped at RM4,000
+- EIS rounds to nearest 5 cents, capped at RM4,000
+- Store keepers: gross = hours × wage + allowances
+- Supervisors/Admins: gross = basic pay + allowances
+- Combined (dispatcher+employee): total gross = dispatcher gross + employee gross, EPF/SOCSO/EIS on total
+- DB model: `EmployeeSalaryRecord` with earnings, statutory (employee+employer), deductions, net
+- API: `GET/POST /api/staff/payroll/[month]/[year]`, `GET /api/staff/payroll/history`
+- Files: `payroll-tab.tsx`, `payroll-summary-cards.tsx`, `statutory.ts`, `socso-table.ts`, API routes
 
 ## History
 

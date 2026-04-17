@@ -8,39 +8,6 @@ import type { StaffDispatcher } from "@/lib/db/staff";
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
 
-/**
- * Calculator-style currency input:
- * Digits shift left, cents always 2 decimals.
- * Type "5" → 0.05, type "2" → 0.52, type "0" → 5.20, type "0" → 52.00
- */
-function calcInsert(current: string, digit: string): string {
-  // current is raw cents string (e.g. "0" for 0.00, "5" for 0.05)
-  const cents = current + digit;
-  // Strip leading zeros
-  const stripped = cents.replace(/^0+/, "") || "0";
-  if (stripped.length > 9) return current; // cap at 9,999,999.99
-  return stripped;
-}
-
-function centsToDisplay(cents: string): string {
-  const padded = cents.padStart(3, "0");
-  const intPart = padded.slice(0, -2);
-  const decPart = padded.slice(-2);
-  // Add thousand separators
-  const formatted = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return formatted + "." + decPart;
-}
-
-function centsToFloat(cents: string): number {
-  const padded = cents.padStart(3, "0");
-  return parseInt(padded, 10) / 100;
-}
-
-function floatToCents(value: number): string {
-  const rounded = Math.round(value * 100);
-  return rounded.toString();
-}
-
 interface EmployeeDrawerProps {
   employee?: StaffEmployee | null;
   dispatchers: StaffDispatcher[];
@@ -72,13 +39,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
   const [branchCode, setBranchCode] = useState(employee?.branchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
 
-  // Calculator-style cents strings
-  const [basicPayCents, setBasicPayCents] = useState(floatToCents(employee?.basicPay ?? 0));
-  const [hourlyWageCents, setHourlyWageCents] = useState(floatToCents(employee?.hourlyWage ?? 0));
-  const [petrolCents, setPetrolCents] = useState(floatToCents(employee?.petrolAllowance ?? 0));
-  const [kpiCents, setKpiCents] = useState(floatToCents(employee?.kpiAllowance ?? 0));
-  const [otherCents, setOtherCents] = useState(floatToCents(employee?.otherAllowance ?? 0));
-
   const [dispatcherId, setDispatcherId] = useState<string | null>(employee?.dispatcherId ?? null);
   const [alsoDispatcher, setAlsoDispatcher] = useState(!!employee?.dispatcherId);
   const [dispatcherSearch, setDispatcherSearch] = useState("");
@@ -99,22 +59,25 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
   }, [showAddBranch]);
 
   useEffect(() => {
-    if (!alsoDispatcher) setDispatcherId(null);
+    if (!alsoDispatcher) {
+      setDispatcherId(null);
+    }
   }, [alsoDispatcher]);
+
+  function selectDispatcher(d: StaffDispatcher) {
+    setDispatcherId(d.id);
+    setErrors((p) => ({ ...p, dispatcher: "" }));
+    // Always sync name, employee ID, and branch from dispatcher
+    setName(d.name);
+    setExtId(d.extId);
+    if (d.branchCode) setBranchCode(d.branchCode);
+  }
 
   const filteredDispatchers = dispatchers.filter((d) => {
     const q = dispatcherSearch.toLowerCase();
     if (!q) return true;
     return d.name.toLowerCase().includes(q) || d.extId.toLowerCase().includes(q);
   });
-
-  function handleCalcKey(setter: (v: string) => void, current: string, key: string) {
-    if (key === "Backspace") {
-      setter(current.length <= 1 ? "0" : current.slice(0, -1));
-    } else if (/^\d$/.test(key)) {
-      setter(calcInsert(current, key));
-    }
-  }
 
   async function handleAddBranch() {
     if (!newBranchCode.trim()) return;
@@ -144,11 +107,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required";
     if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
-    if (type === "STORE_KEEPER") {
-      if (centsToFloat(hourlyWageCents) <= 0) errs.hourlyWage = "Hourly wage is required";
-    } else {
-      if (centsToFloat(basicPayCents) <= 0) errs.basicPay = "Basic pay is required";
-    }
     if (alsoDispatcher && !dispatcherId) errs.dispatcher = "Select a dispatcher to link";
     return errs;
   }
@@ -167,11 +125,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
         icNo: icNo.trim() || null,
         type,
         branchCode: branchCode || null,
-        basicPay: type === "STORE_KEEPER" ? null : centsToFloat(basicPayCents),
-        hourlyWage: type === "STORE_KEEPER" ? centsToFloat(hourlyWageCents) : null,
-        petrolAllowance: centsToFloat(petrolCents),
-        kpiAllowance: centsToFloat(kpiCents),
-        otherAllowance: centsToFloat(otherCents),
         dispatcherId: alsoDispatcher ? dispatcherId : null,
       };
 
@@ -200,11 +153,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
           icNo: icNo.trim() ? "\u2022".repeat(8) + icNo.trim().slice(-4) : "",
           type,
           branchCode: branchCode || null,
-          basicPay: type === "STORE_KEEPER" ? null : centsToFloat(basicPayCents),
-          hourlyWage: type === "STORE_KEEPER" ? centsToFloat(hourlyWageCents) : null,
-          petrolAllowance: centsToFloat(petrolCents),
-          kpiAllowance: centsToFloat(kpiCents),
-          otherAllowance: centsToFloat(otherCents),
           dispatcherId: alsoDispatcher ? dispatcherId : null,
           dispatcherExtId: linkedDispatcher?.extId ?? null,
           dispatcherBranch: linkedDispatcher?.branchCode ?? null,
@@ -225,60 +173,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
     }
   }
 
-  const isStoreKeeper = type === "STORE_KEEPER";
-
-  function CalcInput({ label, cents, setCents, error, errorKey }: {
-    label: string; cents: string; setCents: (v: string) => void;
-    error?: string; errorKey?: string;
-  }) {
-    return (
-      <div>
-        <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-          {label}
-        </label>
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[0.84rem] text-on-surface-variant/60">RM</span>
-          <input
-            type="text"
-            inputMode="none"
-            readOnly
-            value={centsToDisplay(cents)}
-            onKeyDown={(e) => {
-              e.preventDefault();
-              handleCalcKey(setCents, cents, e.key);
-              if (errorKey) setErrors((p) => ({ ...p, [errorKey]: "" }));
-            }}
-            className={`w-full pl-10 pr-3 py-2 text-[0.84rem] text-right bg-white border rounded-[0.375rem] text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums cursor-text ${error ? "border-critical/50" : "border-outline-variant/30"}`}
-          />
-        </div>
-        {error && <p className="text-[0.68rem] text-critical mt-1">{error}</p>}
-      </div>
-    );
-  }
-
-  function CalcInputSmall({ label, cents, setCents }: {
-    label: string; cents: string; setCents: (v: string) => void;
-  }) {
-    return (
-      <div>
-        <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-          {label}
-        </label>
-        <input
-          type="text"
-          inputMode="none"
-          readOnly
-          value={centsToDisplay(cents)}
-          onKeyDown={(e) => {
-            e.preventDefault();
-            handleCalcKey(setCents, cents, e.key);
-          }}
-          className="w-full px-2 py-2 text-[0.84rem] text-right bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface focus:outline-none focus:ring-1 focus:ring-brand/40 tabular-nums cursor-text"
-        />
-      </div>
-    );
-  }
-
   return (
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-on-surface/40" onClick={onClose} />
@@ -295,19 +189,95 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
 
         {/* Form */}
         <form id="employee-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {/* Also a Dispatcher toggle — at top */}
+          <div className="pb-3 border-b border-outline-variant/15">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[0.84rem] font-medium text-on-surface">Also a Dispatcher</p>
+                <p className="text-[0.68rem] text-on-surface-variant mt-0.5">Link to an existing dispatcher — auto-fills name, ID & branch</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAlsoDispatcher((v) => !v)}
+                className={`relative w-10 h-5.5 rounded-full transition-colors ${alsoDispatcher ? "bg-brand" : "bg-outline-variant/40"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform ${alsoDispatcher ? "translate-x-4.5" : ""}`} />
+              </button>
+            </div>
+
+            {alsoDispatcher && (
+              <div className="mt-3">
+                <div className="relative mb-2">
+                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search dispatcher by name or ID..."
+                    value={dispatcherSearch}
+                    onChange={(e) => setDispatcherSearch(e.target.value)}
+                    className="w-full pl-8 pr-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                  />
+                </div>
+                <div className={`border rounded-[0.375rem] max-h-40 overflow-y-auto ${errors.dispatcher ? "border-critical/50" : "border-outline-variant/30"}`}>
+                  {filteredDispatchers.length === 0 ? (
+                    <p className="px-3 py-2 text-[0.78rem] text-on-surface-variant/60">No dispatchers found</p>
+                  ) : (
+                    filteredDispatchers.map((d) => {
+                      const isSelected = dispatcherId === d.id;
+                      return (
+                        <div
+                          key={d.id}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => selectDispatcher(d)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectDispatcher(d); } }}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors border-b border-outline-variant/10 last:border-b-0 ${
+                            isSelected ? "bg-primary/5" : "hover:bg-surface-container-low"
+                          }`}
+                        >
+                          <div>
+                            <p className={`text-[0.84rem] leading-tight ${isSelected ? "text-primary font-semibold" : "text-on-surface"}`}>{d.name}</p>
+                            <p className="text-[0.68rem] text-on-surface-variant/60 mt-0.5">{d.extId} &middot; {d.branchCode}</p>
+                          </div>
+                          {isSelected && <Check size={13} className="text-primary shrink-0" />}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                {errors.dispatcher && <p className="text-[0.68rem] text-critical mt-1">{errors.dispatcher}</p>}
+              </div>
+            )}
+          </div>
+
           {/* Name */}
           <div>
             <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Full Name
+              Full Name {dispatcherId && <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span>}
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
               placeholder="Enter employee name"
-              className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
+              readOnly={!!dispatcherId}
+              className={`w-full px-3 py-2 text-[0.84rem] border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"} ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.name && <p className="text-[0.68rem] text-critical mt-1">{errors.name}</p>}
+          </div>
+
+          {/* Employee ID */}
+          <div>
+            <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
+              Employee ID {dispatcherId ? <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span> : <span className="text-on-surface-variant/50 normal-case">(optional)</span>}
+            </label>
+            <input
+              type="text"
+              value={extId}
+              onChange={(e) => setExtId(e.target.value)}
+              placeholder="Enter employee ID"
+              readOnly={!!dispatcherId}
+              className={`w-full px-3 py-2 text-[0.84rem] border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"}`}
+            />
           </div>
 
           {/* Employee Type */}
@@ -342,30 +312,16 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
             </div>
           </div>
 
-          {/* Employee ID */}
-          <div>
-            <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Employee ID <span className="text-on-surface-variant/50 normal-case">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={extId}
-              onChange={(e) => setExtId(e.target.value)}
-              placeholder="Enter employee ID"
-              className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
-            />
-          </div>
-
           {/* Branch */}
           <div>
             <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Branch <span className="text-on-surface-variant/50 normal-case">(optional)</span>
+              Branch {dispatcherId ? <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span> : <span className="text-on-surface-variant/50 normal-case">(optional)</span>}
             </label>
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setBranchOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-colors"
+                onClick={() => { if (!dispatcherId) setBranchOpen((o) => !o); }}
+                className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"}`}
               >
                 <span className={branchCode ? "text-on-surface" : "text-on-surface-variant/50"}>
                   {branchCode || "Select branch"}
@@ -453,84 +409,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
             {errors.icNo && <p className="text-[0.68rem] text-critical mt-1">{errors.icNo}</p>}
           </div>
 
-          {/* Salary Fields */}
-          <div className="pt-2 border-t border-outline-variant/15">
-            <p className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-3">
-              Salary Details
-            </p>
-
-            {isStoreKeeper ? (
-              <div className="mb-3">
-                <CalcInput label="Hourly Wage (RM)" cents={hourlyWageCents} setCents={setHourlyWageCents} error={errors.hourlyWage} errorKey="hourlyWage" />
-              </div>
-            ) : (
-              <div className="mb-3">
-                <CalcInput label="Basic Pay (RM)" cents={basicPayCents} setCents={setBasicPayCents} error={errors.basicPay} errorKey="basicPay" />
-              </div>
-            )}
-
-            {/* Allowances */}
-            <div className="grid grid-cols-3 gap-3">
-              <CalcInputSmall label="Petrol (RM)" cents={petrolCents} setCents={setPetrolCents} />
-              <CalcInputSmall label="KPI (RM)" cents={kpiCents} setCents={setKpiCents} />
-              <CalcInputSmall label="Other (RM)" cents={otherCents} setCents={setOtherCents} />
-            </div>
-          </div>
-
-          {/* Also a Dispatcher toggle */}
-          <div className="pt-2 border-t border-outline-variant/15">
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <p className="text-[0.84rem] font-medium text-on-surface">Also a Dispatcher</p>
-                <p className="text-[0.68rem] text-on-surface-variant mt-0.5">Link this employee to an existing dispatcher profile</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAlsoDispatcher((v) => !v)}
-                className={`relative w-10 h-5.5 rounded-full transition-colors ${alsoDispatcher ? "bg-brand" : "bg-outline-variant/40"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform ${alsoDispatcher ? "translate-x-4.5" : ""}`} />
-              </button>
-            </div>
-
-            {alsoDispatcher && (
-              <div>
-                <div className="relative mb-2">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search dispatcher by name or ID..."
-                    value={dispatcherSearch}
-                    onChange={(e) => setDispatcherSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
-                  />
-                </div>
-                <div className={`border rounded-[0.375rem] max-h-40 overflow-y-auto ${errors.dispatcher ? "border-critical/50" : "border-outline-variant/30"}`}>
-                  {filteredDispatchers.length === 0 ? (
-                    <p className="px-3 py-2 text-[0.78rem] text-on-surface-variant/60">No dispatchers found</p>
-                  ) : (
-                    filteredDispatchers.map((d) => (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => { setDispatcherId(d.id); setErrors((p) => ({ ...p, dispatcher: "" })); }}
-                        className={`w-full flex items-center justify-between px-3 py-2 transition-colors border-b border-outline-variant/10 last:border-b-0 text-left ${
-                          dispatcherId === d.id ? "bg-surface-low" : "hover:bg-surface-low"
-                        }`}
-                      >
-                        <div>
-                          <p className={`text-[0.84rem] leading-tight ${dispatcherId === d.id ? "text-brand font-semibold" : "text-on-surface"}`}>{d.name}</p>
-                          <p className="text-[0.68rem] text-on-surface-variant/60 mt-0.5">{d.extId} &middot; {d.branchCode}</p>
-                        </div>
-                        {dispatcherId === d.id && <Check size={13} className="text-brand shrink-0" />}
-                      </button>
-                    ))
-                  )}
-                </div>
-                {errors.dispatcher && <p className="text-[0.68rem] text-critical mt-1">{errors.dispatcher}</p>}
-              </div>
-            )}
-          </div>
         </form>
 
         {/* Footer */}
