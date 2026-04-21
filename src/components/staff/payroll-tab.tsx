@@ -19,16 +19,14 @@ const MONTHS = [
 
 interface PayrollEntry {
   employeeId: string
-  employeeExtId: string | null
   name: string
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER"
   branchCode: string | null
   icNo: string | null
-  dispatcherExtId: string | null
+  hasDispatcherMatch: boolean
   dispatcherGross: number
   dispatcherPenalty: number
   dispatcherAdvance: number
-  hasDispatcher: boolean
   basicPay: number
   workingHours: number
   hourlyWage: number
@@ -271,8 +269,8 @@ export function PayrollTab() {
         petrolAllowance: e.petrolAllowance,
         otherAllowance: e.otherAllowance,
         pcb: e.pcb,
-        penalty: e.hasDispatcher ? e.penalty - e.dispatcherPenalty : e.penalty,
-        advance: e.hasDispatcher ? e.advance - e.dispatcherAdvance : e.advance,
+        penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
+        advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
       }))
 
       const res = await fetch(`/api/employee-payroll/${month}/${year}`, {
@@ -613,10 +611,10 @@ export function PayrollTab() {
                         {entry.name}
                       </div>
                       <div className="text-[0.68rem] text-on-surface-variant/70 leading-tight mt-0.5">
-                        {entry.employeeExtId || "—"}{entry.branchCode ? ` · ${entry.branchCode}` : ""}
+                        {entry.branchCode || "—"}
                       </div>
                       <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
-                        {TYPE_LABELS[entry.type]}{entry.hasDispatcher ? ` + Dispatcher` : ""}
+                        {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? ` + Dispatcher` : ""}
                       </div>
                     </td>
 
@@ -679,7 +677,7 @@ export function PayrollTab() {
                       <div className="text-[0.8rem] tabular-nums text-on-surface font-medium">
                         {formatRM(entry.grossSalary)}
                       </div>
-                      {entry.hasDispatcher && entry.dispatcherGross > 0 && (
+                      {entry.hasDispatcherMatch && entry.dispatcherGross > 0 && (
                         <div className="text-[0.6rem] text-on-surface-variant/50 tabular-nums">
                           +dispatch {formatRM(entry.dispatcherGross)}
                         </div>

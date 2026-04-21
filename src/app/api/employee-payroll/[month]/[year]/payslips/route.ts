@@ -33,10 +33,11 @@ export async function POST(
     return NextResponse.json({ error: "Maximum 50 payslips at once" }, { status: 400 });
   }
 
-  // Fetch employees + salary records
+  // Fetch employees + salary records + branch
   const employees = await prisma.employee.findMany({
     where: { id: { in: employeeIds }, agentId: effective.agentId },
     include: {
+      branch: { select: { id: true } },
       salaryRecords: {
         where: { month, year },
         take: 1,
@@ -54,27 +55,24 @@ export async function POST(
     },
   });
 
-  // Fetch dispatcher salary records for linked employees
-  const linkedDispatcherIds = employees
-    .filter((e) => e.dispatcherId)
-    .map((e) => e.dispatcherId!);
+  // Auto-match dispatchers by name + branch (case-insensitive)
+  const dispatcherSalaries = await prisma.salaryRecord.findMany({
+    where: {
+      month,
+      year,
+      dispatcher: { branch: { agentId: effective.agentId } },
+    },
+    include: {
+      dispatcher: { select: { name: true, branchId: true } },
+      lineItems: { select: { weight: true, commission: true } },
+    },
+  });
 
-  const dispatcherSalaries = linkedDispatcherIds.length > 0
-    ? await prisma.salaryRecord.findMany({
-        where: {
-          dispatcherId: { in: linkedDispatcherIds },
-          month,
-          year,
-        },
-        include: {
-          lineItems: { select: { weight: true, commission: true } },
-        },
-      })
-    : [];
-
-  const dispatcherSalaryMap = new Map(
-    dispatcherSalaries.map((ds) => [ds.dispatcherId, ds]),
-  );
+  // Build lookup: lowercase name + branchId → salary record
+  const dispatcherMap = new Map<string, typeof dispatcherSalaries[number]>();
+  for (const ds of dispatcherSalaries) {
+    dispatcherMap.set(`${ds.dispatcher.name.toLowerCase()}::${ds.dispatcher.branchId}`, ds);
+  }
 
   const payslips: { fileName: string; buffer: Buffer }[] = [];
 
@@ -90,23 +88,22 @@ export async function POST(
       advance: number;
     } | null = null;
 
-    if (emp.dispatcherId) {
-      const ds = dispatcherSalaryMap.get(emp.dispatcherId);
-      if (ds) {
-        const snapshot = (ds.weightTiersSnapshot ?? []) as {
-          tier: number;
-          minWeight: number;
-          maxWeight: number | null;
-          commission: number;
-        }[];
-        dispatcherData = {
-          tierBreakdowns: countParcelsPerTier(ds.lineItems, snapshot),
-          incentive: ds.incentive,
-          petrolSubsidy: ds.petrolSubsidy,
-          penalty: ds.penalty,
-          advance: ds.advance,
-        };
-      }
+    const matchKey = emp.branchId ? `${emp.name.toLowerCase()}::${emp.branchId}` : null;
+    const ds = matchKey ? dispatcherMap.get(matchKey) : null;
+    if (ds) {
+      const snapshot = (ds.weightTiersSnapshot ?? []) as {
+        tier: number;
+        minWeight: number;
+        maxWeight: number | null;
+        commission: number;
+      }[];
+      dispatcherData = {
+        tierBreakdowns: countParcelsPerTier(ds.lineItems, snapshot),
+        incentive: ds.incentive,
+        petrolSubsidy: ds.petrolSubsidy,
+        penalty: ds.penalty,
+        advance: ds.advance,
+      };
     }
 
     const icFormatted = emp.icNo.replace(/(\d{6})(\d{2})(\d{4})/, "$1-$2-$3");

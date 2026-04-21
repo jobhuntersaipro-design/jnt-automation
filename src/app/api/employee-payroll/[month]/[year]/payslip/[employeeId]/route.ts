@@ -26,10 +26,11 @@ export async function POST(
     return NextResponse.json({ error: "Invalid month/year" }, { status: 400 });
   }
 
-  // Fetch employee + salary record
+  // Fetch employee + salary record + branch
   const employee = await prisma.employee.findFirst({
     where: { id: employeeId, agentId: effective.agentId },
     include: {
+      branch: { select: { id: true } },
       salaryRecords: {
         where: { month, year },
         take: 1,
@@ -61,7 +62,7 @@ export async function POST(
     },
   });
 
-  // Check if combined (linked dispatcher with salary record)
+  // Auto-match dispatcher by name + branch (case-insensitive)
   let dispatcherData: {
     tierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
     incentive: number;
@@ -70,32 +71,42 @@ export async function POST(
     advance: number;
   } | null = null;
 
-  if (employee.dispatcherId) {
-    const dispatcherSalary = await prisma.salaryRecord.findFirst({
+  if (employee.branchId) {
+    const matchedDispatcher = await prisma.dispatcher.findFirst({
       where: {
-        dispatcherId: employee.dispatcherId,
-        month,
-        year,
+        name: { equals: employee.name, mode: "insensitive" },
+        branchId: employee.branchId,
       },
-      include: {
-        lineItems: { select: { weight: true, commission: true } },
-      },
+      select: { id: true },
     });
 
-    if (dispatcherSalary) {
-      const snapshot = (dispatcherSalary.weightTiersSnapshot ?? []) as {
-        tier: number;
-        minWeight: number;
-        maxWeight: number | null;
-        commission: number;
-      }[];
-      dispatcherData = {
-        tierBreakdowns: countParcelsPerTier(dispatcherSalary.lineItems, snapshot),
-        incentive: dispatcherSalary.incentive,
-        petrolSubsidy: dispatcherSalary.petrolSubsidy,
-        penalty: dispatcherSalary.penalty,
-        advance: dispatcherSalary.advance,
-      };
+    if (matchedDispatcher) {
+      const dispatcherSalary = await prisma.salaryRecord.findFirst({
+        where: {
+          dispatcherId: matchedDispatcher.id,
+          month,
+          year,
+        },
+        include: {
+          lineItems: { select: { weight: true, commission: true } },
+        },
+      });
+
+      if (dispatcherSalary) {
+        const snapshot = (dispatcherSalary.weightTiersSnapshot ?? []) as {
+          tier: number;
+          minWeight: number;
+          maxWeight: number | null;
+          commission: number;
+        }[];
+        dispatcherData = {
+          tierBreakdowns: countParcelsPerTier(dispatcherSalary.lineItems, snapshot),
+          incentive: dispatcherSalary.incentive,
+          petrolSubsidy: dispatcherSalary.petrolSubsidy,
+          penalty: dispatcherSalary.penalty,
+          advance: dispatcherSalary.advance,
+        };
+      }
     }
   }
 

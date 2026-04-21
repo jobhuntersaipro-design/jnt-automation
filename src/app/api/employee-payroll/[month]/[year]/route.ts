@@ -45,25 +45,7 @@ export async function GET(
     const employees = await prisma.employee.findMany({
       where: { agentId },
       include: {
-        branch: { select: { code: true } },
-        dispatcher: {
-          select: {
-            id: true,
-            extId: true,
-            name: true,
-            salaryRecords: {
-              where: { month, year },
-              select: {
-                baseSalary: true,
-                incentive: true,
-                petrolSubsidy: true,
-                penalty: true,
-                advance: true,
-              },
-              take: 1,
-            },
-          },
-        },
+        branch: { select: { id: true, code: true } },
         salaryRecords: {
           where: { month, year },
           take: 1,
@@ -72,11 +54,37 @@ export async function GET(
       orderBy: { name: "asc" },
     })
 
+    // Auto-match dispatchers by name + branch (case-insensitive)
+    // Fetch all salary records for this month for the agent's dispatchers
+    const dispatcherSalaries = await prisma.salaryRecord.findMany({
+      where: {
+        month,
+        year,
+        dispatcher: { branch: { agentId } },
+      },
+      include: {
+        dispatcher: {
+          select: { name: true, branchId: true },
+        },
+      },
+    })
+
+    // Build lookup: lowercase name + branchId → salary record
+    const dispatcherMap = new Map<string, typeof dispatcherSalaries[number]>()
+    for (const ds of dispatcherSalaries) {
+      const key = `${ds.dispatcher.name.toLowerCase()}::${ds.dispatcher.branchId}`
+      dispatcherMap.set(key, ds)
+    }
+
     const result = employees.map((emp) => {
       const saved = emp.salaryRecords[0]
-      const dispatcherRecord = emp.dispatcher?.salaryRecords?.[0]
 
-      // Dispatcher gross components (if linked and has a salary record for this month)
+      // Auto-match: find dispatcher with same name + same branch (case-insensitive)
+      const matchKey = emp.branchId
+        ? `${emp.name.toLowerCase()}::${emp.branchId}`
+        : null
+      const dispatcherRecord = matchKey ? dispatcherMap.get(matchKey) ?? null : null
+
       const dispatcherGross = dispatcherRecord
         ? dispatcherRecord.baseSalary +
           dispatcherRecord.incentive +
@@ -84,22 +92,19 @@ export async function GET(
         : 0
       const dispatcherPenalty = dispatcherRecord?.penalty ?? 0
       const dispatcherAdvance = dispatcherRecord?.advance ?? 0
+      const hasDispatcherMatch = !!dispatcherRecord
 
       if (saved) {
-        // Return saved record
         return {
           employeeId: emp.id,
-          employeeExtId: emp.extId ?? null,
           name: emp.name,
           type: emp.type,
           branchCode: emp.branch?.code ?? null,
           icNo: emp.icNo ?? null,
-          dispatcherExtId: emp.dispatcher?.extId ?? null,
+          hasDispatcherMatch,
           dispatcherGross,
           dispatcherPenalty,
           dispatcherAdvance,
-          hasDispatcher: !!emp.dispatcherId,
-          // Saved values
           basicPay: saved.basicPay,
           workingHours: saved.workingHours,
           hourlyWage: saved.hourlyWage,
@@ -121,22 +126,19 @@ export async function GET(
         }
       }
 
-      // No saved record — return blank entry for manual input
       const statutory = calculateStatutory(dispatcherGross)
       const netSalary = calculateNetSalary(dispatcherGross, statutory, 0, dispatcherPenalty, dispatcherAdvance)
 
       return {
         employeeId: emp.id,
-        employeeExtId: emp.extId ?? null,
         name: emp.name,
         type: emp.type,
         branchCode: emp.branch?.code ?? null,
         icNo: emp.icNo ?? null,
-        dispatcherExtId: emp.dispatcher?.extId ?? null,
+        hasDispatcherMatch,
         dispatcherGross,
         dispatcherPenalty,
         dispatcherAdvance,
-        hasDispatcher: !!emp.dispatcherId,
         basicPay: 0,
         workingHours: 0,
         hourlyWage: 0,

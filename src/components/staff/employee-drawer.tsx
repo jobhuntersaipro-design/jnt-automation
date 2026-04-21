@@ -1,16 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { X, ChevronDown, Check, Search, Plus } from "lucide-react";
+import { X, ChevronDown, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
-import type { StaffDispatcher } from "@/lib/db/staff";
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
 
 interface EmployeeDrawerProps {
   employee?: StaffEmployee | null;
-  dispatchers: StaffDispatcher[];
   branchCodes: string[];
   onClose: () => void;
   onSaved: (employee: StaffEmployee) => void;
@@ -29,11 +27,10 @@ const TYPE_LABEL: Record<EmployeeType, string> = {
   STORE_KEEPER: "Store Keeper",
 };
 
-export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBranchCodes, onClose, onSaved, onBranchAdded }: EmployeeDrawerProps) {
+export function EmployeeDrawer({ employee, branchCodes: initialBranchCodes, onClose, onSaved, onBranchAdded }: EmployeeDrawerProps) {
   const isEdit = !!employee;
 
   const [name, setName] = useState(employee?.name ?? "");
-  const [extId, setExtId] = useState(employee?.extId ?? "");
   const [icNo, setIcNo] = useState(employee?.rawIcNo ?? "");
   const [epfNo, setEpfNo] = useState(employee?.epfNo ?? "");
   const [socsoNo, setSocsoNo] = useState(employee?.socsoNo ?? "");
@@ -42,9 +39,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
   const [branchCode, setBranchCode] = useState(employee?.branchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
 
-  const [dispatcherId, setDispatcherId] = useState<string | null>(employee?.dispatcherId ?? null);
-  const [alsoDispatcher, setAlsoDispatcher] = useState(!!employee?.dispatcherId);
-  const [dispatcherSearch, setDispatcherSearch] = useState("");
   const [typeOpen, setTypeOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
 
@@ -60,27 +54,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
   useEffect(() => {
     if (showAddBranch) newBranchInputRef.current?.focus();
   }, [showAddBranch]);
-
-  useEffect(() => {
-    if (!alsoDispatcher) {
-      setDispatcherId(null);
-    }
-  }, [alsoDispatcher]);
-
-  function selectDispatcher(d: StaffDispatcher) {
-    setDispatcherId(d.id);
-    setErrors((p) => ({ ...p, dispatcher: "" }));
-    // Always sync name, employee ID, and branch from dispatcher
-    setName(d.name);
-    setExtId(d.extId);
-    if (d.branchCode) setBranchCode(d.branchCode);
-  }
-
-  const filteredDispatchers = dispatchers.filter((d) => {
-    const q = dispatcherSearch.toLowerCase();
-    if (!q) return true;
-    return d.name.toLowerCase().includes(q) || d.extId.toLowerCase().includes(q);
-  });
 
   async function handleAddBranch() {
     if (!newBranchCode.trim()) return;
@@ -110,7 +83,6 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required";
     if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
-    if (alsoDispatcher && !dispatcherId) errs.dispatcher = "Select a dispatcher to link";
     return errs;
   }
 
@@ -124,11 +96,9 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
     try {
       const payload = {
         name: name.trim(),
-        extId: extId.trim() || null,
         icNo: icNo.trim() || null,
         type,
         branchCode: branchCode || null,
-        dispatcherId: alsoDispatcher ? dispatcherId : null,
         epfNo: epfNo.trim() || null,
         socsoNo: socsoNo.trim() || null,
         incomeTaxNo: incomeTaxNo.trim() || null,
@@ -150,18 +120,13 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
       }
 
       if (isEdit) {
-        const linkedDispatcher = dispatcherId ? dispatchers.find((d) => d.id === dispatcherId) : null;
         const updated: StaffEmployee = {
           ...employee,
-          extId: extId.trim(),
           name: name.trim(),
           rawIcNo: icNo.trim(),
           icNo: icNo.trim() ? "\u2022".repeat(8) + icNo.trim().slice(-4) : "",
           type,
           branchCode: branchCode || null,
-          dispatcherId: alsoDispatcher ? dispatcherId : null,
-          dispatcherExtId: linkedDispatcher?.extId ?? null,
-          dispatcherBranch: linkedDispatcher?.branchCode ?? null,
           isComplete: !!icNo.trim(),
           gender: employee.gender,
         };
@@ -195,95 +160,19 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
 
         {/* Form */}
         <form id="employee-form" onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
-          {/* Also a Dispatcher toggle — at top */}
-          <div className="pb-3 border-b border-outline-variant/15">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-[0.84rem] font-medium text-on-surface">Also a Dispatcher</p>
-                <p className="text-[0.68rem] text-on-surface-variant mt-0.5">Link to an existing dispatcher — auto-fills name, ID & branch</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAlsoDispatcher((v) => !v)}
-                className={`relative w-10 h-5.5 rounded-full transition-colors ${alsoDispatcher ? "bg-brand" : "bg-outline-variant/40"}`}
-              >
-                <span className={`absolute top-0.5 left-0.5 w-4.5 h-4.5 bg-white rounded-full shadow-sm transition-transform ${alsoDispatcher ? "translate-x-4.5" : ""}`} />
-              </button>
-            </div>
-
-            {alsoDispatcher && (
-              <div className="mt-3">
-                <div className="relative mb-2">
-                  <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-                  <input
-                    type="text"
-                    placeholder="Search dispatcher by name or ID..."
-                    value={dispatcherSearch}
-                    onChange={(e) => setDispatcherSearch(e.target.value)}
-                    className="w-full pl-8 pr-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
-                  />
-                </div>
-                <div className={`border rounded-[0.375rem] max-h-40 overflow-y-auto ${errors.dispatcher ? "border-critical/50" : "border-outline-variant/30"}`}>
-                  {filteredDispatchers.length === 0 ? (
-                    <p className="px-3 py-2 text-[0.78rem] text-on-surface-variant/60">No dispatchers found</p>
-                  ) : (
-                    filteredDispatchers.map((d) => {
-                      const isSelected = dispatcherId === d.id;
-                      return (
-                        <div
-                          key={d.id}
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => selectDispatcher(d)}
-                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectDispatcher(d); } }}
-                          className={`w-full flex items-center justify-between px-3 py-2.5 cursor-pointer transition-colors border-b border-outline-variant/10 last:border-b-0 ${
-                            isSelected ? "bg-primary/5" : "hover:bg-surface-container-low"
-                          }`}
-                        >
-                          <div>
-                            <p className={`text-[0.84rem] leading-tight ${isSelected ? "text-primary font-semibold" : "text-on-surface"}`}>{d.name}</p>
-                            <p className="text-[0.68rem] text-on-surface-variant/60 mt-0.5">{d.extId} &middot; {d.branchCode}</p>
-                          </div>
-                          {isSelected && <Check size={13} className="text-primary shrink-0" />}
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-                {errors.dispatcher && <p className="text-[0.68rem] text-critical mt-1">{errors.dispatcher}</p>}
-              </div>
-            )}
-          </div>
-
           {/* Name */}
           <div>
             <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Full Name {dispatcherId && <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span>}
+              Full Name
             </label>
             <input
               type="text"
               value={name}
               onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
               placeholder="Enter employee name"
-              readOnly={!!dispatcherId}
-              className={`w-full px-3 py-2 text-[0.84rem] border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"} ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
+              className={`w-full px-3 py-2 text-[0.84rem] border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors bg-white ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.name && <p className="text-[0.68rem] text-critical mt-1">{errors.name}</p>}
-          </div>
-
-          {/* Employee ID */}
-          <div>
-            <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Employee ID {dispatcherId ? <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span> : <span className="text-on-surface-variant/50 normal-case">(optional)</span>}
-            </label>
-            <input
-              type="text"
-              value={extId}
-              onChange={(e) => setExtId(e.target.value)}
-              placeholder="Enter employee ID"
-              readOnly={!!dispatcherId}
-              className={`w-full px-3 py-2 text-[0.84rem] border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"}`}
-            />
           </div>
 
           {/* Employee Type */}
@@ -321,13 +210,13 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
           {/* Branch */}
           <div>
             <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
-              Branch {dispatcherId ? <span className="text-on-surface-variant/50 normal-case">(from dispatcher)</span> : <span className="text-on-surface-variant/50 normal-case">(optional)</span>}
+              Branch
             </label>
             <div className="relative">
               <button
                 type="button"
-                onClick={() => { if (!dispatcherId) setBranchOpen((o) => !o); }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-colors ${dispatcherId ? "bg-surface-dim/30 cursor-not-allowed" : "bg-white"}`}
+                onClick={() => setBranchOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-colors"
               >
                 <span className={branchCode ? "text-on-surface" : "text-on-surface-variant/50"}>
                   {branchCode || "Select branch"}

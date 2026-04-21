@@ -424,7 +424,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
         {activeTab === "payroll" ? (
           <PayrollTab />
         ) : activeTab === "employees" ? (
-          <EmployeeList employees={employees} dispatchers={serverData} branchCodes={localBranchCodes} onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])} />
+          <EmployeeList employees={employees} branchCodes={localBranchCodes} onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])} />
         ) : (
         <>
         {/* Filters */}

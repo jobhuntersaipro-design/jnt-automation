@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
-import type { StaffDispatcher } from "@/lib/db/staff";
 import { EmployeeDrawer } from "./employee-drawer";
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
@@ -42,12 +41,11 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
 
 interface EmployeeListProps {
   employees: StaffEmployee[];
-  dispatchers: StaffDispatcher[];
   branchCodes: string[];
   onBranchAdded?: (code: string) => void;
 }
 
-export function EmployeeList({ employees: serverData, dispatchers, branchCodes, onBranchAdded }: EmployeeListProps) {
+export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded }: EmployeeListProps) {
   const router = useRouter();
 
   const [items, setItems] = useState(serverData);
@@ -309,7 +307,6 @@ export function EmployeeList({ employees: serverData, dispatchers, branchCodes, 
       {drawerEmployee !== undefined && (
         <EmployeeDrawer
           employee={drawerEmployee}
-          dispatchers={dispatchers}
           branchCodes={branchCodes}
           onClose={() => setDrawerEmployee(undefined)}
           onSaved={handleSaved}
