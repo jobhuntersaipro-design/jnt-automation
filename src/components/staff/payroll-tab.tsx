@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { ChevronDown, Check, Loader2 } from "lucide-react"
+import { ChevronDown, Check, Loader2, FileText, Download, X } from "lucide-react"
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
@@ -23,6 +23,7 @@ interface PayrollEntry {
   name: string
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER"
   branchCode: string | null
+  icNo: string | null
   dispatcherExtId: string | null
   dispatcherGross: number
   dispatcherPenalty: number
@@ -316,6 +317,128 @@ export function PayrollTab() {
     return Array.from({ length: 5 }, (_, i) => current - 2 + i)
   }, [])
 
+  // ── Payslip generation state ──
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [generatingId, setGeneratingId] = useState<string | null>(null)
+  const [generatingBulk, setGeneratingBulk] = useState(false)
+  const [icPrompt, setIcPrompt] = useState<{ employeeId: string; name: string } | null>(null)
+  const [icInput, setIcInput] = useState("")
+  const [savingIc, setSavingIc] = useState(false)
+
+  // Clear selection when month/year changes
+  useEffect(() => { setSelectedIds(new Set()) }, [month, year])
+
+  const allSaved = useMemo(() => entries.length > 0 && entries.every((e) => e.isSaved), [entries])
+
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }, [])
+
+  const toggleSelectAll = useCallback(() => {
+    if (selectedIds.size === entries.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(entries.map((e) => e.employeeId)))
+    }
+  }, [selectedIds.size, entries])
+
+  const handleGeneratePayslip = useCallback(async (entry: PayrollEntry) => {
+    if (!entry.icNo) {
+      setIcPrompt({ employeeId: entry.employeeId, name: entry.name })
+      setIcInput("")
+      return
+    }
+    if (!entry.isSaved) {
+      toast.error("Save payroll first before generating payslips")
+      return
+    }
+    setGeneratingId(entry.employeeId)
+    try {
+      const res = await fetch(`/api/employee-payroll/${month}/${year}/payslip/${entry.employeeId}`, { method: "POST" })
+      if (!res.ok) {
+        const data = await res.json()
+        if (data.error === "IC_MISSING") {
+          setIcPrompt({ employeeId: entry.employeeId, name: entry.name })
+          setIcInput("")
+          return
+        }
+        toast.error(data.error || "Failed to generate payslip")
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "payslip.pdf"
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error("Failed to generate payslip")
+    } finally {
+      setGeneratingId(null)
+    }
+  }, [month, year])
+
+  const handleBulkGenerate = useCallback(async () => {
+    if (selectedIds.size === 0) return
+    setGeneratingBulk(true)
+    try {
+      const res = await fetch(`/api/employee-payroll/${month}/${year}/payslips`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ employeeIds: Array.from(selectedIds) }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        toast.error(data.error || "Failed to generate payslips")
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      const contentType = res.headers.get("Content-Type") || ""
+      a.download = contentType.includes("zip")
+        ? `staff_payslips_${MONTHS[month - 1]}_${year}.zip`
+        : res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "payslip.pdf"
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success(`Generated ${selectedIds.size} payslip${selectedIds.size > 1 ? "s" : ""}`)
+    } catch {
+      toast.error("Failed to generate payslips")
+    } finally {
+      setGeneratingBulk(false)
+    }
+  }, [selectedIds, month, year])
+
+  const handleSaveIc = useCallback(async () => {
+    if (!icPrompt || !/^\d{12}$/.test(icInput)) return
+    setSavingIc(true)
+    try {
+      const res = await fetch(`/api/employees/${icPrompt.employeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ icNo: icInput }),
+      })
+      if (!res.ok) { toast.error("Failed to save IC"); return }
+      // Update local entry
+      setEntries((prev) => prev.map((e) =>
+        e.employeeId === icPrompt.employeeId ? { ...e, icNo: icInput } : e
+      ))
+      toast.success("IC number saved")
+      setIcPrompt(null)
+    } catch {
+      toast.error("Failed to save IC")
+    } finally {
+      setSavingIc(false)
+    }
+  }, [icPrompt, icInput])
+
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -405,6 +528,16 @@ export function PayrollTab() {
           <table className="w-full" style={{ minWidth: 1100 }}>
             <thead>
               <tr>
+                {allSaved && (
+                  <th className="pb-3 pl-3" style={{ width: 30 }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === entries.length && entries.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded accent-brand"
+                    />
+                  </th>
+                )}
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3" style={{ width: 160 }}>Employee</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 85 }}>Pay</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 60 }}>Hours</th>
@@ -427,7 +560,7 @@ export function PayrollTab() {
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
                 <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Net</th>
-                <th className="pb-3" style={{ width: 24 }}></th>
+                <th className="pb-3" style={{ width: allSaved ? 60 : 24 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -440,6 +573,18 @@ export function PayrollTab() {
                     key={entry.employeeId}
                     className="group hover:bg-surface-hover/50 transition-colors border-b border-outline-variant/15 last:border-b-0"
                   >
+                    {/* Checkbox */}
+                    {allSaved && (
+                      <td className="py-2.5 pl-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(entry.employeeId)}
+                          onChange={() => toggleSelect(entry.employeeId)}
+                          className="rounded accent-brand"
+                        />
+                      </td>
+                    )}
+
                     {/* Employee */}
                     <td className="py-2.5 pl-3">
                       <div className="text-[0.8rem] font-medium text-on-surface leading-tight">
@@ -597,14 +742,29 @@ export function PayrollTab() {
                       </span>
                     </td>
 
-                    {/* Status */}
+                    {/* Status / Payslip */}
                     <td className="py-2.5 text-center">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full ${
-                          isReady ? "bg-emerald-500" : "bg-gray-300"
-                        }`}
-                        title={isReady ? "Ready" : "Hours required"}
-                      />
+                      {entry.isSaved ? (
+                        <button
+                          onClick={() => handleGeneratePayslip(entry)}
+                          disabled={generatingId === entry.employeeId}
+                          className="inline-flex items-center gap-1 px-1.5 py-1 text-[0.68rem] font-medium text-brand hover:bg-brand/5 rounded transition-colors disabled:opacity-50"
+                          title="Generate payslip"
+                        >
+                          {generatingId === entry.employeeId ? (
+                            <Loader2 size={11} className="animate-spin" />
+                          ) : (
+                            <FileText size={11} />
+                          )}
+                        </button>
+                      ) : (
+                        <span
+                          className={`inline-block w-2 h-2 rounded-full ${
+                            isReady ? "bg-emerald-500" : "bg-gray-300"
+                          }`}
+                          title={isReady ? "Ready" : "Hours required"}
+                        />
+                      )}
                     </td>
                   </tr>
                 )
@@ -614,6 +774,66 @@ export function PayrollTab() {
         </div>
       )}
 
+      {/* Floating action bar for multi-select */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-on-surface text-white px-5 py-3 rounded-xl shadow-[0_12px_40px_-12px_rgba(25,28,29,0.3)]">
+          <span className="text-[0.82rem] font-medium">
+            {selectedIds.size} employee{selectedIds.size !== 1 ? "s" : ""} selected
+          </span>
+          <button
+            onClick={handleBulkGenerate}
+            disabled={generatingBulk}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-on-surface text-[0.8rem] font-medium rounded-[0.375rem] hover:bg-gray-100 transition-colors disabled:opacity-50"
+          >
+            {generatingBulk ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+            Generate Payslips
+          </button>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="p-1 text-white/60 hover:text-white transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      )}
+
+      {/* IC Prompt Dialog */}
+      {icPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-on-surface/40" onClick={() => setIcPrompt(null)} />
+          <div className="relative bg-white rounded-xl shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] p-6 w-full max-w-sm">
+            <h3 className="text-[1rem] font-semibold text-on-surface mb-1">IC Number Required</h3>
+            <p className="text-[0.82rem] text-on-surface-variant mb-4">
+              Enter IC number for <span className="font-medium text-on-surface">{icPrompt.name}</span> to generate their payslip.
+            </p>
+            <input
+              type="text"
+              value={icInput ? icInput.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+              onChange={(e) => setIcInput(e.target.value.replace(/\D/g, "").slice(0, 12))}
+              placeholder="12-digit IC number"
+              maxLength={14}
+              autoFocus
+              className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 tabular-nums mb-4"
+              onKeyDown={(e) => { if (e.key === "Enter") handleSaveIc() }}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setIcPrompt(null)}
+                className="px-3 py-1.5 text-[0.82rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveIc}
+                disabled={!/^\d{12}$/.test(icInput) || savingIc}
+                className="px-3 py-1.5 text-[0.82rem] font-medium text-white bg-brand rounded-[0.375rem] hover:bg-brand/90 transition-colors disabled:opacity-50"
+              >
+                {savingIc ? "Saving..." : "Save & Continue"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

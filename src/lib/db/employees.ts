@@ -17,6 +17,9 @@ export type StaffEmployee = {
   petrolAllowance: number;
   kpiAllowance: number;
   otherAllowance: number;
+  epfNo: string | null;
+  socsoNo: string | null;
+  incomeTaxNo: string | null;
   dispatcherId: string | null;
   dispatcherExtId: string | null;
   dispatcherBranch: string | null;
@@ -65,6 +68,9 @@ export async function getEmployees(
     petrolAllowance: e.petrolAllowance,
     kpiAllowance: e.kpiAllowance,
     otherAllowance: e.otherAllowance,
+    epfNo: e.epfNo,
+    socsoNo: e.socsoNo,
+    incomeTaxNo: e.incomeTaxNo,
     dispatcherId: e.dispatcherId,
     dispatcherExtId: e.dispatcher?.extId ?? null,
     dispatcherBranch: e.dispatcher?.branch?.code ?? null,

@@ -35,6 +35,9 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
   const [name, setName] = useState(employee?.name ?? "");
   const [extId, setExtId] = useState(employee?.extId ?? "");
   const [icNo, setIcNo] = useState(employee?.rawIcNo ?? "");
+  const [epfNo, setEpfNo] = useState(employee?.epfNo ?? "");
+  const [socsoNo, setSocsoNo] = useState(employee?.socsoNo ?? "");
+  const [incomeTaxNo, setIncomeTaxNo] = useState(employee?.incomeTaxNo ?? "");
   const [type, setType] = useState<EmployeeType>(employee?.type ?? "SUPERVISOR");
   const [branchCode, setBranchCode] = useState(employee?.branchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
@@ -126,6 +129,9 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
         type,
         branchCode: branchCode || null,
         dispatcherId: alsoDispatcher ? dispatcherId : null,
+        epfNo: epfNo.trim() || null,
+        socsoNo: socsoNo.trim() || null,
+        incomeTaxNo: incomeTaxNo.trim() || null,
       };
 
       const url = isEdit ? `/api/employees/${employee.id}` : "/api/employees";
@@ -408,6 +414,50 @@ export function EmployeeDrawer({ employee, dispatchers, branchCodes: initialBran
             />
             {errors.icNo && <p className="text-[0.68rem] text-critical mt-1">{errors.icNo}</p>}
           </div>
+
+          {/* Statutory Reference Numbers */}
+          {type !== "STORE_KEEPER" && (
+            <div>
+              <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
+                EPF No <span className="text-on-surface-variant/50 normal-case">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={epfNo}
+                onChange={(e) => setEpfNo(e.target.value)}
+                placeholder="EPF number"
+                className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
+              SOCSO No <span className="text-on-surface-variant/50 normal-case">(optional)</span>
+            </label>
+            <input
+              type="text"
+              value={socsoNo}
+              onChange={(e) => setSocsoNo(e.target.value)}
+              placeholder="SOCSO number"
+              className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+            />
+          </div>
+
+          {type === "STORE_KEEPER" && (
+            <div>
+              <label className="block text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-1.5">
+                Income Tax No <span className="text-on-surface-variant/50 normal-case">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={incomeTaxNo}
+                onChange={(e) => setIncomeTaxNo(e.target.value)}
+                placeholder="Income tax number"
+                className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+              />
+            </div>
+          )}
 
         </form>
 

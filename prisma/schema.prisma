@@ -198,6 +198,11 @@ model Employee {
   kpiAllowance    Float    @default(0)
   otherAllowance  Float    @default(0)
 
+  // Statutory reference numbers (for payslips)
+  epfNo       String?
+  socsoNo     String?
+  incomeTaxNo String?
+
   // Store Keeper fields
   hourlyWage  Float?
 

@@ -39,13 +39,16 @@ export async function POST(req: NextRequest) {
     const agentId = effective.agentId;
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, dispatcherId } = body as {
+    const { name, extId, icNo, type, branchCode, dispatcherId, epfNo, socsoNo, incomeTaxNo } = body as {
       name?: string;
       extId?: string;
       icNo?: string;
       type?: EmployeeType;
       branchCode?: string;
       dispatcherId?: string;
+      epfNo?: string;
+      socsoNo?: string;
+      incomeTaxNo?: string;
     };
 
     if (!name?.trim()) {
@@ -97,6 +100,9 @@ export async function POST(req: NextRequest) {
         type,
         branchId,
         dispatcherId: dispatcherId || null,
+        epfNo: epfNo?.trim() || null,
+        socsoNo: socsoNo?.trim() || null,
+        incomeTaxNo: incomeTaxNo?.trim() || null,
       },
       include: {
         branch: { select: { code: true } },
@@ -122,6 +128,9 @@ export async function POST(req: NextRequest) {
         petrolAllowance: employee.petrolAllowance,
         kpiAllowance: employee.kpiAllowance,
         otherAllowance: employee.otherAllowance,
+        epfNo: employee.epfNo,
+        socsoNo: employee.socsoNo,
+        incomeTaxNo: employee.incomeTaxNo,
         dispatcherId: employee.dispatcherId,
         dispatcherExtId: employee.dispatcher?.extId ?? null,
         dispatcherBranch: employee.dispatcher?.branch?.code ?? null,

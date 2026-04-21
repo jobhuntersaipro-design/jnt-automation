@@ -27,7 +27,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId } = body as {
+    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId, epfNo, socsoNo, incomeTaxNo } = body as {
       name?: string;
       extId?: string | null;
       icNo?: string | null;
@@ -39,6 +39,9 @@ export async function PATCH(
       kpiAllowance?: number;
       otherAllowance?: number;
       dispatcherId?: string | null;
+      epfNo?: string | null;
+      socsoNo?: string | null;
+      incomeTaxNo?: string | null;
     };
 
     if (name !== undefined && !name.trim()) {
@@ -105,6 +108,9 @@ export async function PATCH(
     if (kpiAllowance !== undefined) updateData.kpiAllowance = kpiAllowance;
     if (otherAllowance !== undefined) updateData.otherAllowance = otherAllowance;
     if (dispatcherId !== undefined) updateData.dispatcherId = dispatcherId;
+    if (epfNo !== undefined) updateData.epfNo = epfNo?.trim() || null;
+    if (socsoNo !== undefined) updateData.socsoNo = socsoNo?.trim() || null;
+    if (incomeTaxNo !== undefined) updateData.incomeTaxNo = incomeTaxNo?.trim() || null;
 
     const updated = await prisma.employee.update({
       where: { id },
