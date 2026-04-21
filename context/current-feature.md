@@ -1,35 +1,18 @@
-# Current Feature: Employees Phase 4 — Nav Restructure (Dispatchers + Staff with Tabs)
+# Current Feature
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- Nav restructured to: Overview | Dispatchers | Staff
-- Current "Staff" page (dispatchers) renamed/moved to `/dispatchers` with Settings + Payroll tabs
-- New `/staff` page for employees with Settings + Payroll tabs
-- `/dispatchers` Settings tab = existing dispatcher list + all current functionality
-- `/dispatchers` Payroll tab = existing payroll page (upload flow, calculate, confirm, payslips)
-- `/dispatchers/payroll/[uploadId]` = salary table for specific upload
-- `/staff` Settings tab = employee list (Phase 1)
-- `/staff` Payroll tab = monthly salary entry (Phase 2 + 3)
-- All internal links updated (`/staff` → `/dispatchers`, `/payroll` → `/dispatchers?tab=payroll`)
-- Old routes redirect properly
-- Middleware/proxy protects all new routes
-- Active nav tab highlights correctly on all routes
-- No broken links, all existing functionality preserved
-
 ## Notes
-
-- Spec: `context/features/employees-phase-4-spec.md`
-- Tab navigation via URL param: `?tab=payroll` for Payroll tab, default is Settings
-- Route mapping: `/staff` → `/dispatchers`, `/payroll` → `/dispatchers` Payroll tab, new `/staff` for employees
-- Key files to modify: nav links, route directories, middleware/proxy, all internal links referencing `/staff` or `/payroll`
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-21: **Employees Phase 4 — Nav Restructure (Dispatchers + Staff with Tabs)** — Completed. Nav restructured from `Overview | Staff | Payroll` to `Overview | Dispatchers | Staff`. `/dispatchers` page with Settings tab (dispatcher list + all existing functionality) and Payroll tab (upload flow, calculate, confirm, payslips). `/dispatchers/payroll/[uploadId]` for salary table detail. `/staff` page with Settings tab (employee list) and Payroll tab (monthly salary entry). Tab switching via `?tab=payroll` URL param with `window.history.replaceState`. Old `/payroll` and `/payroll/[uploadId]` routes redirect to new paths. Proxy matcher updated for `/dispatchers/:path*`. All internal links updated: nav-links, mobile-nav, confirm-settings-card, salary-table, payroll-history, payroll-client, agent-view-client, Google Sheets callback/connect routes, recalculate revalidatePath. Deleted unused `staff-client.tsx`. Added branded HTML approval email (`src/lib/email.ts`) with `sendApprovalEmail()` — sent automatically when agent is approved via `toggleAgentApproval`. Email template uses design system colors (gradient header, CTA button, plain-text fallback). New files: `src/components/dispatchers/dispatchers-client.tsx`, `src/components/staff/staff-employees-client.tsx`, `src/app/(dashboard)/dispatchers/{page,loading}.tsx`, `src/app/(dashboard)/dispatchers/payroll/[uploadId]/{page,loading}.tsx`, `src/lib/email.ts`. Spec: `context/features/employees-phase-4-spec.md`.
 
 - 2026-04-21: **Employees Phase 3 — Employee Payslip Generation** — Completed. Three payslip PDF templates matching ST XIANG format: Template 1 (Supervisor/Admin) with EPF NO + SOCSO NO in particulars, Template 2 (Store Keeper) with SOCSO NO + INCOME TAX NO and WAGES (X HOUR), Template 3 (Combined Dispatcher + Employee) with parcel tier breakdowns + wages + allowances. EPF/SOCSO/EIS on combined gross. Employer contribution on LEFT, NET PAY on RIGHT. Generate Payslip button per saved employee row. IC missing prompt dialog before generation. Multi-select checkboxes with floating action bar for bulk ZIP download. EPF NO, SOCSO NO, Income Tax No optional fields added to Employee model + drawer (conditional by type). Deduction labels exact: `EMPLOYEE EPF (KWSP)`, `EMPLOYEE SOCSO(PERKESO)`, `EMPLOYMENT INSURANCE SCHEME (EIS)`. Penalty/PCB/Advance shown only if > 0. Company stamp bottom right. Prisma migration: `epfNo`, `socsoNo`, `incomeTaxNo` on Employee. API routes: `POST /api/employee-payroll/[month]/[year]/payslip/[employeeId]` (single PDF), `POST /api/employee-payroll/[month]/[year]/payslips` (bulk ZIP). Files: `src/lib/staff/payslip-generator.ts`, `src/components/staff/{payroll-tab,employee-drawer}.tsx`, `src/lib/db/employees.ts`, API routes. Spec: `context/features/employees-phase-3-spec.md`.
 
