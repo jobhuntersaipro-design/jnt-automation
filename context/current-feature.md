@@ -1,37 +1,18 @@
-# Employees Phase 3 — Employee Payslip Generation
+# Current Feature
 
 ## Status
 
-In Progress
+Complete
 
 ## Goals
 
-- [ ] Add `epfNo`, `socsoNo`, `incomeTaxNo` optional fields to Employee model + migration
-- [ ] Create employee payslip PDF templates matching ST XIANG format:
-  - Template 1: Employee-only (Supervisor/Admin) — EPF NO + SOCSO NO in particulars
-  - Template 2: Store Keeper only — SOCSO NO + INCOME TAX NO in particulars, WAGES (X HOUR) instead of BASIC PAY
-  - Template 3: Combined (Dispatcher + Employee) — parcel tiers + wages + allowances, EPF/SOCSO/EIS on total gross
-- [ ] "Generate Payslip" button per employee row in confirmed months
-- [ ] IC missing prompt before generation
-- [ ] Combined payslip checks dispatcher SalaryRecord exists for same month
-- [ ] Multi-select + ZIP download with floating action bar
-- [ ] Add EPF NO, SOCSO NO, Income Tax No fields to employee drawer
-- [ ] API routes: single payslip + bulk ZIP generation
-
 ## Notes
-
-- Deduction labels must be exact: `EMPLOYEE EPF (KWSP)`, `EMPLOYEE SOCSO(PERKESO)`, `EMPLOYMENT INSURANCE SCHEME (EIS)`
-- Employer contribution on LEFT side, Net pay on RIGHT side
-- KPI shown as `KPI` (not `KPI ALLOWANCE`), Other Allowance shown as `ALLOWANCE`
-- Penalty/PCB/Advance shown only if > 0
-- Company stamp bottom right
-- ZIP filename: `staff_payslips_[month]_[year].zip`
-- Individual: `[position]_[name]_[month]_[year].pdf`
-- Reference payslips: `NURUL EMYRA.pdf` and `MUHAMAMD FIKRI.pdf` in project root
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-21: **Employees Phase 3 — Employee Payslip Generation** — Completed. Three payslip PDF templates matching ST XIANG format: Template 1 (Supervisor/Admin) with EPF NO + SOCSO NO in particulars, Template 2 (Store Keeper) with SOCSO NO + INCOME TAX NO and WAGES (X HOUR), Template 3 (Combined Dispatcher + Employee) with parcel tier breakdowns + wages + allowances. EPF/SOCSO/EIS on combined gross. Employer contribution on LEFT, NET PAY on RIGHT. Generate Payslip button per saved employee row. IC missing prompt dialog before generation. Multi-select checkboxes with floating action bar for bulk ZIP download. EPF NO, SOCSO NO, Income Tax No optional fields added to Employee model + drawer (conditional by type). Deduction labels exact: `EMPLOYEE EPF (KWSP)`, `EMPLOYEE SOCSO(PERKESO)`, `EMPLOYMENT INSURANCE SCHEME (EIS)`. Penalty/PCB/Advance shown only if > 0. Company stamp bottom right. Prisma migration: `epfNo`, `socsoNo`, `incomeTaxNo` on Employee. API routes: `POST /api/employee-payroll/[month]/[year]/payslip/[employeeId]` (single PDF), `POST /api/employee-payroll/[month]/[year]/payslips` (bulk ZIP). Files: `src/lib/staff/payslip-generator.ts`, `src/components/staff/{payroll-tab,employee-drawer}.tsx`, `src/lib/db/employees.ts`, API routes. Spec: `context/features/employees-phase-3-spec.md`.
 
 - 2026-04-16: **Employees Phase 2 — Employee Payroll + EPF/SOCSO/EIS** — Completed. Payroll tab on Staff page for monthly employee salary entry. Agent selects month/year, enters basic pay (or hourly wage + hours for store keepers), petrol/KPI/other allowances, PCB, penalty per employee via calculator-style inputs (digit shift: 5→0.05, 2→0.52). EPF auto-calculated using RM20 salary bracket ceiling (11% employee, 13%/12% employer), SOCSO First Category bracket lookup (cap RM6,000), EIS bracket lookup (cap RM6,000) — all matching official PERKESO/KWSP tables. All statutory fields (employee + employer) editable for manual override; auto-recalculate when gross changes. Combined salary for employees linked to dispatchers (dispatcher gross + employee gross → unified statutory). Summary cards: Total Net Payout (solid blue), Total Gross, EPF, SOCSO, EIS (grey borders). Table columns center-aligned with per-employee employer contributions shown below employee amounts in EPF/SOCSO/EIS columns. Confirm & Save persists `EmployeeSalaryRecord` rows to DB; re-opening saved month shows saved values. Employee drawer simplified to identity-only (name, ID, position, branch, IC, dispatcher toggle — no salary fields). Dispatcher toggle moved to top, auto-fills name/ID/branch, locks those fields when linked. Employee API routes updated to use `getEffectiveAgentId` for superadmin impersonation support. Prisma migration: `EmployeeSalaryRecord` model with earnings, statutory (employee+employer), deductions, net. API routes: `GET/POST /api/employee-payroll/[month]/[year]`, `GET /api/employee-payroll/history`. Files: `src/components/staff/{payroll-tab,payroll-summary-cards,employee-drawer,staff-client}.tsx`, `src/lib/payroll/{statutory,socso-table,eis-table}.ts`, `src/app/api/employee-payroll/`, `src/app/api/employees/`. Spec: `context/features/employees-phase-2-spec.md`.
 
