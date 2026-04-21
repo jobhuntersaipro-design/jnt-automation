@@ -21,7 +21,7 @@ export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
         valid.push(file);
       }
     }
-    if (valid.length > 0) onFilesSelected(valid);
+    if (valid.length > 0) onFilesSelected([valid[0]]);
   }, [onFilesSelected]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -46,7 +46,7 @@ export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".xlsx,.xls";
-    input.multiple = true;
+    input.multiple = false;
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) validateAndSelect(files);
@@ -77,7 +77,7 @@ export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
           Branch and month will be detected automatically
         </p>
         <p className="text-[0.8rem] text-on-surface-variant/70 mt-1">
-          Drag &amp; drop or click to browse &mdash; multiple files supported
+          Drag &amp; drop or click to browse
         </p>
         <p className="text-[0.75rem] text-on-surface-variant/50 mt-0.5">
           .xlsx / .xls only
