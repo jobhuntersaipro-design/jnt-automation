@@ -204,7 +204,14 @@ export async function getIncentiveHitRate(
       select: { month: true, year: true, totalOrders: true, dispatcherId: true },
     }),
     prisma.incentiveRule.findMany({
-      where: { dispatcher: { branch: { agentId } } },
+      where: {
+        dispatcher: {
+          branch: {
+            agentId,
+            ...(selectedBranchCodes.length > 0 && { code: { in: selectedBranchCodes } }),
+          },
+        },
+      },
       select: { dispatcherId: true, orderThreshold: true },
     }),
   ]);

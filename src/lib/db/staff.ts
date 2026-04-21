@@ -26,58 +26,52 @@ export async function getDispatchers(
 ): Promise<StaffDispatcher[]> {
   const { branchCodes = [], search } = filters;
 
-  const dispatchers = await prisma.dispatcher.findMany({
-    where: {
-      branch: {
-        agentId,
-        ...(branchCodes.length > 0 && { code: { in: branchCodes } }),
+  const [dispatchers, latestRecord] = await Promise.all([
+    prisma.dispatcher.findMany({
+      where: {
+        branch: {
+          agentId,
+          ...(branchCodes.length > 0 && { code: { in: branchCodes } }),
+        },
+        ...(search && {
+          OR: [
+            { name: { contains: search, mode: "insensitive" as const } },
+            { extId: { contains: search, mode: "insensitive" as const } },
+          ],
+        }),
       },
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: "insensitive" as const } },
-          { extId: { contains: search, mode: "insensitive" as const } },
-        ],
-      }),
-    },
-    include: {
-      branch: { select: { code: true } },
-      weightTiers: {
-        select: { tier: true, minWeight: true, maxWeight: true, commission: true },
-        orderBy: { tier: "asc" as const },
+      include: {
+        branch: { select: { code: true } },
+        weightTiers: {
+          select: { tier: true, minWeight: true, maxWeight: true, commission: true },
+          orderBy: { tier: "asc" as const },
+        },
+        incentiveRule: { select: { orderThreshold: true, incentiveAmount: true } },
+        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
+        salaryRecords: {
+          select: { month: true, year: true },
+          orderBy: [{ year: "asc" }, { month: "asc" }],
+          take: 1,
+        },
       },
-      incentiveRule: { select: { orderThreshold: true, incentiveAmount: true } },
-      petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
-      salaryRecords: {
-        select: { month: true, year: true },
-        orderBy: [{ year: "asc" }, { month: "asc" }],
-        take: 1,
-      },
-    },
-    orderBy: [{ isPinned: "desc" }, { name: "asc" }],
-  });
+      orderBy: [{ isPinned: "desc" }, { name: "asc" }],
+    }),
+    prisma.salaryRecord.findFirst({
+      where: { dispatcher: { branch: { agentId } } },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      select: { month: true, year: true },
+    }),
+  ]);
 
-  // Determine the latest uploaded month across all dispatchers
-  // to know what counts as "this month" (NEW)
-  let latestMonth = 0;
-  let latestYear = 0;
+  // Determine the latest uploaded month to know what counts as "NEW"
+  let latestMonth = latestRecord?.month ?? 0;
+  let latestYear = latestRecord?.year ?? 0;
   for (const d of dispatchers) {
     for (const sr of d.salaryRecords) {
       if (sr.year > latestYear || (sr.year === latestYear && sr.month > latestMonth)) {
         latestYear = sr.year;
         latestMonth = sr.month;
       }
-    }
-  }
-  // Also check the latest across ALL salary records for this agent
-  const latestRecord = await prisma.salaryRecord.findFirst({
-    where: { dispatcher: { branch: { agentId } } },
-    orderBy: [{ year: "desc" }, { month: "desc" }],
-    select: { month: true, year: true },
-  });
-  if (latestRecord) {
-    if (latestRecord.year > latestYear || (latestRecord.year === latestYear && latestRecord.month > latestMonth)) {
-      latestYear = latestRecord.year;
-      latestMonth = latestRecord.month;
     }
   }
 

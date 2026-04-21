@@ -5,38 +5,40 @@ import { prisma } from "@/lib/prisma";
  * Used for the payroll history list.
  */
 export async function getPayrollHistory(agentId: string) {
-  const uploads = await prisma.upload.findMany({
-    where: {
-      branch: { agentId },
-      status: "SAVED",
-    },
-    select: {
-      id: true,
-      month: true,
-      year: true,
-      branch: {
-        select: { code: true },
+  const [uploads, sums] = await Promise.all([
+    prisma.upload.findMany({
+      where: { branch: { agentId }, status: "SAVED" },
+      select: {
+        id: true,
+        month: true,
+        year: true,
+        branch: { select: { code: true } },
+        _count: { select: { salaryRecords: true } },
       },
-      _count: {
-        select: { salaryRecords: true },
-      },
-      salaryRecords: {
-        select: { netSalary: true, baseSalary: true, penalty: true, advance: true },
-      },
-    },
-    orderBy: [{ year: "desc" }, { month: "desc" }],
-  });
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+    }),
+    prisma.salaryRecord.groupBy({
+      by: ["uploadId"],
+      where: { upload: { branch: { agentId }, status: "SAVED" } },
+      _sum: { netSalary: true, baseSalary: true, penalty: true, advance: true },
+    }),
+  ]);
 
-  return uploads.map((u) => ({
-    uploadId: u.id,
-    branchCode: u.branch.code,
-    month: u.month,
-    year: u.year,
-    dispatcherCount: u._count.salaryRecords,
-    totalNetPayout: u.salaryRecords.reduce((sum, r) => sum + r.netSalary, 0),
-    totalBaseSalary: u.salaryRecords.reduce((sum, r) => sum + r.baseSalary, 0),
-    totalDeductions: u.salaryRecords.reduce((sum, r) => sum + r.penalty + r.advance, 0),
-  }));
+  const sumMap = new Map(sums.map((s) => [s.uploadId, s._sum]));
+
+  return uploads.map((u) => {
+    const s = sumMap.get(u.id);
+    return {
+      uploadId: u.id,
+      branchCode: u.branch.code,
+      month: u.month,
+      year: u.year,
+      dispatcherCount: u._count.salaryRecords,
+      totalNetPayout: s?.netSalary ?? 0,
+      totalBaseSalary: s?.baseSalary ?? 0,
+      totalDeductions: (s?.penalty ?? 0) + (s?.advance ?? 0),
+    };
+  });
 }
 
 /**
@@ -44,31 +46,23 @@ export async function getPayrollHistory(agentId: string) {
  * Used for the /payroll/[uploadId] salary table page.
  */
 export async function getSalaryRecordsByUpload(uploadId: string, agentId: string) {
-  const upload = await prisma.upload.findFirst({
-    where: {
-      id: uploadId,
-      branch: { agentId },
-      status: "SAVED",
-    },
-    select: {
-      id: true,
-      month: true,
-      year: true,
-      branch: { select: { code: true } },
-    },
-  });
+  const [upload, records] = await Promise.all([
+    prisma.upload.findFirst({
+      where: { id: uploadId, branch: { agentId }, status: "SAVED" },
+      select: { id: true, month: true, year: true, branch: { select: { code: true } } },
+    }),
+    prisma.salaryRecord.findMany({
+      where: { uploadId },
+      include: {
+        dispatcher: {
+          select: { id: true, extId: true, name: true, avatarUrl: true, icNo: true },
+        },
+      },
+      orderBy: { dispatcher: { name: "asc" } },
+    }),
+  ]);
 
   if (!upload) return null;
-
-  const records = await prisma.salaryRecord.findMany({
-    where: { uploadId },
-    include: {
-      dispatcher: {
-        select: { id: true, extId: true, name: true, avatarUrl: true, icNo: true },
-      },
-    },
-    orderBy: { dispatcher: { name: "asc" } },
-  });
 
   const summary = {
     totalNetPayout: records.reduce((sum, r) => sum + r.netSalary, 0),

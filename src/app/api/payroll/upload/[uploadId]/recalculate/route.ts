@@ -67,9 +67,9 @@ export async function POST(
     const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d]));
 
     await prisma.$transaction(async (tx) => {
-      for (const update of updates) {
+      await Promise.all(updates.map((update) => {
         const dispatcher = dispatcherMap.get(update.dispatcherId);
-        if (!dispatcher) continue;
+        if (!dispatcher) return Promise.resolve();
 
         const netSalary =
           update.baseSalary +
@@ -78,7 +78,7 @@ export async function POST(
           update.penalty -
           update.advance;
 
-        await tx.salaryRecord.update({
+        return tx.salaryRecord.update({
           where: {
             dispatcherId_uploadId: {
               dispatcherId: update.dispatcherId,
@@ -114,7 +114,7 @@ export async function POST(
               : undefined,
           },
         });
-      }
+      }));
     }, { timeout: 30000 });
 
     revalidatePath("/payroll");
