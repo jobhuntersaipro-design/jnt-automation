@@ -290,7 +290,7 @@ function PayrollTab({ payroll }: { payroll: AgentView["payroll"] }) {
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     <Link
-                      href={`/payroll/${p.uploadId}`}
+                      href={`/dispatchers/payroll/${p.uploadId}`}
                       className="inline-flex items-center gap-1 px-2 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded transition-colors"
                     >
                       <Eye size={12} />

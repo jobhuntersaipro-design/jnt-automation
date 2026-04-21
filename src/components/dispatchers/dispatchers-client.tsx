@@ -1,26 +1,29 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
-import { DispatcherRow } from "./dispatcher-row";
-import { AddDispatcherDrawer } from "./add-dispatcher-drawer";
-import { DefaultsDrawer } from "./defaults-drawer";
-import { DispatcherDrawer } from "./dispatcher-drawer";
-import { EmployeeList } from "./employee-list";
-import { PayrollTab } from "./payroll-tab";
+import { DispatcherRow, ROW_GRID } from "@/components/staff/dispatcher-row";
+import { AddDispatcherDrawer } from "@/components/staff/add-dispatcher-drawer";
+import { DefaultsDrawer } from "@/components/staff/defaults-drawer";
+import { DispatcherDrawer } from "@/components/staff/dispatcher-drawer";
+import { PayrollClient } from "@/components/payroll/payroll-client";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
-import type { StaffEmployee } from "@/lib/db/employees";
+import type { getPayrollHistory } from "@/lib/db/payroll";
+
+type PayrollHistory = Awaited<ReturnType<typeof getPayrollHistory>>;
 
 const PAGE_SIZE = 20;
 
-interface StaffClientProps {
+interface DispatchersClientProps {
   dispatchers: StaffDispatcher[];
   branchCodes: string[];
   defaults: AgentDefaults;
-  employees: StaffEmployee[];
+  // Payroll tab data
+  payrollHistory: PayrollHistory;
+  payrollBranchCodes: string[];
 }
 
 function sortItems(list: StaffDispatcher[]) {
@@ -29,8 +32,6 @@ function sortItems(list: StaffDispatcher[]) {
     return a.name.localeCompare(b.name);
   });
 }
-
-import { ROW_GRID } from "./dispatcher-row";
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
   const pages: (number | "...")[] = [];
@@ -48,10 +49,18 @@ function getPageNumbers(current: number, total: number): (number | "...")[] {
   return pages;
 }
 
-type Tab = "dispatchers" | "employees" | "payroll";
+type Tab = "settings" | "payroll";
 
-export function StaffClient({ dispatchers: serverData, branchCodes: initialBranchCodes, defaults, employees }: StaffClientProps) {
-  const [activeTab, setActiveTab] = useState<Tab>("dispatchers");
+export function DispatchersClient({
+  dispatchers: serverData,
+  branchCodes: initialBranchCodes,
+  defaults,
+  payrollHistory,
+  payrollBranchCodes,
+}: DispatchersClientProps) {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "payroll" ? "payroll" : "settings";
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const router = useRouter();
   const [localBranchCodes, setLocalBranchCodes] = useState<string[]>(initialBranchCodes);
 
@@ -129,7 +138,6 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
         return true;
       })
       .sort((a, b) => {
-        // Pinned first, then new (empty IC) first, then alphabetical
         if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1;
         const aNew = a.rawIcNo === "";
         const bNew = b.rawIcNo === "";
@@ -158,7 +166,6 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
       const res = await fetch(`/api/staff/${dispatcher.id}/pin`, { method: "PATCH" });
       if (!res.ok) throw new Error();
     } catch {
-      // Revert optimistic update on failure
       capturePositions();
       setItems(serverData);
       toast.error("Failed to update pin status");
@@ -191,7 +198,6 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
     setItems((prev) => prev.map((d) =>
       d.id === dispatcherId ? { ...d, isComplete } : d,
     ));
-    // Track save completions for handleSaveAll
     if (pendingSavesRef.current > 0) {
       pendingSavesRef.current -= 1;
       if (pendingSavesRef.current <= 0 && saveResolveRef.current) {
@@ -208,7 +214,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
     setPage(1);
     fetch(`/api/staff/${dispatcher.id}/pin`, { method: "PATCH" }).then(() => router.refresh());
     toast.success(`${dispatcher.name} added`, {
-      action: { label: "Go to Payroll", onClick: () => router.push("/payroll") },
+      action: { label: "Go to Payroll", onClick: () => setActiveTab("payroll") },
     });
   }
 
@@ -294,12 +300,10 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
     }
     setSaveButtonState("saving");
     pendingSavesRef.current = dirtyIds.size;
-    // Wait for all saves to complete via onFieldSaved callbacks
     const allSaved = new Promise<void>((resolve) => {
       saveResolveRef.current = resolve;
     });
     setSaveTrigger((t) => t + 1);
-    // Timeout fallback in case a save never calls onFieldSaved
     const timeout = new Promise<void>((resolve) => setTimeout(resolve, 10000));
     Promise.race([allSaved, timeout]).then(() => {
       router.refresh();
@@ -307,6 +311,12 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
       toast.success("All changes saved", { duration: 3000 });
       setTimeout(() => setSaveButtonState("idle"), 3000);
     });
+  }
+
+  function switchTab(tab: Tab) {
+    setActiveTab(tab);
+    const url = tab === "payroll" ? "/dispatchers?tab=payroll" : "/dispatchers";
+    window.history.replaceState(null, "", url);
   }
 
   const branchLabel = selectedBranch || "All Branches";
@@ -319,17 +329,17 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
       <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
           <div className="shrink-0">
-            <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">Staff</h1>
+            <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">Dispatchers</h1>
             <p className="text-[0.72rem] text-on-surface-variant mt-0.5 hidden sm:block">
-              Manage dispatchers, employees and salary rules across all branches.
+              Manage dispatchers and salary rules across all branches.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {activeTab === "dispatchers" && (
+            {activeTab === "settings" && (
               <>
                 <button
                   onClick={() => setShowDefaults(true)}
-                                   className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"
                 >
                   Defaults
                 </button>
@@ -341,7 +351,7 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
                 </button>
               </>
             )}
-            {hasIssues ? (
+            {activeTab === "settings" && (hasIssues ? (
               <button
                 onClick={() => {
                   const msgs: string[] = [];
@@ -382,33 +392,23 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
                 <Save size={14} />
                 {dirtyIds.size > 0 ? `Save (${dirtyIds.size})` : "Save"}
               </button>
-            )}
+            ))}
           </div>
         </div>
         {/* Tab Switcher */}
         <div className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
           <button
-            onClick={() => setActiveTab("dispatchers")}
+            onClick={() => switchTab("settings")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
-              activeTab === "dispatchers"
+              activeTab === "settings"
                 ? "bg-white text-on-surface shadow-sm"
                 : "text-on-surface-variant hover:text-on-surface"
             }`}
           >
-            Dispatchers
+            Settings
           </button>
           <button
-            onClick={() => setActiveTab("employees")}
-            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
-              activeTab === "employees"
-                ? "bg-white text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Employees
-          </button>
-          <button
-            onClick={() => setActiveTab("payroll")}
+            onClick={() => switchTab("payroll")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
               activeTab === "payroll"
                 ? "bg-white text-on-surface shadow-sm"
@@ -422,9 +422,10 @@ export function StaffClient({ dispatchers: serverData, branchCodes: initialBranc
 
       <main className="px-4 lg:px-8 pb-16 space-y-4">
         {activeTab === "payroll" ? (
-          <PayrollTab />
-        ) : activeTab === "employees" ? (
-          <EmployeeList employees={employees} branchCodes={localBranchCodes} onBranchAdded={(code) => setLocalBranchCodes((prev) => [...prev, code])} />
+          <PayrollClient
+            initialHistory={payrollHistory}
+            branchCodes={payrollBranchCodes}
+          />
         ) : (
         <>
         {/* Filters */}

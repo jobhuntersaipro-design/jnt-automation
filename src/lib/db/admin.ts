@@ -42,13 +42,22 @@ export async function getPaymentRecords(agentId: string) {
   });
 }
 
-// Toggle agent approval
+// Toggle agent approval — sends welcome email when approving
 export async function toggleAgentApproval(agentId: string, isApproved: boolean) {
-  return prisma.agent.update({
+  const agent = await prisma.agent.update({
     where: { id: agentId },
     data: { isApproved },
-    select: { id: true, isApproved: true },
+    select: { id: true, isApproved: true, email: true, name: true },
   });
+
+  if (isApproved) {
+    const { sendApprovalEmail } = await import("@/lib/email");
+    sendApprovalEmail(agent.email, agent.name).catch((err) => {
+      console.error("Failed to send approval email:", err);
+    });
+  }
+
+  return { id: agent.id, isApproved: agent.isApproved };
 }
 
 // Update agent maxBranches

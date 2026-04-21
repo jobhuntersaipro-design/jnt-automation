@@ -117,7 +117,7 @@ export async function POST(
       }));
     }, { timeout: 30000 });
 
-    revalidatePath("/payroll");
+    revalidatePath("/dispatchers");
     revalidatePath("/dashboard");
 
     // Notify

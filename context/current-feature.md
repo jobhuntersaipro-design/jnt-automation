@@ -1,12 +1,31 @@
-# Current Feature
+# Current Feature: Employees Phase 4 — Nav Restructure (Dispatchers + Staff with Tabs)
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
+- Nav restructured to: Overview | Dispatchers | Staff
+- Current "Staff" page (dispatchers) renamed/moved to `/dispatchers` with Settings + Payroll tabs
+- New `/staff` page for employees with Settings + Payroll tabs
+- `/dispatchers` Settings tab = existing dispatcher list + all current functionality
+- `/dispatchers` Payroll tab = existing payroll page (upload flow, calculate, confirm, payslips)
+- `/dispatchers/payroll/[uploadId]` = salary table for specific upload
+- `/staff` Settings tab = employee list (Phase 1)
+- `/staff` Payroll tab = monthly salary entry (Phase 2 + 3)
+- All internal links updated (`/staff` → `/dispatchers`, `/payroll` → `/dispatchers?tab=payroll`)
+- Old routes redirect properly
+- Middleware/proxy protects all new routes
+- Active nav tab highlights correctly on all routes
+- No broken links, all existing functionality preserved
+
 ## Notes
+
+- Spec: `context/features/employees-phase-4-spec.md`
+- Tab navigation via URL param: `?tab=payroll` for Payroll tab, default is Settings
+- Route mapping: `/staff` → `/dispatchers`, `/payroll` → `/dispatchers` Payroll tab, new `/staff` for employees
+- Key files to modify: nav links, route directories, middleware/proxy, all internal links referencing `/staff` or `/payroll`
 
 ## History
 

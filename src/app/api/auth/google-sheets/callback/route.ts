@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   if (!code || !state || !storedNonce || state !== storedNonce) {
     return NextResponse.redirect(
-      new URL("/payroll?error=google_sheets_failed", baseUrl),
+      new URL("/dispatchers?tab=payroll&error=google_sheets_failed", baseUrl),
     );
   }
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
     if (!tokenRes.ok) {
       console.error("Google token exchange failed:", await tokenRes.text());
       return NextResponse.redirect(
-        new URL("/payroll?error=google_sheets_failed", baseUrl),
+        new URL("/dispatchers?tab=payroll&error=google_sheets_failed", baseUrl),
       );
     }
 
@@ -66,12 +66,12 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL("/payroll?google_sheets=connected", baseUrl),
+      new URL("/dispatchers?tab=payroll&google_sheets=connected", baseUrl),
     );
   } catch (error) {
     console.error("Google Sheets OAuth callback error:", error);
     return NextResponse.redirect(
-      new URL("/payroll?error=google_sheets_failed", baseUrl),
+      new URL("/dispatchers?tab=payroll&error=google_sheets_failed", baseUrl),
     );
   }
 }

@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
 
   if (!clientId) {
     return NextResponse.redirect(
-      new URL("/payroll?error=google_sheets_failed", baseUrl),
+      new URL("/dispatchers?tab=payroll&error=google_sheets_failed", baseUrl),
     );
   }
 

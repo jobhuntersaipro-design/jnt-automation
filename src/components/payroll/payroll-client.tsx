@@ -41,11 +41,11 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
   useEffect(() => {
     if (searchParams.get("google_sheets") === "connected") {
       toast.success("Google Sheets connected");
-      window.history.replaceState({}, "", "/payroll");
+      window.history.replaceState({}, "", "/dispatchers?tab=payroll");
     }
     if (searchParams.get("error") === "google_sheets_failed") {
       toast.error("Failed to connect Google Sheets");
-      window.history.replaceState({}, "", "/payroll");
+      window.history.replaceState({}, "", "/dispatchers?tab=payroll");
     }
   }, [searchParams]);
 

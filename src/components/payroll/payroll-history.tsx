@@ -84,7 +84,7 @@ function BranchGroup({ branchCode, items }: { branchCode: string; items: Payroll
             </span>
             <div className="flex items-center gap-1 justify-end">
               <Link
-                href={`/payroll/${item.uploadId}`}
+                href={`/dispatchers/payroll/${item.uploadId}`}
                 className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-brand hover:bg-brand/5 rounded transition-colors"
               >
                 <Eye className="w-3 h-3" />

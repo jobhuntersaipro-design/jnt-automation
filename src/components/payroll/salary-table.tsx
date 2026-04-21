@@ -359,7 +359,7 @@ export function SalaryTable({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/payroll"
+            href="/dispatchers?tab=payroll"
             className="p-1.5 rounded-md hover:bg-surface-hover transition-colors text-on-surface-variant"
           >
             <ArrowLeft className="w-4 h-4" />

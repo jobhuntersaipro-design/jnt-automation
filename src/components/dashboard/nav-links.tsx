@@ -6,8 +6,8 @@ import { usePathname } from "next/navigation";
 
 const BASE_ITEMS = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/dispatchers", label: "Dispatchers" },
   { href: "/staff", label: "Staff" },
-  { href: "/payroll", label: "Payroll" },
 ];
 
 export function NavLinks({ isSuperAdmin, impersonating }: { isSuperAdmin: boolean; impersonating?: boolean }) {
