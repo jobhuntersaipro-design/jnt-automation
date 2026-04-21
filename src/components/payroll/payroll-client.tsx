@@ -102,18 +102,29 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
 
       const { r2Key, presignedUrl } = await initRes.json();
 
-      // 2. Upload to R2
+      // 2. Upload to R2 with progress tracking
       const contentType = file.name.endsWith(".xlsx")
         ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         : "application/vnd.ms-excel";
 
-      const uploadRes = await fetch(presignedUrl, {
-        method: "PUT",
-        body: file,
-        headers: { "Content-Type": contentType },
+      const uploadOk = await new Promise<boolean>((resolve) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", presignedUrl);
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setActiveUploads((prev) =>
+              prev.map((u) => (u.id === clientId ? { ...u, uploadProgress: pct } : u))
+            );
+          }
+        };
+        xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300);
+        xhr.onerror = () => resolve(false);
+        xhr.send(file);
       });
 
-      if (!uploadRes.ok) {
+      if (!uploadOk) {
         setActiveUploads((prev) =>
           prev.map((u) =>
             u.id === clientId

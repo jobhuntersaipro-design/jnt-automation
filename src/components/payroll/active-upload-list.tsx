@@ -36,6 +36,7 @@ export interface ActiveUpload {
   fileName: string;
   r2Key?: string;
   status: UploadStatus;
+  uploadProgress?: number; // 0-100 for R2 upload progress
   branchCode?: string;
   month?: number;
   year?: number;
@@ -227,6 +228,19 @@ function UploadRow({
             <p className="text-[0.85rem] font-medium text-on-surface truncate">
               {isActive ? `${statusLabel(upload.status)} ${label}\u2026` : label}
             </p>
+            {upload.status === "UPLOADING" && upload.uploadProgress !== undefined && (
+              <div className="mt-1.5 w-full bg-outline-variant/20 rounded-full h-1.5 overflow-hidden">
+                <div
+                  className="h-full bg-brand rounded-full transition-all duration-300"
+                  style={{ width: `${upload.uploadProgress}%` }}
+                />
+              </div>
+            )}
+            {upload.status === "UPLOADING" && upload.uploadProgress !== undefined && (
+              <p className="text-[0.7rem] text-on-surface-variant/60 mt-0.5 tabular-nums">
+                {upload.uploadProgress < 100 ? `${upload.uploadProgress}%` : "Processing\u2026"}
+              </p>
+            )}
             {upload.status === "FAILED" && upload.errorMessage && (
               <p className="text-[0.78rem] text-critical mt-0.5 truncate">
                 {upload.errorMessage}
