@@ -427,17 +427,39 @@ export function PayrollTab() {
       })
       if (!res.ok) { toast.error("Failed to save IC"); return }
       // Update local entry
+      const empId = icPrompt.employeeId
       setEntries((prev) => prev.map((e) =>
-        e.employeeId === icPrompt.employeeId ? { ...e, icNo: icInput } : e
+        e.employeeId === empId ? { ...e, icNo: icInput } : e
       ))
-      toast.success("IC number saved")
+      toast.success("IC number saved — generating payslip...")
       setIcPrompt(null)
+      // Auto-generate payslip after saving IC
+      setGeneratingId(empId)
+      try {
+        const pdfRes = await fetch(`/api/employee-payroll/${month}/${year}/payslip/${empId}`, { method: "POST" })
+        if (pdfRes.ok) {
+          const blob = await pdfRes.blob()
+          const url = URL.createObjectURL(blob)
+          const a = document.createElement("a")
+          a.href = url
+          a.download = pdfRes.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "payslip.pdf"
+          a.click()
+          URL.revokeObjectURL(url)
+        } else {
+          const data = await pdfRes.json()
+          toast.error(data.error || "Failed to generate payslip")
+        }
+      } catch {
+        toast.error("Failed to generate payslip")
+      } finally {
+        setGeneratingId(null)
+      }
     } catch {
       toast.error("Failed to save IC")
     } finally {
       setSavingIc(false)
     }
-  }, [icPrompt, icInput])
+  }, [icPrompt, icInput, month, year])
 
   return (
     <div className="space-y-5">
