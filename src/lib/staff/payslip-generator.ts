@@ -22,10 +22,12 @@ const B = "#000";
 const s = StyleSheet.create({
   page: { paddingTop: 50, paddingBottom: 40, paddingHorizontal: 50, fontSize: 9, fontFamily: "Helvetica" },
 
+  // Company header
   center: { textAlign: "center", marginBottom: 24 },
   companyName: { fontSize: 12, fontFamily: "Helvetica-Bold" },
   addressLine: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 1 },
 
+  // Employee particulars
   partTitle: { textAlign: "center", textDecoration: "underline", fontSize: 9.5, marginBottom: 2 },
   partBox: { flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: B },
   partLeft: { flex: 1, paddingVertical: 4, paddingHorizontal: 6 },
@@ -35,34 +37,48 @@ const s = StyleSheet.create({
   partColon: { width: 10, fontSize: 9 },
   partVal: { flex: 1, fontSize: 9, fontFamily: "Helvetica-Bold" },
 
-  tableOuter: { flexDirection: "row" as const, borderWidth: 1, borderColor: B, marginTop: 10 },
+  // Main table — wraps everything: addition/deduction + total + employer section
+  tableWrapper: { borderWidth: 1, borderColor: B, marginTop: 10 },
+
+  // Addition/deduction columns row
+  columnsRow: { flexDirection: "row" as const },
   halfLeft: { flex: 1, borderRightWidth: 1, borderRightColor: B },
   halfRight: { flex: 1 },
 
+  // Column headers
   hdrRow: { flexDirection: "row" as const, borderBottomWidth: 1, borderBottomColor: B, paddingVertical: 3, paddingHorizontal: 6 },
   hdrLabel: { flex: 1, fontSize: 9, textAlign: "center" as const, textDecoration: "underline" as const },
   hdrRM: { width: 80, fontSize: 9, textAlign: "center" as const, textDecoration: "underline" as const },
 
+  // Data rows (no borders)
   dataRow: { flexDirection: "row" as const, paddingVertical: 2, paddingHorizontal: 6 },
   cellL: { flex: 1, fontSize: 9 },
   cellR: { width: 80, fontSize: 9, textAlign: "right" as const },
 
-  sepRow: { flexDirection: "row" as const, paddingVertical: 3, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: B },
-  sepLabelCenterBold: { flex: 1, fontSize: 9, textAlign: "center" as const, fontFamily: "Helvetica-Bold" },
-  sepAmtBold: { width: 80, fontSize: 9, textAlign: "right" as const, fontFamily: "Helvetica-Bold" },
+  // TOTAL row — full-width row with top border, two halves
+  totalRow: { flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: B },
+  totalLeft: { flex: 1, flexDirection: "row" as const, paddingVertical: 3, paddingHorizontal: 6, borderRightWidth: 1, borderRightColor: B },
+  totalRight: { flex: 1 },
+  totalLabel: { flex: 1, fontSize: 9, textAlign: "center" as const, fontFamily: "Helvetica-Bold" },
+  totalAmt: { width: 80, fontSize: 9, textAlign: "right" as const, fontFamily: "Helvetica-Bold" },
 
-  // Employer contribution section
-  employerRow: { flexDirection: "row" as const, paddingVertical: 3, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: B },
-  employerLeft: { flex: 1 },
-  employerRight: { flex: 1, borderLeftWidth: 1, borderLeftColor: B, paddingLeft: 6 },
-  employerLine: { flexDirection: "row" as const, marginBottom: 1 },
+  // Employer contribution — full-width row with top border, two halves
+  employerRow: { flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: B },
+  employerLeft: { flex: 1, paddingVertical: 6, paddingHorizontal: 6, borderRightWidth: 1, borderRightColor: B },
+  employerRight: { flex: 1, paddingVertical: 6, paddingHorizontal: 6 },
+  employerTitle: { fontSize: 9, fontFamily: "Helvetica-Bold", marginBottom: 6, textDecoration: "underline" as const },
+  employerLine: { flexDirection: "row" as const, marginBottom: 1.5 },
   employerLabel: { width: 45, fontSize: 9 },
   employerColon: { width: 10, fontSize: 9 },
   employerVal: { flex: 1, fontSize: 9 },
 
-  remarksRow: { paddingVertical: 4, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: B },
+  // Net pay + remarks (inside employerRight)
+  netPayRow: { flexDirection: "row" as const, marginBottom: 8 },
+  netPayLabel: { flex: 1, fontSize: 9, textAlign: "center" as const, fontFamily: "Helvetica-Bold" },
+  netPayAmt: { width: 80, fontSize: 9, textAlign: "right" as const, fontFamily: "Helvetica-Bold" },
   remarksBold: { fontSize: 9, fontFamily: "Helvetica-Bold" },
 
+  // Footer
   footer: { flexDirection: "row" as const, marginTop: 60, justifyContent: "space-between" as const, alignItems: "flex-end" as const },
   sigBlock: { alignItems: "center" as const, width: 180 },
   sigDots: { fontSize: 9, marginBottom: 3 },
@@ -82,7 +98,7 @@ export interface EmployeePayslipInput {
 
   employeeName: string;
   icNo: string;
-  position: string; // "SUPERVISOR" | "ADMIN" | "STORE KEEPER"
+  position: string;
   employeeType: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
   month: number;
   year: number;
@@ -94,8 +110,8 @@ export interface EmployeePayslipInput {
 
   // Employee earnings
   basicPay: number;
-  workingHours: number; // store keeper only
-  hourlyWage: number;   // store keeper only
+  workingHours: number;
+  hourlyWage: number;
   petrolAllowance: number;
   kpiAllowance: number;
   otherAllowance: number;
@@ -107,7 +123,7 @@ export interface EmployeePayslipInput {
   dispatcherPenalty?: number;
   dispatcherAdvance?: number;
 
-  // Statutory deductions (on combined gross)
+  // Statutory deductions
   epfEmployee: number;
   socsoEmployee: number;
   eisEmployee: number;
@@ -144,9 +160,7 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
   const dateStr = `${String(lastDay).padStart(2, "0")}/${String(data.month).padStart(2, "0")}/${data.year}`;
   const position = POSITION_LABEL[data.employeeType] ?? data.position;
 
-  // ── Right-side particulars fields differ by type ──
-  // Supervisor/Admin: DATE, EPF NO, SOCSO NO
-  // Store Keeper: DATE, SOCSO NO, INCOME TAX NO
+  // ── Right-side particulars ──
   const rightParticulars = isStoreKeeper
     ? [
         { label: "DATE", value: dateStr },
@@ -159,10 +173,9 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
         { label: "SOCSO NO", value: data.socsoNo ?? "" },
       ];
 
-  // ── Build addition rows ──
+  // ── Addition rows ──
   const addRows: React.ReactElement[] = [];
 
-  // Combined: dispatcher parcel tiers first
   if (isCombined && data.dispatcherTierBreakdowns) {
     for (const t of data.dispatcherTierBreakdowns) {
       addRows.push(
@@ -186,11 +199,9 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
     }
   }
 
-  // Employee earnings
   if (isStoreKeeper) {
-    const wageLabel = `WAGES (${data.workingHours} HOUR)`;
     addRows.push(h(View, { key: "wages", style: s.dataRow },
-      h(Text, { style: s.cellL }, wageLabel),
+      h(Text, { style: s.cellL }, `WAGES (${data.workingHours} HOUR)`),
       h(Text, { style: s.cellR }, formatRM(data.workingHours * data.hourlyWage)),
     ));
   } else {
@@ -218,7 +229,7 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
     ));
   }
 
-  // ── Build deduction rows ──
+  // ── Deduction rows ──
   const dedRows: React.ReactElement[] = [];
   if (data.epfEmployee > 0) {
     dedRows.push(h(View, { key: "epf", style: s.dataRow },
@@ -256,7 +267,6 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
       h(Text, { style: s.cellR }, formatRM(data.advance)),
     ));
   }
-  // Dispatcher penalty/advance in combined
   if (isCombined && data.dispatcherPenalty && data.dispatcherPenalty > 0) {
     dedRows.push(h(View, { key: "dpen", style: s.dataRow },
       h(Text, { style: s.cellL }, "Penalty (Dispatcher)"),
@@ -310,25 +320,43 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
         ),
       ),
 
-      // ── Addition / Deduction Table ──
-      h(View, { style: s.tableOuter },
+      // ── Main Table (outer border wraps everything) ──
+      h(View, { style: s.tableWrapper },
 
-        // LEFT HALF — Addition
-        h(View, { style: s.halfLeft },
-          h(View, { style: s.hdrRow },
-            h(Text, { style: s.hdrLabel }, "ADDITION"),
-            h(Text, { style: s.hdrRM }, "RM"),
+        // Row 1: Addition | Deduction columns side by side
+        h(View, { style: s.columnsRow },
+          // LEFT — Addition
+          h(View, { style: s.halfLeft },
+            h(View, { style: s.hdrRow },
+              h(Text, { style: s.hdrLabel }, "ADDITION"),
+              h(Text, { style: s.hdrRM }, "RM"),
+            ),
+            ...addRows,
           ),
-          ...addRows,
-          h(View, { style: { flex: 1 } }),
-          // TOTAL
-          h(View, { style: s.sepRow },
-            h(Text, { style: s.sepLabelCenterBold }, "TOTAL :-"),
-            h(Text, { style: s.sepAmtBold }, formatRM(data.grossSalary)),
+          // RIGHT — Deduction
+          h(View, { style: s.halfRight },
+            h(View, { style: s.hdrRow },
+              h(Text, { style: s.hdrLabel }, "DEDUCTION"),
+              h(Text, { style: s.hdrRM }, "RM"),
+            ),
+            ...dedRows,
           ),
-          // EMPLOYER'S CONTRIBUTION
-          h(View, { style: { paddingVertical: 4, paddingHorizontal: 6, borderTopWidth: 1, borderTopColor: B } },
-            h(Text, { style: { ...s.remarksBold, marginBottom: 4 } }, "EMPLOYER'S CONTRIBUTION"),
+        ),
+
+        // Row 2: TOTAL (left) | empty (right) — full width with top border
+        h(View, { style: s.totalRow },
+          h(View, { style: s.totalLeft },
+            h(Text, { style: s.totalLabel }, "TOTAL :-"),
+            h(Text, { style: s.totalAmt }, formatRM(data.grossSalary)),
+          ),
+          h(View, { style: s.totalRight }),
+        ),
+
+        // Row 3: EMPLOYER'S CONTRIBUTION (left) | NET PAY + REMARKS (right)
+        h(View, { style: s.employerRow },
+          // Left half — employer contributions
+          h(View, { style: s.employerLeft },
+            h(Text, { style: s.employerTitle }, "EMPLOYER'S CONTRIBUTION"),
             h(View, { style: s.employerLine },
               h(Text, { style: s.employerLabel }, "EPF"),
               h(Text, { style: s.employerColon }, ":"),
@@ -345,40 +373,29 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
               h(Text, { style: s.employerVal }, `RM${formatRM(data.eisEmployer)}`),
             ),
           ),
-        ),
-
-        // RIGHT HALF — Deduction
-        h(View, { style: s.halfRight },
-          h(View, { style: s.hdrRow },
-            h(Text, { style: s.hdrLabel }, "DEDUCTION"),
-            h(Text, { style: s.hdrRM }, "RM"),
-          ),
-          ...dedRows,
-          h(View, { style: { flex: 1 } }),
-          // NET PAY
-          h(View, { style: s.sepRow },
-            h(Text, { style: s.sepLabelCenterBold }, "NET PAY :-"),
-            h(Text, { style: s.sepAmtBold }, formatRM(data.netSalary)),
-          ),
-          // REMARKS
-          h(View, { style: s.remarksRow },
+          // Right half — net pay + remarks
+          h(View, { style: s.employerRight },
+            h(View, { style: s.netPayRow },
+              h(Text, { style: s.netPayLabel }, "NET PAY :-"),
+              h(Text, { style: s.netPayAmt }, formatRM(data.netSalary)),
+            ),
             h(Text, { style: s.remarksBold }, "REMARKS :-"),
+            h(View, { style: { minHeight: 30 } }),
           ),
-          h(View, { style: { minHeight: 16 } }),
         ),
       ),
 
       // ── Stamp + Signatures ──
       h(View, { style: s.footer },
         h(View, { style: s.sigBlock },
-          h(Text, { style: s.sigDots }, "......................."),
+          h(Text, { style: s.sigDots }, "\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026.."),
           h(Text, { style: s.sigLabel }, "PREPARED BY"),
         ),
         h(View, { style: s.sigBlock },
           ...(data.stampImageUrl
             ? [h(Image, { key: "stamp", style: s.stamp, src: data.stampImageUrl })]
             : []),
-          h(Text, { style: s.sigDots }, "......................."),
+          h(Text, { style: s.sigDots }, "\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026\u2026.."),
           h(Text, { style: s.sigLabel }, "APPROVED BY"),
         ),
       ),
