@@ -17,7 +17,6 @@ export default async function SettingsPage() {
       companyRegistrationNo: true,
       companyAddress: true,
       stampImageUrl: true,
-      googleSheetsRefreshToken: true,
       createdAt: true,
     },
   });
@@ -44,7 +43,6 @@ export default async function SettingsPage() {
           imageUrl={agent.avatarUrl ?? session.user.image ?? null}
           hasPassword={hasPassword}
           connectedProviders={connectedProviders}
-          googleSheetsConnected={!!agent.googleSheetsRefreshToken}
           companyRegistrationNo={agent.companyRegistrationNo}
           companyAddress={agent.companyAddress}
           stampImageUrl={agent.stampImageUrl}

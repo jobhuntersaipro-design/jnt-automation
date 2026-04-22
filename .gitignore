@@ -53,3 +53,9 @@ next-env.d.ts
 
 # QA screenshots at repo root (Playwright MCP default output)
 /*.png
+
+# Playwright test runner artifacts
+/e2e/.auth/
+/test-results/
+/playwright-report/
+/playwright/.cache/

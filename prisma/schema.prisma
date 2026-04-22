@@ -28,9 +28,6 @@ model Agent {
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
   stampImageUrl            String?    // R2 URL for company stamp on payslips
-  googleSheetsAccessToken  String?
-  googleSheetsRefreshToken String?
-  googleSheetsTokenExpiry  DateTime?
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 }

@@ -25,7 +25,10 @@ export interface BulkJob {
 
 const jobKey = (jobId: string) => `bulk-job:${jobId}`;
 const activeSetKey = (agentId: string) => `bulk-job:active:${agentId}`;
+const recentListKey = (agentId: string) => `bulk-job:recent:${agentId}`;
 const TTL_SECONDS = 7200; // 2h for job records
+export const RECENT_CAP = 20;
+export const RECENT_RETURN_LIMIT = 10;
 
 export async function createJob(
   data: Omit<BulkJob, "status" | "done" | "total" | "createdAt" | "updatedAt">,
@@ -55,15 +58,23 @@ export async function updateJob(
 ): Promise<void> {
   const existing = await getJob(jobId);
   if (!existing) return;
+  const wasTerminal = existing.status === "done" || existing.status === "failed";
   const next: BulkJob = {
     ...existing,
     ...patch,
     updatedAt: Date.now(),
   };
   await redis.set(jobKey(jobId), next, { ex: TTL_SECONDS });
-  // Remove from active set once the job is no longer running
+
   if (next.status === "done" || next.status === "failed") {
     await redis.srem(activeSetKey(next.agentId), jobId);
+    // Only add to recent on the transition — re-applying terminal state
+    // (e.g. repeated status writes) must not duplicate list entries.
+    if (!wasTerminal) {
+      await redis.lpush(recentListKey(next.agentId), jobId);
+      await redis.ltrim(recentListKey(next.agentId), 0, RECENT_CAP - 1);
+      await redis.expire(recentListKey(next.agentId), TTL_SECONDS);
+    }
   }
 }
 
@@ -91,4 +102,52 @@ export async function listActiveJobs(agentId: string): Promise<BulkJob[]> {
     jobs.push(job);
   }
   return jobs;
+}
+
+/**
+ * Returns the agent's merged active + recently completed jobs, sorted by
+ * `updatedAt` desc, capped at RECENT_RETURN_LIMIT. Used by the Downloads
+ * Center panel on the notification bell.
+ *
+ * Expired jobs (per-job TTL hit) are lazily swept from both the active set
+ * and the recent list so callers never see dangling IDs.
+ */
+export async function listRecent(agentId: string): Promise<BulkJob[]> {
+  const [activeIds, recentIds] = await Promise.all([
+    redis.smembers(activeSetKey(agentId)),
+    redis.lrange(recentListKey(agentId), 0, RECENT_CAP - 1),
+  ]);
+
+  // Deduplicate — a job may appear in both while the LPUSH races the
+  // active-set removal. Keep the active-set ordering priority.
+  const seen = new Set<string>();
+  const orderedIds: string[] = [];
+  for (const id of [...activeIds, ...(recentIds as string[])]) {
+    if (seen.has(id)) continue;
+    seen.add(id);
+    orderedIds.push(id);
+  }
+
+  const jobs: BulkJob[] = [];
+  for (const id of orderedIds) {
+    const job = await getJob(id);
+    if (!job) {
+      // TTL expired — sweep from both collections
+      await redis.srem(activeSetKey(agentId), id);
+      await redis.lrem(recentListKey(agentId), 0, id);
+      continue;
+    }
+    jobs.push(job);
+  }
+
+  jobs.sort((a, b) => b.updatedAt - a.updatedAt);
+  return jobs.slice(0, RECENT_RETURN_LIMIT);
+}
+
+/**
+ * Hard-clear the recent list for an agent (does not touch in-flight jobs).
+ * Backs the DELETE /api/dispatchers/month-detail/bulk/recent endpoint.
+ */
+export async function clearRecent(agentId: string): Promise<void> {
+  await redis.del(recentListKey(agentId));
 }

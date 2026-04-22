@@ -2,14 +2,12 @@
 
 import { useState, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { Download, FileSpreadsheet, ChevronDown } from "lucide-react";
+import { Download, FileText, ChevronDown } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
-import { toast } from "sonner";
 
 export function OverviewExport() {
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
   useClickOutside(ref, close);
@@ -30,87 +28,24 @@ export function OverviewExport() {
     return params.toString();
   }
 
-  function getFiltersBody() {
-    const now = new Date();
-    let defaultToMonth = now.getMonth();
-    let defaultToYear = now.getFullYear();
-    if (defaultToMonth === 0) { defaultToMonth = 12; defaultToYear--; }
-    let defaultFromMonth = defaultToMonth - 2;
-    let defaultFromYear = defaultToYear;
-    if (defaultFromMonth <= 0) { defaultFromMonth += 12; defaultFromYear--; }
-
-    return {
-      branches: searchParams.get("branches")?.split(",").filter(Boolean) ?? [],
-      fromMonth: Number(searchParams.get("fromMonth") ?? defaultFromMonth),
-      fromYear: Number(searchParams.get("fromYear") ?? defaultFromYear),
-      toMonth: Number(searchParams.get("toMonth") ?? defaultToMonth),
-      toYear: Number(searchParams.get("toYear") ?? defaultToYear),
-    };
-  }
-
   function handleCSV(type: "dispatcher" | "branch") {
     setOpen(false);
     window.open(`/api/overview/export/csv?${buildQueryString(type)}`, "_blank");
   }
 
-  async function handleSheets() {
+  function handlePDF() {
     setOpen(false);
-    setExporting(true);
-    try {
-      const res = await fetch("/api/overview/export/sheets", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(getFiltersBody()),
-      });
-
-      if (res.status === 401) {
-        const data = await res.json();
-        if (data.error === "NOT_CONNECTED") {
-          toast.error("Google Sheets not connected", {
-            description: "Connect Google Sheets in Settings first.",
-            action: {
-              label: "Connect",
-              onClick: () => window.open("/api/auth/google-sheets/connect", "_self"),
-            },
-          });
-          return;
-        }
-        if (data.error === "TOKEN_REVOKED") {
-          toast.error("Google Sheets access revoked", {
-            description: "Reconnect Google Sheets in Settings.",
-          });
-          return;
-        }
-      }
-
-      if (!res.ok) {
-        toast.error("Export failed", { description: "Something went wrong. Try again." });
-        return;
-      }
-
-      const data = await res.json();
-      toast.success("Exported to Google Sheets", {
-        action: {
-          label: "Open",
-          onClick: () => window.open(data.spreadsheetUrl, "_blank"),
-        },
-      });
-    } catch {
-      toast.error("Export failed", { description: "Network error. Try again." });
-    } finally {
-      setExporting(false);
-    }
+    window.open(`/api/overview/export/pdf?${buildQueryString("dispatcher")}`, "_blank");
   }
 
   return (
     <div ref={ref} className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        disabled={exporting}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-[rgba(195,198,214,0.3)] hover:border-[rgba(195,198,214,0.6)] transition-colors disabled:opacity-50"
       >
         <Download size={13} className="text-on-surface-variant" />
-        {exporting ? "Exporting..." : "Export"}
+        Export
         <ChevronDown
           size={11}
           className={`text-on-surface-variant transition-transform ${open ? "rotate-180" : ""}`}
@@ -127,11 +62,11 @@ export function OverviewExport() {
             CSV
           </button>
           <button
-            onClick={handleSheets}
+            onClick={handlePDF}
             className="w-full text-left px-3.5 py-2.5 text-[0.8rem] text-on-surface hover:bg-surface-container-high transition-colors flex items-center gap-2.5"
           >
-            <FileSpreadsheet size={14} className="text-on-surface-variant" />
-            Google Sheets
+            <FileText size={14} className="text-on-surface-variant" />
+            PDF
           </button>
         </div>
       )}

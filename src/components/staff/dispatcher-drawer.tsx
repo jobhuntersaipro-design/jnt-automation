@@ -45,7 +45,7 @@ export function DispatcherDrawer({ dispatcher, onClose }: DispatcherDrawerProps)
     .join("");
 
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-40" data-testid="dispatcher-drawer">
       <div className="absolute inset-0 bg-on-surface/30" />
       <div
         ref={drawerRef}

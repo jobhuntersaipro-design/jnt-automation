@@ -3,6 +3,11 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Bell, Upload, BadgeDollarSign, UserPlus, RefreshCw } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { DownloadsPanel } from "./downloads-panel";
+import {
+  acknowledgeDownloadsSeen,
+  useJustFinishedCount,
+} from "./bulk-jobs-indicator";
 
 type Notification = {
   id: string;
@@ -12,6 +17,8 @@ type Notification = {
   isRead: boolean;
   createdAt: string;
 };
+
+type Tab = "notifications" | "downloads";
 
 const iconMap = {
   upload: { Icon: Upload, bg: "#0056D2" },
@@ -33,6 +40,7 @@ function timeAgo(iso: string) {
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<Tab>("notifications");
   const [items, setItems] = useState<Notification[]>([]);
   const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,6 +48,7 @@ export function NotificationBell() {
   useClickOutside(ref, close);
 
   const unreadCount = items.filter((n) => !n.isRead).length;
+  const downloadsRedDot = useJustFinishedCount() > 0;
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -54,29 +63,35 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Fetch when dropdown is opened
+  // When the popover is opened, freshen notifications + mark as read.
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    if (tab === "notifications") {
       fetchNotifications();
-      // Mark all as read
       if (unreadCount > 0) {
         fetch("/api/notifications", { method: "PATCH" }).then(() => {
           setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
         });
       }
+    } else if (tab === "downloads") {
+      acknowledgeDownloadsSeen();
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleClear = useCallback(async () => {
     await fetch("/api/notifications", { method: "DELETE" });
     setItems([]);
   }, []);
 
+  const hasAnyDot = unreadCount > 0 || downloadsRedDot;
+
   return (
     <div ref={ref} className="relative">
       <button
+        data-testid="notification-bell"
         onClick={() => setOpen((o) => !o)}
-        className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors"
+        aria-label="Notifications and downloads"
+        className="relative w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-hover transition-colors cursor-pointer"
       >
         <Bell size={18} className="text-on-surface-variant" />
         {unreadCount > 0 && (
@@ -84,62 +99,132 @@ export function NotificationBell() {
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
+        {unreadCount === 0 && downloadsRedDot && (
+          <span
+            data-testid="downloads-red-dot"
+            className="absolute top-1 right-1 w-2 h-2 rounded-full bg-critical"
+          />
+        )}
+        {/* Hidden hint for tests when both signals exist */}
+        {unreadCount > 0 && downloadsRedDot && (
+          <span data-testid="downloads-red-dot" className="sr-only">
+            downloads ready
+          </span>
+        )}
+        <span className="sr-only">{hasAnyDot ? "unread activity" : ""}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-[rgba(195,198,214,0.18)] z-50 p-5">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h3 className="font-heading font-semibold text-[1rem] text-on-surface leading-tight">
-                Notifications
-              </h3>
-              <p className="text-[0.78rem] text-on-surface-variant mt-0.5">Recent activity</p>
-            </div>
-            {items.length > 0 && (
-              <button
-                onClick={handleClear}
-                className="text-[0.78rem] font-medium text-on-surface-variant hover:text-on-surface transition-colors mt-0.5"
-              >
-                Clear All
-              </button>
-            )}
+        <div
+          className="absolute right-0 top-full mt-2 w-96 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-[rgba(195,198,214,0.18)] z-50 p-4"
+        >
+          <div className="flex items-center gap-1 mb-3" role="tablist">
+            <button
+              data-testid="notifications-tab"
+              role="tab"
+              aria-selected={tab === "notifications"}
+              onClick={() => setTab("notifications")}
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium rounded-md transition-colors cursor-pointer ${
+                tab === "notifications"
+                  ? "bg-surface-container-low text-on-surface"
+                  : "text-on-surface-variant hover:bg-surface-hover"
+              }`}
+            >
+              Notifications
+              {unreadCount > 0 ? (
+                <span className="inline-flex items-center justify-center min-w-4 h-4 px-1 text-[0.6rem] font-bold text-white bg-critical rounded-full">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+            <button
+              data-testid="downloads-tab"
+              role="tab"
+              aria-selected={tab === "downloads"}
+              onClick={() => setTab("downloads")}
+              className={`relative flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium rounded-md transition-colors cursor-pointer ${
+                tab === "downloads"
+                  ? "bg-surface-container-low text-on-surface"
+                  : "text-on-surface-variant hover:bg-surface-hover"
+              }`}
+            >
+              Downloads
+              {downloadsRedDot ? (
+                <span className="w-1.5 h-1.5 rounded-full bg-critical" aria-hidden />
+              ) : null}
+            </button>
           </div>
 
-          {!loaded ? (
-            <p className="text-[0.84rem] text-on-surface-variant py-2 text-center">
-              Loading...
-            </p>
-          ) : items.length === 0 ? (
-            <p className="text-[0.84rem] text-on-surface-variant py-2 text-center">
-              No notifications.
-            </p>
+          {tab === "notifications" ? (
+            <NotificationsList
+              items={items}
+              loaded={loaded}
+              onClear={handleClear}
+            />
           ) : (
-            <div className="flex flex-col gap-3.5 max-h-80 overflow-y-auto">
-              {items.map((n) => {
-                const mapping = iconMap[n.type as keyof typeof iconMap] ?? iconMap.upload;
-                const { Icon, bg } = mapping;
-                return (
-                  <div key={n.id} className="flex items-start gap-3">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                      style={{ background: bg }}
-                    >
-                      <Icon size={14} color="#ffffff" strokeWidth={1.75} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[0.84rem] font-semibold text-on-surface leading-snug">
-                        {n.message}
-                      </p>
-                      <p className="text-[0.75rem] text-on-surface-variant mt-0.5">{n.detail}</p>
-                    </div>
-                    <span className="text-[0.68rem] font-medium tracking-[0.03em] text-on-surface-variant shrink-0 mt-0.5 whitespace-nowrap">
-                      {timeAgo(n.createdAt)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
+            <DownloadsPanel />
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NotificationsList({
+  items,
+  loaded,
+  onClear,
+}: {
+  items: Notification[];
+  loaded: boolean;
+  onClear: () => void;
+}) {
+  return (
+    <div>
+      {items.length > 0 ? (
+        <div className="flex justify-end mb-2">
+          <button
+            onClick={onClear}
+            className="text-[0.72rem] font-medium text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer"
+          >
+            Clear All
+          </button>
+        </div>
+      ) : null}
+
+      {!loaded ? (
+        <p className="text-[0.84rem] text-on-surface-variant py-4 text-center">
+          Loading…
+        </p>
+      ) : items.length === 0 ? (
+        <p className="text-[0.84rem] text-on-surface-variant py-4 text-center">
+          No notifications.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3.5 max-h-80 overflow-y-auto">
+          {items.map((n) => {
+            const mapping = iconMap[n.type as keyof typeof iconMap] ?? iconMap.upload;
+            const { Icon, bg } = mapping;
+            return (
+              <div key={n.id} className="flex items-start gap-3">
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: bg }}
+                >
+                  <Icon size={14} color="#ffffff" strokeWidth={1.75} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[0.84rem] font-semibold text-on-surface leading-snug">
+                    {n.message}
+                  </p>
+                  <p className="text-[0.75rem] text-on-surface-variant mt-0.5">{n.detail}</p>
+                </div>
+                <span className="text-[0.68rem] font-medium tracking-[0.03em] text-on-surface-variant shrink-0 mt-0.5 whitespace-nowrap">
+                  {timeAgo(n.createdAt)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

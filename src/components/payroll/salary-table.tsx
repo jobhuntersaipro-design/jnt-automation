@@ -11,7 +11,6 @@ import {
   Search,
   Settings,
   Download,
-  ExternalLink,
   FileText,
   CheckCircle2,
   AlertTriangle,
@@ -250,7 +249,7 @@ export function SalaryTable({
   const [showConfirm, setShowConfirm] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [exportingSheets, setExportingSheets] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [tierPopover, setTierPopover] = useState<string | null>(null);
 
   // Snapshot of records before edit mode for cancel/diff
@@ -439,43 +438,10 @@ export function SalaryTable({
     setTimeout(() => setExportingCsv(false), 1500);
   };
 
-  const handleExportSheets = async () => {
-    setExportingSheets(true);
-    try {
-      const res = await fetch(`/api/payroll/upload/${uploadId}/export/sheets`, {
-        method: "POST",
-      });
-
-      if (res.status === 401) {
-        const data = await res.json();
-        if (data.error === "NOT_CONNECTED" && data.connectUrl) {
-          window.location.href = data.connectUrl;
-          return;
-        }
-        if (data.error === "TOKEN_REVOKED") {
-          toast.error("Google Sheets connection lost. Reconnect in Settings.");
-          return;
-        }
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "Export failed");
-        return;
-      }
-
-      const { spreadsheetUrl } = await res.json();
-      toast.success("Exported to Google Sheets", {
-        action: {
-          label: "Open",
-          onClick: () => window.open(spreadsheetUrl, "_blank"),
-        },
-      });
-    } catch {
-      toast.error("Failed to export to Google Sheets");
-    } finally {
-      setExportingSheets(false);
-    }
+  const handleExportPdf = () => {
+    setExportingPdf(true);
+    window.location.href = `/api/payroll/upload/${uploadId}/export/pdf`;
+    setTimeout(() => setExportingPdf(false), 1500);
   };
 
   const StatusFilterPill = ({
@@ -606,12 +572,12 @@ export function SalaryTable({
               {exportingCsv ? "Downloading..." : "Download CSV"}
             </button>
             <button
-              onClick={handleExportSheets}
-              disabled={exportingSheets}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-on-surface border border-outline-variant/30 rounded-md hover:bg-surface-hover transition-colors disabled:opacity-50"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              {exportingSheets ? "Syncing..." : "Sync to Google Sheets"}
+              <FileText className="w-3.5 h-3.5" />
+              {exportingPdf ? "Downloading..." : "Download PDF"}
             </button>
             <button
               onClick={handleGeneratePayslips}

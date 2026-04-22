@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DispatcherRow } from "@/lib/db/overview";
 
@@ -168,9 +169,14 @@ function DispatcherTable({
           <p className="text-[0.84rem] text-on-surface-variant px-2 py-4">No dispatchers found.</p>
         ) : (
           sorted.map((d) => (
-            <div
+            <Link
               key={d.id}
-              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors"
+              href={`/dispatchers?highlight=${d.id}`}
+              data-testid="top-dispatchers-row"
+              data-dispatcher-id={d.id}
+              data-dispatcher-name={d.name}
+              aria-label={`Open salary history for ${d.name}`}
+              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40"
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">
@@ -215,7 +221,7 @@ function DispatcherTable({
               <span className={`tabular-nums text-[0.875rem] ${d.deductions > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                 {d.deductions > 0 ? `RM ${fmt(d.deductions)}` : "—"}
               </span>
-            </div>
+            </Link>
           ))
         )}
       </div>
