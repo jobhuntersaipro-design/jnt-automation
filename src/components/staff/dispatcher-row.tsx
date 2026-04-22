@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Pin, Trash2, Pencil, Camera, X, Upload, Trash, Clock, ChevronDown } from "lucide-react";
+import { Pin, Trash2, Pencil, Camera, X, Upload, Trash, Clock } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
@@ -480,20 +480,32 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
         document.body,
       )}
 
-      {/* Branch — dropdown */}
-      <div className="flex items-center justify-center group/branch" onClick={(e) => e.stopPropagation()}>
-        <div className="relative w-full">
-          <select
-            value={branchCode}
-            onChange={(e) => setBranchCode(e.target.value)}
-            className="w-full px-1 py-1 pr-5 text-[0.78rem] font-medium text-on-surface-variant text-center bg-transparent border border-dashed border-transparent rounded-lg hover:border-outline-variant/50 hover:bg-brand/5 focus:bg-transparent focus:border-transparent focus:outline-none focus:ring-0 transition-all cursor-pointer appearance-none"
-          >
-            {branchCodes.map((code) => (
-              <option key={code} value={code}>{code}</option>
-            ))}
-          </select>
-          <ChevronDown size={10} className="absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant/0 group-hover/branch:text-on-surface-variant/50 transition-colors pointer-events-none" />
-        </div>
+      {/* Branch chips — one per assignment, most recent first */}
+      <div
+        className="flex items-center justify-center gap-1 flex-wrap"
+        onClick={(e) => e.stopPropagation()}
+        title={
+          dispatcher.assignments.length > 1
+            ? `${dispatcher.assignments.length} branches: ${dispatcher.assignments.map((a) => a.branchCode).join(", ")}`
+            : undefined
+        }
+      >
+        {dispatcher.assignments.length === 0 ? (
+          <span className="text-[0.72rem] text-on-surface-variant/60">—</span>
+        ) : (
+          dispatcher.assignments.map((a, idx) => (
+            <span
+              key={`${a.branchCode}-${a.extId}`}
+              className={`px-1.5 py-0.5 text-[0.7rem] font-medium rounded-md tabular-nums ${
+                idx === 0
+                  ? "bg-brand/10 text-brand"
+                  : "bg-surface-low text-on-surface-variant/70"
+              }`}
+            >
+              {a.branchCode}
+            </span>
+          ))
+        )}
       </div>
 
       {/* IC No */}

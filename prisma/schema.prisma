@@ -24,6 +24,7 @@ model Agent {
   paymentRecords        PaymentRecord[]
   notifications         Notification[]
   employees             Employee[]
+  dispatchers           Dispatcher[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -95,31 +96,39 @@ model VerificationToken {
 // ─── Core Domain ─────────────────────────────────────────────
 
 model Branch {
-  id          String       @id @default(cuid())
+  id          String                 @id @default(cuid())
   agentId     String
-  code        String       // raw branch code from J&T data e.g. "PHG379"
+  code        String                 // raw branch code from J&T data e.g. "PHG379"
   dispatchers Dispatcher[]
+  assignments DispatcherAssignment[]
   employees   Employee[]
   uploads     Upload[]
-  agent       Agent        @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  agent       Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
   @@unique([agentId, code])
   @@index([agentId])
 }
 
 model Dispatcher {
-  id        String  @id @default(cuid())
-  extId     String  // Dispatcher ID from raw data (col M) e.g. "PHG3795023"
-  name      String
-  icNo      String  // Malaysian MyKad — mandatory. Last digit: odd = male, even = female
-  gender    Gender  @default(UNKNOWN)
-  avatarUrl String?
-  branchId  String
-  isPinned  Boolean @default(false)
+  id             String  @id @default(cuid())
+  // agentId: direct ownership by agent. Nullable in Phase A to allow the
+  // additive migration on existing rows; backfilled to non-null before Phase B
+  // flips it to required and drops branchId from this table.
+  agentId        String?
+  extId          String  // Dispatcher ID from raw data (col M) e.g. "PHG3795023". Moves to DispatcherAssignment in Phase B.
+  name           String
+  normalizedName String  @default("") // UPPER(TRIM(COLLAPSE_WS(name))) for fallback matching. Backfilled in Phase A.
+  icNo           String? // Malaysian MyKad. Was required; now optional — matches data reality.
+  gender         Gender  @default(UNKNOWN)
+  avatarUrl      String?
+  branchId       String  // Moves to DispatcherAssignment in Phase B.
+  isPinned       Boolean @default(false)
 
-  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  agent         Agent?                 @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  branch        Branch                 @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  assignments   DispatcherAssignment[]
   weightTiers   WeightTier[]
   incentiveRule IncentiveRule?
   petrolRule    PetrolRule?
@@ -132,6 +141,28 @@ model Dispatcher {
   @@unique([branchId, extId])
   @@index([branchId])
   @@index([extId])
+  @@index([agentId])
+  @@index([agentId, icNo])
+  @@index([agentId, normalizedName])
+}
+
+// A dispatcher's assignment to a specific branch. Created in Phase B backfill;
+// until then this table is empty and the app continues to read branchId/extId
+// directly from Dispatcher.
+model DispatcherAssignment {
+  id           String    @id @default(cuid())
+  dispatcherId String
+  branchId     String
+  extId        String    // branch-scoped J&T ID
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime? // null = still assigned
+
+  dispatcher Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+  branch     Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, extId])
+  @@index([dispatcherId])
+  @@index([branchId])
 }
 
 enum Gender {

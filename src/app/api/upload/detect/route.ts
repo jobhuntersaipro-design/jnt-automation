@@ -7,6 +7,7 @@ import { createUpload, replaceUpload, updateUploadStatus } from "@/lib/db/upload
 import { getAgentDefaults } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
 import { dispatchWorker } from "@/lib/upload/dispatch-worker";
+import { normalizeName } from "@/lib/dispatcher-identity/normalize-name";
 
 /**
  * POST /api/upload/detect
@@ -121,20 +122,39 @@ export async function POST(req: NextRequest) {
     const defaults = await getAgentDefaults(agentId);
 
     await prisma.$transaction(async (tx) => {
-      // Upsert all unknown dispatchers
+      // For each unknown extId, find or create the Dispatcher + its Assignment
       const upsertedDispatchers: { id: string }[] = [];
       for (const d of unknown) {
-        const dispatcher = await tx.dispatcher.upsert({
+        const existingAssignment = await tx.dispatcherAssignment.findUnique({
           where: { branchId_extId: { branchId: branch.id, extId: d.extId } },
-          update: {},
-          create: {
+          select: { dispatcherId: true },
+        });
+
+        if (existingAssignment) {
+          upsertedDispatchers.push({ id: existingAssignment.dispatcherId });
+          continue;
+        }
+
+        const dispatcher = await tx.dispatcher.create({
+          data: {
+            agentId,
             name: d.name,
+            normalizedName: normalizeName(d.name),
             extId: d.extId,
-            icNo: "",
+            icNo: null,
             branchId: branch.id,
           },
           select: { id: true },
         });
+
+        await tx.dispatcherAssignment.create({
+          data: {
+            dispatcherId: dispatcher.id,
+            branchId: branch.id,
+            extId: d.extId,
+          },
+        });
+
         upsertedDispatchers.push(dispatcher);
       }
 

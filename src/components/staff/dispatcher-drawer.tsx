@@ -65,11 +65,25 @@ export function DispatcherDrawer({ dispatcher, onClose }: DispatcherDrawerProps)
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface truncate">{dispatcher.name}</h2>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-[0.75rem] text-on-surface-variant">{dispatcher.extId}</p>
-              <span className="inline-block px-1.5 py-0.5 text-[0.68rem] font-medium text-on-surface-variant bg-surface-low rounded-lg">
-                {dispatcher.branchCode}
-              </span>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {dispatcher.assignments.length === 0 ? (
+                <p className="text-[0.75rem] text-on-surface-variant">{dispatcher.extId}</p>
+              ) : (
+                dispatcher.assignments.map((a, idx) => (
+                  <span
+                    key={`${a.branchCode}-${a.extId}`}
+                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg tabular-nums ${
+                      idx === 0
+                        ? "bg-brand/10 text-brand"
+                        : "bg-surface-low text-on-surface-variant"
+                    }`}
+                    title={idx === 0 ? "Current assignment" : "Previous assignment"}
+                  >
+                    <span className="font-semibold">{a.branchCode}</span>
+                    <span className="opacity-70">· {a.extId}</span>
+                  </span>
+                ))
+              )}
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover transition-colors">

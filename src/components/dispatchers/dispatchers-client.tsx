@@ -693,7 +693,13 @@ export function DispatchersClient({
               Delete {deleteTarget.name}?
             </h3>
             <p className="text-[0.84rem] text-on-surface-variant mt-2">
-              This will permanently delete this dispatcher and all their salary rules. This cannot be undone.
+              {deleteTarget.assignments.length > 1 ? (
+                <>
+                  This person is assigned to <strong className="text-on-surface">{deleteTarget.assignments.length} branches</strong> ({deleteTarget.assignments.map((a) => a.branchCode).join(", ")}). Deleting will remove all of their assignments, salary rules, and historical salary records across every branch. This cannot be undone.
+                </>
+              ) : (
+                <>This will permanently delete this dispatcher, their salary rules, and all historical salary records. This cannot be undone.</>
+              )}
             </p>
             <div className="flex items-center justify-end gap-2 mt-5">
               <button onClick={() => setDeleteTarget(null)} disabled={deleting} className="px-4 py-2 text-[0.84rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors disabled:opacity-60">

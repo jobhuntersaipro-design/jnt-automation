@@ -1,15 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import type { Gender } from "@/generated/prisma/client";
 
+export type StaffAssignment = {
+  branchCode: string;
+  extId: string;
+};
+
 export type StaffDispatcher = {
   id: string;
+  /** Primary / most-recent assignment extId (for single-branch display contexts) */
   extId: string;
   name: string;
   icNo: string;
   gender: Gender;
   avatarUrl: string | null;
   isPinned: boolean;
+  /** Primary / most-recent assignment branch code */
   branchCode: string;
+  /** All branch assignments, ordered most recent first */
+  assignments: StaffAssignment[];
   isComplete: boolean;
   /** "NEW" if no salary records or first seen this month, otherwise "Jan 2026" */
   firstSeen: string;
@@ -29,19 +38,33 @@ export async function getDispatchers(
   const [dispatchers, latestRecord] = await Promise.all([
     prisma.dispatcher.findMany({
       where: {
-        branch: {
-          agentId,
-          ...(branchCodes.length > 0 && { code: { in: branchCodes } }),
-        },
+        // A dispatcher is owned directly by the agent (post-Phase-B agentId)
+        // or, as a safety net, via their canonical branch. The `agentId` field
+        // is authoritative.
+        agentId,
+        // Filter matches if the person has an assignment at any of the
+        // selected branches — a transfer-aware lookup.
+        ...(branchCodes.length > 0 && {
+          assignments: {
+            some: { branch: { code: { in: branchCodes } } },
+          },
+        }),
         ...(search && {
           OR: [
             { name: { contains: search, mode: "insensitive" as const } },
-            { extId: { contains: search, mode: "insensitive" as const } },
+            {
+              assignments: {
+                some: { extId: { contains: search, mode: "insensitive" as const } },
+              },
+            },
           ],
         }),
       },
       include: {
-        branch: { select: { code: true } },
+        assignments: {
+          include: { branch: { select: { code: true } } },
+          orderBy: { startedAt: "desc" },
+        },
         weightTiers: {
           select: { tier: true, minWeight: true, maxWeight: true, commission: true },
           orderBy: { tier: "asc" as const },
@@ -57,7 +80,7 @@ export async function getDispatchers(
       orderBy: [{ isPinned: "desc" }, { name: "asc" }],
     }),
     prisma.salaryRecord.findFirst({
-      where: { dispatcher: { branch: { agentId } } },
+      where: { dispatcher: { agentId } },
       orderBy: [{ year: "desc" }, { month: "desc" }],
       select: { month: true, year: true },
     }),
@@ -86,18 +109,30 @@ export async function getDispatchers(
       firstSeen = `${MONTH_ABBR[earliest.month - 1]} ${earliest.year}`;
     }
 
+    const assignments: StaffAssignment[] = d.assignments.map((a) => ({
+      branchCode: a.branch.code,
+      extId: a.extId,
+    }));
+    // Fall back to the denormalized Dispatcher.branchId/extId if — for any
+    // reason — the person has no assignments yet (e.g., mid-migration, or
+    // legacy rows created before Phase B). Phase-B backfilled all rows, but
+    // being defensive prevents the list from rendering empty chips.
+    const primaryBranchCode = assignments[0]?.branchCode ?? "";
+    const primaryExtId = assignments[0]?.extId ?? d.extId;
+
     return {
       id: d.id,
-      extId: d.extId,
+      extId: primaryExtId,
       name: d.name,
       icNo: maskIc(d.icNo),
       gender: d.gender,
       avatarUrl: d.avatarUrl,
       isPinned: d.isPinned,
-      branchCode: d.branch.code,
-      isComplete: computeIsComplete(d.name, d.icNo, d.extId),
+      branchCode: primaryBranchCode,
+      assignments,
+      isComplete: computeIsComplete(d.name, d.icNo, primaryExtId),
       firstSeen,
-      rawIcNo: d.icNo,
+      rawIcNo: d.icNo ?? "",
       weightTiers: d.weightTiers,
       incentiveRule: d.incentiveRule,
       petrolRule: d.petrolRule,
@@ -151,7 +186,7 @@ export async function getDispatcherById(
     id: d.id,
     extId: d.extId,
     name: d.name,
-    icNo: d.icNo,
+    icNo: d.icNo ?? "",
     gender: d.gender,
     branchCode: d.branch.code,
     isPinned: d.isPinned,
@@ -194,13 +229,14 @@ export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> 
 
 export function computeIsComplete(
   name: string,
-  _icNo: string,
+  _icNo: string | null,
   extId: string,
 ): boolean {
   return name.length > 0 && extId.length > 0;
 }
 
-export function maskIc(ic: string): string {
+export function maskIc(ic: string | null): string {
+  if (!ic) return "";
   if (ic.length <= 4) return ic;
   return "\u2022".repeat(ic.length - 4) + ic.slice(-4);
 }

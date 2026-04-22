@@ -25,7 +25,7 @@ export interface SalaryRecordRow {
   extId: string;
   name: string;
   avatarUrl: string | null;
-  icNo: string;
+  icNo: string | null;
   totalOrders: number;
   baseSalary: number;
   incentive: number;

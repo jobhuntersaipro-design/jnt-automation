@@ -20,7 +20,10 @@ export async function splitDispatchers(
 ): Promise<DispatcherSplitResult> {
   const allExtIds = [...new Set(rows.map((r) => r.dispatcherId))];
 
-  const existing = await prisma.dispatcher.findMany({
+  // "Known" means a DispatcherAssignment exists for this (agent, extId) — the
+  // assignment table is the authoritative map of branch-specific J&T IDs to
+  // person-level Dispatcher records post-Phase-B.
+  const existing = await prisma.dispatcherAssignment.findMany({
     where: {
       branch: { agentId },
       extId: { in: allExtIds },
@@ -28,7 +31,7 @@ export async function splitDispatchers(
     select: { extId: true },
   });
 
-  const knownIds = new Set(existing.map((d) => d.extId));
+  const knownIds = new Set(existing.map((a) => a.extId));
 
   return {
     known: allExtIds.filter((id) => knownIds.has(id)),

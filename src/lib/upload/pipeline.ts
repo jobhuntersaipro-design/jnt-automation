@@ -124,16 +124,22 @@ export async function calculateAfterConfirm(uploadId: string) {
   });
   const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
-  // Load dispatchers with their salary rules
-  const dispatchers = await prisma.dispatcher.findMany({
+  // Load dispatchers via their DispatcherAssignment for THIS upload's branch.
+  // Going through the assignment table is correct post-Phase-B: a person's
+  // branch-specific extId lives on the assignment row, not on Dispatcher.
+  const assignments = await prisma.dispatcherAssignment.findMany({
     where: {
-      branch: { agentId: upload.branch.agentId },
+      branchId: upload.branchId,
       extId: { in: known },
     },
     include: {
-      weightTiers: { orderBy: { tier: "asc" } },
-      incentiveRule: true,
-      petrolRule: true,
+      dispatcher: {
+        include: {
+          weightTiers: { orderBy: { tier: "asc" } },
+          incentiveRule: true,
+          petrolRule: true,
+        },
+      },
     },
   });
 
@@ -141,28 +147,29 @@ export async function calculateAfterConfirm(uploadId: string) {
     stage: "calculate",
     stageLabel: "Calculating salaries",
     rowsParsed: rows.length,
-    dispatchersFound: dispatchers.length,
+    dispatchersFound: assignments.length,
     dispatchersProcessed: 0,
-    totalDispatchers: dispatchers.length,
+    totalDispatchers: assignments.length,
     startedAt,
   });
 
   // Calculate salary for each known dispatcher
   const results: SalaryResult[] = [];
   let processed = 0;
-  for (const d of dispatchers) {
+  for (const a of assignments) {
+    const d = a.dispatcher;
     if (!d.incentiveRule || !d.petrolRule) {
       processed++;
       continue;
     }
 
-    const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
+    const dispatcherRows = rows.filter((r) => r.dispatcherId === a.extId);
     processed++;
     if (dispatcherRows.length === 0) continue;
 
     const rules: DispatcherRules = {
       dispatcherId: d.id,
-      extId: d.extId,
+      extId: a.extId,
       weightTiers: d.weightTiers.map((t) => ({
         tier: t.tier,
         minWeight: t.minWeight,
@@ -182,14 +189,14 @@ export async function calculateAfterConfirm(uploadId: string) {
 
     results.push(calculateSalary(rules, dispatcherRows));
 
-    if (processed % 5 === 0 || processed === dispatchers.length) {
+    if (processed % 5 === 0 || processed === assignments.length) {
       await setProgress(uploadId, {
         stage: "calculate",
         stageLabel: "Calculating salaries",
         rowsParsed: rows.length,
-        dispatchersFound: dispatchers.length,
+        dispatchersFound: assignments.length,
         dispatchersProcessed: processed,
-        totalDispatchers: dispatchers.length,
+        totalDispatchers: assignments.length,
         startedAt,
       });
     }
@@ -218,9 +225,9 @@ export async function calculateAfterConfirm(uploadId: string) {
     stage: "save",
     stageLabel: "Saving preview",
     rowsParsed: rows.length,
-    dispatchersFound: dispatchers.length,
-    dispatchersProcessed: dispatchers.length,
-    totalDispatchers: dispatchers.length,
+    dispatchersFound: assignments.length,
+    dispatchersProcessed: assignments.length,
+    totalDispatchers: assignments.length,
     startedAt,
   });
 
@@ -259,30 +266,36 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
   // Re-parse from R2
   const rows = await parseExcelFromR2(upload.r2Key);
 
-  // Load the newly-created dispatchers with their rules
-  const dispatchers = await prisma.dispatcher.findMany({
+  // Load the newly-created dispatchers via DispatcherAssignment for this
+  // upload's branch — assignment carries the branch-specific extId.
+  const assignments = await prisma.dispatcherAssignment.findMany({
     where: {
-      branch: { agentId: upload.branch.agentId },
+      branchId: upload.branchId,
       extId: { in: unknownExtIds },
     },
     include: {
-      weightTiers: { orderBy: { tier: "asc" } },
-      incentiveRule: true,
-      petrolRule: true,
+      dispatcher: {
+        include: {
+          weightTiers: { orderBy: { tier: "asc" } },
+          incentiveRule: true,
+          petrolRule: true,
+        },
+      },
     },
   });
 
   // Calculate salary for each new dispatcher
   const newResults: PreviewResult[] = [];
-  for (const d of dispatchers) {
+  for (const a of assignments) {
+    const d = a.dispatcher;
     if (!d.incentiveRule || !d.petrolRule) continue;
 
-    const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
+    const dispatcherRows = rows.filter((r) => r.dispatcherId === a.extId);
     if (dispatcherRows.length === 0) continue;
 
     const rules: DispatcherRules = {
       dispatcherId: d.id,
-      extId: d.extId,
+      extId: a.extId,
       weightTiers: d.weightTiers.map((t) => ({
         tier: t.tier,
         minWeight: t.minWeight,
