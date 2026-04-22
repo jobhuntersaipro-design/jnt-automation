@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { ConfirmSettingsCard } from "./confirm-settings-card";
 import { ReadyToConfirm } from "./ready-to-confirm";
+import { UploadStageTimeline, type UploadProgressData } from "./processing-card";
 
 type UploadStatus =
   | "UPLOADING"
@@ -43,6 +44,8 @@ export interface ActiveUpload {
   errorMessage?: string;
   knownCount?: number;
   unknownDispatchers?: UnknownDispatcher[];
+  /** Server-reported progress tick during PROCESSING */
+  progress?: UploadProgressData;
 }
 
 interface ActiveUploadListProps {
@@ -86,6 +89,7 @@ function UploadRow({
   const prevStatusRef = useRef(upload.status);
   const [isCancelling, setIsCancelling] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   // Auto-expand when transitioning to an actionable state
   useEffect(() => {
@@ -125,16 +129,18 @@ function UploadRow({
         }
         if (!res.ok) return;
         const data = await res.json();
+        // Always forward progress ticks so the timeline updates even
+        // when status hasn't transitioned.
+        const updates: Partial<ActiveUpload> = { progress: data.progress };
         if (data.status !== upload.status) {
-          onUpdate({
-            status: data.status,
-            errorMessage: data.errorMessage,
-            knownCount: data.knownCount,
-            unknownDispatchers: data.unknownDispatchers,
-          });
-          if (data.status === "SAVED") {
-            onUploadComplete();
-          }
+          updates.status = data.status;
+          updates.errorMessage = data.errorMessage;
+          updates.knownCount = data.knownCount;
+          updates.unknownDispatchers = data.unknownDispatchers;
+        }
+        onUpdate(updates);
+        if (data.status === "SAVED") {
+          onUploadComplete();
         }
       }, 2000);
     }
@@ -180,6 +186,25 @@ function UploadRow({
       setIsCancelling(false);
     }
   }, [upload.uploadId, onRemove]);
+
+  const handleRetry = useCallback(async () => {
+    if (!upload.uploadId) return;
+    setIsRetrying(true);
+    try {
+      const res = await fetch(`/api/upload/${upload.uploadId}/retry`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Failed to retry");
+        return;
+      }
+      onUpdate({ status: "PROCESSING", errorMessage: undefined, progress: undefined });
+      toast.success("Retrying…");
+    } catch {
+      toast.error("Failed to retry");
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [upload.uploadId, onUpdate]);
 
   const handleConfirmSettings = useCallback(async () => {
     if (!upload.uploadId) return;
@@ -242,7 +267,7 @@ function UploadRow({
               </p>
             )}
             {upload.status === "FAILED" && upload.errorMessage && (
-              <p className="text-[0.78rem] text-critical mt-0.5 truncate">
+              <p className="text-[0.78rem] text-critical mt-0.5 line-clamp-2 break-words">
                 {upload.errorMessage}
               </p>
             )}
@@ -284,6 +309,16 @@ function UploadRow({
               <X className="w-3.5 h-3.5" />
             </button>
           )}
+          {upload.status === "FAILED" && upload.uploadId && (
+            <button
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="px-2.5 py-1 text-[0.75rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 transition-colors disabled:opacity-50"
+              title="Retry without re-uploading"
+            >
+              {isRetrying ? "Retrying…" : "Retry"}
+            </button>
+          )}
           {(upload.status === "SAVED" || upload.status === "FAILED") && (
             <button
               onClick={onRemove}
@@ -294,6 +329,17 @@ function UploadRow({
             </button>
           )}
         </div>
+
+        {/* Stage timeline — visible during UPLOADING and PROCESSING */}
+        {(upload.status === "UPLOADING" || upload.status === "PROCESSING") && (
+          <div className="px-4 pb-4">
+            <UploadStageTimeline
+              phase={upload.status === "UPLOADING" ? "uploading" : "processing"}
+              uploadPercent={upload.uploadProgress}
+              progress={upload.progress}
+            />
+          </div>
+        )}
 
         {/* Expanded detail */}
         {expanded && upload.uploadId && (

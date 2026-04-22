@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Client } from "@upstash/qstash";
 import { parseExcelFromR2 } from "@/lib/upload/parser";
 import { splitDispatchers } from "@/lib/upload/dispatcher-check";
 import { createUpload, replaceUpload, updateUploadStatus } from "@/lib/db/upload";
 import { getAgentDefaults } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
-
-const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
+import { dispatchWorker } from "@/lib/upload/dispatch-worker";
 
 /**
  * POST /api/upload/detect
@@ -38,9 +36,13 @@ export async function POST(req: NextRequest) {
   let rows;
   try {
     rows = await parseExcelFromR2(r2Key);
-  } catch {
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    console.error("[upload/detect] parse failed", { r2Key, detail });
     return NextResponse.json(
-      { error: "Failed to parse file. Please ensure it is a valid Excel file." },
+      {
+        error: `Failed to parse file: ${detail}. Please ensure it is a valid J&T delivery export.`,
+      },
       { status: 400 },
     );
   }
@@ -215,11 +217,7 @@ export async function POST(req: NextRequest) {
 
     // Trigger processing
     await updateUploadStatus(result.uploadId!, "PROCESSING");
-    await qstash.publishJSON({
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/api/upload/worker`,
-      body: { uploadId: result.uploadId },
-      retries: 2,
-    });
+    await dispatchWorker(result.uploadId!, "parse");
 
     return NextResponse.json({
       isDuplicate: false,
@@ -246,11 +244,7 @@ export async function POST(req: NextRequest) {
   });
 
   await updateUploadStatus(uploadId, "PROCESSING");
-  await qstash.publishJSON({
-    url: `${process.env.NEXT_PUBLIC_APP_URL}/api/upload/worker`,
-    body: { uploadId },
-    retries: 2,
-  });
+  await dispatchWorker(uploadId, "parse");
 
   return NextResponse.json({
     isDuplicate: false,

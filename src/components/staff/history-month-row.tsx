@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronDown, RefreshCw, Download } from "lucide-react";
+import {
+  ChevronDown,
+  RefreshCw,
+  Download,
+  CheckCircle2,
+  AlertTriangle,
+} from "lucide-react";
 
 const MONTHS = [
   "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -28,12 +34,14 @@ interface PetrolSnapshot {
 
 export interface HistoryRecord {
   salaryRecordId: string;
+  uploadId: string;
   month: number;
   year: number;
   netSalary: number;
   baseSalary: number;
   incentive: number;
   petrolSubsidy: number;
+  petrolQualifyingDays: number;
   penalty: number;
   advance: number;
   totalOrders: number;
@@ -62,6 +70,72 @@ const DEFAULT_PETROL: PetrolSnapshot = { isEligible: false, dailyThreshold: 70, 
 
 function formatRM(value: number): string {
   return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+type RowStatus = "confirmed" | "recalculated" | "review";
+
+function rowStatus(r: HistoryRecord): RowStatus {
+  if (r.totalOrders === 0 || r.netSalary <= 0) return "review";
+  if (r.wasRecalculated) return "recalculated";
+  return "confirmed";
+}
+
+function StatusPill({ status }: { status: RowStatus }) {
+  const config = {
+    confirmed: {
+      label: "Confirmed",
+      icon: CheckCircle2,
+      className: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    },
+    recalculated: {
+      label: "Recalculated",
+      icon: RefreshCw,
+      className: "text-amber-700 bg-amber-50 border-amber-200",
+    },
+    review: {
+      label: "Review",
+      icon: AlertTriangle,
+      className: "text-critical bg-red-50 border-red-200",
+    },
+  }[status];
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium rounded-full border ${config.className}`}
+    >
+      <Icon className="w-3 h-3" strokeWidth={2.5} />
+      {config.label}
+    </span>
+  );
+}
+
+function StatChip({
+  label,
+  value,
+  color,
+  muted,
+}: {
+  label: string;
+  value: string;
+  color?: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="flex flex-col min-w-0">
+      <span className="text-[0.6rem] uppercase tracking-wider text-on-surface-variant/70 font-medium">
+        {label}
+      </span>
+      <span
+        className="text-[0.82rem] font-semibold tabular-nums truncate"
+        style={{
+          color: muted ? "var(--color-on-surface-variant)" : color ?? "var(--color-on-surface)",
+          opacity: muted ? 0.4 : 1,
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
 }
 
 /** Text-based decimal input that always uses "." with optional +/- stepper */
@@ -141,6 +215,7 @@ export function HistoryMonthRow({
   onRecalculated,
 }: HistoryMonthRowProps) {
   const monthLabel = `${MONTHS[record.month]} ${record.year}`;
+  const status = rowStatus(record);
 
   const originalTiers = record.weightTiersSnapshot ?? DEFAULT_WEIGHT_TIERS;
   const originalIncentive = record.incentiveSnapshot ?? DEFAULT_INCENTIVE;
@@ -228,21 +303,34 @@ export function HistoryMonthRow({
     }
   }
 
-  async function handleDownloadPayslip() {
+  async function handleDownloadPayslip(e: React.MouseEvent) {
+    e.stopPropagation();
     setDownloading(true);
     try {
-      const res = await fetch(`/api/payroll/payslip/${record.salaryRecordId}`, { method: "POST" });
-      if (!res.ok) throw new Error("Failed to generate payslip");
+      const res = await fetch(`/api/payroll/upload/${record.uploadId}/payslips`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ dispatcherIds: [dispatcherId] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to generate payslip");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
+      const disposition = res.headers.get("Content-Disposition") || "";
+      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `payslip_${dispatcherId}_${record.month}_${record.year}.pdf`;
+      a.download = filenameMatch?.[1] || `payslip_${dispatcherId}_${record.month}_${record.year}.pdf`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to download payslip";
       const { toast } = await import("sonner");
-      toast.error("Failed to download payslip");
+      toast.error(message);
     } finally {
       setDownloading(false);
     }
@@ -255,56 +343,93 @@ export function HistoryMonthRow({
   }
 
   return (
-    <div className="border-b border-outline-variant/15 last:border-b-0">
-      {/* Summary Row */}
+    <div className="rounded-xl bg-surface-card border border-outline-variant/15 overflow-hidden">
+      {/* Summary card */}
       <div
         role="button"
         tabIndex={0}
         onClick={onToggle}
-        onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onToggle(); } }}
-        className="w-full grid grid-cols-[5rem_1fr_7rem_5.5rem] items-center px-4 py-3 text-left hover:bg-surface-hover/50 transition-colors cursor-pointer"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer"
       >
-        <span className="text-[0.84rem] font-medium text-on-surface">{monthLabel}</span>
-        <span className="text-[0.84rem] font-semibold tabular-nums text-on-surface text-center">
-          {formatRM(record.netSalary)}
-        </span>
-        <div className="flex justify-center">
-          {record.wasRecalculated ? (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium text-amber-700 bg-amber-50 rounded-lg">
-              <RefreshCw size={10} />
-              Recalculated
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium text-green-700 bg-green-50 rounded-lg">
-              Confirmed
-            </span>
-          )}
-        </div>
-        <div className="flex items-center justify-center gap-2">
-          {record.wasRecalculated && (
+        {/* Top: month + status + actions */}
+        <div className="flex items-center justify-between gap-2 mb-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[0.9rem] font-semibold text-on-surface">{monthLabel}</span>
+            <StatusPill status={status} />
+          </div>
+          <div className="flex items-center gap-1">
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDownloadPayslip();
-              }}
+              onClick={handleDownloadPayslip}
               disabled={downloading}
-              className="inline-flex items-center gap-1 px-2 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded-[0.375rem] transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded-md transition-colors disabled:opacity-50"
+              title="Download payslip PDF"
             >
               <Download size={12} />
-              Payslip
+              {downloading ? "..." : "Payslip"}
             </button>
-          )}
-          <ChevronDown
-            size={14}
-            className={`text-on-surface-variant transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            <ChevronDown
+              size={14}
+              className={`text-on-surface-variant transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            />
+          </div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-4 gap-3">
+          <StatChip
+            label="Orders"
+            value={record.totalOrders.toLocaleString()}
+            muted={record.totalOrders === 0}
           />
+          <StatChip
+            label="Base"
+            value={formatRM(record.baseSalary)}
+          />
+          <StatChip
+            label="Incentive"
+            value={record.incentive > 0 ? formatRM(record.incentive) : "—"}
+            color="#12B981"
+            muted={record.incentive === 0}
+          />
+          <StatChip
+            label={`Petrol${record.petrolQualifyingDays > 0 ? ` · ${record.petrolQualifyingDays}d` : ""}`}
+            value={record.petrolSubsidy > 0 ? formatRM(record.petrolSubsidy) : "—"}
+            color="#B27F08"
+            muted={record.petrolSubsidy === 0}
+          />
+          <StatChip
+            label="Penalty"
+            value={record.penalty > 0 ? formatRM(record.penalty) : "—"}
+            color="var(--color-critical)"
+            muted={record.penalty === 0}
+          />
+          <StatChip
+            label="Advance"
+            value={record.advance > 0 ? formatRM(record.advance) : "—"}
+            color="var(--color-critical)"
+            muted={record.advance === 0}
+          />
+          <div className="col-span-2 flex flex-col items-end justify-end border-l border-outline-variant/20 pl-3">
+            <span className="text-[0.6rem] uppercase tracking-wider text-on-surface-variant/70 font-medium">
+              Net Salary
+            </span>
+            <span className="text-[1rem] font-bold tabular-nums text-brand">
+              {formatRM(record.netSalary)}
+            </span>
+          </div>
         </div>
       </div>
 
       {/* Expandable Edit Panel */}
       {isExpanded && (
-        <div className="px-4 pb-4">
-          <div className="bg-surface-low rounded-[0.5rem] p-4 space-y-5">
+        <div className="px-4 pb-4 border-t border-outline-variant/15">
+          <div className="bg-surface-low rounded-[0.5rem] p-4 mt-3 space-y-5">
             <h4 className="text-[0.75rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
               {monthLabel} — Settings used
             </h4>
@@ -449,13 +574,13 @@ export function HistoryMonthRow({
             {/* Actions */}
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-outline-variant/15">
               <button
-                onClick={handleCancel}
+                onClick={(e) => { e.stopPropagation(); handleCancel(); }}
                 className="px-4 py-2 text-[0.84rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors"
               >
                 Cancel
               </button>
               <button
-                onClick={() => setShowConfirm(true)}
+                onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
                 disabled={!hasChanges}
                 className="px-4 py-2 text-[0.84rem] font-medium text-white bg-brand rounded-[0.375rem] hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:pointer-events-none"
               >
