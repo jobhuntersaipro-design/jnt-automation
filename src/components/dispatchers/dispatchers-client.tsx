@@ -61,7 +61,10 @@ export function DispatchersClient({
 }: DispatchersClientProps) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "payroll" ? "payroll" : "settings";
+  const initialHighlight = searchParams.get("highlight");
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
+  // Consume the ?highlight=<id> deep-link exactly once per mount.
+  const highlightConsumedRef = useRef(false);
   const router = useRouter();
   const [localBranchCodes, setLocalBranchCodes] = useState<string[]>(initialBranchCodes);
 
@@ -76,6 +79,32 @@ export function DispatchersClient({
       refreshResolveRef.current = null;
     }
   }, [serverData]);
+
+  // Consume ?highlight=<id> deep-link — open the drawer for the matching
+  // dispatcher, scroll them into view, and clear the URL so refresh doesn't
+  // re-trigger. Silently ignored if the id doesn't match.
+  useEffect(() => {
+    if (highlightConsumedRef.current) return;
+    if (!initialHighlight) return;
+    highlightConsumedRef.current = true;
+
+    // TopDispatchers sends the extId in the URL (DispatcherRow.id === extId).
+    // StaffDispatcher.id is a cuid; match on extId too so either form works.
+    const match = items.find(
+      (d) => d.id === initialHighlight || d.extId === initialHighlight,
+    );
+    window.history.replaceState(null, "", "/dispatchers");
+    if (!match) return; // invalid id — silently ignore per spec
+
+    setActiveTab("settings");
+    setDrawerDispatcher(match);
+    // Scroll the row into view (best-effort — row may not be rendered if on
+    // a different pagination page; the drawer opens regardless).
+    requestAnimationFrame(() => {
+      const el = rowRefs.current.get(match.id);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [initialHighlight, items]);
 
   const [selectedBranch, setSelectedBranch] = useState("");
   const [filterNew, setFilterNew] = useState(false);
