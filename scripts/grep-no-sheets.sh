@@ -28,6 +28,10 @@ EXCLUDES=(
   ":!scripts/grep-no-sheets.sh"
   # Legacy migration that ADDED the columns — append-only, never edit
   ":!prisma/migrations/20260413_add_google_sheets_tokens/**"
+  # The guard test itself asserts absence of these strings
+  ":!src/lib/__tests__/schema-no-sheets.test.ts"
+  ":!e2e/sheets-removed.spec.ts"
+  ":!e2e/pdf-exports.spec.ts"
 )
 
 # Build the path args, skipping any that don't exist (git grep errors otherwise).

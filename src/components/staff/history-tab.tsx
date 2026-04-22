@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import { Download, ExternalLink, TrendingUp } from "lucide-react";
+import { Download, FileText, TrendingUp } from "lucide-react";
 import { HistoryMonthRow } from "./history-month-row";
 import type { HistoryRecord } from "./history-month-row";
 
@@ -20,7 +20,7 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
-  const [exportingSheets, setExportingSheets] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const initialExpanded = useRef(false);
 
   const fetchHistory = useCallback(async () => {
@@ -85,43 +85,10 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
     setTimeout(() => setExportingCsv(false), 1500);
   };
 
-  const handleExportSheets = async () => {
-    setExportingSheets(true);
-    try {
-      const res = await fetch(`/api/staff/${dispatcherId}/export/sheets`, {
-        method: "POST",
-      });
-
-      if (res.status === 401) {
-        const data = await res.json();
-        if (data.error === "NOT_CONNECTED" && data.connectUrl) {
-          window.location.href = data.connectUrl;
-          return;
-        }
-        if (data.error === "TOKEN_REVOKED") {
-          toast.error("Google Sheets connection lost. Reconnect in Settings.");
-          return;
-        }
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "Export failed");
-        return;
-      }
-
-      const { spreadsheetUrl } = await res.json();
-      toast.success("Exported to Google Sheets", {
-        action: {
-          label: "Open",
-          onClick: () => window.open(spreadsheetUrl, "_blank"),
-        },
-      });
-    } catch {
-      toast.error("Failed to export to Google Sheets");
-    } finally {
-      setExportingSheets(false);
-    }
+  const handleExportPdf = () => {
+    setExportingPdf(true);
+    window.location.href = `/api/staff/${dispatcherId}/export/pdf`;
+    setTimeout(() => setExportingPdf(false), 1500);
   };
 
   if (loading) {
@@ -166,12 +133,12 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
               {exportingCsv ? "Downloading..." : "CSV"}
             </button>
             <button
-              onClick={handleExportSheets}
-              disabled={exportingSheets}
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.75rem] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-md transition-colors disabled:opacity-50"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              {exportingSheets ? "Syncing..." : "Sheets"}
+              <FileText className="w-3.5 h-3.5" />
+              {exportingPdf ? "Downloading..." : "PDF"}
             </button>
           </div>
         </div>

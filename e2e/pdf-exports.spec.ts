@@ -18,10 +18,13 @@ import { test, expect } from "@playwright/test";
  */
 async function firstUploadId(page: import("@playwright/test").Page): Promise<string | null> {
   await page.goto("/dispatchers?tab=payroll");
-  const href = await page
-    .locator('a[href^="/dispatchers/payroll/"]')
-    .first()
-    .getAttribute("href");
+  const link = page.locator('a[href^="/dispatchers/payroll/"]').first();
+  try {
+    await link.waitFor({ state: "visible", timeout: 10_000 });
+  } catch {
+    return null;
+  }
+  const href = await link.getAttribute("href");
   if (!href) return null;
   return href.replace("/dispatchers/payroll/", "");
 }

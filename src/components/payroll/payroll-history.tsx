@@ -9,7 +9,6 @@ import {
   ArrowUpDown,
   ChevronDown,
   Download,
-  ExternalLink,
   Eye,
   FileSpreadsheet,
   FileText,
@@ -148,7 +147,6 @@ function RowActions({
   const linesRef = useRef<HTMLDivElement>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [linesOpen, setLinesOpen] = useState(false);
-  const [exportingSheets, setExportingSheets] = useState(false);
   const [exportingLines, setExportingLines] = useState<"csv" | "pdf" | null>(null);
 
   useClickOutside(summaryRef, () => setSummaryOpen(false));
@@ -159,41 +157,9 @@ function RowActions({
     window.open(`/api/payroll/upload/${uploadId}/export/csv`, "_blank");
   };
 
-  const handleSummarySheets = async () => {
+  const handleSummaryPdf = () => {
     setSummaryOpen(false);
-    setExportingSheets(true);
-    try {
-      const res = await fetch(`/api/payroll/upload/${uploadId}/export/sheets`, {
-        method: "POST",
-      });
-      if (res.status === 401) {
-        const data = await res.json();
-        if (data.error === "NOT_CONNECTED" && data.connectUrl) {
-          window.location.href = data.connectUrl;
-          return;
-        }
-        if (data.error === "TOKEN_REVOKED") {
-          toast.error("Google Sheets connection lost. Reconnect in Settings.");
-          return;
-        }
-      }
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        toast.error(data.error || "Export failed");
-        return;
-      }
-      const { spreadsheetUrl } = await res.json();
-      toast.success("Exported to Google Sheets", {
-        action: {
-          label: "Open",
-          onClick: () => window.open(spreadsheetUrl, "_blank"),
-        },
-      });
-    } catch {
-      toast.error("Failed to export to Google Sheets");
-    } finally {
-      setExportingSheets(false);
-    }
+    window.open(`/api/payroll/upload/${uploadId}/export/pdf`, "_blank");
   };
 
   const handleLineItems = async (format: "csv" | "pdf") => {
@@ -243,12 +209,11 @@ function RowActions({
             setSummaryOpen((v) => !v);
             setLinesOpen(false);
           }}
-          disabled={exportingSheets}
           aria-label="Download monthly summary"
           className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
         >
           <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden />
-          {exportingSheets ? "…" : "Summary"}
+          Summary
           <ChevronDown className="w-2.5 h-2.5" aria-hidden />
         </button>
         {summaryOpen && (
@@ -266,11 +231,11 @@ function RowActions({
             </button>
             <button
               type="button"
-              onClick={handleSummarySheets}
+              onClick={handleSummaryPdf}
               className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
             >
-              <ExternalLink className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
-              Google Sheets
+              <FileText className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
+              PDF
             </button>
           </div>
         )}
