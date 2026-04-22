@@ -225,13 +225,14 @@ class BulkJobsStore {
 }
 
 const bulkJobsStore = new BulkJobsStore();
+const EMPTY_JOBS: ActiveJob[] = [];
 
 /** Hook — subscribes to the live active-jobs list. */
 export function useActiveJobs(): ActiveJob[] {
   return useSyncExternalStore(
     bulkJobsStore.subscribe.bind(bulkJobsStore),
     bulkJobsStore.getSnapshot,
-    () => [],
+    () => EMPTY_JOBS,
   );
 }
 
