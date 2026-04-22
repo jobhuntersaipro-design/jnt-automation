@@ -7,6 +7,7 @@ import {
   Download,
   CheckCircle2,
   AlertTriangle,
+  FileText,
 } from "lucide-react";
 
 const MONTHS = [
@@ -364,6 +365,17 @@ export function HistoryMonthRow({
             <StatusPill status={status} />
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                window.open(`/dispatchers/history/${record.salaryRecordId}`, "_blank");
+              }}
+              className="inline-flex items-center gap-1 px-2 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded-md transition-colors"
+              title="Open parcel-level detail in a new tab"
+            >
+              <FileText size={12} />
+              Detail
+            </button>
             <button
               onClick={handleDownloadPayslip}
               disabled={downloading}

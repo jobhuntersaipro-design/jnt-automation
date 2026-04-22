@@ -2,6 +2,7 @@ import Image from "next/image";
 import { NavLinks } from "@/components/dashboard/nav-links";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { NotificationBell } from "@/components/dashboard/notification-bell";
+import { BulkJobsIndicator } from "@/components/dashboard/bulk-jobs-indicator";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { BfcacheFix } from "@/components/dashboard/bfcache-fix";
 import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
@@ -49,7 +50,10 @@ export default async function DashboardLayout({
 
         {/* Right side — icons + user */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
-          <NotificationBell />
+          <div className="relative">
+            <NotificationBell />
+            <BulkJobsIndicator />
+          </div>
 
           <div className="w-px h-5 bg-outline-variant/40 mx-1 hidden sm:block" />
 

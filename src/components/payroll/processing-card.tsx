@@ -12,6 +12,8 @@ export interface UploadProgressData {
   dispatchersFound?: number;
   dispatchersProcessed?: number;
   totalDispatchers?: number;
+  lineItemsInserted?: number;
+  totalLineItems?: number;
   startedAt: number;
   updatedAt: number;
 }
@@ -153,10 +155,19 @@ export function UploadStageTimeline({
           percent = 60 + Math.floor(fraction * 35);
           break;
         }
-        case "save":
-          detail = "Finalising preview…";
-          percent = 97;
+        case "save": {
+          const inserted = progress.lineItemsInserted;
+          const total = progress.totalLineItems;
+          if (typeof inserted === "number" && typeof total === "number" && total > 0) {
+            const fraction = inserted / total;
+            detail = `${progress.stageLabel} — ${formatNumber(inserted)}/${formatNumber(total)} items · ${formatElapsed(elapsed)} elapsed`;
+            percent = 60 + Math.floor(fraction * 38);
+          } else {
+            detail = progress.stageLabel || "Finalising…";
+            percent = 97;
+          }
           break;
+        }
       }
     }
   }

@@ -294,7 +294,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
 
   return (
     <main className="flex-1 overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
-      <div className="max-w-4xl mx-auto flex flex-col gap-8 lg:gap-10">
+      <div className="max-w-6xl mx-auto flex flex-col gap-8 lg:gap-10">
         {/* Page header */}
         <div>
           <h1 className="text-[1.3rem] lg:text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
