@@ -2,6 +2,7 @@
 
 import { type ReactNode, useRef, useState } from "react";
 import { AlertTriangle, Stamp } from "lucide-react";
+import { toast } from "sonner";
 
 type MissingField = "businessName" | "registrationNumber" | "companyAddress";
 
@@ -30,10 +31,14 @@ export function usePayslipGuard() {
     let data: CompanySetup;
     try {
       const res = await fetch("/api/settings/company", { cache: "no-store" });
-      if (!res.ok) return true;
+      if (!res.ok) {
+        toast.error("Couldn't verify company setup. Please try again.");
+        return false;
+      }
       data = (await res.json()) as CompanySetup;
     } catch {
-      return true;
+      toast.error("Couldn't verify company setup. Check your connection and try again.");
+      return false;
     }
 
     const missing: MissingField[] = [];
