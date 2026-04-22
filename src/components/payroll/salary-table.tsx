@@ -4,9 +4,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, Pencil, X, Search, Settings } from "lucide-react";
+import {
+  ArrowLeft,
+  Pencil,
+  X,
+  Search,
+  Settings,
+  Download,
+  ExternalLink,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Circle,
+  History,
+} from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
-import { ExportButtons } from "./export-buttons";
 
 export interface SalaryRecordRow {
   dispatcherId: string;
@@ -25,6 +37,7 @@ export interface SalaryRecordRow {
   weightTiersSnapshot: unknown;
   incentiveSnapshot: unknown;
   petrolSnapshot: unknown;
+  wasRecalculated?: boolean;
 }
 
 interface SalaryTableProps {
@@ -32,6 +45,7 @@ interface SalaryTableProps {
   branchCode: string;
   month: number;
   year: number;
+  wasRecalculated: boolean;
   initialRecords: SalaryRecordRow[];
   initialSummary: {
     totalNetPayout: number;
@@ -46,6 +60,9 @@ const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
+
+type RowStatus = "ready" | "review" | "zero" | "edited";
+type StatusFilter = "all" | RowStatus;
 
 function formatRM(amount: number): string {
   return amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -63,6 +80,47 @@ function computeSummary(records: SalaryRecordRow[]) {
     totalPetrolSubsidy: records.reduce((s, r) => s + r.petrolSubsidy, 0),
     totalDeductions: records.reduce((s, r) => s + r.penalty + r.advance, 0),
   };
+}
+
+function rowStatus(r: SalaryRecordRow, edited: boolean): RowStatus {
+  if (edited) return "edited";
+  if (r.totalOrders === 0) return "zero";
+  if (r.netSalary <= 0) return "review";
+  return "ready";
+}
+
+function StatusPill({ status }: { status: RowStatus }) {
+  const config = {
+    ready: {
+      label: "Ready",
+      icon: CheckCircle2,
+      className: "text-emerald-700 bg-emerald-50 border-emerald-200",
+    },
+    review: {
+      label: "Review",
+      icon: AlertTriangle,
+      className: "text-amber-700 bg-amber-50 border-amber-200",
+    },
+    zero: {
+      label: "Zero",
+      icon: Circle,
+      className: "text-on-surface-variant bg-surface-low border-outline-variant/40",
+    },
+    edited: {
+      label: "Edited",
+      icon: Pencil,
+      className: "text-brand bg-brand/5 border-brand/30",
+    },
+  }[status];
+  const Icon = config.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-full border ${config.className}`}
+    >
+      <Icon className="w-3 h-3" strokeWidth={2.5} />
+      {config.label}
+    </span>
+  );
 }
 
 /**
@@ -176,6 +234,7 @@ export function SalaryTable({
   branchCode,
   month,
   year,
+  wasRecalculated,
   initialRecords,
   initialSummary,
 }: SalaryTableProps) {
@@ -186,22 +245,42 @@ export function SalaryTable({
   const [editedRecords, setEditedRecords] = useState<Map<string, SalaryRecordRow>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingSheets, setExportingSheets] = useState(false);
   const [tierPopover, setTierPopover] = useState<string | null>(null);
 
   // Snapshot of records before edit mode for cancel/diff
   const [preEditRecords, setPreEditRecords] = useState(initialRecords);
 
+  // Status counts (based on records, not filtered view)
+  const statusCounts = useMemo(() => {
+    const counts = { all: records.length, ready: 0, review: 0, zero: 0, edited: 0 };
+    for (const r of records) {
+      const edited = editedRecords.has(r.dispatcherId);
+      const s = rowStatus(r, edited);
+      counts[s]++;
+    }
+    return counts;
+  }, [records, editedRecords]);
+
   // Filtered records for display
   const filtered = useMemo(() => {
-    if (!search.trim()) return records;
-    const q = search.toLowerCase();
-    return records.filter(
-      (r) => r.name.toLowerCase().includes(q) || r.extId.toLowerCase().includes(q),
-    );
-  }, [records, search]);
+    const q = search.trim().toLowerCase();
+    return records.filter((r) => {
+      if (q && !r.name.toLowerCase().includes(q) && !r.extId.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (statusFilter !== "all") {
+        const edited = editedRecords.has(r.dispatcherId);
+        if (rowStatus(r, edited) !== statusFilter) return false;
+      }
+      return true;
+    });
+  }, [records, search, statusFilter, editedRecords]);
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((r) => selectedIds.has(r.dispatcherId));
 
@@ -336,7 +415,6 @@ export function SalaryTable({
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      // Extract filename from Content-Disposition header, fallback to .zip
       const disposition = res.headers.get("Content-Disposition") || "";
       const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
       const monthStr = String(month).padStart(2, "0");
@@ -353,10 +431,90 @@ export function SalaryTable({
     }
   };
 
+  const handleExportCsv = () => {
+    setExportingCsv(true);
+    // Use anchor download so Chrome treats it as a file, not a tab
+    window.location.href = `/api/payroll/upload/${uploadId}/export/csv`;
+    // Reset state after brief delay (download is fire-and-forget)
+    setTimeout(() => setExportingCsv(false), 1500);
+  };
+
+  const handleExportSheets = async () => {
+    setExportingSheets(true);
+    try {
+      const res = await fetch(`/api/payroll/upload/${uploadId}/export/sheets`, {
+        method: "POST",
+      });
+
+      if (res.status === 401) {
+        const data = await res.json();
+        if (data.error === "NOT_CONNECTED" && data.connectUrl) {
+          window.location.href = data.connectUrl;
+          return;
+        }
+        if (data.error === "TOKEN_REVOKED") {
+          toast.error("Google Sheets connection lost. Reconnect in Settings.");
+          return;
+        }
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Export failed");
+        return;
+      }
+
+      const { spreadsheetUrl } = await res.json();
+      toast.success("Exported to Google Sheets", {
+        action: {
+          label: "Open",
+          onClick: () => window.open(spreadsheetUrl, "_blank"),
+        },
+      });
+    } catch {
+      toast.error("Failed to export to Google Sheets");
+    } finally {
+      setExportingSheets(false);
+    }
+  };
+
+  const StatusFilterPill = ({
+    value,
+    label,
+    count,
+    color,
+  }: {
+    value: StatusFilter;
+    label: string;
+    count: number;
+    color: string;
+  }) => {
+    const active = statusFilter === value;
+    return (
+      <button
+        onClick={() => setStatusFilter(value)}
+        className={`inline-flex items-center gap-1.5 px-3 py-1 text-[0.78rem] font-medium rounded-full border transition-colors ${
+          active
+            ? "bg-on-surface text-white border-on-surface"
+            : "bg-surface-card text-on-surface-variant border-outline-variant/25 hover:bg-surface-hover"
+        }`}
+      >
+        <span
+          className="w-1.5 h-1.5 rounded-full"
+          style={{ backgroundColor: active ? "white" : color }}
+        />
+        {label}
+        <span className={`tabular-nums ${active ? "text-white/75" : "text-on-surface-variant/60"}`}>
+          {count}
+        </span>
+      </button>
+    );
+  };
+
   return (
-    <div className="flex flex-col gap-6 pb-20">
+    <div className="flex flex-col gap-5 pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link
             href="/dispatchers?tab=payroll"
@@ -365,61 +523,124 @@ export function SalaryTable({
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-[1.25rem] font-semibold text-on-surface tracking-tight">
-              {branchCode} — {MONTH_NAMES[month - 1]} {year}
-            </h1>
-            <p className="text-[0.78rem] text-on-surface-variant">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-[1.25rem] font-semibold text-on-surface tracking-tight">
+                {branchCode} — {MONTH_NAMES[month - 1]} {year}
+              </h1>
+              {wasRecalculated && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium rounded-full bg-brand/5 text-brand border border-brand/20">
+                  <History className="w-3 h-3" strokeWidth={2.5} />
+                  Recalculated
+                </span>
+              )}
+            </div>
+            <p className="text-[0.78rem] text-on-surface-variant mt-0.5">
               {records.length} dispatcher{records.length !== 1 ? "s" : ""}
+              {" • "}
+              <span className="text-emerald-700">{statusCounts.ready} ready</span>
+              {statusCounts.review > 0 && (
+                <>
+                  {" • "}
+                  <span className="text-amber-700">{statusCounts.review} need review</span>
+                </>
+              )}
+              {statusCounts.zero > 0 && (
+                <>
+                  {" • "}
+                  <span className="text-on-surface-variant/60">{statusCounts.zero} zero</span>
+                </>
+              )}
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {editMode ? (
-            <>
-              <button
-                onClick={cancelEdit}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-on-surface-variant border border-outline-variant/30 rounded-md hover:bg-surface-hover transition-colors"
-              >
-                <X className="w-3.5 h-3.5" />
-                Cancel
-              </button>
-              <button
-                onClick={() => setShowConfirm(true)}
-                disabled={modifiedCount === 0 || saving}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.82rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {saving ? "Saving..." : `Save & Regenerate (${modifiedCount})`}
-              </button>
-            </>
-          ) : (
-            <>
-              <ExportButtons uploadId={uploadId} />
-              <button
-                onClick={startEdit}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-                Edit & Recalculate
-              </button>
-            </>
-          )}
         </div>
       </div>
 
       {/* Edit mode banner */}
       {editMode && (
         <div className="flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-[0.82rem] text-amber-800">
+          <Pencil className="w-3.5 h-3.5" strokeWidth={2.5} />
           <span className="font-medium">Edit mode</span>
-          <span className="text-amber-600">— changes will update salary records and snapshots. Payslips will reflect the new values after saving.</span>
+          <span className="text-amber-700/80">— changes will update salary records and snapshots. Payslips will reflect the new values after saving.</span>
         </div>
       )}
 
-      {/* Summary Cards */}
-      <PreviewSummaryCards {...summary} />
+      {/* Summary Cards — semantic variant */}
+      <PreviewSummaryCards
+        {...summary}
+        variant="semantic"
+        heroSubtitle={`${records.length} dispatcher${records.length !== 1 ? "s" : ""} · ${MONTH_NAMES[month - 1]} ${year}`}
+      />
+
+      {/* Action toolbar */}
+      <div className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-surface-card border border-outline-variant/15">
+        {editMode ? (
+          <>
+            <div className="flex-1 text-[0.82rem] text-on-surface-variant">
+              {modifiedCount > 0
+                ? `${modifiedCount} dispatcher${modifiedCount !== 1 ? "s" : ""} modified`
+                : "No changes yet — edit any incentive, petrol, penalty, or advance cell."}
+            </div>
+            <button
+              onClick={cancelEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-on-surface-variant border border-outline-variant/30 rounded-md hover:bg-surface-hover transition-colors"
+            >
+              <X className="w-3.5 h-3.5" />
+              Cancel
+            </button>
+            <button
+              onClick={() => setShowConfirm(true)}
+              disabled={modifiedCount === 0 || saving}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.82rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {saving ? "Saving..." : `Save & Regenerate (${modifiedCount})`}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-on-surface border border-outline-variant/30 rounded-md hover:bg-surface-hover transition-colors disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exportingCsv ? "Downloading..." : "Download CSV"}
+            </button>
+            <button
+              onClick={handleExportSheets}
+              disabled={exportingSheets}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-white bg-emerald-600 rounded-md hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              {exportingSheets ? "Syncing..." : "Sync to Google Sheets"}
+            </button>
+            <button
+              onClick={handleGeneratePayslips}
+              disabled={selectedIds.size === 0 || generating}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-on-surface border border-outline-variant/30 rounded-md hover:bg-surface-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              title={selectedIds.size === 0 ? "Select dispatchers below to enable" : undefined}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              {generating
+                ? "Generating..."
+                : selectedIds.size > 0
+                ? `Generate Payslips (${selectedIds.size})`
+                : "Generate Payslips"}
+            </button>
+            <div className="flex-1" />
+            <button
+              onClick={startEdit}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.82rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit & Recalculate
+            </button>
+          </>
+        )}
+      </div>
 
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-52 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-on-surface-variant/50" />
           <input
             type="text"
@@ -429,8 +650,21 @@ export function SalaryTable({
             className="w-full pl-8 pr-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40"
           />
         </div>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <StatusFilterPill value="all" label="All" count={statusCounts.all} color="#424654" />
+          <StatusFilterPill value="ready" label="Ready" count={statusCounts.ready} color="#10b981" />
+          {statusCounts.review > 0 && (
+            <StatusFilterPill value="review" label="Review" count={statusCounts.review} color="#f59e0b" />
+          )}
+          {statusCounts.zero > 0 && (
+            <StatusFilterPill value="zero" label="Zero" count={statusCounts.zero} color="#9ca3af" />
+          )}
+          {editMode && statusCounts.edited > 0 && (
+            <StatusFilterPill value="edited" label="Edited" count={statusCounts.edited} color="#0056D2" />
+          )}
+        </div>
         {!editMode && (
-          <label className="flex items-center gap-2 text-[0.78rem] text-on-surface-variant cursor-pointer">
+          <label className="flex items-center gap-2 text-[0.78rem] text-on-surface-variant cursor-pointer ml-auto">
             <input
               type="checkbox"
               checked={allFilteredSelected}
@@ -443,134 +677,156 @@ export function SalaryTable({
       </div>
 
       {/* Table */}
-      <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden">
+      <div className="rounded-xl bg-surface-card border border-outline-variant/15 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[0.82rem]">
             <thead>
-              <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant bg-surface-container-low">
+              <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant bg-surface-low">
                 {!editMode && <th className="py-3 px-3 font-medium w-10" />}
                 <th className="py-3 px-4 font-medium">Dispatcher</th>
+                <th className="py-3 px-3 font-medium">Status</th>
                 <th className="py-3 px-3 font-medium text-right">Orders</th>
                 <th className="py-3 px-3 font-medium text-right">Base Salary</th>
-                <th className="py-3 px-3 font-medium text-right">Incentive</th>
-                <th className="py-3 px-3 font-medium text-right">Petrol</th>
-                <th className="py-3 px-3 font-medium text-right">Days</th>
-                <th className="py-3 px-3 font-medium text-right">Penalty</th>
-                <th className="py-3 px-3 font-medium text-right">Advance</th>
-                <th className="py-3 px-4 font-medium text-right">Net Salary</th>
+                <th className="py-3 px-3 font-medium text-right" style={{ color: "#12B981" }}>Incentive</th>
+                <th className="py-3 px-3 font-medium text-right" style={{ color: "#B27F08" }}>Petrol</th>
+                <th className="py-3 px-3 font-medium text-right" style={{ color: "#B27F08" }}>Days</th>
+                <th className="py-3 px-3 font-medium text-right text-critical">Penalty</th>
+                <th className="py-3 px-3 font-medium text-right text-critical">Advance</th>
+                <th className="py-3 px-4 font-medium text-right text-brand">Net Salary</th>
                 <th className="py-3 px-3 font-medium text-center w-12">Tiers</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
-                <tr
-                  key={r.dispatcherId}
-                  className="border-t border-outline-variant/8 hover:bg-surface-container-high/50 transition-colors"
-                >
-                  {!editMode && (
-                    <td className="py-2.5 px-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(r.dispatcherId)}
-                        onChange={() => toggleSelect(r.dispatcherId)}
-                        className="rounded accent-brand"
-                      />
+              {filtered.map((r) => {
+                const edited = editedRecords.has(r.dispatcherId);
+                const status = rowStatus(r, edited);
+                return (
+                  <tr
+                    key={r.dispatcherId}
+                    className="border-t border-outline-variant/8 hover:bg-surface-hover/40 transition-colors"
+                  >
+                    {!editMode && (
+                      <td className="py-2.5 px-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(r.dispatcherId)}
+                          onChange={() => toggleSelect(r.dispatcherId)}
+                          className="rounded accent-brand"
+                        />
+                      </td>
+                    )}
+                    <td className="py-2.5 px-4">
+                      <p className="font-medium text-on-surface leading-tight">{r.name}</p>
+                      <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
                     </td>
-                  )}
-                  <td className="py-2.5 px-4">
-                    <p className="font-medium text-on-surface leading-tight">{r.name}</p>
-                    <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
-                  </td>
-                  {editMode ? (
-                    <>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
-                        {r.totalOrders.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
-                        {formatRM(r.baseSalary)}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <EditableCell
-                          value={r.incentive}
-                          isAmount
-                          onChange={(v) => updateField(r.dispatcherId, "incentive", v)}
+                    <td className="py-2.5 px-3">
+                      <StatusPill status={status} />
+                    </td>
+                    {editMode ? (
+                      <>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                          {r.totalOrders.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                          {formatRM(r.baseSalary)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <EditableCell
+                            value={r.incentive}
+                            isAmount
+                            onChange={(v) => updateField(r.dispatcherId, "incentive", v)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <EditableCell
+                            value={r.petrolSubsidy}
+                            isAmount
+                            onChange={(v) => updateField(r.dispatcherId, "petrolSubsidy", v)}
+                          />
+                        </td>
+                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
+                          {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <EditableCell
+                            value={r.penalty}
+                            isAmount
+                            onChange={(v) => updateField(r.dispatcherId, "penalty", v)}
+                          />
+                        </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <EditableCell
+                            value={r.advance}
+                            isAmount
+                            onChange={(v) => updateField(r.dispatcherId, "advance", v)}
+                          />
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                          {r.totalOrders.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                          {formatRM(r.baseSalary)}
+                        </td>
+                        <td
+                          className="py-2.5 px-3 text-right tabular-nums"
+                          style={{
+                            color: r.incentive > 0 ? "#12B981" : "var(--color-on-surface-variant)",
+                            opacity: r.incentive > 0 ? 1 : 0.4,
+                          }}
+                        >
+                          {r.incentive > 0 ? formatRM(r.incentive) : "—"}
+                        </td>
+                        <td
+                          className="py-2.5 px-3 text-right tabular-nums"
+                          style={{
+                            color: r.petrolSubsidy > 0 ? "#B27F08" : "var(--color-on-surface-variant)",
+                            opacity: r.petrolSubsidy > 0 ? 1 : 0.4,
+                          }}
+                        >
+                          {r.petrolSubsidy > 0 ? formatRM(r.petrolSubsidy) : "—"}
+                        </td>
+                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
+                          {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
+                        </td>
+                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
+                          {r.penalty > 0 ? formatRM(r.penalty) : "—"}
+                        </td>
+                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.advance > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
+                          {r.advance > 0 ? formatRM(r.advance) : "—"}
+                        </td>
+                      </>
+                    )}
+                    <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
+                      {formatRM(r.netSalary)}
+                    </td>
+                    <td className="py-2.5 px-3 text-center relative">
+                      <button
+                        onClick={() => setTierPopover(tierPopover === r.dispatcherId ? null : r.dispatcherId)}
+                        className="p-1.5 text-on-surface-variant/50 hover:text-brand hover:bg-brand/5 rounded-md transition-colors"
+                        title="View weight tiers"
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                      {tierPopover === r.dispatcherId ? (
+                        <ViewTierPopover
+                          dispatcherName={r.name}
+                          tiers={(r.weightTiersSnapshot ?? []) as Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>}
+                          onClose={() => setTierPopover(null)}
                         />
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <EditableCell
-                          value={r.petrolSubsidy}
-                          isAmount
-                          onChange={(v) => updateField(r.dispatcherId, "petrolSubsidy", v)}
-                        />
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                        {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <EditableCell
-                          value={r.penalty}
-                          isAmount
-                          onChange={(v) => updateField(r.dispatcherId, "penalty", v)}
-                        />
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <EditableCell
-                          value={r.advance}
-                          isAmount
-                          onChange={(v) => updateField(r.dispatcherId, "advance", v)}
-                        />
-                      </td>
-                    </>
-                  ) : (
-                    <>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
-                        {r.totalOrders.toLocaleString()}
-                      </td>
-                      <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
-                        {formatRM(r.baseSalary)}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.incentive > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                        {formatRM(r.incentive)}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolSubsidy > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                        {formatRM(r.petrolSubsidy)}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                        {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
-                        {r.penalty > 0 ? formatRM(r.penalty) : "—"}
-                      </td>
-                      <td className={`py-2.5 px-3 text-right tabular-nums ${r.advance > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
-                        {r.advance > 0 ? formatRM(r.advance) : "—"}
-                      </td>
-                    </>
-                  )}
-                  <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
-                    {formatRM(r.netSalary)}
-                  </td>
-                  <td className="py-2.5 px-3 text-center relative">
-                    <button
-                      onClick={() => setTierPopover(tierPopover === r.dispatcherId ? null : r.dispatcherId)}
-                      className="p-1.5 text-on-surface-variant/50 hover:text-brand hover:bg-brand/5 rounded-md transition-colors"
-                      title="View weight tiers"
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                    </button>
-                    {tierPopover === r.dispatcherId ? (
-                      <ViewTierPopover
-                        dispatcherName={r.name}
-                        tiers={(r.weightTiersSnapshot ?? []) as Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>}
-                        onClose={() => setTierPopover(null)}
-                      />
-                    ) : null}
-                  </td>
-                </tr>
-              ))}
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={editMode ? 9 : 10} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
-                    No dispatchers found.
+                  <td colSpan={editMode ? 11 : 12} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
+                    {records.length === 0
+                      ? "No dispatchers in this payroll."
+                      : "No dispatchers match your filters."}
                   </td>
                 </tr>
               )}
@@ -590,6 +846,7 @@ export function SalaryTable({
             disabled={generating}
             className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.82rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors disabled:opacity-50"
           >
+            <FileText className="w-3.5 h-3.5" />
             {generating ? "Generating..." : "Generate Payslips"}
           </button>
           <button

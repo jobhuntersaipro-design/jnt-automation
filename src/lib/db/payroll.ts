@@ -72,12 +72,17 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
     totalDeductions: records.reduce((sum, r) => sum + r.penalty + r.advance, 0),
   };
 
+  const wasRecalculated = records.some(
+    (r) => r.updatedAt.getTime() - r.createdAt.getTime() > 1000,
+  );
+
   return {
     upload: {
       id: upload.id,
       month: upload.month,
       year: upload.year,
       branchCode: upload.branch.code,
+      wasRecalculated,
     },
     records: records.map((r) => ({
       dispatcherId: r.dispatcherId,
@@ -96,6 +101,7 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
       weightTiersSnapshot: r.weightTiersSnapshot,
       incentiveSnapshot: r.incentiveSnapshot,
       petrolSnapshot: r.petrolSnapshot,
+      wasRecalculated: r.updatedAt.getTime() - r.createdAt.getTime() > 1000,
     })),
     summary,
   };

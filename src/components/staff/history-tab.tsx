@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { toast } from "sonner";
+import { Download, ExternalLink, TrendingUp } from "lucide-react";
 import { HistoryMonthRow } from "./history-month-row";
 import type { HistoryRecord } from "./history-month-row";
 
@@ -10,10 +11,16 @@ interface HistoryTabProps {
   dispatcherName: string;
 }
 
+function formatRM(value: number): string {
+  return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
   const [records, setRecords] = useState<HistoryRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingSheets, setExportingSheets] = useState(false);
   const initialExpanded = useRef(false);
 
   const fetchHistory = useCallback(async () => {
@@ -23,7 +30,6 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
       if (!res.ok) throw new Error();
       const data: HistoryRecord[] = await res.json();
       setRecords(data);
-      // Auto-expand the first (latest) record
       if (!initialExpanded.current && data.length > 0) {
         setExpandedId(data[0].salaryRecordId);
         initialExpanded.current = true;
@@ -61,11 +67,69 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
     toast.success(`${monthLabel} recalculated for ${dispatcherName}`);
   }
 
+  // YTD totals (all records, not filtered)
+  const totals = useMemo(() => {
+    return records.reduce(
+      (acc, r) => ({
+        netSalary: acc.netSalary + r.netSalary,
+        totalOrders: acc.totalOrders + r.totalOrders,
+        months: acc.months + 1,
+      }),
+      { netSalary: 0, totalOrders: 0, months: 0 },
+    );
+  }, [records]);
+
+  const handleExportCsv = () => {
+    setExportingCsv(true);
+    window.location.href = `/api/staff/${dispatcherId}/export/csv`;
+    setTimeout(() => setExportingCsv(false), 1500);
+  };
+
+  const handleExportSheets = async () => {
+    setExportingSheets(true);
+    try {
+      const res = await fetch(`/api/staff/${dispatcherId}/export/sheets`, {
+        method: "POST",
+      });
+
+      if (res.status === 401) {
+        const data = await res.json();
+        if (data.error === "NOT_CONNECTED" && data.connectUrl) {
+          window.location.href = data.connectUrl;
+          return;
+        }
+        if (data.error === "TOKEN_REVOKED") {
+          toast.error("Google Sheets connection lost. Reconnect in Settings.");
+          return;
+        }
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || "Export failed");
+        return;
+      }
+
+      const { spreadsheetUrl } = await res.json();
+      toast.success("Exported to Google Sheets", {
+        action: {
+          label: "Open",
+          onClick: () => window.open(spreadsheetUrl, "_blank"),
+        },
+      });
+    } catch {
+      toast.error("Failed to export to Google Sheets");
+    } finally {
+      setExportingSheets(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-3">
+        <div className="h-16 bg-surface-hover/50 rounded-xl animate-pulse" />
         {[1, 2, 3].map((i) => (
-          <div key={i} className="h-12 bg-surface-hover/50 rounded-[0.375rem] animate-pulse" />
+          <div key={i} className="h-20 bg-surface-hover/50 rounded-xl animate-pulse" />
         ))}
       </div>
     );
@@ -82,35 +146,57 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
   }
 
   return (
-    <div className="bg-white rounded-[0.5rem] border border-outline-variant/15 overflow-hidden">
-      {/* Header */}
-      <div className="grid grid-cols-[5rem_1fr_7rem_5.5rem] items-center px-4 py-2 border-b border-outline-variant/15">
-        <span className="text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
-          Month
-        </span>
-        <span className="text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center">
-          Net Salary
-        </span>
-        <span className="text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center">
-          Status
-        </span>
-        <span className="text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center">
-          Actions
-        </span>
+    <div className="space-y-4">
+      {/* YTD summary + export toolbar */}
+      <div className="rounded-xl bg-gradient-to-br from-brand to-brand-container p-4 text-white">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-white/70" />
+            <p className="text-[0.7rem] uppercase tracking-wider text-white/70 font-medium">
+              Lifetime earnings
+            </p>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleExportCsv}
+              disabled={exportingCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.75rem] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-md transition-colors disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {exportingCsv ? "Downloading..." : "CSV"}
+            </button>
+            <button
+              onClick={handleExportSheets}
+              disabled={exportingSheets}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[0.75rem] font-medium text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-md transition-colors disabled:opacity-50"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              {exportingSheets ? "Syncing..." : "Sheets"}
+            </button>
+          </div>
+        </div>
+        <p className="mt-1.5 text-[1.5rem] font-bold tracking-tight tabular-nums">
+          {formatRM(totals.netSalary)}
+        </p>
+        <p className="text-[0.72rem] text-white/80 mt-0.5 tabular-nums">
+          {totals.months} month{totals.months !== 1 ? "s" : ""} · {totals.totalOrders.toLocaleString()} order{totals.totalOrders !== 1 ? "s" : ""}
+        </p>
       </div>
 
-      {/* Rows */}
-      {records.map((record) => (
-        <HistoryMonthRow
-          key={record.salaryRecordId}
-          record={record}
-          isExpanded={expandedId === record.salaryRecordId}
-          onToggle={() => handleToggle(record.salaryRecordId)}
-          dispatcherName={dispatcherName}
-          dispatcherId={dispatcherId}
-          onRecalculated={handleRecalculated}
-        />
-      ))}
+      {/* Records list */}
+      <div className="space-y-3">
+        {records.map((record) => (
+          <HistoryMonthRow
+            key={record.salaryRecordId}
+            record={record}
+            isExpanded={expandedId === record.salaryRecordId}
+            onToggle={() => handleToggle(record.salaryRecordId)}
+            dispatcherName={dispatcherName}
+            dispatcherId={dispatcherId}
+            onRecalculated={handleRecalculated}
+          />
+        ))}
+      </div>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getUploadStatus } from "@/lib/db/upload";
 import { getUploadMeta, getPreviewData } from "@/lib/upload/pipeline";
+import { getProgress } from "@/lib/upload/progress";
 
 export async function GET(
   _req: NextRequest,
@@ -36,6 +37,9 @@ export async function GET(
     }
   }
 
+  // Progress ticks during PROCESSING
+  const progress = upload.status === "PROCESSING" ? await getProgress(uploadId) : null;
+
   return NextResponse.json({
     status: upload.status,
     errorMessage: upload.errorMessage,
@@ -50,5 +54,6 @@ export async function GET(
       knownCount: knownCountFromPreview,
       unknownDispatchers: unknownFromPreview,
     }),
+    ...(progress && { progress }),
   });
 }

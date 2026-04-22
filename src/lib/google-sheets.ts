@@ -278,3 +278,166 @@ export async function exportToGoogleSheets(
 
   return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
 }
+
+interface DispatcherHistoryRow {
+  month: number;
+  year: number;
+  totalOrders: number;
+  baseSalary: number;
+  incentive: number;
+  petrolSubsidy: number;
+  petrolQualifyingDays: number;
+  penalty: number;
+  advance: number;
+  netSalary: number;
+  wasRecalculated: boolean;
+}
+
+/**
+ * Export a single dispatcher's salary history to a Google Sheet.
+ * One row per month with all salary fields.
+ */
+export async function exportDispatcherHistoryToSheets(
+  accessToken: string,
+  dispatcher: { name: string; extId: string; branchCode: string },
+  rows: DispatcherHistoryRow[],
+): Promise<string> {
+  const title = `EasyStaff History — ${dispatcher.name} (${dispatcher.extId})`;
+
+  const createRes = await fetch("https://sheets.googleapis.com/v4/spreadsheets", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      properties: { title },
+      sheets: [{ properties: { title: "History", sheetId: 0 } }],
+    }),
+  });
+
+  if (!createRes.ok) {
+    const err = await createRes.text();
+    throw new Error(`Failed to create spreadsheet: ${err}`);
+  }
+
+  const spreadsheet = await createRes.json();
+  const spreadsheetId = spreadsheet.spreadsheetId;
+
+  const metaRows: (string | number)[][] = [
+    ["Dispatcher", dispatcher.name],
+    ["Dispatcher ID", dispatcher.extId],
+    ["Branch", dispatcher.branchCode],
+    [""],
+  ];
+
+  const headers = [
+    "Month", "Year", "Total Orders",
+    "Base Salary (RM)", "Incentive (RM)",
+    "Petrol Subsidy (RM)", "Qualifying Days",
+    "Penalty (RM)", "Advance (RM)",
+    "Net Salary (RM)", "Status",
+  ];
+
+  const dataRows = rows.map((r) => [
+    MONTH_NAMES[r.month - 1],
+    r.year,
+    r.totalOrders,
+    r.baseSalary,
+    r.incentive,
+    r.petrolSubsidy,
+    r.petrolQualifyingDays,
+    r.penalty,
+    r.advance,
+    r.netSalary,
+    r.wasRecalculated ? "Recalculated" : (r.netSalary <= 0 || r.totalOrders === 0) ? "Review" : "Confirmed",
+  ]);
+
+  const totals = rows.reduce(
+    (acc, r) => ({
+      totalOrders: acc.totalOrders + r.totalOrders,
+      baseSalary: acc.baseSalary + r.baseSalary,
+      incentive: acc.incentive + r.incentive,
+      petrolSubsidy: acc.petrolSubsidy + r.petrolSubsidy,
+      petrolQualifyingDays: acc.petrolQualifyingDays + r.petrolQualifyingDays,
+      penalty: acc.penalty + r.penalty,
+      advance: acc.advance + r.advance,
+      netSalary: acc.netSalary + r.netSalary,
+    }),
+    { totalOrders: 0, baseSalary: 0, incentive: 0, petrolSubsidy: 0, petrolQualifyingDays: 0, penalty: 0, advance: 0, netSalary: 0 },
+  );
+
+  const totalRow = [
+    "TOTAL", "", totals.totalOrders,
+    totals.baseSalary, totals.incentive,
+    totals.petrolSubsidy, totals.petrolQualifyingDays,
+    totals.penalty, totals.advance,
+    totals.netSalary, "",
+  ];
+
+  const values = [...metaRows, headers, ...dataRows, totalRow];
+
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values:batchUpdate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        valueInputOption: "RAW",
+        data: [{ range: "History!A1", values }],
+      }),
+    },
+  );
+
+  const headerRowIndex = metaRows.length;
+
+  await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}:batchUpdate`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        requests: [
+          // Bold meta labels
+          {
+            repeatCell: {
+              range: { sheetId: 0, startRowIndex: 0, endRowIndex: metaRows.length - 1, startColumnIndex: 0, endColumnIndex: 1 },
+              cell: { userEnteredFormat: { textFormat: { bold: true } } },
+              fields: "userEnteredFormat.textFormat.bold",
+            },
+          },
+          // Bold header row
+          {
+            repeatCell: {
+              range: { sheetId: 0, startRowIndex: headerRowIndex, endRowIndex: headerRowIndex + 1 },
+              cell: { userEnteredFormat: { textFormat: { bold: true } } },
+              fields: "userEnteredFormat.textFormat.bold",
+            },
+          },
+          // Bold TOTAL row
+          {
+            repeatCell: {
+              range: { sheetId: 0, startRowIndex: values.length - 1, endRowIndex: values.length },
+              cell: { userEnteredFormat: { textFormat: { bold: true } } },
+              fields: "userEnteredFormat.textFormat.bold",
+            },
+          },
+          // Auto-resize columns
+          {
+            autoResizeDimensions: {
+              dimensions: { sheetId: 0, dimension: "COLUMNS", startIndex: 0, endIndex: headers.length },
+            },
+          },
+        ],
+      }),
+    },
+  );
+
+  return `https://docs.google.com/spreadsheets/d/${spreadsheetId}`;
+}

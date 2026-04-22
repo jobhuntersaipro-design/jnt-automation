@@ -8,6 +8,11 @@ import { splitDispatchers } from "./dispatcher-check";
 import { calculateSalary } from "./calculator";
 import type { SalaryResult, DispatcherRules, WeightTierInput, IncentiveRuleInput, PetrolRuleInput } from "./calculator";
 import type { UnknownDispatcher } from "./dispatcher-check";
+import {
+  setProgress,
+  clearProgress,
+  throttledProgressWriter,
+} from "./progress";
 
 /** KV key for parsing metadata (dispatcher counts). TTL = 2 hours. */
 const metaKey = (uploadId: string) => `meta:${uploadId}`;
@@ -29,14 +34,38 @@ export async function processUpload(uploadId: string) {
 
   if (!upload) throw new Error("Upload not found");
 
-  // 1. Parse Excel from R2
-  const rows = await parseExcelFromR2(upload.r2Key);
+  const startedAt = Date.now();
+
+  // 1. Parse Excel from R2 — with row-level progress callback
+  await setProgress(uploadId, {
+    stage: "parse",
+    stageLabel: "Parsing Excel file",
+    rowsParsed: 0,
+    startedAt,
+  });
+
+  const writeProgress = throttledProgressWriter(uploadId, 500);
+  const rows = await parseExcelFromR2(upload.r2Key, (rowsParsed) => {
+    writeProgress({
+      stage: "parse",
+      stageLabel: "Parsing Excel file",
+      rowsParsed,
+      startedAt,
+    });
+  });
 
   if (rows.length === 0) {
     throw new Error("No delivery rows found in the uploaded file");
   }
 
   // 2. Split known vs unknown
+  await setProgress(uploadId, {
+    stage: "split",
+    stageLabel: "Matching dispatchers",
+    rowsParsed: rows.length,
+    startedAt,
+  });
+
   const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
   // 3. Store metadata for polling endpoint
@@ -46,8 +75,16 @@ export async function processUpload(uploadId: string) {
   };
   await redis.set(metaKey(uploadId), meta, { ex: 7200 });
 
-  // 4. Set status to CONFIRM_SETTINGS
+  // 4. If there are no unknown dispatchers, skip the review step entirely
+  //    and run Phase B (calculate) inline. Otherwise stop at CONFIRM_SETTINGS
+  //    so the agent can set up the new dispatchers.
+  if (unknown.length === 0) {
+    await calculateAfterConfirm(uploadId);
+    return;
+  }
+
   await updateUploadStatus(uploadId, "CONFIRM_SETTINGS");
+  await clearProgress(uploadId);
 }
 
 // ─── Phase B: Calculate (runs after agent confirms settings) ──────
@@ -60,8 +97,31 @@ export async function calculateAfterConfirm(uploadId: string) {
 
   if (!upload) throw new Error("Upload not found");
 
+  const startedAt = Date.now();
+  await setProgress(uploadId, {
+    stage: "parse",
+    stageLabel: "Re-parsing Excel file",
+    rowsParsed: 0,
+    startedAt,
+  });
+
   // Re-parse from R2 (avoids storing 100K+ rows in KV which exceeds 10MB limit)
-  const rows = await parseExcelFromR2(upload.r2Key);
+  const writeProgress = throttledProgressWriter(uploadId, 500);
+  const rows = await parseExcelFromR2(upload.r2Key, (rowsParsed) => {
+    writeProgress({
+      stage: "parse",
+      stageLabel: "Re-parsing Excel file",
+      rowsParsed,
+      startedAt,
+    });
+  });
+
+  await setProgress(uploadId, {
+    stage: "split",
+    stageLabel: "Matching dispatchers",
+    rowsParsed: rows.length,
+    startedAt,
+  });
   const { known, unknown } = await splitDispatchers(rows, upload.branch.agentId);
 
   // Load dispatchers with their salary rules
@@ -77,12 +137,27 @@ export async function calculateAfterConfirm(uploadId: string) {
     },
   });
 
+  await setProgress(uploadId, {
+    stage: "calculate",
+    stageLabel: "Calculating salaries",
+    rowsParsed: rows.length,
+    dispatchersFound: dispatchers.length,
+    dispatchersProcessed: 0,
+    totalDispatchers: dispatchers.length,
+    startedAt,
+  });
+
   // Calculate salary for each known dispatcher
   const results: SalaryResult[] = [];
+  let processed = 0;
   for (const d of dispatchers) {
-    if (!d.incentiveRule || !d.petrolRule) continue;
+    if (!d.incentiveRule || !d.petrolRule) {
+      processed++;
+      continue;
+    }
 
     const dispatcherRows = rows.filter((r) => r.dispatcherId === d.extId);
+    processed++;
     if (dispatcherRows.length === 0) continue;
 
     const rules: DispatcherRules = {
@@ -106,6 +181,18 @@ export async function calculateAfterConfirm(uploadId: string) {
     };
 
     results.push(calculateSalary(rules, dispatcherRows));
+
+    if (processed % 5 === 0 || processed === dispatchers.length) {
+      await setProgress(uploadId, {
+        stage: "calculate",
+        stageLabel: "Calculating salaries",
+        rowsParsed: rows.length,
+        dispatchersFound: dispatchers.length,
+        dispatchersProcessed: processed,
+        totalDispatchers: dispatchers.length,
+        startedAt,
+      });
+    }
   }
 
   // Store compact preview in KV (without lineItems to stay under 10MB limit).
@@ -127,6 +214,16 @@ export async function calculateAfterConfirm(uploadId: string) {
     petrolSnapshot: r.petrolSnapshot,
   }));
 
+  await setProgress(uploadId, {
+    stage: "save",
+    stageLabel: "Saving preview",
+    rowsParsed: rows.length,
+    dispatchersFound: dispatchers.length,
+    dispatchersProcessed: dispatchers.length,
+    totalDispatchers: dispatchers.length,
+    startedAt,
+  });
+
   await redis.set(
     previewKey(uploadId),
     { results: compactResults, unknownDispatchers: unknown },
@@ -140,8 +237,9 @@ export async function calculateAfterConfirm(uploadId: string) {
     hasUnknown ? "NEEDS_ATTENTION" : "READY_TO_CONFIRM",
   );
 
-  // Clean up metadata KV
+  // Clean up metadata KV + progress
   await redis.del(metaKey(uploadId));
+  await clearProgress(uploadId);
 }
 
 // ─── Process Unknown (runs after agent sets up new dispatchers) ──
@@ -236,8 +334,9 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
   // Update status
   await updateUploadStatus(uploadId, "READY_TO_CONFIRM");
 
-  // Clean up metadata KV
+  // Clean up metadata KV + progress
   await redis.del(metaKey(uploadId));
+  await clearProgress(uploadId);
 }
 
 /**
@@ -317,5 +416,6 @@ export async function deleteUploadData(
   uploadId: string,
 ): Promise<void> {
   await redis.del(metaKey(uploadId), previewKey(uploadId));
+  await clearProgress(uploadId);
 }
 
