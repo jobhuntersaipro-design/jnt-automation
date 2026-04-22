@@ -20,11 +20,13 @@ export async function GET(
   return NextResponse.json({
     jobId: job.jobId,
     status: job.status,
+    stage: job.stage,
     done: job.done,
     total: job.total,
     year: job.year,
     month: job.month,
     format: job.format,
+    startedAt: job.startedAt,
     error: job.error,
     ready: job.status === "done",
   });

@@ -3,14 +3,24 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
+export type BulkJobStage =
+  | "queued"
+  | "fetching"
+  | "generating"
+  | "zipping"
+  | "uploading"
+  | "done";
+
 export interface ActiveJob {
   jobId: string;
   status: "queued" | "running" | "done" | "failed";
+  stage: BulkJobStage;
   done: number;
   total: number;
   year: number;
   month: number;
   format: "csv" | "pdf";
+  startedAt: number | null;
 }
 
 interface SeededJob {
@@ -82,7 +92,7 @@ class BulkJobsStore {
   private finalized = new Set<string>();
   private inFlight = false;
   private started = false;
-  private intervalId: ReturnType<typeof setInterval> | null = null;
+  private timeoutId: ReturnType<typeof setTimeout> | null = null;
   // jobId → timestamp of transition into done/failed
   private justFinished = new Map<string, number>();
   private justFinishedAcknowledged = new Set<string>();
@@ -123,8 +133,10 @@ class BulkJobsStore {
   seed(job: SeededJob): void {
     if (!job?.jobId || this.finalized.has(job.jobId)) return;
     this.watched.set(job.jobId, job);
-    // kick an immediate tick so the ring shows up right away
+    // kick an immediate tick so the ring shows up right away, and tighten
+    // the poll cadence to 1.5 s while this job is in flight.
     void this.tick();
+    this.scheduleNext();
   }
 
   start(): void {
@@ -133,17 +145,29 @@ class BulkJobsStore {
 
     window.addEventListener(BULK_EXPORT_STARTED_EVENT, this.onStart);
     void this.tick();
-    this.intervalId = setInterval(() => {
-      void this.tick();
-    }, 3_000);
+    this.scheduleNext();
   }
 
   stop(): void {
     if (!this.started) return;
     this.started = false;
     window.removeEventListener(BULK_EXPORT_STARTED_EVENT, this.onStart);
-    if (this.intervalId) clearInterval(this.intervalId);
-    this.intervalId = null;
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    this.timeoutId = null;
+  }
+
+  /**
+   * Adaptive poll interval: 1.5 s while any job is active (tight feedback
+   * during generation), 3 s when idle (keeps background load low).
+   */
+  private scheduleNext(): void {
+    if (!this.started) return;
+    if (this.timeoutId) clearTimeout(this.timeoutId);
+    const delay =
+      this.activeJobs.length > 0 || this.watched.size > 0 ? 1_500 : 3_000;
+    this.timeoutId = setTimeout(() => {
+      void this.tick().finally(() => this.scheduleNext());
+    }, delay);
   }
 
   private onStart = (e: Event) => {

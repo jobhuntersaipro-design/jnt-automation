@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { announceBulkExportStarted } from "@/components/dashboard/bulk-jobs-indicator";
+import { BranchChip } from "@/components/ui/branch-chip";
 
 /**
  * Renders dropdown content into document.body via portal, anchored to a
@@ -181,32 +182,6 @@ function SortHeader({
   );
 }
 
-/**
- * Branch colour chip — derives a stable hue from the branch code so each
- * branch reads as a visual unit even in a flat table.
- */
-function BranchChip({ code }: { code: string }) {
-  // Soft saturation; branches stay muted so they don't compete with currency columns.
-  const palette = [
-    { bg: "bg-blue-100", text: "text-blue-700", ring: "ring-blue-200" },
-    { bg: "bg-emerald-100", text: "text-emerald-700", ring: "ring-emerald-200" },
-    { bg: "bg-amber-100", text: "text-amber-700", ring: "ring-amber-200" },
-    { bg: "bg-purple-100", text: "text-purple-700", ring: "ring-purple-200" },
-    { bg: "bg-rose-100", text: "text-rose-700", ring: "ring-rose-200" },
-    { bg: "bg-sky-100", text: "text-sky-700", ring: "ring-sky-200" },
-  ];
-  let hash = 0;
-  for (let i = 0; i < code.length; i++) hash = (hash * 31 + code.charCodeAt(i)) >>> 0;
-  const c = palette[hash % palette.length];
-  return (
-    <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[0.72rem] font-medium tabular-nums ring-1 ring-inset ${c.bg} ${c.text} ${c.ring}`}
-    >
-      {code}
-    </span>
-  );
-}
-
 function RowActions({
   uploadId,
   year,
@@ -355,7 +330,7 @@ function RowActions({
           PDF zip
         </button>
         <p className="px-3 py-1.5 text-[0.68rem] text-on-surface-variant/70 border-t border-outline-variant/15 mt-1">
-          Bundles every dispatcher's parcel detail for the whole month
+          Bundles every dispatcher&apos;s parcel detail for the whole month
           (all branches) into a single zip.
         </p>
       </PortalDropdown>

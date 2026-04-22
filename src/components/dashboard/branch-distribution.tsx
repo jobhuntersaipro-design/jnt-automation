@@ -10,7 +10,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { BranchPoint } from "@/lib/db/overview";
-import { CHART_COLORS } from "@/lib/chart-colors";
+import { getBranchColor } from "@/lib/branch-colors";
 
 type Metric = "netPayout" | "totalOrders";
 
@@ -210,12 +210,13 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
                 dataKey={metric}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 shape={(props: any) => {
-                  const { x, y, width, height, index } = props;
+                  const { x, y, width, height, index, payload } = props;
                   if (!width || height <= 0) return <g />;
                   const opacity = hoveredIndex === null || hoveredIndex === index ? 1 : 0.2;
                   const r = 4;
                   const path = `M${x},${y + height} L${x},${y + r} Q${x},${y} ${x + r},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height} Z`;
-                  return <path d={path} fill={CHART_COLORS.brand} fillOpacity={opacity} />;
+                  const fill = getBranchColor(payload?.name).hexSolid;
+                  return <path d={path} fill={fill} fillOpacity={opacity} />;
                 }}
               />
             </BarChart>

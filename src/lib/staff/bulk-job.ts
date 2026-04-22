@@ -4,6 +4,19 @@ const redis = Redis.fromEnv();
 
 export type BulkJobStatus = "queued" | "running" | "done" | "failed";
 
+/**
+ * Fine-grained stage during a running job. Drives the downloads-panel label
+ * ("Fetching records…" vs. "Bundling zip…") so a long job doesn't feel stuck
+ * on a single counter.
+ */
+export type BulkJobStage =
+  | "queued"
+  | "fetching"
+  | "generating"
+  | "zipping"
+  | "uploading"
+  | "done";
+
 export interface BulkJob {
   jobId: string;
   agentId: string;
@@ -11,10 +24,13 @@ export interface BulkJob {
   month: number;
   format: "csv" | "pdf";
   status: BulkJobStatus;
+  stage: BulkJobStage;
   /** Files generated so far */
   done: number;
   /** Total files to generate (set after the initial DB query) */
   total: number;
+  /** Wall-clock start of actual work (fetching onwards). Null while queued. */
+  startedAt: number | null;
   /** R2 object key once the zip has been uploaded */
   r2Key?: string;
   /** Human-readable error when status === "failed" */
@@ -31,14 +47,19 @@ export const RECENT_CAP = 20;
 export const RECENT_RETURN_LIMIT = 10;
 
 export async function createJob(
-  data: Omit<BulkJob, "status" | "done" | "total" | "createdAt" | "updatedAt">,
+  data: Omit<
+    BulkJob,
+    "status" | "stage" | "done" | "total" | "startedAt" | "createdAt" | "updatedAt"
+  >,
 ): Promise<BulkJob> {
   const now = Date.now();
   const job: BulkJob = {
     ...data,
     status: "queued",
+    stage: "queued",
     done: 0,
     total: 0,
+    startedAt: null,
     createdAt: now,
     updatedAt: now,
   };

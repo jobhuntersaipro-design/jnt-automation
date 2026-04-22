@@ -588,7 +588,6 @@ export function DispatchersClient({
                   dispatcher={d}
                   dataVersion={dataVersion}
                   defaults={defaults}
-                  branchCodes={localBranchCodes}
                   saveTrigger={saveTrigger}
                   isNew={newlyAddedIds.has(d.id)}
                   isChecked={checkedIds.has(d.id)}

@@ -6,6 +6,7 @@ import { Pin, Trash2, Pencil, Camera, X, Upload, Trash, Clock } from "lucide-rea
 import Image from "next/image";
 import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
+import { BranchChip } from "@/components/ui/branch-chip";
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";
 
@@ -105,7 +106,6 @@ interface DispatcherRowProps {
   dispatcher: StaffDispatcher;
   dataVersion: number;
   defaults: AgentDefaults;
-  branchCodes: string[];
   saveTrigger: number;
   isNew?: boolean;
   isChecked?: boolean;
@@ -126,7 +126,7 @@ const INPUT_CLASS =
 const AVATAR_ACCEPTED = ".jpg,.jpeg,.png,.webp";
 const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
 
-export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, saveTrigger, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange, onOpenDrawer, onDirtyChange }: DispatcherRowProps) {
+export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange, onOpenDrawer, onDirtyChange }: DispatcherRowProps) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -494,16 +494,12 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, branchCodes, 
           <span className="text-[0.72rem] text-on-surface-variant/60">—</span>
         ) : (
           dispatcher.assignments.map((a, idx) => (
-            <span
+            <BranchChip
               key={`${a.branchCode}-${a.extId}`}
-              className={`px-1.5 py-0.5 text-[0.7rem] font-medium rounded-md tabular-nums ${
-                idx === 0
-                  ? "bg-brand/10 text-brand"
-                  : "bg-surface-low text-on-surface-variant/70"
-              }`}
-            >
-              {a.branchCode}
-            </span>
+              code={a.branchCode}
+              variant={idx === 0 ? "solid" : "muted"}
+              title={idx === 0 ? `Current: ${a.branchCode}` : `Previous: ${a.branchCode}`}
+            />
           ))
         )}
       </div>

@@ -19,11 +19,13 @@ export async function GET() {
     jobs: jobs.map((j) => ({
       jobId: j.jobId,
       status: j.status,
+      stage: j.stage ?? (j.status === "queued" ? "queued" : "generating"),
       done: j.done,
       total: j.total,
       year: j.year,
       month: j.month,
       format: j.format,
+      startedAt: j.startedAt ?? null,
     })),
   });
 }

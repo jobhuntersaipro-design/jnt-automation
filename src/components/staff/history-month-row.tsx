@@ -10,6 +10,7 @@ import {
   FileText,
 } from "lucide-react";
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
+import { BranchChip } from "@/components/ui/branch-chip";
 
 const MONTHS = [
   "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -369,12 +370,10 @@ export function HistoryMonthRow({
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[0.9rem] font-semibold text-on-surface">{monthLabel}</span>
             {record.branchCode && (
-              <span
-                className="inline-flex items-center px-1.5 py-0.5 text-[0.66rem] font-medium bg-surface-low text-on-surface-variant rounded-md tabular-nums"
+              <BranchChip
+                code={record.branchCode}
                 title={`Salary from branch ${record.branchCode}`}
-              >
-                {record.branchCode}
-              </span>
+              />
             )}
             <StatusPill status={status} />
           </div>

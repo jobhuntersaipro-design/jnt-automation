@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   Download,
@@ -14,19 +14,64 @@ import {
   downloadZip,
   useActiveJobs,
   type ActiveJob,
+  type BulkJobStage,
 } from "./bulk-jobs-indicator";
 
 export interface RecentJob {
   jobId: string;
   status: "queued" | "running" | "done" | "failed";
+  stage: BulkJobStage;
   done: number;
   total: number;
   year: number;
   month: number;
   format: "csv" | "pdf";
   error?: string;
+  startedAt: number | null;
   createdAt: number;
   updatedAt: number;
+}
+
+/** Human-readable label for each stage of a running job. */
+function stageLabel(stage: BulkJobStage, done: number, total: number): string {
+  switch (stage) {
+    case "queued":
+      return "Queued…";
+    case "fetching":
+      return "Fetching records…";
+    case "generating":
+      return total > 0 ? `Generating ${done} / ${total}` : "Generating…";
+    case "zipping":
+      return "Bundling zip…";
+    case "uploading":
+      return "Uploading…";
+    case "done":
+      return "Done";
+  }
+}
+
+/**
+ * Rate-based ETA, only shown during the `generating` stage once we have a
+ * stable sample (>=3 files). Anything earlier gives wildly noisy estimates
+ * that jump around in the UI.
+ */
+function formatEta(
+  stage: BulkJobStage,
+  done: number,
+  total: number,
+  startedAt: number | null,
+): string | null {
+  if (stage !== "generating" || done < 3 || total <= 0 || !startedAt) return null;
+  const elapsed = Date.now() - startedAt;
+  if (elapsed <= 0) return null;
+  const remaining = total - done;
+  if (remaining <= 0) return null;
+  const etaMs = (elapsed / done) * remaining;
+  if (etaMs < 15_000) return "~10s remaining";
+  if (etaMs < 60_000) return `~${Math.round(etaMs / 1_000 / 5) * 5}s remaining`;
+  const mins = Math.round(etaMs / 60_000);
+  if (mins < 60) return `~${mins} min remaining`;
+  return `~${Math.round(mins / 60)} h remaining`;
 }
 
 function zipName(year: number, month: number): string {
@@ -73,11 +118,30 @@ export function DownloadsPanel() {
     }
   }, []);
 
+  // Adaptive poll cadence: 1.5 s while any row is still running (so stage +
+  // counter feel live during generation), 3 s when everything is terminal.
+  const anyActive = useMemo(
+    () =>
+      recent.some((j) => j.status === "queued" || j.status === "running") ||
+      active.length > 0,
+    [recent, active],
+  );
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
-    fetchRecent();
-    const id = setInterval(fetchRecent, 3_000);
-    return () => clearInterval(id);
-  }, [fetchRecent]);
+    let cancelled = false;
+    const loop = async () => {
+      if (cancelled) return;
+      await fetchRecent();
+      if (cancelled) return;
+      const delay = anyActive ? 1_500 : 3_000;
+      timeoutRef.current = setTimeout(loop, delay);
+    };
+    loop();
+    return () => {
+      cancelled = true;
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [fetchRecent, anyActive]);
 
   // Merge active (from the shared store) + recent (from /recent) so the panel
   // never flashes between poll boundaries when a job transitions.
@@ -219,11 +283,15 @@ function DownloadRow({
       job.total > 0
         ? Math.min(100, Math.round((job.done / job.total) * 100))
         : 0;
+    const stage = job.stage ?? (job.status === "queued" ? "queued" : "generating");
+    const label_ = stageLabel(stage, job.done, job.total);
+    const eta = formatEta(stage, job.done, job.total, job.startedAt);
     return (
       <li
         data-testid="download-row"
         data-job-id={job.jobId}
         data-status={job.status}
+        data-stage={stage}
         className="rounded-lg border border-outline-variant/25 p-3 bg-surface-container-low/50"
       >
         <div className="flex items-center gap-2">
@@ -231,15 +299,21 @@ function DownloadRow({
           <span className="text-[0.78rem] font-medium text-on-surface">
             {formatLabel_} export · {label}
           </span>
-          <span className="ml-auto text-[0.72rem] text-on-surface-variant tabular-nums">
-            {job.total > 0 ? `${job.done}/${job.total}` : job.status === "queued" ? "queued" : "…"}
-          </span>
+          {stage !== "generating" || job.total === 0 ? null : (
+            <span className="ml-auto text-[0.72rem] text-on-surface-variant tabular-nums">
+              {pct}%
+            </span>
+          )}
         </div>
         <div className="mt-2 h-1 rounded-full bg-surface-container-high overflow-hidden">
           <div
             className="h-full bg-brand transition-[width] duration-300"
             style={{ width: `${pct}%` }}
           />
+        </div>
+        <div className="mt-1.5 flex items-center justify-between gap-2 text-[0.7rem] text-on-surface-variant/80 tabular-nums">
+          <span>{label_}</span>
+          {eta && <span className="text-on-surface-variant">{eta}</span>}
         </div>
       </li>
     );

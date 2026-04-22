@@ -51,7 +51,11 @@ export async function runBulkExport(jobId: string): Promise<void> {
   }
 
   try {
-    await updateJob(jobId, { status: "running" });
+    await updateJob(jobId, {
+      status: "running",
+      stage: "fetching",
+      startedAt: Date.now(),
+    });
 
     // 1. Batch-fetch every dispatcher's detail for the month in ONE round-trip.
     //    ~2 Prisma queries total (findMany + include → extra query for lineItems).
@@ -65,7 +69,7 @@ export async function runBulkExport(jobId: string): Promise<void> {
       return;
     }
 
-    await updateJob(jobId, { total: details.length });
+    await updateJob(jobId, { total: details.length, stage: "generating" });
 
     // 2. Generate files in a bounded pool. CSV is cheap (string join),
     //    PDF is CPU-bound so we keep concurrency low.
@@ -130,6 +134,7 @@ export async function runBulkExport(jobId: string): Promise<void> {
     const files = raw.filter((f): f is GeneratedFile => f !== null);
 
     // 3. Build the zip in memory (still the cheapest option for 60-ish files)
+    await updateJob(jobId, { stage: "zipping" });
     const zip = new JSZip();
     for (const f of files) {
       zip.file(f.fileName, f.data);
@@ -137,6 +142,7 @@ export async function runBulkExport(jobId: string): Promise<void> {
     const zipBuffer = await zip.generateAsync({ type: "uint8array" });
 
     // 4. Upload to R2
+    await updateJob(jobId, { stage: "uploading" });
     const mm = String(job.month).padStart(2, "0");
     const r2Key = `bulk-exports/${job.agentId}/${job.jobId}/${job.year}_${mm}_details.zip`;
     await r2.send(
@@ -177,6 +183,7 @@ export async function runBulkExport(jobId: string): Promise<void> {
 
     await updateJob(jobId, {
       status: "done",
+      stage: "done",
       done: files.length,
       total: details.length,
       r2Key,

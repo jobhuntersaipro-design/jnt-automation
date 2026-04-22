@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import type { DispatcherRow } from "@/lib/db/overview";
+import { BranchChip } from "@/components/ui/branch-chip";
 
 type SortKey = "name" | "branch" | "totalOrders" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy" | "deductions";
 type SortDir = "asc" | "desc";
@@ -188,9 +189,7 @@ function DispatcherTable({
               </div>
 
               {/* Branch chip */}
-              <span className="inline-block px-2 py-0.5 text-[0.85rem] font-medium text-on-surface-variant bg-surface-low rounded-[0.375rem] w-fit">
-                {d.branch}
-              </span>
+              <BranchChip code={d.branch} size="md" className="w-fit" />
 
               {/* Total Orders */}
               <span className="tabular-nums text-[0.875rem] text-on-surface">
