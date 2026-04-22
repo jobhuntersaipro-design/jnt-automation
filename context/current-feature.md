@@ -2,15 +2,34 @@
 
 ## Status
 
-None — ready for next feature.
+**Active** — Person Identity Model (Option 1: rename Dispatcher to person-level + add `DispatcherAssignment` child table).
+
+Spec: `context/features/person-identity-spec.md`.
 
 ## Goals
 
-_No active feature. Use `/feature load <spec-path>` or describe the next feature to start._
+Unify dispatcher records across branches. Today the same human appears as N separate rows when they transfer between branches (different J&T ext-IDs per branch). After this feature: one row per person, with branch history shown as chips. Settings edited once, YTD history merged, headcount reflects unique humans.
+
+- Match identity: **IC when present, normalized full name as fallback** (tiered, agent-scoped).
+- Keep `Dispatcher` as the person entity; move `extId` + `branchId` into a new `DispatcherAssignment` table.
+- One-time backfill with a dry-run report the user reviews before committing.
+- Salary records stay per-upload (branch × month) — no change to payroll structure.
 
 ## Notes
 
-_Populated when a feature is loaded._
+### Phased execution (on branch `feature/person-identity-model`)
+
+- **Phase A** — Schema migration (additive only: `DispatcherAssignment`, `Dispatcher.agentId`, `Dispatcher.normalizedName`, `icNo` → nullable) + dry-run script + unit/integration tests. No data destruction yet. Output: report at `docs/audit-results/person-identity-dry-run.md` for user to review.
+- **Phase B** — Commit backfill: re-link `SalaryRecord.dispatcherId` + `Employee.dispatcherId` to canonical person, delete duplicate `Dispatcher` rows + their settings, create `DispatcherAssignment` for every original `(branchId, extId)`. Second Prisma migration drops `Dispatcher.extId` + `Dispatcher.branchId`.
+- **Phase C** — UI: one row per person in Settings, current + past branches as chips, history drawer merges across branches with branch badge per month, Add Dispatcher drawer creates person + first assignment atomically, delete confirmation copy surfaces blast radius.
+- **Phase D** — Prod deploy: Neon snapshot → `prisma migrate deploy` → run backfill against prod → deploy app.
+
+### Risks to keep in mind
+
+1. False merges on name-only matches (namesakes without IC) — mitigated by dry-run review, not eliminated. Manual split action is a possible follow-up.
+2. Settings conflicts across duplicate rows — canonical row (latest `updatedAt`) wins. Dry-run surfaces diffs for user spot-check.
+3. Prod migration is a one-way door once `extId`/`branchId` are dropped from `Dispatcher`. Snapshot required.
+4. Malaysian name variants (`bin` vs `b.`, tribal suffixes) aren't caught by uppercase-trim normalization. Accepted limitation for v1.
 
 ## History
 
