@@ -31,6 +31,7 @@ const { mockRedis } = vi.hoisted(() => {
       lpush: vi.fn(),
       ltrim: vi.fn(),
       lrange: vi.fn(),
+      lrem: vi.fn(),
       del: vi.fn(),
     },
   };

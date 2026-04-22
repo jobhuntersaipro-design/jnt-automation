@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 
-interface ActiveJob {
+export interface ActiveJob {
   jobId: string;
   status: "queued" | "running" | "done" | "failed";
   done: number;
@@ -25,7 +25,8 @@ function zipName(year: number, month: number): string {
   return `${year}_${mm}_details.zip`;
 }
 
-async function downloadZip(jobId: string, filename: string) {
+/** Client-side download helper used by both the toast action and the panel. */
+export async function downloadZip(jobId: string, filename: string): Promise<void> {
   try {
     const res = await fetch(`/api/dispatchers/month-detail/bulk/${jobId}/download`);
     if (!res.ok) {
@@ -49,9 +50,9 @@ async function downloadZip(jobId: string, filename: string) {
 const BULK_EXPORT_STARTED_EVENT = "bulk-export:started";
 
 /**
- * Call after starting a bulk export so the indicator can track it even if
- * the job finishes between 3 s poll ticks (otherwise short-running CSVs can
- * complete without ever being caught as "active" → no completion toast).
+ * Call after starting a bulk export so the indicator tracks it even if the
+ * job finishes between 3 s poll ticks. Without this, short-running CSVs can
+ * complete and never fire a completion toast.
  */
 export function announceBulkExportStarted(job: SeededJob): void {
   if (typeof window === "undefined") return;
@@ -60,125 +61,228 @@ export function announceBulkExportStarted(job: SeededJob): void {
   );
 }
 
+/* ─── Shared store ─────────────────────────────────────────────────── */
+
 /**
- * Background indicator that polls active bulk-export jobs and:
- *  - Renders an animated progress ring absolutely positioned over the
- *    notification bell while any job is running.
- *  - Fires a toast (with a "Download" action) whenever a job transitions
- *    from running → done.
+ * Module-level store that lives for the lifetime of the React root. It owns:
+ *   - the 3 s poll of /active (a single poller across the whole app)
+ *   - the active-job list (read by the ring overlay and the Downloads panel)
+ *   - a small "just-finished" queue (powers the Downloads red-dot)
  *
- * The component has no visual footprint in the layout; the ring is
- * absolutely positioned, so place it as a sibling of NotificationBell.
+ * Components subscribe via `useActiveJobs()` / `useJustFinishedCount()`.
  */
-export function BulkJobsIndicator() {
-  const [jobs, setJobs] = useState<ActiveJob[]>([]);
-  // Jobs we've seen active (or been told about) that still need a finalize toast
-  const watched = useRef<Map<string, SeededJob>>(new Map());
-  // Jobs we've already toasted for — prevents double-toast under concurrent
-  // ticks + React Strict Mode double-mount.
-  const finalized = useRef<Set<string>>(new Set());
-  // Guard against overlapping ticks (setInterval doesn't await)
-  const inFlight = useRef(false);
+type Listener = () => void;
 
-  useEffect(() => {
-    let cancelled = false;
+const RECENT_FINISH_WINDOW_MS = 10_000;
 
-    async function tick() {
-      if (inFlight.current) return;
-      inFlight.current = true;
-      try {
-        const res = await fetch("/api/dispatchers/month-detail/bulk/active");
-        if (!res.ok) return;
-        const data = await res.json();
-        const next: ActiveJob[] = data.jobs ?? [];
+class BulkJobsStore {
+  activeJobs: ActiveJob[] = [];
+  private listeners = new Set<Listener>();
+  private watched = new Map<string, SeededJob>();
+  private finalized = new Set<string>();
+  private inFlight = false;
+  private started = false;
+  private intervalId: ReturnType<typeof setInterval> | null = null;
+  // jobId → timestamp of transition into done/failed
+  private justFinished = new Map<string, number>();
+  private justFinishedAcknowledged = new Set<string>();
 
-        // Detect jobs that were previously tracked but are no longer
-        // in the active list — those either finished or failed.
-        // Snapshot entries before awaiting so the map can be mutated below.
-        for (const [jobId, prev] of Array.from(watched.current.entries())) {
-          if (next.find((j) => j.jobId === jobId)) continue;
-          if (finalized.current.has(jobId)) {
-            watched.current.delete(jobId);
-            continue;
-          }
-          // Claim synchronously — before any await — so overlapping polls
-          // don't re-enter this branch and double-toast.
-          finalized.current.add(jobId);
-          watched.current.delete(jobId);
+  subscribe(fn: Listener): () => void {
+    this.listeners.add(fn);
+    return () => {
+      this.listeners.delete(fn);
+    };
+  }
 
-          try {
-            const statusRes = await fetch(
-              `/api/dispatchers/month-detail/bulk/${jobId}/status`,
-            );
-            if (!statusRes.ok) continue;
-            const status = await statusRes.json();
-            if (status.status === "done") {
-              const filename = zipName(prev.year, prev.month);
-              toast.success(`${prev.format.toUpperCase()} export ready`, {
-                description: filename,
-                duration: 30_000,
-                action: {
-                  label: "Download",
-                  onClick: () => downloadZip(jobId, filename),
-                },
-              });
-            } else if (status.status === "failed") {
-              toast.error("Bulk export failed", {
-                description: status.error || "Unknown error",
-              });
-            }
-          } catch {
-            // Ignore transient polling errors
-          }
+  private emit() {
+    for (const fn of this.listeners) fn();
+  }
+
+  getSnapshot = (): ActiveJob[] => this.activeJobs;
+
+  /** Count of jobs that finished within the last 10 s and haven't been acknowledged. */
+  unacknowledgedFinishCount(): number {
+    const cutoff = Date.now() - RECENT_FINISH_WINDOW_MS;
+    let n = 0;
+    for (const [id, ts] of this.justFinished) {
+      if (ts < cutoff) continue;
+      if (this.justFinishedAcknowledged.has(id)) continue;
+      n++;
+    }
+    return n;
+  }
+
+  /** Call when the Downloads tab opens — clears the red dot. */
+  acknowledgeFinishes(): void {
+    for (const id of this.justFinished.keys()) {
+      this.justFinishedAcknowledged.add(id);
+    }
+    this.emit();
+  }
+
+  seed(job: SeededJob): void {
+    if (!job?.jobId || this.finalized.has(job.jobId)) return;
+    this.watched.set(job.jobId, job);
+    // kick an immediate tick so the ring shows up right away
+    void this.tick();
+  }
+
+  start(): void {
+    if (this.started || typeof window === "undefined") return;
+    this.started = true;
+
+    window.addEventListener(BULK_EXPORT_STARTED_EVENT, this.onStart);
+    void this.tick();
+    this.intervalId = setInterval(() => {
+      void this.tick();
+    }, 3_000);
+  }
+
+  stop(): void {
+    if (!this.started) return;
+    this.started = false;
+    window.removeEventListener(BULK_EXPORT_STARTED_EVENT, this.onStart);
+    if (this.intervalId) clearInterval(this.intervalId);
+    this.intervalId = null;
+  }
+
+  private onStart = (e: Event) => {
+    const detail = (e as CustomEvent<SeededJob>).detail;
+    this.seed(detail);
+  };
+
+  private async tick(): Promise<void> {
+    if (this.inFlight) return;
+    this.inFlight = true;
+    try {
+      const res = await fetch("/api/dispatchers/month-detail/bulk/active");
+      if (!res.ok) return;
+      const data = await res.json();
+      const next: ActiveJob[] = data.jobs ?? [];
+
+      // Finalize jobs that dropped out of the active set.
+      for (const [jobId, prev] of Array.from(this.watched.entries())) {
+        if (next.find((j) => j.jobId === jobId)) continue;
+        if (this.finalized.has(jobId)) {
+          this.watched.delete(jobId);
+          continue;
         }
+        // Claim synchronously before awaiting — prevents double-toast when
+        // React Strict Mode or overlapping ticks race.
+        this.finalized.add(jobId);
+        this.watched.delete(jobId);
 
-        if (!cancelled) {
-          setJobs(next);
-          for (const j of next) {
-            if (finalized.current.has(j.jobId)) continue;
-            watched.current.set(j.jobId, {
-              jobId: j.jobId,
-              year: j.year,
-              month: j.month,
-              format: j.format,
+        try {
+          const statusRes = await fetch(
+            `/api/dispatchers/month-detail/bulk/${jobId}/status`,
+          );
+          if (!statusRes.ok) continue;
+          const status = await statusRes.json();
+          if (status.status === "done") {
+            this.justFinished.set(jobId, Date.now());
+            const filename = zipName(prev.year, prev.month);
+            toast.success(`${prev.format.toUpperCase()} export ready`, {
+              description: filename,
+              duration: 15_000,
+              action: {
+                label: "Download",
+                onClick: () => downloadZip(jobId, filename),
+              },
+            });
+          } else if (status.status === "failed") {
+            this.justFinished.set(jobId, Date.now());
+            toast.error("Bulk export failed", {
+              description: status.error || "Unknown error",
             });
           }
+        } catch {
+          // ignore transient
         }
-      } catch {
-        // Ignore transient polling errors
-      } finally {
-        inFlight.current = false;
       }
-    }
 
-    function onStart(e: Event) {
-      const detail = (e as CustomEvent<SeededJob>).detail;
-      if (!detail?.jobId || finalized.current.has(detail.jobId)) return;
-      watched.current.set(detail.jobId, detail);
-      // Kick off an immediate poll so the ring shows up right away instead
-      // of waiting up to 3 s for the next tick.
-      tick();
+      this.activeJobs = next;
+      for (const j of next) {
+        if (this.finalized.has(j.jobId)) continue;
+        this.watched.set(j.jobId, {
+          jobId: j.jobId,
+          year: j.year,
+          month: j.month,
+          format: j.format,
+        });
+      }
+      // Prune old justFinished entries (anything > 5× the window)
+      const cutoff = Date.now() - RECENT_FINISH_WINDOW_MS * 5;
+      for (const [id, ts] of this.justFinished) {
+        if (ts < cutoff) this.justFinished.delete(id);
+      }
+      this.emit();
+    } catch {
+      // ignore transient
+    } finally {
+      this.inFlight = false;
     }
+  }
+}
 
-    window.addEventListener(BULK_EXPORT_STARTED_EVENT, onStart);
-    tick();
-    const id = setInterval(tick, 3000);
+const bulkJobsStore = new BulkJobsStore();
+
+/** Hook — subscribes to the live active-jobs list. */
+export function useActiveJobs(): ActiveJob[] {
+  return useSyncExternalStore(
+    bulkJobsStore.subscribe.bind(bulkJobsStore),
+    bulkJobsStore.getSnapshot,
+    () => [],
+  );
+}
+
+/** Hook — how many jobs finished in the last 10 s and haven't been seen. */
+export function useJustFinishedCount(): number {
+  const [, setRerender] = useState(0);
+  useEffect(() => {
+    const unsub = bulkJobsStore.subscribe(() => setRerender((x) => x + 1));
+    // Also rerender every 1 s so the 10 s window expires cleanly without a poll.
+    const id = setInterval(() => setRerender((x) => x + 1), 1_000);
     return () => {
-      cancelled = true;
-      window.removeEventListener(BULK_EXPORT_STARTED_EVENT, onStart);
+      unsub();
       clearInterval(id);
+    };
+  }, []);
+  return bulkJobsStore.unacknowledgedFinishCount();
+}
+
+/** Call when the Downloads tab opens — clears the red dot. */
+export function acknowledgeDownloadsSeen(): void {
+  bulkJobsStore.acknowledgeFinishes();
+}
+
+/* ─── Progress ring component ──────────────────────────────────────── */
+
+/**
+ * Thin consumer that mounts the store on the page and renders the SVG
+ * progress ring over the notification bell while any job is in flight.
+ *
+ * The polling + state live in `bulkJobsStore` — this component only renders.
+ */
+export function BulkJobsIndicator() {
+  const jobs = useActiveJobs();
+
+  // Boot the store once per app (StrictMode double-mount is idempotent via `started`).
+  useEffect(() => {
+    bulkJobsStore.start();
+    return () => {
+      // We intentionally don't stop on unmount — the store is app-scoped and
+      // unmounting just the ring shouldn't kill the poller (the panel also
+      // depends on it).
     };
   }, []);
 
   if (jobs.length === 0) return null;
 
-  // Overall progress across all active jobs
   const totalFiles = jobs.reduce((s, j) => s + (j.total || 0), 0);
   const totalDone = jobs.reduce((s, j) => s + (j.done || 0), 0);
   const fraction = totalFiles > 0 ? totalDone / totalFiles : 0;
   const percent = Math.round(fraction * 100);
 
-  // SVG circle progress ring — r=13 gives circumference ≈ 81.68
   const r = 13;
   const c = 2 * Math.PI * r;
   const offset = c * (1 - fraction);
@@ -189,23 +293,8 @@ export function BulkJobsIndicator() {
       aria-label={`${jobs.length} bulk export${jobs.length !== 1 ? "s" : ""} in progress, ${percent}% done`}
       title={`${totalDone}/${totalFiles} files · ${percent}%`}
     >
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 32 32"
-        className="-rotate-90"
-        aria-hidden="true"
-      >
-        {/* Background ring */}
-        <circle
-          cx="16"
-          cy="16"
-          r={r}
-          fill="none"
-          stroke="rgba(0,86,210,0.12)"
-          strokeWidth="2"
-        />
-        {/* Progress arc */}
+      <svg width="32" height="32" viewBox="0 0 32 32" className="-rotate-90" aria-hidden="true">
+        <circle cx="16" cy="16" r={r} fill="none" stroke="rgba(0,86,210,0.12)" strokeWidth="2" />
         <circle
           cx="16"
           cy="16"
@@ -222,3 +311,4 @@ export function BulkJobsIndicator() {
     </div>
   );
 }
+
