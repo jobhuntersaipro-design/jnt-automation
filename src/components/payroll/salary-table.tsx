@@ -18,6 +18,7 @@ import {
   History,
 } from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
+import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
 
 export interface SalaryRecordRow {
   dispatcherId: string;
@@ -169,10 +170,10 @@ function EditableCell({
       onKeyDown={handleKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-colors cursor-text ${
+      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-all cursor-text ${
         focused
-          ? "border-brand outline-none ring-1 ring-brand/30"
-          : "border-outline-variant/30"
+          ? "border-brand outline-none ring-2 ring-brand/30 bg-brand/5 text-brand font-semibold shadow-sm"
+          : "border-outline-variant/30 hover:border-outline-variant/60 hover:bg-surface-hover/40"
       }`}
     />
   );
@@ -251,6 +252,7 @@ export function SalaryTable({
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [tierPopover, setTierPopover] = useState<string | null>(null);
+  const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard();
 
   // Snapshot of records before edit mode for cancel/diff
   const [preEditRecords, setPreEditRecords] = useState(initialRecords);
@@ -396,6 +398,8 @@ export function SalaryTable({
   // Generate payslips
   const handleGeneratePayslips = async () => {
     if (selectedIds.size === 0) return;
+    const ok = await checkPayslipSetup();
+    if (!ok) return;
     setGenerating(true);
     try {
       const res = await fetch(`/api/payroll/upload/${uploadId}/payslips`, {
@@ -864,6 +868,8 @@ export function SalaryTable({
           </div>
         </>
       )}
+
+      {payslipGuardDialog}
     </div>
   );
 }

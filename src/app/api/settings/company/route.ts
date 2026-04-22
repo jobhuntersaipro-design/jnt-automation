@@ -8,6 +8,34 @@ const schema = z.object({
   companyAddress: z.string().max(500).nullish(),
 });
 
+export async function GET() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!session.user.isApproved) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const agent = await prisma.agent.findUnique({
+    where: { id: session.user.id },
+    select: {
+      name: true,
+      companyRegistrationNo: true,
+      companyAddress: true,
+      stampImageUrl: true,
+    },
+  });
+
+  if (!agent) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(agent);
+}
+
 export async function PATCH(req: NextRequest) {
   const session = await auth();
 

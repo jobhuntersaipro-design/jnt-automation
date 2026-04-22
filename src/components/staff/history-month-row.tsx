@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   FileText,
 } from "lucide-react";
+import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
 
 const MONTHS = [
   "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -204,8 +205,8 @@ function IntField({ value, onChange, className }: {
   );
 }
 
-const FIELD_CLASS = "w-20 px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface hover:bg-surface-hover/60 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40";
-const WEIGHT_FIELD_CLASS = "w-16 px-1.5 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface hover:bg-surface-hover/60 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 text-center";
+const FIELD_CLASS = "w-20 px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-all caret-brand hover:bg-surface-hover/60 hover:border-outline-variant/50 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand focus:bg-brand/5 focus:text-brand focus:font-semibold focus:shadow-sm";
+const WEIGHT_FIELD_CLASS = "w-16 px-1.5 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-all caret-brand hover:bg-surface-hover/60 hover:border-outline-variant/50 focus:outline-none focus:ring-2 focus:ring-brand/40 focus:border-brand focus:bg-brand/5 focus:text-brand focus:font-semibold focus:shadow-sm text-center";
 
 export function HistoryMonthRow({
   record,
@@ -228,6 +229,7 @@ export function HistoryMonthRow({
   const [showConfirm, setShowConfirm] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard();
 
   // Detect changes
   const changes = useMemo(() => {
@@ -306,6 +308,8 @@ export function HistoryMonthRow({
 
   async function handleDownloadPayslip(e: React.MouseEvent) {
     e.stopPropagation();
+    const ok = await checkPayslipSetup();
+    if (!ok) return;
     setDownloading(true);
     try {
       const res = await fetch(`/api/payroll/upload/${record.uploadId}/payslips`, {
@@ -646,6 +650,8 @@ export function HistoryMonthRow({
           </div>
         </div>
       )}
+
+      {payslipGuardDialog}
     </div>
   );
 }

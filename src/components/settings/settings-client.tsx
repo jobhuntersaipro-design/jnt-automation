@@ -67,7 +67,7 @@ function ProfileSection({
 
   async function handleSave() {
     if (!name.trim()) {
-      toast.error("Name cannot be empty.");
+      toast.error("Business name cannot be empty.");
       return;
     }
     if (name.trim() === initialName) return;
@@ -134,9 +134,12 @@ function ProfileSection({
 
   return (
     <section>
-      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-4">
+      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-1">
         Profile
       </h2>
+      <p className="text-xs text-on-surface-variant mb-4">
+        Your business name appears as the company header on generated payslip PDFs.
+      </p>
       <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-5">
         <div className="flex items-center gap-4">
           <div className="relative group">
@@ -175,12 +178,13 @@ function ProfileSection({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
-            Name
+            Business Name
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. ST XIANG ENTERPRISE"
             className="w-full border border-outline-variant rounded-md px-3 py-2 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
@@ -287,11 +291,11 @@ function CompanySection({
 
   return (
     <section>
-      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-4">
+      <h2 className="font-manrope font-semibold text-lg text-on-surface mb-1">
         Company Details
       </h2>
       <p className="text-xs text-on-surface-variant mb-4">
-        These details appear on generated payslip PDFs. All fields are optional.
+        These details appear on generated payslip PDFs.
       </p>
       <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-5">
         <div className="flex flex-col gap-1">

@@ -5,6 +5,7 @@ import { ChevronDown, Check, Loader2, FileText, Download, X } from "lucide-react
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
+import { usePayslipGuard } from "@/components/settings/use-payslip-guard"
 import {
   calculateStatutory,
   calculateNetSalary,
@@ -167,7 +168,7 @@ function CalcCurrencyInput({
       value={display}
       placeholder="0.00"
       onKeyDown={handleKey}
-      className={`w-full bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none cursor-text ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
+      className={`peer w-full bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold cursor-text ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
     />
   )
 }
@@ -189,7 +190,7 @@ function HoursInput({
       inputMode="decimal"
       value={display}
       placeholder="0"
-      className="w-full bg-transparent text-center text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none"
+      className="w-full bg-transparent text-center text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 caret-primary focus:outline-none focus:text-primary focus:font-semibold"
       onFocus={() => setEditing(value > 0 ? value.toString() : "")}
       onChange={(e) => setEditing(e.target.value.replace(/[^\d.]/g, ""))}
       onBlur={() => {
@@ -322,6 +323,7 @@ export function PayrollTab() {
   const [icPrompt, setIcPrompt] = useState<{ employeeId: string; name: string } | null>(null)
   const [icInput, setIcInput] = useState("")
   const [savingIc, setSavingIc] = useState(false)
+  const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard()
 
   // Clear selection when month/year changes
   useEffect(() => { setSelectedIds(new Set()) }, [month, year])
@@ -355,6 +357,8 @@ export function PayrollTab() {
       toast.error("Save payroll first before generating payslips")
       return
     }
+    const ok = await checkPayslipSetup()
+    if (!ok) return
     setGeneratingId(entry.employeeId)
     try {
       const res = await fetch(`/api/employee-payroll/${month}/${year}/payslip/${entry.employeeId}`, { method: "POST" })
@@ -380,10 +384,12 @@ export function PayrollTab() {
     } finally {
       setGeneratingId(null)
     }
-  }, [month, year])
+  }, [month, year, checkPayslipSetup])
 
   const handleBulkGenerate = useCallback(async () => {
     if (selectedIds.size === 0) return
+    const ok = await checkPayslipSetup()
+    if (!ok) return
     setGeneratingBulk(true)
     try {
       const res = await fetch(`/api/employee-payroll/${month}/${year}/payslips`, {
@@ -412,7 +418,7 @@ export function PayrollTab() {
     } finally {
       setGeneratingBulk(false)
     }
-  }, [selectedIds, month, year])
+  }, [selectedIds, month, year, checkPayslipSetup])
 
   const handleSaveIc = useCallback(async () => {
     if (!icPrompt || !/^\d{12}$/.test(icInput)) return
@@ -429,8 +435,13 @@ export function PayrollTab() {
       setEntries((prev) => prev.map((e) =>
         e.employeeId === empId ? { ...e, icNo: icInput } : e
       ))
-      toast.success("IC number saved — generating payslip...")
       setIcPrompt(null)
+      const ok = await checkPayslipSetup()
+      if (!ok) {
+        setSavingIc(false)
+        return
+      }
+      toast.success("IC number saved — generating payslip...")
       // Auto-generate payslip after saving IC
       setGeneratingId(empId)
       try {
@@ -457,7 +468,7 @@ export function PayrollTab() {
     } finally {
       setSavingIc(false)
     }
-  }, [icPrompt, icInput, month, year])
+  }, [icPrompt, icInput, month, year, checkPayslipSetup])
 
   return (
     <div className="space-y-5">
@@ -580,7 +591,7 @@ export function PayrollTab() {
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
                 <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Net</th>
-                <th className="pb-3" style={{ width: allSaved ? 60 : 24 }}></th>
+                <th className="pb-3" style={{ width: 150 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -620,7 +631,7 @@ export function PayrollTab() {
 
                     {/* Basic Pay / Hourly Wage */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={isStoreKeeper ? entry.hourlyWage : entry.basicPay}
                           onChange={(v) => updateEntry(entry.employeeId, isStoreKeeper ? "hourlyWage" : "basicPay", v)}
@@ -631,7 +642,7 @@ export function PayrollTab() {
                     {/* Working Hours */}
                     <td className="py-2.5 px-1">
                       {isStoreKeeper ? (
-                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                           <HoursInput
                             value={entry.workingHours}
                             onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
@@ -644,7 +655,7 @@ export function PayrollTab() {
 
                     {/* Petrol */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.petrolAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "petrolAllowance", v)}
@@ -654,7 +665,7 @@ export function PayrollTab() {
 
                     {/* KPI */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.kpiAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "kpiAllowance", v)}
@@ -664,7 +675,7 @@ export function PayrollTab() {
 
                     {/* Other */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.otherAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "otherAllowance", v)}
@@ -686,7 +697,7 @@ export function PayrollTab() {
 
                     {/* PCB */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.pcb}
                           onChange={(v) => updateEntry(entry.employeeId, "pcb", v)}
@@ -696,7 +707,7 @@ export function PayrollTab() {
 
                     {/* Penalty */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.penalty}
                           onChange={(v) => updateEntry(entry.employeeId, "penalty", v)}
@@ -706,13 +717,13 @@ export function PayrollTab() {
 
                     {/* EPF */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.epfEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "epfEmployee", v)}
                         />
                       </div>
-                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors mt-0.5">
+                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
                         <CalcCurrencyInput
                           value={entry.epfEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "epfEmployer", v)}
@@ -723,13 +734,13 @@ export function PayrollTab() {
 
                     {/* SOCSO */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.socsoEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "socsoEmployee", v)}
                         />
                       </div>
-                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors mt-0.5">
+                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
                         <CalcCurrencyInput
                           value={entry.socsoEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "socsoEmployer", v)}
@@ -740,13 +751,13 @@ export function PayrollTab() {
 
                     {/* EIS */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
                           value={entry.eisEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "eisEmployee", v)}
                         />
                       </div>
-                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/5 transition-colors mt-0.5">
+                      <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
                         <CalcCurrencyInput
                           value={entry.eisEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "eisEmployer", v)}
@@ -763,27 +774,37 @@ export function PayrollTab() {
                     </td>
 
                     {/* Status / Payslip */}
-                    <td className="py-2.5 text-center">
+                    <td className="py-2.5 px-2 text-center">
                       {entry.isSaved ? (
                         <button
                           onClick={() => handleGeneratePayslip(entry)}
                           disabled={generatingId === entry.employeeId}
-                          className="inline-flex items-center gap-1 px-1.5 py-1 text-[0.68rem] font-medium text-brand hover:bg-brand/5 rounded transition-colors disabled:opacity-50"
-                          title="Generate payslip"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 hover:border-brand/50 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
                         >
                           {generatingId === entry.employeeId ? (
-                            <Loader2 size={11} className="animate-spin" />
+                            <>
+                              <Loader2 size={12} className="animate-spin" />
+                              <span>Generating…</span>
+                            </>
                           ) : (
-                            <FileText size={11} />
+                            <>
+                              <FileText size={12} />
+                              <span>Generate Payslip</span>
+                            </>
                           )}
                         </button>
                       ) : (
                         <span
-                          className={`inline-block w-2 h-2 rounded-full ${
-                            isReady ? "bg-emerald-500" : "bg-gray-300"
-                          }`}
-                          title={isReady ? "Ready" : "Hours required"}
-                        />
+                          className="inline-flex items-center gap-1.5 text-[0.7rem] text-on-surface-variant/70"
+                          title={isReady ? "Save payroll to enable" : "Working hours required"}
+                        >
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full ${
+                              isReady ? "bg-emerald-500" : "bg-gray-300"
+                            }`}
+                          />
+                          {isReady ? "Ready" : "Hours required"}
+                        </span>
                       )}
                     </td>
                   </tr>
@@ -854,6 +875,8 @@ export function PayrollTab() {
           </div>
         </div>
       )}
+
+      {payslipGuardDialog}
     </div>
   )
 }
