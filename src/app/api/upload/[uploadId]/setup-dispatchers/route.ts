@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
+import { normalizeName } from "@/lib/dispatcher-identity/normalize-name";
 
 interface DispatcherInput {
   extId: string;
@@ -87,28 +88,42 @@ export async function POST(
 
   // Create all dispatchers in a single transaction
   const createdCount = await prisma.$transaction(async (tx) => {
-    // Batch-check which extIds already exist in this branch
+    // Idempotency: batch-check which (branchId, extId) assignments already
+    // exist. DispatcherAssignment is the authoritative map post-Phase-B.
     const extIds = dispatchers.map((d) => d.extId.trim());
-    const existingDispatchers = await tx.dispatcher.findMany({
+    const existingAssignments = await tx.dispatcherAssignment.findMany({
       where: { branchId: branch.id, extId: { in: extIds } },
       select: { extId: true },
     });
-    const existingExtIds = new Set(existingDispatchers.map((d) => d.extId));
+    const existingExtIds = new Set(existingAssignments.map((a) => a.extId));
 
     let count = 0;
 
     for (const d of dispatchers) {
-      if (existingExtIds.has(d.extId.trim())) continue; // skip if already exists (idempotency)
+      const extIdTrim = d.extId.trim();
+      if (existingExtIds.has(extIdTrim)) continue; // idempotent
 
-      const gender = deriveGender(d.icNo);
+      const nameTrim = d.name.trim();
+      const safeIcNo = d.icNo?.trim() ? d.icNo.trim() : null;
+      const gender = safeIcNo ? deriveGender(safeIcNo) : "UNKNOWN" as const;
 
       const dispatcher = await tx.dispatcher.create({
         data: {
-          name: d.name.trim(),
-          extId: d.extId.trim(),
-          icNo: d.icNo,
+          agentId: session.user.id,
+          name: nameTrim,
+          normalizedName: normalizeName(nameTrim),
+          extId: extIdTrim,
+          icNo: safeIcNo,
           gender,
           branchId: branch.id,
+        },
+      });
+
+      await tx.dispatcherAssignment.create({
+        data: {
+          dispatcherId: dispatcher.id,
+          branchId: branch.id,
+          extId: extIdTrim,
         },
       });
 

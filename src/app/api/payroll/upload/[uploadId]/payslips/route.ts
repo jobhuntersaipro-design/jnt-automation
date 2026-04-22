@@ -111,7 +111,7 @@ export async function POST(
         companyAddress: agent.companyAddress,
         stampImageUrl: agent.stampImageUrl,
         dispatcherName: record.dispatcher.name,
-        icNo: record.dispatcher.icNo,
+        icNo: record.dispatcher.icNo ?? "",
         month: fullUpload.month,
         year: fullUpload.year,
         incentive: record.incentive,

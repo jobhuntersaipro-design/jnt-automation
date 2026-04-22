@@ -14,6 +14,7 @@ import { normalizeName } from "../src/lib/dispatcher-identity/normalize-name";
 import {
   clusterDispatchers,
   normalizeIc,
+  pickCanonical,
   type IdentityCandidate,
 } from "../src/lib/dispatcher-identity/matcher";
 
@@ -50,17 +51,6 @@ interface ClusterAnalysis {
   canonical: DispatcherRow;
   nameOnlyMatch: boolean; // true if no row in cluster has an IC
   settingsConflicts: string[]; // human-readable diffs
-}
-
-// ─── Canonical row picker ─────────────────────────────────────
-
-function pickCanonical(rows: DispatcherRow[]): DispatcherRow {
-  // Most recently updated wins; ties broken by oldest createdAt (stability).
-  return [...rows].sort((a, b) => {
-    const dt = b.updatedAt.getTime() - a.updatedAt.getTime();
-    if (dt !== 0) return dt;
-    return a.createdAt.getTime() - b.createdAt.getTime();
-  })[0];
 }
 
 // ─── Settings diff ────────────────────────────────────────────

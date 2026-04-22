@@ -3,6 +3,7 @@ import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { computeIsComplete, getAgentDefaults } from "@/lib/db/staff";
+import { normalizeName } from "@/lib/dispatcher-identity/normalize-name";
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,9 +39,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Branch not found" }, { status: 404 });
   }
 
-  // Check extId uniqueness within branch
-  const existing = await prisma.dispatcher.findFirst({
-    where: { branchId: branch.id, extId: extId.trim() },
+  const trimmedExtId = extId.trim();
+
+  // Uniqueness check goes against DispatcherAssignment — a (branchId, extId)
+  // is one branch-specific J&T ID, and assignments are the authoritative
+  // index of that mapping after Phase B.
+  const existing = await prisma.dispatcherAssignment.findUnique({
+    where: { branchId_extId: { branchId: branch.id, extId: trimmedExtId } },
     select: { id: true },
   });
 
@@ -51,10 +56,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const safeIcNo = icNo?.trim() || "";
+  const trimmedIcNo = icNo?.trim();
+  const safeIcNo = trimmedIcNo ? trimmedIcNo : null;
   const gender = safeIcNo ? deriveGender(safeIcNo) : "UNKNOWN" as const;
   const trimmedName = name.trim();
-  const trimmedExtId = extId.trim();
 
   const defs = await getAgentDefaults(agentId);
   const wt = defs.weightTiers;
@@ -64,11 +69,21 @@ export async function POST(req: NextRequest) {
   const dispatcher = await prisma.$transaction(async (tx) => {
     const d = await tx.dispatcher.create({
       data: {
+        agentId,
         name: trimmedName,
+        normalizedName: normalizeName(trimmedName),
         extId: trimmedExtId,
         icNo: safeIcNo,
         gender,
         branchId: branch.id,
+      },
+    });
+
+    await tx.dispatcherAssignment.create({
+      data: {
+        dispatcherId: d.id,
+        branchId: branch.id,
+        extId: trimmedExtId,
       },
     });
 

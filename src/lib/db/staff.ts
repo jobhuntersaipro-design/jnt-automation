@@ -97,7 +97,7 @@ export async function getDispatchers(
       branchCode: d.branch.code,
       isComplete: computeIsComplete(d.name, d.icNo, d.extId),
       firstSeen,
-      rawIcNo: d.icNo,
+      rawIcNo: d.icNo ?? "",
       weightTiers: d.weightTiers,
       incentiveRule: d.incentiveRule,
       petrolRule: d.petrolRule,
@@ -151,7 +151,7 @@ export async function getDispatcherById(
     id: d.id,
     extId: d.extId,
     name: d.name,
-    icNo: d.icNo,
+    icNo: d.icNo ?? "",
     gender: d.gender,
     branchCode: d.branch.code,
     isPinned: d.isPinned,
@@ -194,13 +194,14 @@ export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> 
 
 export function computeIsComplete(
   name: string,
-  _icNo: string,
+  _icNo: string | null,
   extId: string,
 ): boolean {
   return name.length > 0 && extId.length > 0;
 }
 
-export function maskIc(ic: string): string {
+export function maskIc(ic: string | null): string {
+  if (!ic) return "";
   if (ic.length <= 4) return ic;
   return "\u2022".repeat(ic.length - 4) + ic.slice(-4);
 }

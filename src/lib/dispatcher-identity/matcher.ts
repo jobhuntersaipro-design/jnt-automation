@@ -76,6 +76,18 @@ export function findMatchingPerson<C extends IdentityCandidate>(
   );
 }
 
+// Pick the canonical row from a cluster: most recent updatedAt wins, ties
+// broken by earliest createdAt (oldest creation survives).
+export function pickCanonical<T extends { updatedAt: Date; createdAt: Date }>(
+  rows: readonly T[],
+): T {
+  return [...rows].sort((a, b) => {
+    const dt = b.updatedAt.getTime() - a.updatedAt.getTime();
+    if (dt !== 0) return dt;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  })[0];
+}
+
 export function clusterDispatchers<C extends IdentityCandidate>(
   records: readonly C[],
 ): C[][] {
