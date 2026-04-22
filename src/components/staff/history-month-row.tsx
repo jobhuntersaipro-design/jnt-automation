@@ -39,6 +39,8 @@ export interface HistoryRecord {
   uploadId: string;
   month: number;
   year: number;
+  /** Branch that produced this salary record (via upload.branch.code) */
+  branchCode: string;
   netSalary: number;
   baseSalary: number;
   incentive: number;
@@ -362,10 +364,18 @@ export function HistoryMonthRow({
         }}
         className="w-full px-4 py-3 text-left hover:bg-surface-hover/40 transition-colors cursor-pointer"
       >
-        {/* Top: month + status + actions */}
+        {/* Top: month + branch + status + actions */}
         <div className="flex items-center justify-between gap-2 mb-2.5">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-[0.9rem] font-semibold text-on-surface">{monthLabel}</span>
+            {record.branchCode && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 text-[0.66rem] font-medium bg-surface-low text-on-surface-variant rounded-md tabular-nums"
+                title={`Salary from branch ${record.branchCode}`}
+              >
+                {record.branchCode}
+              </span>
+            )}
             <StatusPill status={status} />
           </div>
           <div className="flex items-center gap-1">

@@ -44,6 +44,7 @@ export async function GET(
         petrolSnapshot: true,
         createdAt: true,
         updatedAt: true,
+        upload: { select: { branch: { select: { code: true } } } },
       },
       orderBy: [{ year: "desc" }, { month: "desc" }],
     });
@@ -53,6 +54,7 @@ export async function GET(
       uploadId: r.uploadId,
       month: r.month,
       year: r.year,
+      branchCode: r.upload.branch.code,
       netSalary: r.netSalary,
       baseSalary: r.baseSalary,
       incentive: r.incentive,
