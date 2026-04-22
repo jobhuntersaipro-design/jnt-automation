@@ -25,7 +25,10 @@ export interface BulkJob {
 
 const jobKey = (jobId: string) => `bulk-job:${jobId}`;
 const activeSetKey = (agentId: string) => `bulk-job:active:${agentId}`;
+const recentListKey = (agentId: string) => `bulk-job:recent:${agentId}`;
 const TTL_SECONDS = 7200; // 2h for job records
+export const RECENT_CAP = 20;
+export const RECENT_RETURN_LIMIT = 10;
 
 export async function createJob(
   data: Omit<BulkJob, "status" | "done" | "total" | "createdAt" | "updatedAt">,
@@ -91,4 +94,24 @@ export async function listActiveJobs(agentId: string): Promise<BulkJob[]> {
     jobs.push(job);
   }
   return jobs;
+}
+
+/**
+ * Stub — Phase 3 will implement. Returns the agent's merged active + recently
+ * completed jobs, sorted by updatedAt desc, capped at RECENT_RETURN_LIMIT.
+ * Used by the Downloads Center panel on the notification bell.
+ */
+export async function listRecent(_agentId: string): Promise<BulkJob[]> {
+  void recentListKey;
+  void RECENT_CAP;
+  void RECENT_RETURN_LIMIT;
+  return [];
+}
+
+/**
+ * Stub — Phase 3 will implement. Clears the agent's recent list (does not
+ * touch in-flight jobs). Backs the DELETE /recent endpoint.
+ */
+export async function clearRecent(_agentId: string): Promise<void> {
+  // no-op
 }
