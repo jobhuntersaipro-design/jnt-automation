@@ -151,20 +151,24 @@ export function ReadyToConfirm({
 
   const handleConfirm = useCallback(async () => {
     setIsConfirming(true);
+    // Hand off to the stage timeline immediately — the server flips
+    // status to PROCESSING at the start of /confirm and writes progress
+    // ticks as it saves records + line items. Polling in the parent will
+    // pick up SAVED when the work completes.
+    onConfirmed();
     try {
       const res = await fetch(`/api/upload/${uploadId}/confirm`, {
         method: "POST",
       });
-
       if (!res.ok) {
         const data = await res.json();
         toast.error(data.error || "Failed to save payroll");
+        // Status is rolled back to READY_TO_CONFIRM by the server on
+        // error; polling will re-render this component.
         return;
       }
-
       const data = await res.json();
       toast.success(`Payroll saved — ${data.savedCount} dispatcher${data.savedCount !== 1 ? "s" : ""}`);
-      onConfirmed();
     } catch {
       toast.error("Failed to save payroll");
     } finally {

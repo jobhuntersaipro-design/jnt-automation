@@ -15,6 +15,10 @@ export interface UploadProgress {
   dispatchersFound?: number;
   dispatchersProcessed?: number;
   totalDispatchers?: number;
+  /** Number of SalaryLineItem rows inserted (save stage, confirm flow) */
+  lineItemsInserted?: number;
+  /** Total SalaryLineItem rows to be inserted (save stage, confirm flow) */
+  totalLineItems?: number;
   startedAt: number;
   updatedAt: number;
 }

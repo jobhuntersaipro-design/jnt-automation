@@ -9,6 +9,7 @@ import { DispatcherRow, ROW_GRID } from "@/components/staff/dispatcher-row";
 import { AddDispatcherDrawer } from "@/components/staff/add-dispatcher-drawer";
 import { DefaultsDrawer } from "@/components/staff/defaults-drawer";
 import { DispatcherDrawer } from "@/components/staff/dispatcher-drawer";
+import { BulkDetailDownload } from "@/components/dispatchers/bulk-detail-download";
 import { PayrollClient } from "@/components/payroll/payroll-client";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 import type { getPayrollHistory } from "@/lib/db/payroll";
@@ -337,6 +338,7 @@ export function DispatchersClient({
           <div className="flex items-center gap-2">
             {activeTab === "settings" && (
               <>
+                <BulkDetailDownload />
                 <button
                   onClick={() => setShowDefaults(true)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-[0.84rem] font-medium text-on-surface bg-white border border-outline-variant/30 rounded-[0.375rem] hover:bg-surface-hover transition-colors"

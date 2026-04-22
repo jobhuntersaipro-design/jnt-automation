@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
+import { escapeCsv } from "@/lib/csv";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ];
-
-function escapeCsv(value: string | number): string {
-  const s = String(value);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
 
 export async function GET(
   _req: NextRequest,

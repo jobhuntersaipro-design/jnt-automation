@@ -364,8 +364,9 @@ function UploadRow({
                 month={upload.month ?? 1}
                 year={upload.year ?? 2026}
                 onConfirmed={() => {
-                  onUpdate({ status: "SAVED" });
-                  onUploadComplete();
+                  // Hand off to the stage timeline — polling will pick up
+                  // SAVED when the confirm worker finishes.
+                  onUpdate({ status: "PROCESSING", progress: undefined });
                 }}
                 onCancel={handleCancel}
                 isCancelling={isCancelling}

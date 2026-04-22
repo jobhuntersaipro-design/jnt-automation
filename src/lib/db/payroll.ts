@@ -20,7 +20,14 @@ export async function getPayrollHistory(agentId: string) {
     prisma.salaryRecord.groupBy({
       by: ["uploadId"],
       where: { upload: { branch: { agentId }, status: "SAVED" } },
-      _sum: { netSalary: true, baseSalary: true, penalty: true, advance: true },
+      _sum: {
+        netSalary: true,
+        baseSalary: true,
+        incentive: true,
+        petrolSubsidy: true,
+        penalty: true,
+        advance: true,
+      },
     }),
   ]);
 
@@ -36,6 +43,8 @@ export async function getPayrollHistory(agentId: string) {
       dispatcherCount: u._count.salaryRecords,
       totalNetPayout: s?.netSalary ?? 0,
       totalBaseSalary: s?.baseSalary ?? 0,
+      totalIncentive: s?.incentive ?? 0,
+      totalPetrolSubsidy: s?.petrolSubsidy ?? 0,
       totalDeductions: (s?.penalty ?? 0) + (s?.advance ?? 0),
     };
   });
