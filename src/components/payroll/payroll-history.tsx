@@ -1,6 +1,15 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+  type RefObject,
+} from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -16,6 +25,70 @@ import {
 } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { announceBulkExportStarted } from "@/components/dashboard/bulk-jobs-indicator";
+
+/**
+ * Renders dropdown content into document.body via portal, anchored to a
+ * button. The surrounding table uses `overflow-x-auto` which clips any
+ * absolute-positioned child — portaling escapes that clip context.
+ */
+function PortalDropdown({
+  open,
+  anchorRef,
+  onClose,
+  children,
+  className = "",
+}: {
+  open: boolean;
+  anchorRef: RefObject<HTMLElement | null>;
+  onClose: () => void;
+  children: ReactNode;
+  className?: string;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || !anchorRef.current) return;
+    const measure = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+    };
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [open, anchorRef]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      const target = e.target as Node;
+      if (anchorRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      onClose();
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, anchorRef, onClose]);
+
+  if (!open || !pos || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={{ position: "fixed", top: pos.top, right: pos.right }}
+      className={`z-50 bg-surface-card border border-outline-variant/20 rounded-md shadow-lg py-1 ${className}`}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 export interface PayrollRecord {
   uploadId: string;
@@ -143,14 +216,11 @@ function RowActions({
   year: number;
   month: number;
 }) {
-  const summaryRef = useRef<HTMLDivElement>(null);
-  const linesRef = useRef<HTMLDivElement>(null);
+  const summaryBtnRef = useRef<HTMLButtonElement>(null);
+  const linesBtnRef = useRef<HTMLButtonElement>(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [linesOpen, setLinesOpen] = useState(false);
   const [exportingLines, setExportingLines] = useState<"csv" | "pdf" | null>(null);
-
-  useClickOutside(summaryRef, () => setSummaryOpen(false));
-  useClickOutside(linesRef, () => setLinesOpen(false));
 
   const handleSummaryCsv = () => {
     setSummaryOpen(false);
@@ -202,89 +272,93 @@ function RowActions({
       </Link>
 
       {/* Summary (per-dispatcher totals for this branch+month) */}
-      <div className="relative" ref={summaryRef}>
+      <button
+        ref={summaryBtnRef}
+        type="button"
+        onClick={() => {
+          setSummaryOpen((v) => !v);
+          setLinesOpen(false);
+        }}
+        aria-label="Download monthly summary"
+        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden />
+        Summary
+        <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+      </button>
+      <PortalDropdown
+        open={summaryOpen}
+        anchorRef={summaryBtnRef}
+        onClose={() => setSummaryOpen(false)}
+        className="min-w-48"
+      >
+        <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wider text-on-surface-variant/60">
+          Monthly summary · this branch
+        </div>
         <button
           type="button"
-          onClick={() => {
-            setSummaryOpen((v) => !v);
-            setLinesOpen(false);
-          }}
-          aria-label="Download monthly summary"
-          className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+          onClick={handleSummaryCsv}
+          className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
         >
-          <FileSpreadsheet className="w-3.5 h-3.5" aria-hidden />
-          Summary
-          <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+          <Download className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
+          CSV
         </button>
-        {summaryOpen && (
-          <div className="absolute right-0 top-full mt-1 z-20 bg-surface-card border border-outline-variant/20 rounded-md shadow-lg py-1 min-w-48">
-            <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wider text-on-surface-variant/60">
-              Monthly summary · this branch
-            </div>
-            <button
-              type="button"
-              onClick={handleSummaryCsv}
-              className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
-              CSV
-            </button>
-            <button
-              type="button"
-              onClick={handleSummaryPdf}
-              className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
-              PDF
-            </button>
-          </div>
-        )}
-      </div>
+        <button
+          type="button"
+          onClick={handleSummaryPdf}
+          className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
+        >
+          <FileText className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
+          PDF
+        </button>
+      </PortalDropdown>
 
       {/* Line items (per-dispatcher parcel detail for the whole month) */}
-      <div className="relative" ref={linesRef}>
+      <button
+        ref={linesBtnRef}
+        type="button"
+        onClick={() => {
+          setLinesOpen((v) => !v);
+          setSummaryOpen(false);
+        }}
+        disabled={exportingLines !== null}
+        aria-label="Download per-dispatcher line items"
+        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <Package className="w-3.5 h-3.5" aria-hidden />
+        {exportingLines ? "Queuing…" : "Line items"}
+        <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+      </button>
+      <PortalDropdown
+        open={linesOpen}
+        anchorRef={linesBtnRef}
+        onClose={() => setLinesOpen(false)}
+        className="min-w-56"
+      >
+        <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wider text-on-surface-variant/60">
+          Per-dispatcher parcel detail
+        </div>
         <button
           type="button"
-          onClick={() => {
-            setLinesOpen((v) => !v);
-            setSummaryOpen(false);
-          }}
-          disabled={exportingLines !== null}
-          aria-label="Download per-dispatcher line items"
-          className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+          onClick={() => handleLineItems("csv")}
+          className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
         >
-          <Package className="w-3.5 h-3.5" aria-hidden />
-          {exportingLines ? "Queuing…" : "Line items"}
-          <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+          <Download className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
+          CSV zip
         </button>
-        {linesOpen && (
-          <div className="absolute right-0 top-full mt-1 z-20 bg-surface-card border border-outline-variant/20 rounded-md shadow-lg py-1 min-w-56">
-            <div className="px-3 py-1 text-[0.65rem] uppercase tracking-wider text-on-surface-variant/60">
-              Per-dispatcher parcel detail
-            </div>
-            <button
-              type="button"
-              onClick={() => handleLineItems("csv")}
-              className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
-              CSV zip
-            </button>
-            <button
-              type="button"
-              onClick={() => handleLineItems("pdf")}
-              className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
-            >
-              <FileText className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
-              PDF zip
-            </button>
-            <p className="px-3 py-1.5 text-[0.68rem] text-on-surface-variant/70 border-t border-outline-variant/15 mt-1">
-              Bundles every dispatcher's parcel detail for the whole month
-              (all branches) into a single zip.
-            </p>
-          </div>
-        )}
-      </div>
+        <button
+          type="button"
+          onClick={() => handleLineItems("pdf")}
+          className="flex items-center gap-2 w-full px-3 py-2 text-[0.82rem] text-on-surface hover:bg-surface-hover transition-colors text-left cursor-pointer"
+        >
+          <FileText className="w-3.5 h-3.5 text-on-surface-variant" aria-hidden />
+          PDF zip
+        </button>
+        <p className="px-3 py-1.5 text-[0.68rem] text-on-surface-variant/70 border-t border-outline-variant/15 mt-1">
+          Bundles every dispatcher's parcel detail for the whole month
+          (all branches) into a single zip.
+        </p>
+      </PortalDropdown>
     </div>
   );
 }
