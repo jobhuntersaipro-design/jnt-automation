@@ -64,7 +64,7 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
       where: { uploadId },
       include: {
         dispatcher: {
-          select: { id: true, extId: true, name: true, avatarUrl: true, icNo: true },
+          select: { id: true, extId: true, name: true, avatarUrl: true, icNo: true, isPinned: true },
         },
       },
       orderBy: { dispatcher: { name: "asc" } },
@@ -104,6 +104,7 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
       name: r.dispatcher.name,
       avatarUrl: r.dispatcher.avatarUrl,
       icNo: r.dispatcher.icNo,
+      isPinned: r.dispatcher.isPinned,
       totalOrders: r.totalOrders,
       baseSalary: r.baseSalary,
       bonusTierEarnings: r.bonusTierEarnings,

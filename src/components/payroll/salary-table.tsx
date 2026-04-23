@@ -13,10 +13,14 @@ import {
   Download,
   FileText,
   TrendingUp,
+  Pin,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
+import { sortAndPinRows, type SortKey, type SortDirection } from "@/lib/payroll/sort-rows";
 
 export interface SalaryRecordRow {
   dispatcherId: string;
@@ -24,6 +28,7 @@ export interface SalaryRecordRow {
   name: string;
   avatarUrl: string | null;
   icNo: string | null;
+  isPinned: boolean;
   totalOrders: number;
   baseSalary: number;
   bonusTierEarnings: number;
@@ -161,6 +166,51 @@ function EditableCell({
   );
 }
 
+function SortHeader({
+  label,
+  columnKey,
+  align,
+  color,
+  compact,
+  sortKey,
+  sortDir,
+  onToggle,
+  disabled,
+}: {
+  label: string;
+  columnKey: SortKey;
+  align: "left" | "right";
+  color?: string;
+  compact?: boolean;
+  sortKey: SortKey | null;
+  sortDir: SortDirection;
+  onToggle: (k: SortKey) => void;
+  disabled?: boolean;
+}) {
+  const active = sortKey === columnKey;
+  const Arrow = active && sortDir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(columnKey)}
+      disabled={disabled}
+      className={`inline-flex items-center gap-1 ${align === "right" ? "justify-end" : "justify-start"} ${
+        align === "right" ? "ml-auto" : ""
+      } ${compact ? "text-[0.68rem]" : "text-[0.72rem]"} uppercase tracking-wider font-medium select-none transition-colors ${
+        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
+      }`}
+      style={color ? { color } : undefined}
+      aria-label={`Sort by ${label}${active ? ` (currently ${sortDir === "asc" ? "ascending" : "descending"})` : ""}`}
+      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+    >
+      <span>{label}</span>
+      <Arrow
+        className={`w-3 h-3 transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
+      />
+    </button>
+  );
+}
+
 export function SalaryTable({
   uploadId,
   branchCode,
@@ -184,6 +234,11 @@ export function SalaryTable({
   const [exportingPdf, setExportingPdf] = useState(false);
   const [hpInfoOpen, setHpInfoOpen] = useState(false);
   const hpInfoRef = useRef<HTMLDivElement>(null);
+  // Sort state — default is Net Salary desc so the highest earners float to the
+  // top on first load. Click a header to cycle asc → desc → unsorted.
+  const [sortKey, setSortKey] = useState<SortKey | null>("netSalary");
+  const [sortDir, setSortDir] = useState<SortDirection>("desc");
+  const [pinBusy, setPinBusy] = useState<Set<string>>(new Set());
   const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard();
 
   useEffect(() => {
@@ -209,17 +264,65 @@ export function SalaryTable({
     return { all: records.length, highPerformer };
   }, [records]);
 
-  // Filtered records for display
+  // Filtered + sorted records for display. Pinned rows always float to the
+  // top; sort is applied within each group (pinned / unpinned).
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return records.filter((r) => {
+    const matched = records.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q) && !r.extId.toLowerCase().includes(q)) {
         return false;
       }
       if (highPerformerOnly && !isHighPerformer(r)) return false;
       return true;
     });
-  }, [records, search, highPerformerOnly]);
+    return sortAndPinRows(matched, sortKey, sortDir);
+  }, [records, search, highPerformerOnly, sortKey, sortDir]);
+
+  // Header click handler — asc → desc → clear.
+  const toggleSort = useCallback((key: SortKey) => {
+    if (editMode) return;
+    setSortKey((prevKey) => {
+      if (prevKey !== key) {
+        setSortDir(key === "name" ? "asc" : "desc");
+        return key;
+      }
+      setSortDir((prevDir) => {
+        if (prevDir === "asc") return "desc";
+        // Third click: clear sort.
+        setSortKey(null);
+        return "desc";
+      });
+      return key;
+    });
+  }, [editMode]);
+
+  async function togglePin(dispatcherId: string) {
+    if (pinBusy.has(dispatcherId)) return;
+    // Optimistic flip so the row re-shuffles instantly.
+    const prevRecords = records;
+    setRecords((curr) =>
+      curr.map((r) => (r.dispatcherId === dispatcherId ? { ...r, isPinned: !r.isPinned } : r)),
+    );
+    setPinBusy((prev) => new Set(prev).add(dispatcherId));
+    try {
+      const res = await fetch(`/api/staff/${dispatcherId}/pin`, { method: "PATCH" });
+      if (!res.ok) throw new Error("Pin failed");
+      const { isPinned } = await res.json();
+      setRecords((curr) =>
+        curr.map((r) => (r.dispatcherId === dispatcherId ? { ...r, isPinned } : r)),
+      );
+    } catch {
+      // Roll back on failure.
+      setRecords(prevRecords);
+      toast.error("Could not update pin. Please try again.");
+    } finally {
+      setPinBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(dispatcherId);
+        return next;
+      });
+    }
+  }
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((r) => selectedIds.has(r.dispatcherId));
 
@@ -621,23 +724,41 @@ export function SalaryTable({
             <thead>
               <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant bg-surface-low">
                 {!editMode && <th rowSpan={2} className="py-2 px-3 font-medium w-10 align-bottom" />}
-                <th rowSpan={2} className="py-2 px-4 font-medium align-bottom">Dispatcher</th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom">Orders</th>
+                <th rowSpan={2} className="py-2 px-4 font-medium align-bottom">
+                  <SortHeader label="Dispatcher" columnKey="name" align="left" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom">
+                  <SortHeader label="Orders" columnKey="totalOrders" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
                 <th
                   colSpan={2}
                   className="pt-2 pb-0.5 px-3 font-semibold text-center border-b border-outline-variant/15"
                 >
                   Base Salary
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#B27F08" }}>Petrol</th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">Penalty</th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">Advance</th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#12B981" }}>Commission</th>
-                <th rowSpan={2} className="py-2 px-4 font-medium text-right align-bottom text-brand">Net Salary</th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#B27F08" }}>
+                  <SortHeader label="Petrol" columnKey="petrolSubsidy" align="right" color="#B27F08" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">
+                  <SortHeader label="Penalty" columnKey="penalty" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">
+                  <SortHeader label="Advance" columnKey="advance" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#12B981" }}>
+                  <SortHeader label="Commission" columnKey="commission" align="right" color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th rowSpan={2} className="py-2 px-4 font-medium text-right align-bottom text-brand">
+                  <SortHeader label="Net Salary" columnKey="netSalary" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
               </tr>
               <tr className="text-left text-[0.68rem] uppercase tracking-wider text-on-surface-variant/70 bg-surface-low">
-                <th className="pt-0.5 pb-2 px-3 font-medium text-right">Default Tier</th>
-                <th className="pt-0.5 pb-2 px-3 font-medium text-right" style={{ color: "#12B981" }}>Bonus Tier</th>
+                <th className="pt-0.5 pb-2 px-3 font-medium text-right">
+                  <SortHeader label="Default Tier" columnKey="baseSalary" align="right" compact sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
+                <th className="pt-0.5 pb-2 px-3 font-medium text-right" style={{ color: "#12B981" }}>
+                  <SortHeader label="Bonus Tier" columnKey="bonusTierEarnings" align="right" compact color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -645,7 +766,7 @@ export function SalaryTable({
                 return (
                   <tr
                     key={r.dispatcherId}
-                    className="border-t border-outline-variant/8 hover:bg-surface-hover/40 transition-colors"
+                    className="group border-t border-outline-variant/8 hover:bg-surface-hover/40 transition-colors"
                   >
                     {!editMode && (
                       <td className="py-2.5 px-3">
@@ -659,6 +780,22 @@ export function SalaryTable({
                     )}
                     <td className="py-2.5 px-4">
                       <div className="flex items-center gap-2 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => togglePin(r.dispatcherId)}
+                          disabled={pinBusy.has(r.dispatcherId) || editMode}
+                          aria-label={r.isPinned ? `Unpin ${r.name}` : `Pin ${r.name} to top`}
+                          title={r.isPinned ? "Unpin" : "Pin to top"}
+                          className={`inline-flex items-center justify-center w-6 h-6 rounded-md transition-all ${
+                            r.isPinned
+                              ? "text-brand bg-brand/10 hover:bg-brand/20"
+                              : "text-on-surface-variant/40 opacity-0 group-hover:opacity-100 hover:text-brand hover:bg-brand/10 focus:opacity-100"
+                          } ${(pinBusy.has(r.dispatcherId) || editMode) ? "cursor-not-allowed" : "cursor-pointer"}`}
+                        >
+                          <Pin
+                            className={`w-3.5 h-3.5 ${r.isPinned ? "fill-current" : ""}`}
+                          />
+                        </button>
                         <p className="font-medium text-on-surface leading-tight">{r.name}</p>
                         {isHighPerformer(r) && (
                           <span
@@ -670,7 +807,7 @@ export function SalaryTable({
                           </span>
                         )}
                       </div>
-                      <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
+                      <p className="text-[0.72rem] text-on-surface-variant/60 pl-8">{r.extId}</p>
                     </td>
                     {editMode ? (
                       <>
