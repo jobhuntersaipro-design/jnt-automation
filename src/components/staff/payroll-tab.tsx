@@ -70,7 +70,9 @@ function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
           entry.basicPay,
           entry.petrolAllowance,
           entry.kpiAllowance,
-          entry.otherAllowance
+          entry.otherAllowance,
+          entry.workingHours,
+          entry.hourlyWage
         )
 
   const totalGross = employeeGross + entry.dispatcherGross
@@ -668,17 +670,30 @@ export function PayrollTab() {
                       </div>
                     </td>
 
-                    {/* Working Hours */}
+                    {/* Working Hours — editable for all types. For Supervisor/Admin
+                        it adds `hours * hourlyWage` on top of basicPay; for Store
+                        Keeper it drives the whole wage. When neither hourlyWage nor
+                        hours is set for a supervisor, it's informational only. */}
                     <td className="py-2.5 px-1">
-                      {isStoreKeeper ? (
-                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                          <HoursInput
-                            value={entry.workingHours}
-                            onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
-                          />
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                        <HoursInput
+                          value={entry.workingHours}
+                          onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
+                        />
+                      </div>
+                      {!isStoreKeeper && entry.workingHours > 0 && (
+                        <div className="mt-1">
+                          <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                            <CalcCurrencyInput
+                              value={entry.hourlyWage}
+                              onChange={(v) => updateEntry(entry.employeeId, "hourlyWage", v)}
+                              light
+                            />
+                          </div>
+                          <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                            RM / hr
+                          </div>
                         </div>
-                      ) : (
-                        <span className="text-[0.8rem] text-on-surface-variant/30 block text-center">&mdash;</span>
                       )}
                     </td>
 

@@ -18,6 +18,8 @@ interface EmployeeDrawerProps {
   /** Called after avatar upload / pick / remove — parent should update the row without closing. */
   onAvatarChange?: (employeeId: string, patch: Pick<StaffEmployee, "avatarUrl" | "dispatcherAvatarUrl">) => void;
   onBranchAdded?: (code: string) => void;
+  /** Pre-select a branch when opening the drawer for a new employee (ignored in edit mode). */
+  initialBranchCode?: string;
 }
 
 const TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
@@ -49,6 +51,7 @@ export function EmployeeDrawer({
   onSaved,
   onAvatarChange,
   onBranchAdded,
+  initialBranchCode,
 }: EmployeeDrawerProps) {
   const isEdit = !!employee;
 
@@ -75,7 +78,7 @@ export function EmployeeDrawer({
   const [socsoNo, setSocsoNo] = useState(employee?.socsoNo ?? "");
   const [incomeTaxNo, setIncomeTaxNo] = useState(employee?.incomeTaxNo ?? "");
   const [type, setType] = useState<EmployeeType>(employee?.type ?? "SUPERVISOR");
-  const [branchCode, setBranchCode] = useState(employee?.branchCode ?? "");
+  const [branchCode, setBranchCode] = useState(employee?.branchCode ?? initialBranchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
 
   const [typeOpen, setTypeOpen] = useState(false);

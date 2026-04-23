@@ -83,14 +83,27 @@ export function calculateNetSalary(
 
 /**
  * Calculate gross salary for a supervisor/admin employee.
+ *
+ * `workingHours` and `hourlyWage` are optional — when both are set, the
+ * product is added on top of the monthly basic pay. This lets supervisors
+ * and admins log extra hourly work (e.g. weekend OT) alongside their fixed
+ * salary. Leaving them unset preserves the original basic-pay-only formula.
  */
 export function calculateSupervisorGross(
   basicPay: number,
   petrolAllowance: number,
   kpiAllowance: number,
-  otherAllowance: number
+  otherAllowance: number,
+  workingHours: number = 0,
+  hourlyWage: number = 0,
 ): number {
-  return basicPay + petrolAllowance + kpiAllowance + otherAllowance
+  return (
+    basicPay +
+    workingHours * hourlyWage +
+    petrolAllowance +
+    kpiAllowance +
+    otherAllowance
+  )
 }
 
 /**

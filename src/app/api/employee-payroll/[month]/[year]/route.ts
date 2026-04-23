@@ -249,7 +249,9 @@ export async function POST(
                 entry.basicPay,
                 entry.petrolAllowance,
                 entry.kpiAllowance,
-                entry.otherAllowance
+                entry.otherAllowance,
+                entry.workingHours,
+                entry.hourlyWage
               )
 
         const totalGross = employeeGross + dispatcherGross

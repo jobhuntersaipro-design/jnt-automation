@@ -5,6 +5,8 @@ import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getBranchDetail } from "@/lib/db/branches";
 import { getBranchColor } from "@/lib/branch-colors";
 import { BranchTrendChart } from "@/components/branches/branch-trend-chart";
+import { AddEmployeeButton } from "@/components/branches/add-employee-button";
+import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +31,19 @@ export default async function BranchDetailPage({
   const effective = await getEffectiveAgentId();
   if (!effective) redirect("/auth/login");
 
-  const detail = await getBranchDetail(effective.agentId, code);
+  const [detail, allBranches] = await Promise.all([
+    getBranchDetail(effective.agentId, code),
+    prisma.branch.findMany({
+      where: { agentId: effective.agentId },
+      select: { code: true },
+      orderBy: { code: "asc" },
+    }),
+  ]);
   if (!detail) notFound();
 
   const { summary, trend, dispatchers } = detail;
   const branchColor = getBranchColor(summary.branchCode);
+  const branchCodes = allBranches.map((b) => b.code);
 
   const summaryCards = [
     { label: "Net payout", value: formatRMShort(summary.totals.netSalary), accent: "text-brand" },
@@ -54,15 +64,18 @@ export default async function BranchDetailPage({
           <ArrowLeft size={14} />
           Back to Overview
         </Link>
-        <div className="mt-2 flex items-center gap-3 flex-wrap">
-          <span
-            className={`inline-flex items-center font-semibold tabular-nums rounded-md ring-1 ring-inset px-2.5 py-1 text-[1rem] ${branchColor.bg} ${branchColor.text} ${branchColor.ring}`}
-          >
-            {summary.branchCode}
-          </span>
-          <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">
-            Branch overview
-          </h1>
+        <div className="mt-2 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span
+              className={`inline-flex items-center font-semibold tabular-nums rounded-md ring-1 ring-inset px-2.5 py-1 text-[1rem] ${branchColor.bg} ${branchColor.text} ${branchColor.ring}`}
+            >
+              {summary.branchCode}
+            </span>
+            <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">
+              Branch overview
+            </h1>
+          </div>
+          <AddEmployeeButton branchCode={summary.branchCode} branchCodes={branchCodes} />
         </div>
         <p className="text-[0.78rem] text-on-surface-variant mt-1">
           {summary.dispatcherCount} dispatcher{summary.dispatcherCount === 1 ? "" : "s"} ·{" "}
