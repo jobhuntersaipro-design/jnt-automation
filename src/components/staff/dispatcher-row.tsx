@@ -1,12 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { createPortal } from "react-dom";
-import { Pin, Trash2, Pencil, Camera, X, Upload, Trash, Clock } from "lucide-react";
-import Image from "next/image";
+import { Pin, Trash2, Pencil, Clock } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 import { BranchChip } from "@/components/ui/branch-chip";
+import { DispatcherAvatar } from "./dispatcher-avatar";
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";
 
@@ -129,53 +128,8 @@ interface DispatcherRowProps {
 const INPUT_CLASS =
   "w-full px-1.5 py-1 text-[0.78rem] tabular-nums text-center bg-transparent border border-dashed border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/50 hover:bg-brand/5 focus:border-brand/40 focus:border-solid focus:bg-white focus:outline-none transition-all";
 
-const AVATAR_ACCEPTED = ".jpg,.jpeg,.png,.webp";
-const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
-
 export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange, onOpenDrawer, onDirtyChange }: DispatcherRowProps) {
-  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
-  const [avatarUploading, setAvatarUploading] = useState(false);
-  const [showLightbox, setShowLightbox] = useState(false);
-
-  async function handleAvatarSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Only JPG, PNG, and WebP files are allowed");
-      return;
-    }
-    if (file.size > AVATAR_MAX_SIZE) {
-      toast.error("File must be under 2MB");
-      return;
-    }
-    setAvatarUploading(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch(`/api/staff/${dispatcher.id}/avatar`, { method: "POST", body: fd });
-      if (!res.ok) { const d = await res.json(); toast.error(d.error || "Upload failed"); return; }
-      const { avatarUrl: newUrl } = await res.json();
-      setAvatarUrl(newUrl);
-      onAvatarChange(dispatcher.id, newUrl);
-      toast.success("Photo updated");
-    } catch { toast.error("Upload failed"); }
-    finally { setAvatarUploading(false); }
-  }
-
-  async function handleAvatarRemove() {
-    setAvatarUploading(true);
-    setShowLightbox(false);
-    try {
-      const res = await fetch(`/api/staff/${dispatcher.id}/avatar`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
-      setAvatarUrl(null);
-      onAvatarChange(dispatcher.id, null);
-      toast.success("Photo removed");
-    } catch { toast.error("Failed to remove photo"); }
-    finally { setAvatarUploading(false); }
-  }
 
   // Avatar can be mutated from the drawer too — resync whenever the prop
   // changes, not just on full server refresh (dataVersion).
@@ -394,13 +348,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         ? "var(--color-female-ring)"
         : "var(--color-outline-variant)";
 
-  const initials = dispatcher.name
-    .trim()
-    .split(/\s+/)
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("");
-
   function Toggle({ checked, onChange, color }: { checked: boolean; onChange: () => void; color: string }) {
     return (
       <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
@@ -438,36 +385,17 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
 
       {/* Dispatcher */}
       <div className="flex items-center gap-2 min-w-0">
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); if (avatarUrl) { setShowLightbox(true); } else { avatarInputRef.current?.click(); } }}
-          className="relative w-8 h-8 rounded-full flex items-center justify-center bg-surface-low text-[0.7rem] font-semibold text-on-surface-variant shrink-0 overflow-hidden group/avatar cursor-pointer"
-          style={{ outline: `2px solid ${ringColor}`, outlineOffset: "1px" }}
-          title={avatarUrl ? "View photo" : "Upload photo"}
-        >
-          {avatarUrl ? (
-            <Image
-              src={avatarUrl}
-              alt=""
-              width={32}
-              height={32}
-              sizes="32px"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            initials
-          )}
-          {avatarUploading ? (
-            <div className="absolute inset-0 rounded-full bg-on-surface/30 flex items-center justify-center">
-              <div className="w-3.5 h-3.5 border-[1.5px] border-white border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : (
-            <div className="absolute inset-0 rounded-full bg-on-surface/0 group-hover/avatar:bg-on-surface/30 flex items-center justify-center transition-colors">
-              <Camera size={12} className="text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity" />
-            </div>
-          )}
-        </button>
-        <input ref={avatarInputRef} type="file" accept={AVATAR_ACCEPTED} onChange={handleAvatarSelect} className="hidden" />
+        <DispatcherAvatar
+          dispatcherId={dispatcher.id}
+          name={dispatcher.name}
+          avatarUrl={avatarUrl}
+          ringColor={ringColor}
+          size="sm"
+          onAvatarChange={(newUrl) => {
+            setAvatarUrl(newUrl);
+            onAvatarChange(dispatcher.id, newUrl);
+          }}
+        />
         <button
           type="button"
           onClick={(e) => { e.stopPropagation(); onOpenDrawer(dispatcher); }}
@@ -478,57 +406,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
           <p className="text-[0.66rem] text-on-surface-variant">{dispatcher.extId}</p>
         </button>
       </div>
-
-      {/* Avatar lightbox */}
-      {showLightbox && avatarUrl && createPortal(
-        <div
-          className="fixed inset-0 z-100 flex items-center justify-center bg-on-surface/60 backdrop-blur-sm animate-in fade-in duration-150"
-          onClick={() => setShowLightbox(false)}
-        >
-          <div
-            className="relative max-w-[min(90vw,400px)] max-h-[min(90vh,400px)]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Image
-              src={avatarUrl}
-              alt={dispatcher.name}
-              width={400}
-              height={400}
-              sizes="400px"
-              className="w-full h-full rounded-2xl object-cover shadow-[0_12px_40px_-12px_rgba(25,28,29,0.3)]"
-              style={{ outline: `3px solid ${ringColor}`, outlineOffset: "3px" }}
-            />
-            <div className="absolute -top-3 -right-3 flex gap-1.5">
-              <button
-                type="button"
-                onClick={() => { setShowLightbox(false); avatarInputRef.current?.click(); }}
-                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-brand transition-colors"
-                title="Change photo"
-              >
-                <Upload size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={handleAvatarRemove}
-                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-critical transition-colors"
-                title="Remove photo"
-              >
-                <Trash size={13} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowLightbox(false)}
-                className="w-7 h-7 rounded-full bg-white shadow-md flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"
-                title="Close"
-              >
-                <X size={14} />
-              </button>
-            </div>
-            <p className="text-center mt-3 text-[0.85rem] font-medium text-white drop-shadow-sm">{dispatcher.name}</p>
-          </div>
-        </div>,
-        document.body,
-      )}
 
       {/* Branch chips — one per assignment, most recent first */}
       <div

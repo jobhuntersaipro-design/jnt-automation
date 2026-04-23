@@ -74,7 +74,7 @@ export function DispatchersClient({
   payrollBranchCodes,
 }: DispatchersClientProps) {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "payroll" ? "payroll" : "settings";
+  const initialTab = searchParams.get("tab") === "settings" ? "settings" : "payroll";
   const initialHighlight = searchParams.get("highlight");
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   // Consume the ?highlight=<id> deep-link exactly once per mount.
@@ -362,7 +362,7 @@ export function DispatchersClient({
 
   function switchTab(tab: Tab) {
     setActiveTab(tab);
-    const url = tab === "payroll" ? "/dispatchers?tab=payroll" : "/dispatchers";
+    const url = tab === "settings" ? "/dispatchers?tab=settings" : "/dispatchers";
     window.history.replaceState(null, "", url);
   }
 
@@ -446,16 +446,6 @@ export function DispatchersClient({
         {/* Tab Switcher */}
         <div className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
           <button
-            onClick={() => switchTab("settings")}
-            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
-              activeTab === "settings"
-                ? "bg-white text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Settings
-          </button>
-          <button
             onClick={() => switchTab("payroll")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
               activeTab === "payroll"
@@ -464,6 +454,16 @@ export function DispatchersClient({
             }`}
           >
             Payroll
+          </button>
+          <button
+            onClick={() => switchTab("settings")}
+            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
+              activeTab === "settings"
+                ? "bg-white text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Settings
           </button>
         </div>
       </header>

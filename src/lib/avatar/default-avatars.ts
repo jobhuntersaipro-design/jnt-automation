@@ -1,5 +1,8 @@
 /**
- * Pre-bundled default avatars (DiceBear Avataaars).
+ * Pre-bundled default avatars (DiceBear Notionists).
+ * Each SVG is baked with one of the branch-chip hexBg pale tones
+ * (see `src/lib/branch-colors.ts`) so the grid matches the colour
+ * vocabulary used on the Branches page and branch chips.
  * SVG files are served statically from /public/avatars/defaults/.
  */
 
@@ -11,18 +14,18 @@ export interface DefaultAvatar {
 }
 
 const DEFAULT_AVATAR_IDS = [
-  "avataaars-01",
-  "avataaars-02",
-  "avataaars-03",
-  "avataaars-04",
-  "avataaars-05",
-  "avataaars-06",
-  "avataaars-07",
-  "avataaars-08",
-  "avataaars-09",
-  "avataaars-10",
-  "avataaars-11",
-  "avataaars-12",
+  "notionists-01",
+  "notionists-02",
+  "notionists-03",
+  "notionists-04",
+  "notionists-05",
+  "notionists-06",
+  "notionists-07",
+  "notionists-08",
+  "notionists-09",
+  "notionists-10",
+  "notionists-11",
+  "notionists-12",
 ] as const;
 
 export const DEFAULT_AVATARS: DefaultAvatar[] = DEFAULT_AVATAR_IDS.map((id) => ({

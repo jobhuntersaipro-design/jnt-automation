@@ -15,13 +15,13 @@ interface StaffEmployeesClientProps {
 
 export function StaffEmployeesClient({ employees, branchCodes: initialBranchCodes }: StaffEmployeesClientProps) {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "payroll" ? "payroll" : "settings";
+  const initialTab = searchParams.get("tab") === "settings" ? "settings" : "payroll";
   const [activeTab, setActiveTab] = useState<Tab>(initialTab);
   const [localBranchCodes, setLocalBranchCodes] = useState<string[]>(initialBranchCodes);
 
   function switchTab(tab: Tab) {
     setActiveTab(tab);
-    const url = tab === "payroll" ? "/staff?tab=payroll" : "/staff";
+    const url = tab === "settings" ? "/staff?tab=settings" : "/staff";
     window.history.replaceState(null, "", url);
   }
 
@@ -40,16 +40,6 @@ export function StaffEmployeesClient({ employees, branchCodes: initialBranchCode
         {/* Tab Switcher */}
         <div className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
           <button
-            onClick={() => switchTab("settings")}
-            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
-              activeTab === "settings"
-                ? "bg-white text-on-surface shadow-sm"
-                : "text-on-surface-variant hover:text-on-surface"
-            }`}
-          >
-            Settings
-          </button>
-          <button
             onClick={() => switchTab("payroll")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
               activeTab === "payroll"
@@ -58,6 +48,16 @@ export function StaffEmployeesClient({ employees, branchCodes: initialBranchCode
             }`}
           >
             Payroll
+          </button>
+          <button
+            onClick={() => switchTab("settings")}
+            className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
+              activeTab === "settings"
+                ? "bg-white text-on-surface shadow-sm"
+                : "text-on-surface-variant hover:text-on-surface"
+            }`}
+          >
+            Settings
           </button>
         </div>
       </header>
