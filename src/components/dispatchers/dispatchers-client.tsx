@@ -1,16 +1,30 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useLayoutEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { DispatcherRow, ROW_GRID } from "@/components/staff/dispatcher-row";
-import { AddDispatcherDrawer } from "@/components/staff/add-dispatcher-drawer";
-import { DefaultsDrawer } from "@/components/staff/defaults-drawer";
-import { DispatcherDrawer } from "@/components/staff/dispatcher-drawer";
-import { BulkDetailDownload } from "@/components/dispatchers/bulk-detail-download";
 import { PayrollClient } from "@/components/payroll/payroll-client";
+
+const AddDispatcherDrawer = dynamic(
+  () => import("@/components/staff/add-dispatcher-drawer").then((m) => m.AddDispatcherDrawer),
+  { ssr: false },
+);
+const DefaultsDrawer = dynamic(
+  () => import("@/components/staff/defaults-drawer").then((m) => m.DefaultsDrawer),
+  { ssr: false },
+);
+const DispatcherDrawer = dynamic(
+  () => import("@/components/staff/dispatcher-drawer").then((m) => m.DispatcherDrawer),
+  { ssr: false },
+);
+const BulkDetailDownload = dynamic(
+  () => import("@/components/dispatchers/bulk-detail-download").then((m) => m.BulkDetailDownload),
+  { ssr: false },
+);
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 import type { getPayrollHistory } from "@/lib/db/payroll";
 

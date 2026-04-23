@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -195,8 +196,14 @@ export function MonthDetailClient({
           </Link>
           <div className="w-10 h-10 rounded-full flex items-center justify-center bg-surface-low text-[0.85rem] font-semibold text-on-surface-variant overflow-hidden">
             {dispatcher.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={dispatcher.avatarUrl} alt="" className="w-full h-full object-cover" />
+              <Image
+                src={dispatcher.avatarUrl}
+                alt=""
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+                unoptimized
+              />
             ) : (
               initials
             )}

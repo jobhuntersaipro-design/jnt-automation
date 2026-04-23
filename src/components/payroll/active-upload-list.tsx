@@ -120,17 +120,21 @@ function UploadRow({
     }
 
     if (upload.status === "PROCESSING" && upload.uploadId) {
-      pollRef.current = setInterval(async () => {
+      const poll = async () => {
+        // Skip network work when the tab is backgrounded — the user won't
+        // see updates anyway, and phones/laptops throttle or kill background
+        // fetches inconsistently. Resumes automatically on the next tick
+        // when the tab comes back.
+        if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+          return;
+        }
         const res = await fetch(`/api/upload/${upload.uploadId}/status`);
         if (res.status === 404) {
-          // Upload was deleted (replaced or cancelled) — remove from list
           onRemove();
           return;
         }
         if (!res.ok) return;
         const data = await res.json();
-        // Always forward progress ticks so the timeline updates even
-        // when status hasn't transitioned.
         const updates: Partial<ActiveUpload> = { progress: data.progress };
         if (data.status !== upload.status) {
           updates.status = data.status;
@@ -142,7 +146,8 @@ function UploadRow({
         if (data.status === "SAVED") {
           onUploadComplete();
         }
-      }, 2000);
+      };
+      pollRef.current = setInterval(poll, 2000);
     }
 
     return () => {

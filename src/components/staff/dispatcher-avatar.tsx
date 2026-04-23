@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import { Camera } from "lucide-react";
-import { AvatarEditDialog } from "./avatar-edit-dialog";
+
+// Dialog is rendered only after the user clicks Edit, so both the dialog JS
+// chunk and the AvatarEditDialog tree are deferred until first open.
+const AvatarEditDialog = dynamic(
+  () => import("./avatar-edit-dialog").then((m) => m.AvatarEditDialog),
+  { ssr: false },
+);
 
 type Size = "sm" | "lg";
 
@@ -72,15 +79,17 @@ export function DispatcherAvatar({
         </div>
       </button>
 
-      <AvatarEditDialog
-        open={dialogOpen}
-        dispatcherId={dispatcherId}
-        dispatcherName={name}
-        avatarUrl={avatarUrl}
-        ringColor={ringColor}
-        onClose={() => setDialogOpen(false)}
-        onAvatarChange={onAvatarChange}
-      />
+      {dialogOpen && (
+        <AvatarEditDialog
+          open
+          dispatcherId={dispatcherId}
+          dispatcherName={name}
+          avatarUrl={avatarUrl}
+          ringColor={ringColor}
+          onClose={() => setDialogOpen(false)}
+          onAvatarChange={onAvatarChange}
+        />
+      )}
     </>
   );
 }

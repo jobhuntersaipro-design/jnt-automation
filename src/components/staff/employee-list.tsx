@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
-import { EmployeeDrawer } from "./employee-drawer";
+
+const EmployeeDrawer = dynamic(
+  () => import("./employee-drawer").then((m) => m.EmployeeDrawer),
+  { ssr: false },
+);
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
 

@@ -122,6 +122,21 @@ class BulkJobsStore {
     return n;
   }
 
+  /**
+   * Earliest absolute ms timestamp at which an unacknowledged just-finished
+   * entry falls out of the window. Returns null if nothing is pending — lets
+   * the bell hook avoid a 1 s ticker when idle.
+   */
+  nextUnacknowledgedExpiryAt(): number | null {
+    let earliest: number | null = null;
+    for (const [id, ts] of this.justFinished) {
+      if (this.justFinishedAcknowledged.has(id)) continue;
+      const expiresAt = ts + RECENT_FINISH_WINDOW_MS;
+      if (earliest === null || expiresAt < earliest) earliest = expiresAt;
+    }
+    return earliest;
+  }
+
   /** Call when the Downloads tab opens — clears the red dot. */
   acknowledgeFinishes(): void {
     for (const id of this.justFinished.keys()) {
@@ -265,11 +280,25 @@ export function useJustFinishedCount(): number {
   const [, setRerender] = useState(0);
   useEffect(() => {
     const unsub = bulkJobsStore.subscribe(() => setRerender((x) => x + 1));
-    // Also rerender every 1 s so the 10 s window expires cleanly without a poll.
-    const id = setInterval(() => setRerender((x) => x + 1), 1_000);
+    // Schedule a single timeout per pending entry to expire the 10 s window —
+    // avoids a perpetual 1 s ticker when nothing is pending (the common case).
+    let expiryTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleExpiry = () => {
+      if (expiryTimer) clearTimeout(expiryTimer);
+      const nextExpiry = bulkJobsStore.nextUnacknowledgedExpiryAt();
+      if (nextExpiry === null) return;
+      const delay = Math.max(100, nextExpiry - Date.now());
+      expiryTimer = setTimeout(() => {
+        setRerender((x) => x + 1);
+        scheduleExpiry();
+      }, delay);
+    };
+    const unsubExpiry = bulkJobsStore.subscribe(scheduleExpiry);
+    scheduleExpiry();
     return () => {
       unsub();
-      clearInterval(id);
+      unsubExpiry();
+      if (expiryTimer) clearTimeout(expiryTimer);
     };
   }, []);
   return bulkJobsStore.unacknowledgedFinishCount();

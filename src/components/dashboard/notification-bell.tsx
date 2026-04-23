@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Bell, Upload, BadgeDollarSign, UserPlus, RefreshCw } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
-import { DownloadsPanel } from "./downloads-panel";
 import {
   acknowledgeDownloadsSeen,
   useJustFinishedCount,
 } from "./bulk-jobs-indicator";
+
+const DownloadsPanel = dynamic(
+  () => import("./downloads-panel").then((m) => m.DownloadsPanel),
+  { ssr: false },
+);
 
 type Notification = {
   id: string;
