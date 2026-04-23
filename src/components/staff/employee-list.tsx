@@ -315,6 +315,14 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           branchCodes={branchCodes}
           onClose={() => setDrawerEmployee(undefined)}
           onSaved={handleSaved}
+          onAvatarChange={(employeeId, patch) => {
+            setItems((prev) =>
+              prev.map((e) => (e.id === employeeId ? { ...e, ...patch } : e)),
+            );
+            setDrawerEmployee((cur) =>
+              cur && cur.id === employeeId ? { ...cur, ...patch } : cur,
+            );
+          }}
           onBranchAdded={onBranchAdded}
         />
       )}

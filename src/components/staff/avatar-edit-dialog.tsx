@@ -16,7 +16,10 @@ const AVATAR_MAX_SIZE = 2 * 1024 * 1024;
 
 interface AvatarEditDialogProps {
   open: boolean;
-  dispatcherId: string;
+  /** For backwards compat. Prefer passing `apiBasePath`; this just builds it as `/api/staff/<id>/avatar`. */
+  dispatcherId?: string;
+  /** API base path for avatar ops: `${apiBasePath}` (POST/DELETE) and `${apiBasePath}/default` (POST). */
+  apiBasePath?: string;
   dispatcherName: string;
   avatarUrl: string | null;
   ringColor: string;
@@ -44,12 +47,14 @@ function getInitials(name: string): string {
 export function AvatarEditDialog({
   open,
   dispatcherId,
+  apiBasePath,
   dispatcherName,
   avatarUrl,
   ringColor,
   onClose,
   onAvatarChange,
 }: AvatarEditDialogProps) {
+  const basePath = apiBasePath ?? `/api/staff/${dispatcherId}/avatar`;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<null | "upload" | "remove" | string>(null);
   const [confirmState, setConfirmState] = useState<PendingConfirm | null>(null);
@@ -95,7 +100,7 @@ export function AvatarEditDialog({
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch(`/api/staff/${dispatcherId}/avatar`, {
+      const res = await fetch(basePath, {
         method: "POST",
         body: fd,
       });
@@ -138,7 +143,7 @@ export function AvatarEditDialog({
   async function executeRemove() {
     setBusy("remove");
     try {
-      const res = await fetch(`/api/staff/${dispatcherId}/avatar`, { method: "DELETE" });
+      const res = await fetch(basePath, { method: "DELETE" });
       if (!res.ok) throw new Error();
       onAvatarChange(null);
       toast.success("Photo removed");
@@ -159,7 +164,7 @@ export function AvatarEditDialog({
   async function executePickDefault(defaultId: string) {
     setBusy(defaultId);
     try {
-      const res = await fetch(`/api/staff/${dispatcherId}/avatar/default`, {
+      const res = await fetch(`${basePath}/default`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ defaultId }),

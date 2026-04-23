@@ -23,6 +23,8 @@ export type StaffEmployee = {
   dispatcherId: string | null;
   dispatcherExtId: string | null;
   dispatcherBranch: string | null;
+  /** Avatar of the linked dispatcher — takes precedence over `avatarUrl` when set. */
+  dispatcherAvatarUrl: string | null;
   isComplete: boolean;
 };
 
@@ -47,7 +49,7 @@ export async function getEmployees(
     include: {
       branch: { select: { code: true } },
       dispatcher: {
-        select: { extId: true, branch: { select: { code: true } } },
+        select: { extId: true, avatarUrl: true, branch: { select: { code: true } } },
       },
     },
     orderBy: { name: "asc" },
@@ -74,6 +76,7 @@ export async function getEmployees(
     dispatcherId: e.dispatcherId,
     dispatcherExtId: e.dispatcher?.extId ?? null,
     dispatcherBranch: e.dispatcher?.branch?.code ?? null,
+    dispatcherAvatarUrl: e.dispatcher?.avatarUrl ?? null,
     isComplete: !!e.icNo,
   }));
 }

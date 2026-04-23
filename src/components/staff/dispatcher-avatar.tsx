@@ -20,12 +20,19 @@ const SIZE_MAP: Record<Size, { box: string; text: string; icon: number; px: numb
 };
 
 interface DispatcherAvatarProps {
+  /** Treated as a generic subject id. Kept name for back-compat with existing call sites. */
   dispatcherId: string;
   name: string;
   avatarUrl: string | null;
   ringColor: string;
   size?: Size;
   onAvatarChange: (avatarUrl: string | null) => void;
+  /** Override the avatar API base path. Defaults to `/api/staff/<dispatcherId>/avatar`. */
+  apiBasePath?: string;
+  /** Disables the click-to-edit affordance (used when editing the linked dispatcher elsewhere). */
+  disabled?: boolean;
+  /** Optional tooltip override for the avatar button. */
+  title?: string;
 }
 
 function getInitials(name: string): string {
@@ -47,6 +54,9 @@ export function DispatcherAvatar({
   ringColor,
   size = "sm",
   onAvatarChange,
+  apiBasePath,
+  disabled,
+  title,
 }: DispatcherAvatarProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -57,14 +67,16 @@ export function DispatcherAvatar({
     <>
       <button
         type="button"
+        disabled={disabled}
         onClick={(e) => {
           e.stopPropagation();
+          if (disabled) return;
           setDialogOpen(true);
         }}
-        className={`relative ${box} rounded-full flex items-center justify-center bg-surface-low ${text} font-semibold text-on-surface-variant shrink-0 overflow-hidden group/avatar cursor-pointer`}
+        className={`relative ${box} rounded-full flex items-center justify-center bg-surface-low ${text} font-semibold text-on-surface-variant shrink-0 overflow-hidden group/avatar ${disabled ? "cursor-default" : "cursor-pointer"}`}
         style={{ outline: `2px solid ${ringColor}`, outlineOffset: "1px" }}
-        title="Edit avatar"
-        aria-label="Edit avatar"
+        title={title ?? (disabled ? name : "Edit avatar")}
+        aria-label={disabled ? `Avatar for ${name}` : "Edit avatar"}
       >
         {avatarUrl ? (
           <Image
@@ -78,18 +90,21 @@ export function DispatcherAvatar({
         ) : (
           initials
         )}
-        <div className="absolute inset-0 rounded-full bg-on-surface/0 group-hover/avatar:bg-on-surface/30 flex items-center justify-center transition-colors">
-          <Camera
-            size={icon}
-            className="text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity"
-          />
-        </div>
+        {!disabled && (
+          <div className="absolute inset-0 rounded-full bg-on-surface/0 group-hover/avatar:bg-on-surface/30 flex items-center justify-center transition-colors">
+            <Camera
+              size={icon}
+              className="text-white opacity-0 group-hover/avatar:opacity-100 transition-opacity"
+            />
+          </div>
+        )}
       </button>
 
       {dialogOpen && (
         <AvatarEditDialog
           open
           dispatcherId={dispatcherId}
+          apiBasePath={apiBasePath}
           dispatcherName={name}
           avatarUrl={avatarUrl}
           ringColor={ringColor}
