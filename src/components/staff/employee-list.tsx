@@ -3,9 +3,10 @@
 import { useState, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, UserPlus } from "lucide-react";
+import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, UserPlus, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
+import { BranchChip } from "@/components/ui/branch-chip";
 
 const EmployeeDrawer = dynamic(
   () => import("./employee-drawer").then((m) => m.EmployeeDrawer),
@@ -185,8 +186,8 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
       ) : (
         <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto mt-4">
           {/* Column headers */}
-          <div className="grid grid-cols-[1.5fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 pt-3 pb-2 border-b border-outline-variant/15">
-            {["Employee", "Type", "IC No", "Pay", "Dispatcher", "Status", ""].map((h, i) => (
+          <div className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 pt-3 pb-2 border-b border-outline-variant/15">
+            {["Employee", "Type", "Branch", "IC No", "Pay", "Dispatcher", "Status", ""].map((h, i) => (
               <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase ${i === 0 ? "text-left" : "text-center"}`}>
                 {h}
               </span>
@@ -198,7 +199,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
             <div
               key={emp.id}
               onClick={() => setDrawerEmployee(emp)}
-              className="grid grid-cols-[1.5fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
+              className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
             >
               {/* Employee name + initials avatar */}
               <div className="flex items-center gap-3">
@@ -215,6 +216,21 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 <span className={`px-2 py-0.5 rounded-lg text-[0.68rem] font-medium ${TYPE_CHIP_CLASS[emp.type]}`}>
                   {TYPE_LABEL[emp.type]}
                 </span>
+              </div>
+
+              {/* Branch */}
+              <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                {emp.branchCode ? (
+                  <BranchChip code={emp.branchCode} />
+                ) : (
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[0.68rem] font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                    title="Branch is required — click the row to set it"
+                  >
+                    <AlertTriangle size={10} />
+                    Set branch
+                  </span>
+                )}
               </div>
 
               {/* IC */}

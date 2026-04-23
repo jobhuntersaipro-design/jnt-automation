@@ -59,6 +59,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Valid employee type is required" }, { status: 400 });
     }
 
+    if (!branchCode || !branchCode.trim()) {
+      return NextResponse.json({ error: "Branch is required" }, { status: 400 });
+    }
+
     if (icNo && icNo.trim() && !/^\d{12}$/.test(icNo.trim())) {
       return NextResponse.json({ error: "IC number must be 12 digits" }, { status: 400 });
     }
@@ -77,18 +81,15 @@ export async function POST(req: NextRequest) {
     const safeIcNo = icNo?.trim() || null;
     const gender = safeIcNo ? deriveGender(safeIcNo) : ("UNKNOWN" as const);
 
-    // Resolve branchCode to branchId
-    let branchId: string | null = null;
-    if (branchCode) {
-      const branch = await prisma.branch.findFirst({
-        where: { code: branchCode, agentId: agentId },
-        select: { id: true },
-      });
-      if (!branch) {
-        return NextResponse.json({ error: "Branch not found" }, { status: 404 });
-      }
-      branchId = branch.id;
+    // Resolve branchCode to branchId (required)
+    const branch = await prisma.branch.findFirst({
+      where: { code: branchCode.trim(), agentId: agentId },
+      select: { id: true },
+    });
+    if (!branch) {
+      return NextResponse.json({ error: "Branch not found" }, { status: 404 });
     }
+    const branchId = branch.id;
 
     const employee = await prisma.employee.create({
       data: {
@@ -107,7 +108,7 @@ export async function POST(req: NextRequest) {
       include: {
         branch: { select: { code: true } },
         dispatcher: {
-          select: { extId: true, branch: { select: { code: true } } },
+          select: { extId: true, avatarUrl: true, branch: { select: { code: true } } },
         },
       },
     });
@@ -134,6 +135,7 @@ export async function POST(req: NextRequest) {
         dispatcherId: employee.dispatcherId,
         dispatcherExtId: employee.dispatcher?.extId ?? null,
         dispatcherBranch: employee.dispatcher?.branch?.code ?? null,
+        dispatcherAvatarUrl: employee.dispatcher?.avatarUrl ?? null,
         isComplete: !!employee.icNo,
       },
     }, { status: 201 });

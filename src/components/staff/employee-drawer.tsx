@@ -138,6 +138,7 @@ export function EmployeeDrawer({
   function validate() {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = "Name is required";
+    if (!branchCode) errs.branchCode = "Branch is required";
     if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
     return errs;
   }
@@ -347,12 +348,12 @@ export function EmployeeDrawer({
                 </div>
               </Field>
 
-              <Field label="Branch">
+              <Field label="Branch" error={errors.branchCode}>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setBranchOpen((o) => !o)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface transition-colors cursor-pointer"
+                    className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface transition-colors cursor-pointer ${errors.branchCode ? "border-critical/50" : "border-outline-variant/30"}`}
                   >
                     <span className={branchCode ? "text-on-surface" : "text-on-surface-variant/50"}>
                       {branchCode || "Select branch"}
@@ -361,19 +362,11 @@ export function EmployeeDrawer({
                   </button>
                   {branchOpen && (
                     <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-full py-1">
-                      <button
-                        type="button"
-                        onClick={() => { setBranchCode(""); setBranchOpen(false); }}
-                        className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${!branchCode ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
-                      >
-                        None
-                        {!branchCode && <Check size={13} className="text-brand" />}
-                      </button>
                       {localBranches.map((code) => (
                         <button
                           key={code}
                           type="button"
-                          onClick={() => { setBranchCode(code); setBranchOpen(false); }}
+                          onClick={() => { setBranchCode(code); setBranchOpen(false); setErrors((p) => ({ ...p, branchCode: "" })); }}
                           className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${branchCode === code ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
                         >
                           {code}

@@ -1,10 +1,11 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { ChevronDown, Check, Loader2, FileText, Download, X } from "lucide-react"
+import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle } from "lucide-react"
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
+import { BranchChip } from "@/components/ui/branch-chip"
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard"
 import {
   calculateStatutory,
@@ -556,7 +557,7 @@ export function PayrollTab() {
         </div>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full" style={{ minWidth: 1100 }}>
+          <table className="w-full" style={{ minWidth: 1180 }}>
             <thead>
               <tr>
                 {allSaved && (
@@ -570,6 +571,7 @@ export function PayrollTab() {
                   </th>
                 )}
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3" style={{ width: 160 }}>Employee</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 80 }}>Branch</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 85 }}>Pay</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 60 }}>Hours</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 70 }}>Petrol</th>
@@ -621,12 +623,24 @@ export function PayrollTab() {
                       <div className="text-[0.8rem] font-medium text-on-surface leading-tight">
                         {entry.name}
                       </div>
-                      <div className="text-[0.68rem] text-on-surface-variant/70 leading-tight mt-0.5">
-                        {entry.branchCode || "—"}
-                      </div>
                       <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
                         {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? ` + Dispatcher` : ""}
                       </div>
+                    </td>
+
+                    {/* Branch */}
+                    <td className="py-2.5 px-1 text-center">
+                      {entry.branchCode ? (
+                        <BranchChip code={entry.branchCode} asLink={false} />
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[0.68rem] font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-200"
+                          title="Branch is required — set it on the Settings tab"
+                        >
+                          <AlertTriangle size={10} />
+                          Set branch
+                        </span>
+                      )}
                     </td>
 
                     {/* Basic Pay / Hourly Wage */}

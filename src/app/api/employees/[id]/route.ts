@@ -89,18 +89,17 @@ export async function PATCH(
     }
     if (type !== undefined) updateData.type = type;
     if (branchCode !== undefined) {
-      if (branchCode) {
-        const branch = await prisma.branch.findFirst({
-          where: { code: branchCode, agentId: agentId },
-          select: { id: true },
-        });
-        if (!branch) {
-          return NextResponse.json({ error: "Branch not found" }, { status: 404 });
-        }
-        updateData.branchId = branch.id;
-      } else {
-        updateData.branchId = null;
+      if (!branchCode || !branchCode.trim()) {
+        return NextResponse.json({ error: "Branch is required" }, { status: 400 });
       }
+      const branch = await prisma.branch.findFirst({
+        where: { code: branchCode.trim(), agentId: agentId },
+        select: { id: true },
+      });
+      if (!branch) {
+        return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+      }
+      updateData.branchId = branch.id;
     }
     if (basicPay !== undefined) updateData.basicPay = effectiveType === "STORE_KEEPER" ? null : basicPay;
     if (hourlyWage !== undefined) updateData.hourlyWage = effectiveType === "STORE_KEEPER" ? hourlyWage : null;
