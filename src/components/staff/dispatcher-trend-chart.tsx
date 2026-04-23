@@ -40,19 +40,16 @@ const ORDERS_COLOR = CHART_COLORS.brand;
 const NET_COLOR = CHART_COLORS.bonusTierEarnings;
 const PENALTY_COLOR = CHART_COLORS.critical;
 
-function fmtRMShort(value: number) {
-  if (value >= 1_000_000) return `RM ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `RM ${(value / 1_000).toFixed(0)}K`;
-  return `RM ${value.toFixed(0)}`;
+function fmtRMAxis(value: number) {
+  return `RM ${Math.round(value).toLocaleString("en-MY")}`;
 }
 
 function fmtRMFull(value: number) {
   return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function fmtOrdersShort(value: number) {
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return `${value}`;
+function fmtOrdersAxis(value: number) {
+  return value.toLocaleString("en-MY");
 }
 
 function CustomTooltip({
@@ -198,21 +195,21 @@ export function DispatcherTrendChart({ records }: { records: TrendInputRecord[] 
               yAxisId="orders"
               orientation="left"
               domain={[0, Math.ceil(ordersMax * 1.15)]}
-              tickFormatter={fmtOrdersShort}
+              tickFormatter={fmtOrdersAxis}
               tick={{ fontSize: 10, fill: CHART_COLORS.axisText }}
               axisLine={false}
               tickLine={false}
-              width={36}
+              width={48}
             />
             <YAxis
               yAxisId="money"
               orientation="right"
               domain={[0, Math.ceil(moneyMax * 1.15)]}
-              tickFormatter={fmtRMShort}
+              tickFormatter={fmtRMAxis}
               tick={{ fontSize: 10, fill: CHART_COLORS.axisText }}
               axisLine={false}
               tickLine={false}
-              width={50}
+              width={66}
             />
             <Tooltip
               content={(props) => (

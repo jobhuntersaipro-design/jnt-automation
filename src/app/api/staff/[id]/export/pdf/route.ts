@@ -15,6 +15,15 @@ function fmt(n: number): string {
   });
 }
 
+function filenameSafe(name: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+  return cleaned || "dispatcher";
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -51,32 +60,21 @@ export async function GET(
       penalty: true,
       advance: true,
       netSalary: true,
-      createdAt: true,
-      updatedAt: true,
     },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
 
-  const rows = records.map((r) => {
-    const wasRecalc = r.updatedAt.getTime() - r.createdAt.getTime() > 1000;
-    const status = wasRecalc
-      ? "Recalculated"
-      : r.netSalary <= 0 || r.totalOrders === 0
-        ? "Review"
-        : "Confirmed";
-    return [
-      `${MONTH_NAMES[r.month - 1]} ${r.year}`,
-      String(r.totalOrders),
-      fmt(r.baseSalary),
-      r.bonusTierEarnings > 0 ? fmt(r.bonusTierEarnings) : "—",
-      r.petrolSubsidy > 0 ? fmt(r.petrolSubsidy) : "—",
-      String(r.petrolQualifyingDays || "—"),
-      r.penalty > 0 ? fmt(r.penalty) : "—",
-      r.advance > 0 ? fmt(r.advance) : "—",
-      fmt(r.netSalary),
-      status,
-    ];
-  });
+  const rows = records.map((r) => [
+    `${MONTH_NAMES[r.month - 1]} ${r.year}`,
+    String(r.totalOrders),
+    fmt(r.baseSalary),
+    r.bonusTierEarnings > 0 ? fmt(r.bonusTierEarnings) : "—",
+    r.petrolSubsidy > 0 ? fmt(r.petrolSubsidy) : "—",
+    String(r.petrolQualifyingDays || "—"),
+    r.penalty > 0 ? fmt(r.penalty) : "—",
+    r.advance > 0 ? fmt(r.advance) : "—",
+    fmt(r.netSalary),
+  ]);
 
   const totals = records.reduce(
     (acc, r) => ({
@@ -111,7 +109,6 @@ export async function GET(
     fmt(totals.penalty),
     fmt(totals.advance),
     fmt(totals.netSalary),
-    "",
   ];
 
   const pdf = await renderSummaryTablePdf({
@@ -134,13 +131,12 @@ export async function GET(
       { label: "Penalty", flex: 1.1, align: "right", tabular: true },
       { label: "Advance", flex: 1.1, align: "right", tabular: true },
       { label: "Net (RM)", flex: 1.3, align: "right", tabular: true },
-      { label: "Status", flex: 1.2 },
     ],
     rows,
     footer,
   });
 
-  const filename = `history_${dispatcher.extId}_${dispatcher.branch.code}.pdf`;
+  const filename = `${filenameSafe(dispatcher.name)}.pdf`;
 
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,

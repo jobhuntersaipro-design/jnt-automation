@@ -8,6 +8,15 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
+function filenameSafe(name: string): string {
+  const cleaned = name
+    .trim()
+    .replace(/[\\/:*?"<>|]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+  return cleaned || "dispatcher";
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -45,8 +54,6 @@ export async function GET(
       penalty: true,
       advance: true,
       netSalary: true,
-      createdAt: true,
-      updatedAt: true,
     },
     orderBy: [{ year: "desc" }, { month: "desc" }],
   });
@@ -61,16 +68,10 @@ export async function GET(
     "Base Salary (RM)", "Bonus Tier (RM)",
     "Petrol Subsidy (RM)", "Qualifying Days",
     "Penalty (RM)", "Advance (RM)",
-    "Net Salary (RM)", "Status",
+    "Net Salary (RM)",
   ].join(","));
 
   for (const r of records) {
-    const wasRecalc = r.updatedAt.getTime() > r.createdAt.getTime() + 1000;
-    const status = wasRecalc
-      ? "Recalculated"
-      : r.netSalary <= 0 || r.totalOrders === 0
-        ? "Review"
-        : "Confirmed";
     lines.push([
       MONTH_NAMES[r.month - 1],
       r.year,
@@ -82,7 +83,6 @@ export async function GET(
       r.penalty.toFixed(2),
       r.advance.toFixed(2),
       r.netSalary.toFixed(2),
-      status,
     ].map(escapeCsv).join(","));
   }
 
@@ -110,11 +110,10 @@ export async function GET(
     totals.penalty.toFixed(2),
     totals.advance.toFixed(2),
     totals.netSalary.toFixed(2),
-    "",
   ].map(escapeCsv).join(","));
 
   const csv = lines.join("\n");
-  const filename = `history_${dispatcher.extId}_${dispatcher.branch.code}.csv`;
+  const filename = `${filenameSafe(dispatcher.name)}.csv`;
 
   return new NextResponse(csv, {
     status: 200,
