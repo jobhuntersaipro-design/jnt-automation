@@ -23,7 +23,6 @@ export default async function DispatcherPayrollDetailPage({
         branchCode={data.upload.branchCode}
         month={data.upload.month}
         year={data.upload.year}
-        wasRecalculated={data.upload.wasRecalculated}
         initialRecords={data.records}
         initialSummary={data.summary}
       />

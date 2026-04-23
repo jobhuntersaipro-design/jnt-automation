@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import type { TierBreakdownRow } from "@/lib/staff/month-detail";
+import type { TierBreakdown } from "@/lib/staff/month-detail";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
 
 interface LineItem {
@@ -19,6 +19,7 @@ interface LineItem {
   waybillNumber: string;
   weight: number;
   commission: number;
+  isBonusTier: boolean;
 }
 
 interface MonthDetailClientProps {
@@ -36,9 +37,12 @@ interface MonthDetailClientProps {
     totalOrders: number;
     totalWeight: number;
     baseSalary: number;
+    bonusTierEarnings: number;
     netSalary: number;
   };
-  tierBreakdown: TierBreakdownRow[];
+  /** High-performer threshold used for the highlight + cumulative counter */
+  orderThreshold: number;
+  tierBreakdown: TierBreakdown;
   lineItems: LineItem[];
 }
 
@@ -118,6 +122,7 @@ export function MonthDetailClient({
   month,
   year,
   totals,
+  orderThreshold,
   tierBreakdown,
   lineItems,
 }: MonthDetailClientProps) {
@@ -255,7 +260,7 @@ export function MonthDetailClient({
         </p>
       </div>
 
-      {/* Tier breakdown */}
+      {/* Base tier breakdown */}
       <div className="rounded-xl bg-surface-card border border-outline-variant/15 overflow-hidden">
         <div className="px-4 py-3 border-b border-outline-variant/15">
           <h2 className="text-[0.85rem] font-semibold text-on-surface">Weight Tier Breakdown</h2>
@@ -272,7 +277,7 @@ export function MonthDetailClient({
             </tr>
           </thead>
           <tbody>
-            {tierBreakdown.map((t) => (
+            {tierBreakdown.base.map((t) => (
               <tr key={t.tier} className="border-t border-outline-variant/8">
                 <td className="py-2.5 px-4 font-medium text-on-surface">T{t.tier}</td>
                 <td className="py-2.5 px-4 text-on-surface-variant">{t.range}</td>
@@ -293,6 +298,55 @@ export function MonthDetailClient({
           </tbody>
         </table>
       </div>
+
+      {/* Bonus tier breakdown (only when the dispatcher crossed the threshold) */}
+      {tierBreakdown.bonusTierEarnings.length > 0 && (
+        <div className="rounded-xl bg-emerald-50/40 border border-emerald-200/60 overflow-hidden">
+          <div className="px-4 py-3 border-b border-emerald-200/60 flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[0.85rem] font-semibold text-emerald-900">Bonus Tier Breakdown</h2>
+              <p className="text-[0.72rem] text-emerald-900/70 mt-0.5">
+                Parcels #{formatNumber(orderThreshold + 1)}+ priced at bonusTierEarnings rates
+              </p>
+            </div>
+            <span className="px-2 py-0.5 text-[0.66rem] font-medium bg-emerald-600 text-white rounded-md uppercase tracking-wide">
+              High Performer
+            </span>
+          </div>
+          <table className="w-full text-[0.82rem]">
+            <thead>
+              <tr className="text-left text-[0.72rem] uppercase tracking-wider text-emerald-900/70 bg-emerald-100/40">
+                <th className="py-2.5 px-4 font-medium">Tier</th>
+                <th className="py-2.5 px-4 font-medium">Range</th>
+                <th className="py-2.5 px-4 font-medium text-right">Rate</th>
+                <th className="py-2.5 px-4 font-medium text-right">Orders</th>
+                <th className="py-2.5 px-4 font-medium text-right">Total Weight</th>
+                <th className="py-2.5 px-4 font-medium text-right">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tierBreakdown.bonusTierEarnings.map((t) => (
+                <tr key={t.tier} className="border-t border-emerald-200/50">
+                  <td className="py-2.5 px-4 font-medium text-emerald-900">T{t.tier}</td>
+                  <td className="py-2.5 px-4 text-emerald-900/80">{t.range}</td>
+                  <td className="py-2.5 px-4 text-right tabular-nums text-emerald-900">
+                    {formatRM(t.commission)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right tabular-nums text-emerald-900">
+                    {formatNumber(t.orderCount)}
+                  </td>
+                  <td className="py-2.5 px-4 text-right tabular-nums text-emerald-900/70">
+                    {t.totalWeight.toFixed(2)} kg
+                  </td>
+                  <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-emerald-700">
+                    {formatRM(t.subtotal)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {/* Parcel list */}
       <div className="rounded-xl bg-surface-card border border-outline-variant/15 overflow-hidden">
@@ -331,7 +385,10 @@ export function MonthDetailClient({
                 return (
                   <tr
                     key={`${li.waybillNumber}-${i}`}
-                    className="border-t border-outline-variant/8 hover:bg-surface-hover/40 transition-colors"
+                    className={`border-t border-outline-variant/8 hover:bg-surface-hover/40 transition-colors ${
+                      li.isBonusTier ? "bg-emerald-50/60 border-l-2 border-l-emerald-500" : ""
+                    }`}
+                    title={li.isBonusTier ? "Post-threshold parcel — priced at bonusTierEarnings tier" : undefined}
                   >
                     <td className="py-2 px-4 text-right text-on-surface-variant tabular-nums">
                       {rowNum}
@@ -339,8 +396,13 @@ export function MonthDetailClient({
                     <td className="py-2 px-4 text-on-surface tabular-nums">
                       {formatDate(li.deliveryDate)}
                     </td>
-                    <td className="py-2 px-4 text-on-surface tabular-nums">
-                      {li.waybillNumber}
+                    <td className="py-2 px-4 text-on-surface tabular-nums flex items-center gap-2">
+                      <span>{li.waybillNumber}</span>
+                      {li.isBonusTier && (
+                        <span className="px-1.5 py-0.5 text-[0.62rem] font-medium bg-emerald-600 text-white rounded-md uppercase tracking-wide">
+                          Bonus Tier
+                        </span>
+                      )}
                     </td>
                     <td className="py-2 px-4 text-right tabular-nums text-on-surface">
                       {li.weight.toFixed(2)} kg

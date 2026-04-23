@@ -16,8 +16,8 @@ interface PreviewTableProps {
   onSummaryUpdate: (summary: {
     totalNetPayout: number;
     totalBaseSalary: number;
-    totalIncentive: number;
     totalPetrolSubsidy: number;
+    totalCommission: number;
     totalDeductions: number;
   }) => void;
   onResultsUpdate: (results: PreviewResult[]) => void;
@@ -208,13 +208,13 @@ export function PreviewTable({
   const [tierPopover, setTierPopover] = useState<string | null>(null);
 
   const handleFieldChange = useCallback(
-    async (dispatcherId: string, field: "penalty" | "advance" | "incentive" | "petrolSubsidy", value: number) => {
+    async (dispatcherId: string, field: "penalty" | "advance" | "bonusTierEarnings" | "petrolSubsidy", value: number) => {
       const result = results.find((r) => r.dispatcherId === dispatcherId);
       if (!result) return;
 
       const penalty = field === "penalty" ? value : result.penalty;
       const advance = field === "advance" ? value : result.advance;
-      const incentive = field === "incentive" ? value : result.incentive;
+      const bonusTierEarnings = field === "bonusTierEarnings" ? value : result.bonusTierEarnings;
       const petrolSubsidy = field === "petrolSubsidy" ? value : result.petrolSubsidy;
 
       setUpdating(dispatcherId);
@@ -222,7 +222,7 @@ export function PreviewTable({
         const res = await fetch(`/api/upload/${uploadId}/preview`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ dispatcherId, penalty, advance, incentive, petrolSubsidy }),
+          body: JSON.stringify({ dispatcherId, penalty, advance, bonusTierEarnings, petrolSubsidy }),
         });
 
         if (!res.ok) {
@@ -235,7 +235,7 @@ export function PreviewTable({
 
         const updated = results.map((r) =>
           r.dispatcherId === dispatcherId
-            ? { ...r, penalty, advance, incentive, petrolSubsidy, netSalary: updatedNetSalary }
+            ? { ...r, penalty, advance, bonusTierEarnings, petrolSubsidy, netSalary: updatedNetSalary }
             : r,
         );
         onResultsUpdate(updated);
@@ -293,7 +293,7 @@ export function PreviewTable({
               <th className="py-3 px-4 font-medium">Dispatcher</th>
               <th className="py-3 px-3 font-medium text-right">Orders</th>
               <th className="py-3 px-3 font-medium text-right">Base Salary</th>
-              <th className="py-3 px-3 font-medium text-right">Incentive</th>
+              <th className="py-3 px-3 font-medium text-right">Bonus Tier</th>
               <th className="py-3 px-3 font-medium text-right">Petrol</th>
               <th className="py-3 px-3 font-medium text-right">Days</th>
               <th className="py-3 px-3 font-medium text-right">Penalty</th>
@@ -325,8 +325,8 @@ export function PreviewTable({
                   </td>
                   <td className="py-2.5 px-3 text-right">
                     <CalcInput
-                      value={r.incentive}
-                      onSave={(val) => handleFieldChange(r.dispatcherId, "incentive", val)}
+                      value={r.bonusTierEarnings}
+                      onSave={(val) => handleFieldChange(r.dispatcherId, "bonusTierEarnings", val)}
                     />
                   </td>
                   <td className="py-2.5 px-3 text-right">

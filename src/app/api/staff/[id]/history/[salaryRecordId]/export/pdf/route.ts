@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getMonthDetail } from "@/lib/db/staff";
-import { buildTierBreakdown, type WeightTierSnapshot } from "@/lib/staff/month-detail";
+import {
+  buildTierBreakdown,
+  type BonusTierSnapshotRow,
+  type WeightTierSnapshot,
+} from "@/lib/staff/month-detail";
+import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailPdf } from "@/lib/staff/month-detail-pdf";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
 
@@ -24,8 +29,10 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const tiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
-  const tierBreakdown = buildTierBreakdown(detail.lineItems, tiers);
+  const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
+  const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
+  const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
+  const tierBreakdown = buildTierBreakdown(detail.lineItems, weightTiers, bonusTiers);
 
   let pdf: Buffer;
   try {
@@ -38,11 +45,13 @@ export async function GET(
       month: detail.month,
       year: detail.year,
       totals: detail.totals,
+      orderThreshold: bonusTierSnapshot?.orderThreshold ?? 2000,
       tierBreakdown,
       lineItems: detail.lineItems.map((li) => ({
         deliveryDate: li.deliveryDate,
         waybillNumber: li.waybillNumber,
         weight: li.weight,
+        isBonusTier: li.isBonusTier,
       })),
     });
   } catch (error) {

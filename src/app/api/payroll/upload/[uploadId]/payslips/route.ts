@@ -89,7 +89,7 @@ export async function POST(
           select: { name: true, extId: true, icNo: true },
         },
         lineItems: {
-          select: { weight: true, commission: true },
+          select: { weight: true, commission: true, isBonusTier: true },
         },
       },
     });
@@ -104,6 +104,10 @@ export async function POST(
         maxWeight: number | null;
         commission: number;
       }>;
+      const bonusSnapshot = record.bonusTierSnapshot as
+        | { orderThreshold: number; tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }> }
+        | null;
+      const bonusTierSnapshot = bonusSnapshot?.tiers ?? [];
 
       const buffer = await generatePayslipPdf({
         companyName: agent.name,
@@ -114,13 +118,14 @@ export async function POST(
         icNo: record.dispatcher.icNo ?? "",
         month: fullUpload.month,
         year: fullUpload.year,
-        incentive: record.incentive,
         petrolSubsidy: record.petrolSubsidy,
+        commission: record.commission,
         penalty: record.penalty,
         advance: record.advance,
         netSalary: record.netSalary,
         lineItems: record.lineItems,
         weightTiersSnapshot,
+        bonusTierSnapshot,
       });
 
       const safeName = record.dispatcher.name.replace(/[^a-zA-Z0-9]/g, "_");

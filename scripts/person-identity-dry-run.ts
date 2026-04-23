@@ -42,7 +42,7 @@ interface DispatcherRow extends IdentityCandidate {
   createdAt: Date;
   updatedAt: Date;
   weightTiers: WeightTierSnapshot[];
-  incentive: { orderThreshold: number; incentiveAmount: number } | null;
+  bonusTierEarnings: { orderThreshold: number } | null;
   petrol: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number } | null;
 }
 
@@ -80,22 +80,16 @@ function detectSettingsConflicts(rows: DispatcherRow[]): string[] {
   }
 
   const incStrings = new Set(
-    rows.map((r) =>
-      r.incentive
-        ? `${r.incentive.orderThreshold}o/RM${r.incentive.incentiveAmount.toFixed(2)}`
-        : "(none)",
-    ),
+    rows.map((r) => (r.bonusTierEarnings ? `${r.bonusTierEarnings.orderThreshold}o` : "(none)")),
   );
   if (incStrings.size > 1) {
     conflicts.push(
-      "Incentive rule differs:\n" +
+      "Bonus tier threshold differs:\n" +
         rows
           .map(
             (r) =>
               `    - ${r.branchCode}/${r.extId}: ${
-                r.incentive
-                  ? `≥${r.incentive.orderThreshold} orders → RM${r.incentive.incentiveAmount.toFixed(2)}`
-                  : "(none)"
+                r.bonusTierEarnings ? `≥${r.bonusTierEarnings.orderThreshold} orders` : "(none)"
               }`,
           )
           .join("\n"),
@@ -328,10 +322,9 @@ async function main() {
         maxWeight: t.maxWeight,
         commission: t.commission,
       })),
-      incentive: d.incentiveRule
+      bonusTierEarnings: d.incentiveRule
         ? {
             orderThreshold: d.incentiveRule.orderThreshold,
-            incentiveAmount: d.incentiveRule.incentiveAmount,
           }
         : null,
       petrol: d.petrolRule

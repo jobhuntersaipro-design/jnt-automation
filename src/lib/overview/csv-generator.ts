@@ -17,9 +17,9 @@ function escapeCSV(value: string): string {
 export function generateDispatcherCSV(rows: DispatcherExportRow[]): string {
   const headers = [
     "Name", "Month", "Branch", "Total Orders",
-    "Base Salary (RM)", "Incentive (RM)", "Petrol Subsidy (RM)", "Penalty (RM)", "Advance (RM)", "Net Salary (RM)",
+    "Base Salary (RM)", "Bonus Tier (RM)", "Petrol Subsidy (RM)", "Penalty (RM)", "Advance (RM)", "Net Salary (RM)",
     "T1 Range (kg)", "T1 Rate (RM)", "T2 Range (kg)", "T2 Rate (RM)", "T3 Range (kg)", "T3 Rate (RM)",
-    "Incentive Threshold (orders)", "Incentive Amount (RM)",
+    "Bonus Tier Threshold (orders)", "Bonus Tier Commission (RM)",
     "Petrol Eligible", "Petrol Threshold (orders/day)", "Petrol Amount (RM/day)",
   ];
 
@@ -30,7 +30,7 @@ export function generateDispatcherCSV(rows: DispatcherExportRow[]): string {
       escapeCSV(r.branch),
       String(r.totalOrders),
       formatAmount(r.baseSalary),
-      formatAmount(r.incentive),
+      formatAmount(r.bonusTierEarnings),
       formatAmount(r.petrolSubsidy),
       formatAmount(r.penalty),
       formatAmount(r.advance),

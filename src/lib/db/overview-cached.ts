@@ -4,7 +4,7 @@ import {
   getMonthlyPayoutTrend,
   getBranchDistribution,
   getSalaryBreakdown,
-  getIncentiveHitRate,
+  getBonusTierHitRate,
   getTopDispatchers,
   type Filters,
 } from "./overview";
@@ -23,7 +23,7 @@ export function fetchDashboardData(agentId: string, filters: Filters) {
         getMonthlyPayoutTrend(agentId, filters),
         getBranchDistribution(agentId, filters),
         getSalaryBreakdown(agentId, filters),
-        getIncentiveHitRate(agentId, filters),
+        getBonusTierHitRate(agentId, filters),
         getTopDispatchers(agentId, filters),
       ]),
     [stableKey],

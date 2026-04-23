@@ -25,7 +25,8 @@ export type StaffDispatcher = {
   /** Full IC (unmasked) for the drawer */
   rawIcNo: string;
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
-  incentiveRule: { orderThreshold: number; incentiveAmount: number } | null;
+  bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number } | null;
   petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number } | null;
 };
 
@@ -69,7 +70,11 @@ export async function getDispatchers(
           select: { tier: true, minWeight: true, maxWeight: true, commission: true },
           orderBy: { tier: "asc" as const },
         },
-        incentiveRule: { select: { orderThreshold: true, incentiveAmount: true } },
+        incentiveRule: { select: { orderThreshold: true } },
+        bonusTiers: {
+          select: { tier: true, minWeight: true, maxWeight: true, commission: true },
+          orderBy: { tier: "asc" as const },
+        },
         petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
         salaryRecords: {
           select: { month: true, year: true },
@@ -134,6 +139,7 @@ export async function getDispatchers(
       firstSeen,
       rawIcNo: d.icNo ?? "",
       weightTiers: d.weightTiers,
+      bonusTiers: d.bonusTiers,
       incentiveRule: d.incentiveRule,
       petrolRule: d.petrolRule,
     };
@@ -155,7 +161,8 @@ export type DispatcherDetail = {
   isPinned: boolean;
   isComplete: boolean;
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
-  incentiveRule: { orderThreshold: number; incentiveAmount: number } | null;
+  bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number } | null;
   petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number } | null;
 };
 
@@ -172,7 +179,11 @@ export async function getDispatcherById(
         orderBy: { tier: "asc" },
       },
       incentiveRule: {
-        select: { orderThreshold: true, incentiveAmount: true },
+        select: { orderThreshold: true },
+      },
+      bonusTiers: {
+        select: { tier: true, minWeight: true, maxWeight: true, commission: true },
+        orderBy: { tier: "asc" },
       },
       petrolRule: {
         select: { isEligible: true, dailyThreshold: true, subsidyAmount: true },
@@ -192,6 +203,7 @@ export async function getDispatcherById(
     isPinned: d.isPinned,
     isComplete: computeIsComplete(d.name, d.icNo, d.extId),
     weightTiers: d.weightTiers,
+    bonusTiers: d.bonusTiers,
     incentiveRule: d.incentiveRule,
     petrolRule: d.petrolRule,
   };
@@ -199,7 +211,8 @@ export async function getDispatcherById(
 
 export type AgentDefaults = {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
-  incentiveRule: { orderThreshold: number; incentiveAmount: number };
+  bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number };
   petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
 };
 
@@ -209,20 +222,32 @@ const FALLBACK_DEFAULTS: AgentDefaults = {
     { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 1.4 },
     { tier: 3, minWeight: 10.01, maxWeight: null, commission: 2.2 },
   ],
-  incentiveRule: { orderThreshold: 2000, incentiveAmount: 200 },
+  bonusTiers: [
+    { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.5 },
+    { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 2.1 },
+    { tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
+  ],
+  incentiveRule: { orderThreshold: 2000 },
   petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15 },
 };
 
 export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> {
   const d = await prisma.agentDefault.findUnique({ where: { agentId } });
   if (!d) return FALLBACK_DEFAULTS;
+  // Bonus tier weight ranges mirror the weight tier ranges; only the
+  // commission rates differ.
   return {
     weightTiers: [
       { tier: 1, minWeight: d.tier1MinWeight, maxWeight: d.tier1MaxWeight, commission: d.tier1Commission },
       { tier: 2, minWeight: d.tier2MinWeight, maxWeight: d.tier2MaxWeight, commission: d.tier2Commission },
       { tier: 3, minWeight: d.tier3MinWeight, maxWeight: null, commission: d.tier3Commission },
     ],
-    incentiveRule: { orderThreshold: d.orderThreshold, incentiveAmount: d.incentiveAmount },
+    bonusTiers: [
+      { tier: 1, minWeight: d.tier1MinWeight, maxWeight: d.tier1MaxWeight, commission: d.bonusTier1Commission },
+      { tier: 2, minWeight: d.tier2MinWeight, maxWeight: d.tier2MaxWeight, commission: d.bonusTier2Commission },
+      { tier: 3, minWeight: d.tier3MinWeight, maxWeight: null, commission: d.bonusTier3Commission },
+    ],
+    incentiveRule: { orderThreshold: d.orderThreshold },
     petrolRule: { isEligible: d.petrolEligible, dailyThreshold: d.dailyThreshold, subsidyAmount: d.subsidyAmount },
   };
 }
@@ -270,6 +295,7 @@ export async function getMonthDetail(salaryRecordId: string, agentId: string) {
           waybillNumber: true,
           weight: true,
           commission: true,
+          isBonusTier: true,
         },
         orderBy: [{ deliveryDate: "asc" }, { weight: "asc" }],
       },
@@ -294,14 +320,17 @@ export async function getMonthDetail(salaryRecordId: string, agentId: string) {
       totalOrders: record.totalOrders,
       totalWeight: record.lineItems.reduce((s, li) => s + li.weight, 0),
       baseSalary: record.baseSalary,
+      bonusTierEarnings: record.bonusTierEarnings,
       netSalary: record.netSalary,
     },
     weightTiersSnapshot: record.weightTiersSnapshot,
+    bonusTierSnapshot: record.bonusTierSnapshot,
     lineItems: record.lineItems.map((li) => ({
       deliveryDate: li.deliveryDate,
       waybillNumber: li.waybillNumber,
       weight: li.weight,
       commission: li.commission,
+      isBonusTier: li.isBonusTier,
     })),
   };
 }
@@ -372,6 +401,7 @@ export async function getMonthDetailsBatch(
             waybillNumber: true,
             weight: true,
             commission: true,
+            isBonusTier: true,
           },
           orderBy: [{ deliveryDate: "asc" }, { weight: "asc" }],
         },
@@ -396,14 +426,17 @@ export async function getMonthDetailsBatch(
       totalOrders: r.totalOrders,
       totalWeight: r.lineItems.reduce((s, li) => s + li.weight, 0),
       baseSalary: r.baseSalary,
+      bonusTierEarnings: r.bonusTierEarnings,
       netSalary: r.netSalary,
     },
     weightTiersSnapshot: r.weightTiersSnapshot,
+    bonusTierSnapshot: r.bonusTierSnapshot,
     lineItems: r.lineItems.map((li) => ({
       deliveryDate: li.deliveryDate,
       waybillNumber: li.waybillNumber,
       weight: li.weight,
       commission: li.commission,
+      isBonusTier: li.isBonusTier,
     })),
   }));
 }

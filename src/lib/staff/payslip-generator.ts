@@ -8,7 +8,11 @@ import {
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
-import { countParcelsPerTier, formatRate } from "../payroll/tier-counter";
+import {
+  countBonusParcelsPerTier,
+  countParcelsPerTier,
+  formatRate,
+} from "../payroll/tier-counter";
 import type { TierBreakdown } from "../payroll/tier-counter";
 
 function formatRM(amount: number): string {
@@ -27,18 +31,21 @@ const s = StyleSheet.create({
   companyName: { fontSize: 12, fontFamily: "Helvetica-Bold" },
   addressLine: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 1 },
 
+  // Outer frame — wraps everything from EMPLOYEE'S PARTICULARS down to EMPLOYER'S CONTRIBUTION
+  outerBox: { borderWidth: 1, borderColor: B },
+
+  // Title row inside the outer box
+  partTitleRow: { borderBottomWidth: 1, borderBottomColor: B, paddingVertical: 4 },
+  partTitle: { textAlign: "center" as const, fontSize: 9.5 },
+
   // Employee particulars
-  partTitle: { textAlign: "center", textDecoration: "underline", fontSize: 9.5, marginBottom: 2 },
-  partBox: { flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: B },
+  partBox: { flexDirection: "row" as const, borderBottomWidth: 1, borderBottomColor: B },
   partLeft: { flex: 1, paddingVertical: 4, paddingHorizontal: 6 },
   partRight: { flex: 1, paddingVertical: 4, paddingHorizontal: 6, borderLeftWidth: 1, borderLeftColor: B },
   partRow: { flexDirection: "row" as const, marginBottom: 1.5 },
   partLabel: { width: 90, fontSize: 9 },
   partColon: { width: 10, fontSize: 9 },
   partVal: { flex: 1, fontSize: 9, fontFamily: "Helvetica-Bold" },
-
-  // Main table — wraps everything: addition/deduction + total + employer section
-  tableWrapper: { borderWidth: 1, borderColor: B, marginTop: 10 },
 
   // Addition/deduction columns row
   columnsRow: { flexDirection: "row" as const },
@@ -118,8 +125,9 @@ export interface EmployeePayslipInput {
 
   // Dispatcher data (for combined payslip)
   dispatcherTierBreakdowns?: TierBreakdown[];
-  dispatcherIncentive?: number;
+  dispatcherBonusTierBreakdowns?: TierBreakdown[];
   dispatcherPetrolSubsidy?: number;
+  dispatcherCommission?: number;
   dispatcherPenalty?: number;
   dispatcherAdvance?: number;
 
@@ -185,16 +193,26 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
         ),
       );
     }
-    if (data.dispatcherIncentive && data.dispatcherIncentive > 0) {
-      addRows.push(h(View, { key: "dinc", style: s.dataRow },
-        h(Text, { style: s.cellL }, "Incentive"),
-        h(Text, { style: s.cellR }, formatRM(data.dispatcherIncentive)),
-      ));
+    if (data.dispatcherBonusTierBreakdowns) {
+      for (const t of data.dispatcherBonusTierBreakdowns) {
+        addRows.push(
+          h(View, { key: `dbt${t.tier}`, style: s.dataRow },
+            h(Text, { style: s.cellL }, `Bonus Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`),
+            h(Text, { style: s.cellR }, formatRM(t.total)),
+          ),
+        );
+      }
     }
     if (data.dispatcherPetrolSubsidy && data.dispatcherPetrolSubsidy > 0) {
       addRows.push(h(View, { key: "dpet", style: s.dataRow },
         h(Text, { style: s.cellL }, "Petrol Subsidy"),
         h(Text, { style: s.cellR }, formatRM(data.dispatcherPetrolSubsidy)),
+      ));
+    }
+    if (data.dispatcherCommission && data.dispatcherCommission > 0) {
+      addRows.push(h(View, { key: "dcom", style: s.dataRow },
+        h(Text, { style: s.cellL }, "Commission"),
+        h(Text, { style: s.cellR }, formatRM(data.dispatcherCommission)),
       ));
     }
   }
@@ -289,39 +307,43 @@ function EmployeePayslipDocument({ data }: { data: EmployeePayslipInput }) {
         ...addressLines.map((line, i) => h(Text, { key: i, style: s.addressLine }, line)),
       ),
 
-      // ── Employee Particulars ──
-      h(Text, { style: s.partTitle }, "EMPLOYEE'S PARTICULARS"),
-      h(View, { style: s.partBox },
-        h(View, { style: s.partLeft },
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "NAME"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, data.employeeName),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "I/C NO"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, data.icNo),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "POSITION"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, position),
-          ),
+      // ── Outer bordered frame: particulars + table + employer section ──
+      h(View, { style: s.outerBox },
+
+        // Title bar inside the frame
+        h(View, { style: s.partTitleRow },
+          h(Text, { style: s.partTitle }, "EMPLOYEE'S PARTICULARS"),
         ),
-        h(View, { style: s.partRight },
-          ...rightParticulars.map((rp, i) =>
-            h(View, { key: i, style: s.partRow },
-              h(Text, { style: s.partLabel }, rp.label),
+
+        // Employee particulars grid
+        h(View, { style: s.partBox },
+          h(View, { style: s.partLeft },
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "NAME"),
               h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, rp.value),
+              h(Text, { style: s.partVal }, data.employeeName),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "I/C NO"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, data.icNo),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "POSITION"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, position),
+            ),
+          ),
+          h(View, { style: s.partRight },
+            ...rightParticulars.map((rp, i) =>
+              h(View, { key: i, style: s.partRow },
+                h(Text, { style: s.partLabel }, rp.label),
+                h(Text, { style: s.partColon }, ":"),
+                h(Text, { style: s.partVal }, rp.value),
+              ),
             ),
           ),
         ),
-      ),
-
-      // ── Main Table (outer border wraps everything) ──
-      h(View, { style: s.tableWrapper },
 
         // Row 1: Addition | Deduction columns side by side
         h(View, { style: s.columnsRow },
@@ -411,5 +433,5 @@ export async function generateEmployeePayslipPdf(input: EmployeePayslipInput): P
 }
 
 // Re-export for combined payslips that need tier breakdown
-export { countParcelsPerTier, formatRate };
+export { countParcelsPerTier, countBonusParcelsPerTier, formatRate };
 export type { TierBreakdown };

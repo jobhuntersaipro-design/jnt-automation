@@ -186,8 +186,17 @@ export async function POST(req: NextRequest) {
           data: {
             dispatcherId: dispatcher.id,
             orderThreshold: defaults.incentiveRule.orderThreshold,
-            incentiveAmount: defaults.incentiveRule.incentiveAmount,
           },
+        });
+
+        await tx.bonusTier.createMany({
+          data: defaults.bonusTiers.map((t) => ({
+            dispatcherId: dispatcher.id,
+            tier: t.tier,
+            minWeight: t.minWeight,
+            maxWeight: t.maxWeight,
+            commission: t.commission,
+          })),
         });
 
         await tx.petrolRule.create({

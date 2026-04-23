@@ -87,7 +87,7 @@ export async function GET(
 
       const dispatcherGross = dispatcherRecord
         ? dispatcherRecord.baseSalary +
-          dispatcherRecord.incentive +
+          dispatcherRecord.bonusTierEarnings +
           dispatcherRecord.petrolSubsidy
         : 0
       const dispatcherPenalty = dispatcherRecord?.penalty ?? 0
@@ -199,7 +199,7 @@ export async function POST(
               where: { month, year },
               select: {
                 baseSalary: true,
-                incentive: true,
+                bonusTierEarnings: true,
                 petrolSubsidy: true,
                 penalty: true,
                 advance: true,
@@ -225,7 +225,7 @@ export async function POST(
 
         const dispatcherGross = dispatcherRecord
           ? dispatcherRecord.baseSalary +
-            dispatcherRecord.incentive +
+            dispatcherRecord.bonusTierEarnings +
             dispatcherRecord.petrolSubsidy
           : 0
 

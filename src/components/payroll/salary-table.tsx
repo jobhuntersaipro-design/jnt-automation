@@ -9,16 +9,14 @@ import {
   Pencil,
   X,
   Search,
-  Settings,
+  Info,
   Download,
   FileText,
-  CheckCircle2,
-  AlertTriangle,
-  Circle,
-  History,
+  TrendingUp,
 } from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
+import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 
 export interface SalaryRecordRow {
   dispatcherId: string;
@@ -28,16 +26,13 @@ export interface SalaryRecordRow {
   icNo: string | null;
   totalOrders: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
-  petrolQualifyingDays: number;
+  commission: number;
   penalty: number;
   advance: number;
   netSalary: number;
-  weightTiersSnapshot: unknown;
-  incentiveSnapshot: unknown;
-  petrolSnapshot: unknown;
-  wasRecalculated?: boolean;
+  bonusTierSnapshot: unknown;
 }
 
 interface SalaryTableProps {
@@ -45,13 +40,12 @@ interface SalaryTableProps {
   branchCode: string;
   month: number;
   year: number;
-  wasRecalculated: boolean;
   initialRecords: SalaryRecordRow[];
   initialSummary: {
     totalNetPayout: number;
     totalBaseSalary: number;
-    totalIncentive: number;
     totalPetrolSubsidy: number;
+    totalCommission: number;
     totalDeductions: number;
   };
 }
@@ -61,66 +55,54 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-type RowStatus = "ready" | "review" | "zero" | "edited";
-type StatusFilter = "all" | RowStatus;
-
 function formatRM(amount: number): string {
   return amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function computeNet(r: SalaryRecordRow): number {
-  return r.baseSalary + r.incentive + r.petrolSubsidy - r.penalty - r.advance;
+  return (
+    r.baseSalary +
+    r.bonusTierEarnings +
+    r.petrolSubsidy +
+    r.commission -
+    r.penalty -
+    r.advance
+  );
+}
+
+/**
+ * Read the bonusTierEarnings order threshold from a snapshot (works for both legacy
+ * and new-shape snapshots). Returns null if the record has no threshold set.
+ */
+function getOrderThreshold(snapshot: unknown): number | null {
+  try {
+    const read = readBonusTierSnapshot(snapshot);
+    if (!read || read.orderThreshold <= 0) return null;
+    return read.orderThreshold;
+  } catch {
+    return null;
+  }
+}
+
+function isHighPerformer(r: SalaryRecordRow): boolean {
+  const threshold = getOrderThreshold(r.bonusTierSnapshot);
+  if (threshold === null) return false;
+  return r.totalOrders > threshold;
 }
 
 function computeSummary(records: SalaryRecordRow[]) {
   return {
     totalNetPayout: records.reduce((s, r) => s + r.netSalary, 0),
-    totalBaseSalary: records.reduce((s, r) => s + r.baseSalary, 0),
-    totalIncentive: records.reduce((s, r) => s + r.incentive, 0),
+    // "Base Salary" in the summary = default-tier + bonus-tier earnings combined.
+    // The per-row table breaks these back out under a grouped Base Salary header.
+    totalBaseSalary: records.reduce(
+      (s, r) => s + r.baseSalary + r.bonusTierEarnings,
+      0,
+    ),
     totalPetrolSubsidy: records.reduce((s, r) => s + r.petrolSubsidy, 0),
+    totalCommission: records.reduce((s, r) => s + r.commission, 0),
     totalDeductions: records.reduce((s, r) => s + r.penalty + r.advance, 0),
   };
-}
-
-function rowStatus(r: SalaryRecordRow, edited: boolean): RowStatus {
-  if (edited) return "edited";
-  if (r.totalOrders === 0) return "zero";
-  if (r.netSalary <= 0) return "review";
-  return "ready";
-}
-
-function StatusPill({ status }: { status: RowStatus }) {
-  const config = {
-    ready: {
-      label: "Ready",
-      icon: CheckCircle2,
-      className: "text-emerald-700 bg-emerald-50 border-emerald-200",
-    },
-    review: {
-      label: "Review",
-      icon: AlertTriangle,
-      className: "text-amber-700 bg-amber-50 border-amber-200",
-    },
-    zero: {
-      label: "Zero",
-      icon: Circle,
-      className: "text-on-surface-variant bg-surface-low border-outline-variant/40",
-    },
-    edited: {
-      label: "Edited",
-      icon: Pencil,
-      className: "text-brand bg-brand/5 border-brand/30",
-    },
-  }[status];
-  const Icon = config.icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-full border ${config.className}`}
-    >
-      <Icon className="w-3 h-3" strokeWidth={2.5} />
-      {config.label}
-    </span>
-  );
 }
 
 /**
@@ -179,62 +161,11 @@ function EditableCell({
   );
 }
 
-/**
- * Weight tier popover for the view page — view-only display of tier config.
- */
-function ViewTierPopover({
-  dispatcherName,
-  tiers,
-  onClose,
-}: {
-  dispatcherName: string;
-  tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>;
-  onClose: () => void;
-}) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
-
-  return (
-    <div
-      ref={popoverRef}
-      className="absolute top-full right-0 mt-2 z-50 bg-white rounded-lg shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-4 w-64"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <p className="text-[0.75rem] font-semibold text-on-surface mb-2">
-        Weight Tiers — {dispatcherName}
-      </p>
-      <div className="space-y-1.5">
-        {tiers.map((tier) => (
-          <div key={tier.tier} className="flex items-center gap-3">
-            <span className="text-[0.72rem] font-semibold text-on-surface-variant w-6">T{tier.tier}</span>
-            <span className="text-[0.72rem] text-on-surface-variant flex-1">
-              {tier.minWeight}–{tier.maxWeight === null ? "∞" : tier.maxWeight}kg
-            </span>
-            <span className="text-[0.72rem] font-medium text-on-surface tabular-nums">
-              RM {tier.commission.toFixed(2)}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function SalaryTable({
   uploadId,
   branchCode,
   month,
   year,
-  wasRecalculated,
   initialRecords,
   initialSummary,
 }: SalaryTableProps) {
@@ -245,28 +176,38 @@ export function SalaryTable({
   const [editedRecords, setEditedRecords] = useState<Map<string, SalaryRecordRow>>(new Map());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [highPerformerOnly, setHighPerformerOnly] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [tierPopover, setTierPopover] = useState<string | null>(null);
+  const [hpInfoOpen, setHpInfoOpen] = useState(false);
+  const hpInfoRef = useRef<HTMLDivElement>(null);
   const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard();
+
+  useEffect(() => {
+    if (!hpInfoOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (hpInfoRef.current && !hpInfoRef.current.contains(e.target as Node)) {
+        setHpInfoOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [hpInfoOpen]);
 
   // Snapshot of records before edit mode for cancel/diff
   const [preEditRecords, setPreEditRecords] = useState(initialRecords);
 
-  // Status counts (based on records, not filtered view)
-  const statusCounts = useMemo(() => {
-    const counts = { all: records.length, ready: 0, review: 0, zero: 0, edited: 0 };
+  // Counts for the remaining filter pills.
+  const counts = useMemo(() => {
+    let highPerformer = 0;
     for (const r of records) {
-      const edited = editedRecords.has(r.dispatcherId);
-      const s = rowStatus(r, edited);
-      counts[s]++;
+      if (isHighPerformer(r)) highPerformer++;
     }
-    return counts;
-  }, [records, editedRecords]);
+    return { all: records.length, highPerformer };
+  }, [records]);
 
   // Filtered records for display
   const filtered = useMemo(() => {
@@ -275,13 +216,10 @@ export function SalaryTable({
       if (q && !r.name.toLowerCase().includes(q) && !r.extId.toLowerCase().includes(q)) {
         return false;
       }
-      if (statusFilter !== "all") {
-        const edited = editedRecords.has(r.dispatcherId);
-        if (rowStatus(r, edited) !== statusFilter) return false;
-      }
+      if (highPerformerOnly && !isHighPerformer(r)) return false;
       return true;
     });
-  }, [records, search, statusFilter, editedRecords]);
+  }, [records, search, highPerformerOnly]);
 
   const allFilteredSelected = filtered.length > 0 && filtered.every((r) => selectedIds.has(r.dispatcherId));
 
@@ -366,8 +304,9 @@ export function SalaryTable({
         dispatcherId: r.dispatcherId,
         totalOrders: r.totalOrders,
         baseSalary: r.baseSalary,
-        incentive: r.incentive,
+        bonusTierEarnings: r.bonusTierEarnings,
         petrolSubsidy: r.petrolSubsidy,
+        commission: r.commission,
         penalty: r.penalty,
         advance: r.advance,
       }));
@@ -448,39 +387,6 @@ export function SalaryTable({
     setTimeout(() => setExportingPdf(false), 1500);
   };
 
-  const StatusFilterPill = ({
-    value,
-    label,
-    count,
-    color,
-  }: {
-    value: StatusFilter;
-    label: string;
-    count: number;
-    color: string;
-  }) => {
-    const active = statusFilter === value;
-    return (
-      <button
-        onClick={() => setStatusFilter(value)}
-        className={`inline-flex items-center gap-1.5 px-3 py-1 text-[0.78rem] font-medium rounded-full border transition-colors ${
-          active
-            ? "bg-on-surface text-white border-on-surface"
-            : "bg-surface-card text-on-surface-variant border-outline-variant/25 hover:bg-surface-hover"
-        }`}
-      >
-        <span
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: active ? "white" : color }}
-        />
-        {label}
-        <span className={`tabular-nums ${active ? "text-white/75" : "text-on-surface-variant/60"}`}>
-          {count}
-        </span>
-      </button>
-    );
-  };
-
   return (
     <div className="flex flex-col gap-5 pb-20">
       {/* Header */}
@@ -493,33 +399,11 @@ export function SalaryTable({
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-[1.25rem] font-semibold text-on-surface tracking-tight">
-                {branchCode} — {MONTH_NAMES[month - 1]} {year}
-              </h1>
-              {wasRecalculated && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium rounded-full bg-brand/5 text-brand border border-brand/20">
-                  <History className="w-3 h-3" strokeWidth={2.5} />
-                  Recalculated
-                </span>
-              )}
-            </div>
+            <h1 className="text-[1.25rem] font-semibold text-on-surface tracking-tight">
+              {branchCode} — {MONTH_NAMES[month - 1]} {year}
+            </h1>
             <p className="text-[0.78rem] text-on-surface-variant mt-0.5">
               {records.length} dispatcher{records.length !== 1 ? "s" : ""}
-              {" • "}
-              <span className="text-emerald-700">{statusCounts.ready} ready</span>
-              {statusCounts.review > 0 && (
-                <>
-                  {" • "}
-                  <span className="text-amber-700">{statusCounts.review} need review</span>
-                </>
-              )}
-              {statusCounts.zero > 0 && (
-                <>
-                  {" • "}
-                  <span className="text-on-surface-variant/60">{statusCounts.zero} zero</span>
-                </>
-              )}
             </p>
           </div>
         </div>
@@ -548,7 +432,7 @@ export function SalaryTable({
             <div className="flex-1 text-[0.82rem] text-on-surface-variant">
               {modifiedCount > 0
                 ? `${modifiedCount} dispatcher${modifiedCount !== 1 ? "s" : ""} modified`
-                : "No changes yet — edit any incentive, petrol, penalty, or advance cell."}
+                : "No changes yet — edit any bonus tier, petrol, commission, penalty, or advance cell."}
             </div>
             <button
               onClick={cancelEdit}
@@ -621,16 +505,54 @@ export function SalaryTable({
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">
-          <StatusFilterPill value="all" label="All" count={statusCounts.all} color="#424654" />
-          <StatusFilterPill value="ready" label="Ready" count={statusCounts.ready} color="#10b981" />
-          {statusCounts.review > 0 && (
-            <StatusFilterPill value="review" label="Review" count={statusCounts.review} color="#f59e0b" />
-          )}
-          {statusCounts.zero > 0 && (
-            <StatusFilterPill value="zero" label="Zero" count={statusCounts.zero} color="#9ca3af" />
-          )}
-          {editMode && statusCounts.edited > 0 && (
-            <StatusFilterPill value="edited" label="Edited" count={statusCounts.edited} color="#0056D2" />
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 text-[0.78rem] font-medium rounded-full border bg-on-surface text-white border-on-surface">
+            All
+            <span className="tabular-nums text-white/75">{counts.all}</span>
+          </span>
+          {counts.highPerformer > 0 && (
+            <>
+              <span className="mx-1 text-outline-variant/60">·</span>
+              <button
+                type="button"
+                onClick={() => setHighPerformerOnly((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.76rem] font-medium rounded-md border transition-colors ${
+                  highPerformerOnly
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-white text-emerald-800 border-emerald-200 hover:bg-emerald-50"
+                }`}
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                High Performers
+                <span
+                  className={`ml-0.5 px-1.5 py-0 text-[0.72rem] tabular-nums rounded-md ${
+                    highPerformerOnly ? "bg-white/20" : "bg-emerald-100 text-emerald-900"
+                  }`}
+                >
+                  {counts.highPerformer}
+                </span>
+              </button>
+              <div ref={hpInfoRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setHpInfoOpen((v) => !v)}
+                  aria-label="What is a High Performer?"
+                  aria-expanded={hpInfoOpen}
+                  className="inline-flex items-center justify-center w-5 h-5 rounded-full text-on-surface-variant/60 hover:text-brand hover:bg-brand/5 transition-colors"
+                >
+                  <Info className="w-3.5 h-3.5" strokeWidth={2} />
+                </button>
+                {hpInfoOpen && (
+                  <div
+                    role="tooltip"
+                    className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 w-64 p-3 rounded-md bg-on-surface text-white text-[0.72rem] leading-snug shadow-[0_8px_24px_-8px_rgba(25,28,29,0.3)]"
+                  >
+                    A <span className="font-semibold">High Performer</span> is a dispatcher whose
+                    monthly orders crossed their bonus tier threshold. Parcels past that threshold
+                    earn the higher bonus-tier rate instead of the default rate.
+                  </div>
+                )}
+              </div>
+            </>
           )}
         </div>
         {!editMode && (
@@ -652,24 +574,28 @@ export function SalaryTable({
           <table className="w-full text-[0.82rem]">
             <thead>
               <tr className="text-left text-[0.72rem] uppercase tracking-wider text-on-surface-variant bg-surface-low">
-                {!editMode && <th className="py-3 px-3 font-medium w-10" />}
-                <th className="py-3 px-4 font-medium">Dispatcher</th>
-                <th className="py-3 px-3 font-medium">Status</th>
-                <th className="py-3 px-3 font-medium text-right">Orders</th>
-                <th className="py-3 px-3 font-medium text-right">Base Salary</th>
-                <th className="py-3 px-3 font-medium text-right" style={{ color: "#12B981" }}>Incentive</th>
-                <th className="py-3 px-3 font-medium text-right" style={{ color: "#B27F08" }}>Petrol</th>
-                <th className="py-3 px-3 font-medium text-right" style={{ color: "#B27F08" }}>Days</th>
-                <th className="py-3 px-3 font-medium text-right text-critical">Penalty</th>
-                <th className="py-3 px-3 font-medium text-right text-critical">Advance</th>
-                <th className="py-3 px-4 font-medium text-right text-brand">Net Salary</th>
-                <th className="py-3 px-3 font-medium text-center w-12">Tiers</th>
+                {!editMode && <th rowSpan={2} className="py-2 px-3 font-medium w-10 align-bottom" />}
+                <th rowSpan={2} className="py-2 px-4 font-medium align-bottom">Dispatcher</th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom">Orders</th>
+                <th
+                  colSpan={2}
+                  className="pt-2 pb-0.5 px-3 font-semibold text-center border-b border-outline-variant/15"
+                >
+                  Base Salary
+                </th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#B27F08" }}>Petrol</th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">Penalty</th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">Advance</th>
+                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#12B981" }}>Commission</th>
+                <th rowSpan={2} className="py-2 px-4 font-medium text-right align-bottom text-brand">Net Salary</th>
+              </tr>
+              <tr className="text-left text-[0.68rem] uppercase tracking-wider text-on-surface-variant/70 bg-surface-low">
+                <th className="pt-0.5 pb-2 px-3 font-medium text-right">Default Tier</th>
+                <th className="pt-0.5 pb-2 px-3 font-medium text-right" style={{ color: "#12B981" }}>Bonus Tier</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r) => {
-                const edited = editedRecords.has(r.dispatcherId);
-                const status = rowStatus(r, edited);
                 return (
                   <tr
                     key={r.dispatcherId}
@@ -686,11 +612,19 @@ export function SalaryTable({
                       </td>
                     )}
                     <td className="py-2.5 px-4">
-                      <p className="font-medium text-on-surface leading-tight">{r.name}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-on-surface leading-tight">{r.name}</p>
+                        {isHighPerformer(r) && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md"
+                            title={`Dispatched over ${(getOrderThreshold(r.bonusTierSnapshot) ?? 0).toLocaleString()} orders`}
+                          >
+                            <TrendingUp className="w-3 h-3" />
+                            High Performer
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[0.72rem] text-on-surface-variant/60">{r.extId}</p>
-                    </td>
-                    <td className="py-2.5 px-3">
-                      <StatusPill status={status} />
                     </td>
                     {editMode ? (
                       <>
@@ -702,9 +636,9 @@ export function SalaryTable({
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <EditableCell
-                            value={r.incentive}
+                            value={r.bonusTierEarnings}
                             isAmount
-                            onChange={(v) => updateField(r.dispatcherId, "incentive", v)}
+                            onChange={(v) => updateField(r.dispatcherId, "bonusTierEarnings", v)}
                           />
                         </td>
                         <td className="py-2.5 px-3 text-right">
@@ -713,9 +647,6 @@ export function SalaryTable({
                             isAmount
                             onChange={(v) => updateField(r.dispatcherId, "petrolSubsidy", v)}
                           />
-                        </td>
-                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                          {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
                         </td>
                         <td className="py-2.5 px-3 text-right">
                           <EditableCell
@@ -731,6 +662,13 @@ export function SalaryTable({
                             onChange={(v) => updateField(r.dispatcherId, "advance", v)}
                           />
                         </td>
+                        <td className="py-2.5 px-3 text-right">
+                          <EditableCell
+                            value={r.commission}
+                            isAmount
+                            onChange={(v) => updateField(r.dispatcherId, "commission", v)}
+                          />
+                        </td>
                       </>
                     ) : (
                       <>
@@ -743,11 +681,11 @@ export function SalaryTable({
                         <td
                           className="py-2.5 px-3 text-right tabular-nums"
                           style={{
-                            color: r.incentive > 0 ? "#12B981" : "var(--color-on-surface-variant)",
-                            opacity: r.incentive > 0 ? 1 : 0.4,
+                            color: r.bonusTierEarnings > 0 ? "#12B981" : "var(--color-on-surface-variant)",
+                            opacity: r.bonusTierEarnings > 0 ? 1 : 0.4,
                           }}
                         >
-                          {r.incentive > 0 ? formatRM(r.incentive) : "—"}
+                          {r.bonusTierEarnings > 0 ? formatRM(r.bonusTierEarnings) : "—"}
                         </td>
                         <td
                           className="py-2.5 px-3 text-right tabular-nums"
@@ -758,42 +696,32 @@ export function SalaryTable({
                         >
                           {r.petrolSubsidy > 0 ? formatRM(r.petrolSubsidy) : "—"}
                         </td>
-                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.petrolQualifyingDays > 0 ? "text-on-surface" : "text-on-surface-variant/40"}`}>
-                          {r.petrolQualifyingDays > 0 ? r.petrolQualifyingDays : "—"}
-                        </td>
                         <td className={`py-2.5 px-3 text-right tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                           {r.penalty > 0 ? formatRM(r.penalty) : "—"}
                         </td>
                         <td className={`py-2.5 px-3 text-right tabular-nums ${r.advance > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                           {r.advance > 0 ? formatRM(r.advance) : "—"}
                         </td>
+                        <td
+                          className="py-2.5 px-3 text-right tabular-nums"
+                          style={{
+                            color: r.commission > 0 ? "#12B981" : "var(--color-on-surface-variant)",
+                            opacity: r.commission > 0 ? 1 : 0.4,
+                          }}
+                        >
+                          {r.commission > 0 ? formatRM(r.commission) : "—"}
+                        </td>
                       </>
                     )}
                     <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
                       {formatRM(r.netSalary)}
-                    </td>
-                    <td className="py-2.5 px-3 text-center relative">
-                      <button
-                        onClick={() => setTierPopover(tierPopover === r.dispatcherId ? null : r.dispatcherId)}
-                        className="p-1.5 text-on-surface-variant/50 hover:text-brand hover:bg-brand/5 rounded-md transition-colors"
-                        title="View weight tiers"
-                      >
-                        <Settings className="w-3.5 h-3.5" />
-                      </button>
-                      {tierPopover === r.dispatcherId ? (
-                        <ViewTierPopover
-                          dispatcherName={r.name}
-                          tiers={(r.weightTiersSnapshot ?? []) as Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>}
-                          onClose={() => setTierPopover(null)}
-                        />
-                      ) : null}
                     </td>
                   </tr>
                 );
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={editMode ? 11 : 12} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
+                  <td colSpan={editMode ? 9 : 10} className="py-12 text-center text-[0.85rem] text-on-surface-variant/60">
                     {records.length === 0
                       ? "No dispatchers in this payroll."
                       : "No dispatchers match your filters."}

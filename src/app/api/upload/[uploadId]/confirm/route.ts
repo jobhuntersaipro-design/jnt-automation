@@ -4,8 +4,12 @@ import { auth } from "@/auth";
 import { verifyUploadOwnership, updateUploadStatus } from "@/lib/db/upload";
 import { getPreviewData, deletePreviewData } from "@/lib/upload/pipeline";
 import { parseExcelFromR2 } from "@/lib/upload/parser";
-import { getCommission } from "@/lib/upload/calculator";
-import type { WeightTierInput } from "@/lib/upload/calculator";
+import { priceLineItems } from "@/lib/upload/calculator";
+import type {
+  BonusTierSnapshot,
+  BonusTierInput,
+  WeightTierInput,
+} from "@/lib/upload/calculator";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
 import {
@@ -115,29 +119,32 @@ export async function POST(
       year: fullUpload.year,
       totalOrders: result.totalOrders,
       baseSalary: result.baseSalary,
-      incentive: result.incentive,
+      bonusTierEarnings: result.bonusTierEarnings,
       petrolSubsidy: result.petrolSubsidy,
       petrolQualifyingDays: result.petrolQualifyingDays ?? 0,
       penalty: result.penalty,
       advance: result.advance,
       netSalary: result.netSalary,
       weightTiersSnapshot: JSON.parse(JSON.stringify(result.weightTiersSnapshot)),
-      incentiveSnapshot: JSON.parse(JSON.stringify(result.incentiveSnapshot)),
+      bonusTierSnapshot: JSON.parse(JSON.stringify(result.bonusTierSnapshot)),
       petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
     }));
 
-    // 4. Build all line items upfront so we know total count
-    const lineItemsByDispatcher = new Map<string, { waybillNumber: string; weight: number; commission: number; deliveryDate: Date | null }[]>();
+    // 4. Build all line items upfront so we know total count. Pricing mirrors
+    //    the calculator's stable-sort + threshold-split rules so `isBonusTier`
+    //    agrees with the preview's baseSalary/bonusTierEarnings totals.
+    const lineItemsByDispatcher = new Map<string, { waybillNumber: string; weight: number; commission: number; deliveryDate: Date | null; isBonusTier: boolean }[]>();
     let totalLineItems = 0;
     for (const result of preview.results) {
       const dispatcherRows = rowsByExtId.get(result.extId) ?? [];
-      const tiers = result.weightTiersSnapshot as WeightTierInput[];
-      const items = dispatcherRows.map((row) => ({
-        waybillNumber: row.waybillNumber,
-        weight: row.billingWeight,
-        commission: getCommission(row.billingWeight, tiers),
-        deliveryDate: row.deliveryDate,
-      }));
+      const weightTiers = result.weightTiersSnapshot as WeightTierInput[];
+      const bonusTierSnapshot = result.bonusTierSnapshot as BonusTierSnapshot;
+      const items = priceLineItems(
+        dispatcherRows,
+        weightTiers,
+        bonusTierSnapshot.tiers as BonusTierInput[],
+        bonusTierSnapshot.orderThreshold,
+      );
       lineItemsByDispatcher.set(result.dispatcherId, items);
       totalLineItems += items.length;
     }
@@ -172,6 +179,7 @@ export async function POST(
       weight: number;
       commission: number;
       deliveryDate: Date | null;
+      isBonusTier: boolean;
     }[] = [];
     for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
       const items = lineItemsByDispatcher.get(dispatcherId);

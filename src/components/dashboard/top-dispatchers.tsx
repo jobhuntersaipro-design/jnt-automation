@@ -6,7 +6,7 @@ import { Search, ChevronUp, ChevronDown as ChevronDownIcon, ChevronLeft, Chevron
 import type { DispatcherRow } from "@/lib/db/overview";
 import { BranchChip } from "@/components/ui/branch-chip";
 
-type SortKey = "name" | "branch" | "totalOrders" | "netSalary" | "baseSalary" | "incentive" | "petrolSubsidy" | "deductions";
+type SortKey = "name" | "branch" | "totalOrders" | "netSalary" | "baseSalary" | "bonusTierEarnings" | "petrolSubsidy" | "deductions";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 10;
@@ -46,7 +46,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: "totalOrders", label: "ORDERS" },
   { key: "netSalary", label: "NET SALARY" },
   { key: "baseSalary", label: "BASE SALARY" },
-  { key: "incentive", label: "INCENTIVE" },
+  { key: "bonusTierEarnings", label: "BONUS TIER" },
   { key: "petrolSubsidy", label: "PETROL" },
   { key: "deductions", label: "DEDUCTIONS" },
 ];
@@ -188,8 +188,8 @@ function DispatcherTable({
                 </div>
               </div>
 
-              {/* Branch chip */}
-              <BranchChip code={d.branch} size="md" className="w-fit" />
+              {/* Branch chip — disable link wrapper to avoid nested anchors */}
+              <BranchChip code={d.branch} size="md" className="w-fit" asLink={false} />
 
               {/* Total Orders */}
               <span className="tabular-nums text-[0.875rem] text-on-surface">
@@ -206,9 +206,9 @@ function DispatcherTable({
                 RM {fmt(d.baseSalary)}
               </span>
 
-              {/* Incentive */}
+              {/* Bonus Tier */}
               <span className="tabular-nums text-[0.875rem] text-on-surface-variant">
-                RM {fmt(d.incentive)}
+                RM {fmt(d.bonusTierEarnings)}
               </span>
 
               {/* Petrol Subsidy */}

@@ -5,12 +5,14 @@ import { getMonthDetailsBatch, type MonthDetail } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
 import {
   buildTierBreakdown,
+  type BonusTierSnapshotRow,
   type WeightTierSnapshot,
 } from "./month-detail";
 import { generateMonthDetailCsv } from "./month-detail-csv";
 import { generateMonthDetailPdf } from "./month-detail-pdf";
 import { monthDetailFilename } from "./month-detail-filename";
 import { getJob, updateJob } from "./bulk-job";
+import { readBonusTierSnapshot } from "./bonus-tier-snapshot";
 
 /**
  * Bounded concurrent pool runner (kept local — small and self-contained).
@@ -82,8 +84,10 @@ export async function runBulkExport(jobId: string): Promise<void> {
       concurrency,
       async (detail) => {
         try {
-          const tiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
-          const tierBreakdown = buildTierBreakdown(detail.lineItems, tiers);
+          const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
+          const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
+          const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
+          const tierBreakdown = buildTierBreakdown(detail.lineItems, weightTiers, bonusTiers);
           const fileName = monthDetailFilename(
             detail.year,
             detail.month,
@@ -104,11 +108,13 @@ export async function runBulkExport(jobId: string): Promise<void> {
               month: detail.month,
               year: detail.year,
               totals: detail.totals,
+              orderThreshold: bonusTierSnapshot?.orderThreshold ?? 2000,
               tierBreakdown,
               lineItems: detail.lineItems.map((li) => ({
                 deliveryDate: li.deliveryDate,
                 waybillNumber: li.waybillNumber,
                 weight: li.weight,
+                isBonusTier: li.isBonusTier,
               })),
             });
             data = new Uint8Array(pdf);

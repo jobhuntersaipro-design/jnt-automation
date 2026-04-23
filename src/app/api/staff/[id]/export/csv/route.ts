@@ -39,7 +39,7 @@ export async function GET(
       year: true,
       totalOrders: true,
       baseSalary: true,
-      incentive: true,
+      bonusTierEarnings: true,
       petrolSubsidy: true,
       petrolQualifyingDays: true,
       penalty: true,
@@ -58,7 +58,7 @@ export async function GET(
   lines.push("");
   lines.push([
     "Month", "Year", "Total Orders",
-    "Base Salary (RM)", "Incentive (RM)",
+    "Base Salary (RM)", "Bonus Tier (RM)",
     "Petrol Subsidy (RM)", "Qualifying Days",
     "Penalty (RM)", "Advance (RM)",
     "Net Salary (RM)", "Status",
@@ -76,7 +76,7 @@ export async function GET(
       r.year,
       r.totalOrders,
       r.baseSalary.toFixed(2),
-      r.incentive.toFixed(2),
+      r.bonusTierEarnings.toFixed(2),
       r.petrolSubsidy.toFixed(2),
       r.petrolQualifyingDays,
       r.penalty.toFixed(2),
@@ -90,21 +90,21 @@ export async function GET(
     (acc, r) => ({
       totalOrders: acc.totalOrders + r.totalOrders,
       baseSalary: acc.baseSalary + r.baseSalary,
-      incentive: acc.incentive + r.incentive,
+      bonusTierEarnings: acc.bonusTierEarnings + r.bonusTierEarnings,
       petrolSubsidy: acc.petrolSubsidy + r.petrolSubsidy,
       petrolQualifyingDays: acc.petrolQualifyingDays + r.petrolQualifyingDays,
       penalty: acc.penalty + r.penalty,
       advance: acc.advance + r.advance,
       netSalary: acc.netSalary + r.netSalary,
     }),
-    { totalOrders: 0, baseSalary: 0, incentive: 0, petrolSubsidy: 0, petrolQualifyingDays: 0, penalty: 0, advance: 0, netSalary: 0 },
+    { totalOrders: 0, baseSalary: 0, bonusTierEarnings: 0, petrolSubsidy: 0, petrolQualifyingDays: 0, penalty: 0, advance: 0, netSalary: 0 },
   );
 
   lines.push([
     "TOTAL", "",
     totals.totalOrders,
     totals.baseSalary.toFixed(2),
-    totals.incentive.toFixed(2),
+    totals.bonusTierEarnings.toFixed(2),
     totals.petrolSubsidy.toFixed(2),
     totals.petrolQualifyingDays,
     totals.penalty.toFixed(2),

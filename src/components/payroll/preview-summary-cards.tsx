@@ -2,9 +2,11 @@
 
 interface PreviewSummaryCardsProps {
   totalNetPayout: number;
+  /** Default-tier + bonus-tier commissions combined. */
   totalBaseSalary: number;
-  totalIncentive: number;
   totalPetrolSubsidy: number;
+  /** Manual additive commission entered per dispatcher (rolls into netSalary). */
+  totalCommission: number;
   totalDeductions: number;
   /**
    * - "preview" (default) — uniform critical-red accent on all non-hero cards
@@ -29,7 +31,7 @@ function SummaryCard({
 }: {
   label: string;
   value: string;
-  accent?: "hero" | "neutral" | "incentive" | "petrol" | "critical";
+  accent?: "hero" | "neutral" | "commission" | "petrol" | "critical";
   subtitle?: string;
 }) {
   if (accent === "hero") {
@@ -52,7 +54,7 @@ function SummaryCard({
   }
 
   const borderColor =
-    accent === "incentive"
+    accent === "commission"
       ? "#12B981"
       : accent === "petrol"
       ? "#FBC024"
@@ -80,8 +82,8 @@ function SummaryCard({
 export function PreviewSummaryCards({
   totalNetPayout,
   totalBaseSalary,
-  totalIncentive,
   totalPetrolSubsidy,
+  totalCommission,
   totalDeductions,
   variant = "preview",
   heroSubtitle,
@@ -101,14 +103,14 @@ export function PreviewSummaryCards({
         accent={isSemantic ? "neutral" : undefined}
       />
       <SummaryCard
-        label="Incentive"
-        value={formatRM(totalIncentive)}
-        accent={isSemantic ? "incentive" : undefined}
-      />
-      <SummaryCard
         label="Petrol Subsidy"
         value={formatRM(totalPetrolSubsidy)}
         accent={isSemantic ? "petrol" : undefined}
+      />
+      <SummaryCard
+        label="Commission"
+        value={formatRM(totalCommission)}
+        accent={isSemantic ? "commission" : undefined}
       />
       <SummaryCard
         label="Deductions"

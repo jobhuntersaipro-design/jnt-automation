@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveAgentId } from "@/lib/impersonation";
-import { generateEmployeePayslipPdf, countParcelsPerTier } from "@/lib/staff/payslip-generator";
+import {
+  generateEmployeePayslipPdf,
+  countParcelsPerTier,
+  countBonusParcelsPerTier,
+} from "@/lib/staff/payslip-generator";
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
 import type { EmployeePayslipInput } from "@/lib/staff/payslip-generator";
 
@@ -64,7 +68,7 @@ export async function POST(
     },
     include: {
       dispatcher: { select: { name: true, branchId: true } },
-      lineItems: { select: { weight: true, commission: true } },
+      lineItems: { select: { weight: true, commission: true, isBonusTier: true } },
     },
   });
 
@@ -82,8 +86,9 @@ export async function POST(
 
     let dispatcherData: {
       tierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
-      incentive: number;
+      bonusTierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
       petrolSubsidy: number;
+      commission: number;
       penalty: number;
       advance: number;
     } | null = null;
@@ -97,10 +102,15 @@ export async function POST(
         maxWeight: number | null;
         commission: number;
       }[];
+      const bonusSnap = ds.bonusTierSnapshot as
+        | { orderThreshold: number; tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }> }
+        | null;
+      const bonusSnapshot = bonusSnap?.tiers ?? [];
       dispatcherData = {
         tierBreakdowns: countParcelsPerTier(ds.lineItems, snapshot),
-        incentive: ds.incentive,
+        bonusTierBreakdowns: countBonusParcelsPerTier(ds.lineItems, bonusSnapshot),
         petrolSubsidy: ds.petrolSubsidy,
+        commission: ds.commission,
         penalty: ds.penalty,
         advance: ds.advance,
       };
@@ -129,8 +139,9 @@ export async function POST(
       kpiAllowance: salaryRecord.kpiAllowance,
       otherAllowance: salaryRecord.otherAllowance,
       dispatcherTierBreakdowns: dispatcherData?.tierBreakdowns,
-      dispatcherIncentive: dispatcherData?.incentive,
+      dispatcherBonusTierBreakdowns: dispatcherData?.bonusTierBreakdowns,
       dispatcherPetrolSubsidy: dispatcherData?.petrolSubsidy,
+      dispatcherCommission: dispatcherData?.commission,
       dispatcherPenalty: dispatcherData?.penalty,
       dispatcherAdvance: dispatcherData?.advance,
       epfEmployee: salaryRecord.epfEmployee,

@@ -8,7 +8,7 @@ import {
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
-import { countParcelsPerTier, formatRate } from "./tier-counter";
+import { countBonusParcelsPerTier, countParcelsPerTier, formatRate } from "./tier-counter";
 import type { TierBreakdown } from "./tier-counter";
 
 function formatRM(amount: number): string {
@@ -27,9 +27,15 @@ const s = StyleSheet.create({
   companyName: { fontSize: 12, fontFamily: "Helvetica-Bold" },
   addressLine: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 1 },
 
-  // Employee Particulars
-  partTitle: { textAlign: "center", textDecoration: "underline", fontSize: 9.5, marginBottom: 2 },
-  partBox: { flexDirection: "row" as const, borderTopWidth: 1, borderTopColor: B },
+  // Outer frame — wraps everything from EMPLOYEE'S PARTICULARS down to NET PAY/REMARKS
+  outerBox: { borderWidth: 1, borderColor: B },
+
+  // Title row inside the outer box
+  partTitleRow: { borderBottomWidth: 1, borderBottomColor: B, paddingVertical: 4 },
+  partTitle: { textAlign: "center" as const, fontSize: 9.5 },
+
+  // Employee Particulars (bottom-bordered so addition/deduction sits below)
+  partBox: { flexDirection: "row" as const, borderBottomWidth: 1, borderBottomColor: B },
   partLeft: { flex: 1, paddingVertical: 4, paddingHorizontal: 6 },
   partRight: { flex: 1, paddingVertical: 4, paddingHorizontal: 6, borderLeftWidth: 1, borderLeftColor: B },
   partRow: { flexDirection: "row" as const, marginBottom: 1.5 },
@@ -37,12 +43,9 @@ const s = StyleSheet.create({
   partColon: { width: 10, fontSize: 9 },
   partVal: { flex: 1, fontSize: 9, fontFamily: "Helvetica-Bold" },
 
-  // Main table — outer border wraps everything
+  // Addition/Deduction columns live inside outerBox; no outer border of their own
   tableOuter: {
     flexDirection: "row" as const,
-    borderWidth: 1,
-    borderColor: B,
-    marginTop: 10,
   },
   // Left half (Addition)
   halfLeft: { flex: 1, borderRightWidth: 1, borderRightColor: B },
@@ -102,9 +105,12 @@ export interface PayslipData {
   icNo: string;
   month: number;
   year: number;
+  /** Default-tier parcels grouped by weight tier (pre-threshold). */
   tierBreakdowns: TierBreakdown[];
-  incentive: number;
+  /** Bonus-tier parcels grouped by weight tier (post-threshold). Empty for non-high-performers. */
+  bonusTierBreakdowns: TierBreakdown[];
   petrolSubsidy: number;
+  commission: number;
   penalty: number;
   advance: number;
   netSalary: number;
@@ -115,8 +121,9 @@ const h = React.createElement;
 function PayslipDocument({ data }: { data: PayslipData }) {
   const addTotal =
     data.tierBreakdowns.reduce((sum, t) => sum + t.total, 0) +
-    data.incentive +
-    data.petrolSubsidy;
+    data.bonusTierBreakdowns.reduce((sum, t) => sum + t.total, 0) +
+    data.petrolSubsidy +
+    data.commission;
 
   // Company header: "ST XIANG TRANSPORTATION SDN BHD (202401013061)"
   const companyHeader = data.companyRegistrationNo
@@ -139,16 +146,24 @@ function PayslipDocument({ data }: { data: PayslipData }) {
       ),
     );
   }
-  if (data.incentive > 0) {
-    addRows.push(h(View, { key: "inc", style: s.dataRow },
-      h(Text, { style: s.cellL }, "Incentive"),
-      h(Text, { style: s.cellR }, formatRM(data.incentive)),
-    ));
+  for (const t of data.bonusTierBreakdowns) {
+    addRows.push(
+      h(View, { key: `bt${t.tier}`, style: s.dataRow },
+        h(Text, { style: s.cellL }, `Bonus Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`),
+        h(Text, { style: s.cellR }, formatRM(t.total)),
+      ),
+    );
   }
   if (data.petrolSubsidy > 0) {
     addRows.push(h(View, { key: "pet", style: s.dataRow },
       h(Text, { style: s.cellL }, "Petrol Subsidy"),
       h(Text, { style: s.cellR }, formatRM(data.petrolSubsidy)),
+    ));
+  }
+  if (data.commission > 0) {
+    addRows.push(h(View, { key: "com", style: s.dataRow },
+      h(Text, { style: s.cellL }, "Commission"),
+      h(Text, { style: s.cellR }, formatRM(data.commission)),
     ));
   }
 
@@ -176,47 +191,54 @@ function PayslipDocument({ data }: { data: PayslipData }) {
         ...addressLines.map((line, i) => h(Text, { key: i, style: s.addressLine }, line)),
       ),
 
-      // ── Employee Particulars ──
-      h(Text, { style: s.partTitle }, "EMPLOYEE'S PARTICULARS"),
-      h(View, { style: s.partBox },
-        h(View, { style: s.partLeft },
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "NAME"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, data.dispatcherName),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "I/C NO"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, data.icNo),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "POSITION"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, "DESPATCH"),
-          ),
-        ),
-        h(View, { style: s.partRight },
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "DATE"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, dateStr),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "SOCSO NO"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, ""),
-          ),
-          h(View, { style: s.partRow },
-            h(Text, { style: s.partLabel }, "INCOME TAX NO"),
-            h(Text, { style: s.partColon }, ":"),
-            h(Text, { style: s.partVal }, ""),
-          ),
-        ),
-      ),
+      // ── Outer bordered frame: particulars + table ──
+      h(View, { style: s.outerBox },
 
-      // ── Addition / Deduction Table ──
-      h(View, { style: s.tableOuter },
+        // Title bar inside the frame
+        h(View, { style: s.partTitleRow },
+          h(Text, { style: s.partTitle }, "EMPLOYEE'S PARTICULARS"),
+        ),
+
+        // Employee Particulars grid
+        h(View, { style: s.partBox },
+          h(View, { style: s.partLeft },
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "NAME"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, data.dispatcherName),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "I/C NO"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, data.icNo),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "POSITION"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, "DESPATCH"),
+            ),
+          ),
+          h(View, { style: s.partRight },
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "DATE"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, dateStr),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "SOCSO NO"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, ""),
+            ),
+            h(View, { style: s.partRow },
+              h(Text, { style: s.partLabel }, "INCOME TAX NO"),
+              h(Text, { style: s.partColon }, ":"),
+              h(Text, { style: s.partVal }, ""),
+            ),
+          ),
+        ),
+
+        // Addition / Deduction columns
+        h(View, { style: s.tableOuter },
 
         // LEFT HALF — Addition
         h(View, { style: s.halfLeft },
@@ -259,6 +281,7 @@ function PayslipDocument({ data }: { data: PayslipData }) {
           // Empty space below remarks
           h(View, { style: { minHeight: 16 } }),
         ),
+        ),
       ),
 
       // ── Stamp + Signatures ──
@@ -282,9 +305,10 @@ function PayslipDocument({ data }: { data: PayslipData }) {
 interface LineItemRow {
   weight: number;
   commission: number;
+  isBonusTier?: boolean;
 }
 
-interface WeightTierSnapshotRow {
+interface TierSnapshotRow {
   tier: number;
   minWeight: number;
   maxWeight: number | null;
@@ -300,17 +324,23 @@ export interface GeneratePayslipInput {
   icNo: string;
   month: number;
   year: number;
-  incentive: number;
   petrolSubsidy: number;
+  commission: number;
   penalty: number;
   advance: number;
   netSalary: number;
   lineItems: LineItemRow[];
-  weightTiersSnapshot: WeightTierSnapshotRow[];
+  weightTiersSnapshot: TierSnapshotRow[];
+  /** Tier snapshot used to price post-threshold parcels. Empty for legacy records. */
+  bonusTierSnapshot: TierSnapshotRow[];
 }
 
 export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<Buffer> {
   const tierBreakdowns = countParcelsPerTier(input.lineItems, input.weightTiersSnapshot);
+  const bonusTierBreakdowns = countBonusParcelsPerTier(
+    input.lineItems,
+    input.bonusTierSnapshot,
+  );
 
   const data: PayslipData = {
     companyName: input.companyName,
@@ -322,8 +352,9 @@ export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<B
     month: input.month,
     year: input.year,
     tierBreakdowns,
-    incentive: input.incentive,
+    bonusTierBreakdowns,
     petrolSubsidy: input.petrolSubsidy,
+    commission: input.commission,
     penalty: input.penalty,
     advance: input.advance,
     netSalary: input.netSalary,

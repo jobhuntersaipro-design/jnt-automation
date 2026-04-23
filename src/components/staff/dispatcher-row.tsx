@@ -22,6 +22,12 @@ const TIER_DEFAULTS = [
   { tier: 3, minWeight: 10.01, maxWeight: null as number | null, commission: 2.2 },
 ];
 
+const BONUS_TIER_DEFAULTS = [
+  { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.5 },
+  { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 2.1 },
+  { tier: 3, minWeight: 10.01, maxWeight: null as number | null, commission: 3.3 },
+];
+
 function validateIc(ic: string): string | null {
   if (!ic) return null; // IC is optional
   if (!/^\d*$/.test(ic)) return "Digits only";
@@ -99,7 +105,7 @@ function DecimalInput({ value, onChange, className, onClick, cents }: {
   );
 }
 
-/** Grid: check | name | branch | IC | tiers | sep | incentive(3) | sep | petrol(3) | status | actions */
+/** Grid: check | name | branch | IC | tiers | sep | bonusTierEarnings(3) | sep | petrol(3) | status | actions */
 export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.5fr] items-center gap-x-1.5";
 
 interface DispatcherRowProps {
@@ -175,8 +181,10 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
   const [icError, setIcError] = useState<string | null>(null);
   const [branchCode, setBranchCode] = useState(dispatcher.branchCode);
   const [orderThreshold, setOrderThreshold] = useState(dispatcher.incentiveRule?.orderThreshold ?? 2000);
-  const [incentiveAmount, setIncentiveAmount] = useState(dispatcher.incentiveRule?.incentiveAmount ?? 0);
-  const [incentiveEnabled, setIncentiveEnabled] = useState((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
+  const [bonusTiers, setBonusTiers] = useState(
+    dispatcher.bonusTiers.length === 3 ? dispatcher.bonusTiers : BONUS_TIER_DEFAULTS,
+  );
+  const [incentiveEnabled, setBonusTierEnabled] = useState((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
   const [isEligible, setIsEligible] = useState(dispatcher.petrolRule?.isEligible ?? false);
   const [dailyThreshold, setDailyThreshold] = useState(dispatcher.petrolRule?.dailyThreshold ?? 70);
   const [subsidyAmount, setSubsidyAmount] = useState(dispatcher.petrolRule?.subsidyAmount ?? 15);
@@ -190,8 +198,10 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     setAvatarUrl(dispatcher.avatarUrl);
     setBranchCode(dispatcher.branchCode);
     setOrderThreshold(dispatcher.incentiveRule?.orderThreshold ?? 2000);
-    setIncentiveAmount(dispatcher.incentiveRule?.incentiveAmount ?? 0);
-    setIncentiveEnabled((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
+    setBonusTiers(
+      dispatcher.bonusTiers.length === 3 ? dispatcher.bonusTiers : BONUS_TIER_DEFAULTS,
+    );
+    setBonusTierEnabled((dispatcher.incentiveRule?.orderThreshold ?? 0) > 0);
     setIsEligible(dispatcher.petrolRule?.isEligible ?? false);
     setDailyThreshold(dispatcher.petrolRule?.dailyThreshold ?? 70);
     setSubsidyAmount(dispatcher.petrolRule?.subsidyAmount ?? 15);
@@ -204,7 +214,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       branchCode: dispatcher.branchCode,
       incentiveEnabled: (dispatcher.incentiveRule?.orderThreshold ?? 0) > 0,
       orderThreshold: dispatcher.incentiveRule?.orderThreshold ?? 2000,
-      incentiveAmount: dispatcher.incentiveRule?.incentiveAmount ?? 0,
+      bonusTiers: dispatcher.bonusTiers.length === 3 ? dispatcher.bonusTiers : BONUS_TIER_DEFAULTS,
       isEligible: dispatcher.petrolRule?.isEligible ?? false,
       dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
       subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
@@ -223,7 +233,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     branchCode: dispatcher.branchCode,
     incentiveEnabled: (dispatcher.incentiveRule?.orderThreshold ?? 0) > 0,
     orderThreshold: dispatcher.incentiveRule?.orderThreshold ?? 2000,
-    incentiveAmount: dispatcher.incentiveRule?.incentiveAmount ?? 0,
+    bonusTiers: dispatcher.bonusTiers.length === 3 ? dispatcher.bonusTiers : BONUS_TIER_DEFAULTS,
     isEligible: dispatcher.petrolRule?.isEligible ?? false,
     dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
     subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
@@ -236,7 +246,12 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     if (icNo !== b.icNo) return true;
     if (branchCode !== b.branchCode) return true;
     if (incentiveEnabled !== b.incentiveEnabled) return true;
-    if (incentiveEnabled && (orderThreshold !== b.orderThreshold || incentiveAmount !== b.incentiveAmount)) return true;
+    if (incentiveEnabled && orderThreshold !== b.orderThreshold) return true;
+    if (incentiveEnabled) {
+      for (let i = 0; i < 3; i++) {
+        if (b.bonusTiers[i].commission !== bonusTiers[i].commission) return true;
+      }
+    }
     if (isEligible !== b.isEligible) return true;
     if (dailyThreshold !== b.dailyThreshold) return true;
     if (subsidyAmount !== b.subsidyAmount) return true;
@@ -247,7 +262,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     }
     return false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [icNo, branchCode, orderThreshold, incentiveAmount, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, baselineVersion]);
+  }, [icNo, branchCode, orderThreshold, bonusTiers, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, baselineVersion]);
 
   // Report dirty state to parent
   useEffect(() => {
@@ -284,8 +299,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       payload.weightTiers = weightTiers;
       payload.incentiveRule = {
         orderThreshold: incentiveEnabled ? orderThreshold : 0,
-        incentiveAmount,
       };
+      payload.bonusTiers = bonusTiers;
       payload.petrolRule = { isEligible, dailyThreshold, subsidyAmount };
 
       const res = await fetch(`/api/staff/${dispatcher.id}/settings`, {
@@ -301,7 +316,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         branchCode,
         incentiveEnabled,
         orderThreshold: incentiveEnabled ? orderThreshold : 0,
-        incentiveAmount,
+        bonusTiers,
         isEligible,
         dailyThreshold,
         subsidyAmount,
@@ -314,7 +329,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     } finally {
       setSaving(false);
     }
-  }, [dispatcher.id, dispatcher.rawIcNo, dispatcher.branchCode, icNo, branchCode, weightTiers, incentiveEnabled, orderThreshold, incentiveAmount, isEligible, dailyThreshold, subsidyAmount, onFieldSaved]);
+  }, [dispatcher.id, dispatcher.rawIcNo, dispatcher.branchCode, icNo, branchCode, weightTiers, incentiveEnabled, orderThreshold, bonusTiers, isEligible, dailyThreshold, subsidyAmount, onFieldSaved]);
 
   // Save on trigger (when parent Save button is clicked)
   const prevTrigger = useRef(0);
@@ -342,6 +357,28 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       return { ...t, [field]: isNaN(num) ? 0 : num };
     }));
   }
+
+  function handleBonusTierRateChange(tierIndex: number, value: string) {
+    const cleaned = value.replace(",", ".");
+    setBonusTiers((prev) => prev.map((t, i) => {
+      if (i !== tierIndex) return t;
+      const num = parseFloat(cleaned);
+      return { ...t, commission: isNaN(num) ? 0 : num };
+    }));
+  }
+
+  const [editingBonusTier, setEditingBonusTier] = useState(false);
+  const incentivePopoverRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!editingBonusTier) return;
+    function onClick(e: MouseEvent) {
+      if (incentivePopoverRef.current && !incentivePopoverRef.current.contains(e.target as Node)) {
+        setEditingBonusTier(false);
+      }
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [editingBonusTier]);
 
   const liveGender = deriveGenderClient(icNo);
   const ringColor =
@@ -603,17 +640,18 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       {/* ── Separator ── */}
       <div className="h-6 rounded-full" style={{ backgroundColor: "rgba(18, 185, 129, 0.15)" }} />
 
-      {/* ── Incentive: Eligible, Min Orders, Amount ── */}
+      {/* ── Bonus Tier: Eligible, Min Orders, Tier Rates ── */}
       <Toggle color="#12B981" checked={incentiveEnabled} onChange={() => {
         const next = !incentiveEnabled;
-        setIncentiveEnabled(next);
+        setBonusTierEnabled(next);
         if (!next) {
           setOrderThreshold(0);
         } else {
           const dt = defaults.incentiveRule;
           setOrderThreshold(dt.orderThreshold);
-          const amt = incentiveAmount || dt.incentiveAmount;
-          setIncentiveAmount(amt);
+          if (bonusTiers.every((t) => t.commission === 0) && defaults.bonusTiers.length === 3) {
+            setBonusTiers(defaults.bonusTiers);
+          }
         }
       }} />
 
@@ -633,14 +671,61 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
       )}
 
+      {/* Bonus Tier Chips — mirrors the Weight Tier popover pattern. */}
       {incentiveEnabled ? (
-        <DecimalInput
-          value={incentiveAmount}
-          onChange={setIncentiveAmount}
-          onClick={(e) => e.stopPropagation()}
-          className={INPUT_CLASS}
-          cents
-        />
+        <div className="relative group/itiers">
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditingBonusTier((v) => !v); }}
+            className="flex items-center gap-1 w-full justify-center cursor-pointer"
+            title="Edit bonusTierEarnings tier rates"
+          >
+            {bonusTiers.map((tier) => (
+              <span
+                key={tier.tier}
+                className="px-1.5 py-0.5 text-[0.7rem] tabular-nums font-medium bg-emerald-50 text-emerald-900/80 rounded-lg group-hover/itiers:bg-emerald-100 transition-colors"
+              >
+                RM{tier.commission.toFixed(2)}
+              </span>
+            ))}
+            <Pencil size={11} className="text-on-surface-variant/0 group-hover/itiers:text-on-surface-variant/50 transition-colors ml-0.5 shrink-0" />
+          </button>
+
+          {editingBonusTier && (
+            <div
+              ref={incentivePopoverRef}
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-3.5 w-64"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-[0.68rem] font-semibold text-emerald-700 uppercase tracking-[0.05em] mb-2.5">
+                Bonus Tiers (post-threshold)
+              </p>
+              <p className="text-[0.64rem] text-on-surface-variant/70 mb-2">
+                Applied to parcels after #{orderThreshold.toLocaleString()}. Weight ranges mirror the base tiers.
+              </p>
+              <div className="grid grid-cols-[2rem_1fr] gap-x-2 items-center mb-1">
+                <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Tier</span>
+                <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
+              </div>
+              <div className="space-y-1.5">
+                {bonusTiers.map((tier, i) => (
+                  <div key={tier.tier} className="grid grid-cols-[2rem_1fr] gap-x-2 items-center">
+                    <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={tier.commission}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(",", ".");
+                        if (v === "" || /^\d*\.?\d*$/.test(v)) handleBonusTierRateChange(i, v);
+                      }}
+                      className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-emerald-50 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/40"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
       )}

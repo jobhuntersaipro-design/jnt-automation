@@ -46,6 +46,7 @@ export async function GET(
     include: {
       weightTiers: { orderBy: { tier: "asc" } },
       incentiveRule: true,
+      bonusTiers: { orderBy: { tier: "asc" } },
       petrolRule: true,
     },
   });
@@ -73,17 +74,17 @@ export async function GET(
     select: {
       dispatcherId: true,
       weightTiersSnapshot: true,
-      incentiveSnapshot: true,
+      bonusTierSnapshot: true,
       petrolSnapshot: true,
     },
   });
 
   const previousSnapshots = new Map<string, PreviousSnapshot>();
   for (const rec of prevRecords) {
-    if (rec.weightTiersSnapshot && rec.incentiveSnapshot && rec.petrolSnapshot) {
+    if (rec.weightTiersSnapshot && rec.bonusTierSnapshot && rec.petrolSnapshot) {
       previousSnapshots.set(rec.dispatcherId, {
         weightTiersSnapshot: rec.weightTiersSnapshot as unknown as PreviousSnapshot["weightTiersSnapshot"],
-        incentiveSnapshot: rec.incentiveSnapshot as unknown as PreviousSnapshot["incentiveSnapshot"],
+        bonusTierSnapshot: rec.bonusTierSnapshot as unknown as PreviousSnapshot["bonusTierSnapshot"],
         petrolSnapshot: rec.petrolSnapshot as unknown as PreviousSnapshot["petrolSnapshot"],
       });
     }
@@ -104,8 +105,13 @@ export async function GET(
       })),
       incentiveRule: {
         orderThreshold: d.incentiveRule!.orderThreshold,
-        incentiveAmount: d.incentiveRule!.incentiveAmount,
       },
+      bonusTiers: d.bonusTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
       petrolRule: {
         isEligible: d.petrolRule!.isEligible,
         dailyThreshold: d.petrolRule!.dailyThreshold,

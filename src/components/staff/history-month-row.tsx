@@ -3,10 +3,7 @@
 import { useState, useMemo } from "react";
 import {
   ChevronDown,
-  RefreshCw,
   Download,
-  CheckCircle2,
-  AlertTriangle,
   FileText,
 } from "lucide-react";
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
@@ -24,9 +21,20 @@ interface WeightTierSnapshot {
   commission: number;
 }
 
-interface IncentiveSnapshot {
+interface BonusTierSnapshotRow {
+  tier: number;
+  minWeight: number;
+  maxWeight: number | null;
+  commission: number;
+}
+
+interface BonusTierSnapshot {
   orderThreshold: number;
-  incentiveAmount: number;
+  // Legacy snapshots pre-dating the bonus-tier feature carry this field
+  // instead of `tiers`. Kept optional so we can read both shapes; new writes
+  // always emit `tiers`.
+  incentiveAmount?: number;
+  tiers?: BonusTierSnapshotRow[];
 }
 
 interface PetrolSnapshot {
@@ -44,7 +52,7 @@ export interface HistoryRecord {
   branchCode: string;
   netSalary: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   petrolQualifyingDays: number;
   penalty: number;
@@ -52,7 +60,7 @@ export interface HistoryRecord {
   totalOrders: number;
   wasRecalculated: boolean;
   weightTiersSnapshot: WeightTierSnapshot[] | null;
-  incentiveSnapshot: IncentiveSnapshot | null;
+  bonusTierSnapshot: BonusTierSnapshot | null;
   petrolSnapshot: PetrolSnapshot | null;
 }
 
@@ -70,48 +78,16 @@ const DEFAULT_WEIGHT_TIERS: WeightTierSnapshot[] = [
   { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 1.4 },
   { tier: 3, minWeight: 10.01, maxWeight: null, commission: 2.2 },
 ];
-const DEFAULT_INCENTIVE: IncentiveSnapshot = { orderThreshold: 2000, incentiveAmount: 0 };
+const DEFAULT_BONUS_TIERS: BonusTierSnapshotRow[] = [
+  { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.5 },
+  { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 2.1 },
+  { tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
+];
+const DEFAULT_BONUS_TIER: BonusTierSnapshot = { orderThreshold: 2000, tiers: DEFAULT_BONUS_TIERS };
 const DEFAULT_PETROL: PetrolSnapshot = { isEligible: false, dailyThreshold: 70, subsidyAmount: 15 };
 
 function formatRM(value: number): string {
   return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-type RowStatus = "confirmed" | "recalculated" | "review";
-
-function rowStatus(r: HistoryRecord): RowStatus {
-  if (r.totalOrders === 0 || r.netSalary <= 0) return "review";
-  if (r.wasRecalculated) return "recalculated";
-  return "confirmed";
-}
-
-function StatusPill({ status }: { status: RowStatus }) {
-  const config = {
-    confirmed: {
-      label: "Confirmed",
-      icon: CheckCircle2,
-      className: "text-emerald-700 bg-emerald-50 border-emerald-200",
-    },
-    recalculated: {
-      label: "Recalculated",
-      icon: RefreshCw,
-      className: "text-amber-700 bg-amber-50 border-amber-200",
-    },
-    review: {
-      label: "Review",
-      icon: AlertTriangle,
-      className: "text-critical bg-red-50 border-red-200",
-    },
-  }[status];
-  const Icon = config.icon;
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 text-[0.68rem] font-medium rounded-full border ${config.className}`}
-    >
-      <Icon className="w-3 h-3" strokeWidth={2.5} />
-      {config.label}
-    </span>
-  );
 }
 
 function StatChip({
@@ -220,14 +196,13 @@ export function HistoryMonthRow({
   onRecalculated,
 }: HistoryMonthRowProps) {
   const monthLabel = `${MONTHS[record.month]} ${record.year}`;
-  const status = rowStatus(record);
 
   const originalTiers = record.weightTiersSnapshot ?? DEFAULT_WEIGHT_TIERS;
-  const originalIncentive = record.incentiveSnapshot ?? DEFAULT_INCENTIVE;
+  const originalBonusTier = record.bonusTierSnapshot ?? DEFAULT_BONUS_TIER;
   const originalPetrol = record.petrolSnapshot ?? DEFAULT_PETROL;
 
   const [tiers, setTiers] = useState<WeightTierSnapshot[]>(originalTiers);
-  const [incentive, setIncentive] = useState<IncentiveSnapshot>(originalIncentive);
+  const [bonusTierEarnings, setBonusTier] = useState<BonusTierSnapshot>(originalBonusTier);
   const [petrol, setPetrol] = useState<PetrolSnapshot>(originalPetrol);
   const [showConfirm, setShowConfirm] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -252,11 +227,32 @@ export function HistoryMonthRow({
         }
       }
     }
-    if (originalIncentive.orderThreshold !== incentive.orderThreshold) {
-      diffs.push({ field: "Incentive order threshold", from: `${originalIncentive.orderThreshold}`, to: `${incentive.orderThreshold}` });
+    if (originalBonusTier.orderThreshold !== bonusTierEarnings.orderThreshold) {
+      diffs.push({ field: "Bonus tier order threshold", from: `${originalBonusTier.orderThreshold}`, to: `${bonusTierEarnings.orderThreshold}` });
     }
-    if (originalIncentive.incentiveAmount !== incentive.incentiveAmount) {
-      diffs.push({ field: "Incentive amount", from: formatRM(originalIncentive.incentiveAmount), to: formatRM(incentive.incentiveAmount) });
+    // Tier-level bonusTierEarnings changes — compare new-shape snapshots tier-by-tier.
+    // Legacy snapshots (with `incentiveAmount` instead of `tiers`) can't be
+    // compared tier-by-tier; surface a single "Bonus tier structure updated"
+    // diff in that case.
+    const origTiers = originalBonusTier.tiers;
+    const currTiers = bonusTierEarnings.tiers;
+    if (origTiers && currTiers) {
+      for (let i = 0; i < currTiers.length; i++) {
+        const orig = origTiers.find((t) => t.tier === currTiers[i].tier);
+        if (orig && orig.commission !== currTiers[i].commission) {
+          diffs.push({
+            field: `Bonus T${currTiers[i].tier}`,
+            from: formatRM(orig.commission),
+            to: formatRM(currTiers[i].commission),
+          });
+        }
+      }
+    } else if (!origTiers && currTiers) {
+      diffs.push({
+        field: "Bonus tier structure",
+        from: `flat RM${(originalBonusTier.incentiveAmount ?? 0).toFixed(2)}`,
+        to: "per-parcel tiers",
+      });
     }
     if (originalPetrol.isEligible !== petrol.isEligible) {
       diffs.push({ field: "Petrol eligible", from: originalPetrol.isEligible ? "Yes" : "No", to: petrol.isEligible ? "Yes" : "No" });
@@ -268,13 +264,13 @@ export function HistoryMonthRow({
       diffs.push({ field: "Petrol subsidy amount", from: formatRM(originalPetrol.subsidyAmount), to: formatRM(petrol.subsidyAmount) });
     }
     return diffs;
-  }, [tiers, incentive, petrol, originalTiers, originalIncentive, originalPetrol]);
+  }, [tiers, bonusTierEarnings, petrol, originalTiers, originalBonusTier, originalPetrol]);
 
   const hasChanges = changes.length > 0;
 
   function handleCancel() {
     setTiers(originalTiers);
-    setIncentive(originalIncentive);
+    setBonusTier(originalBonusTier);
     setPetrol(originalPetrol);
     onToggle();
   }
@@ -287,7 +283,12 @@ export function HistoryMonthRow({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           salaryRecordId: record.salaryRecordId,
-          updatedSnapshot: { weightTiers: tiers, incentive, petrol },
+          updatedSnapshot: {
+            weightTiers: tiers,
+            bonusTiers: bonusTierEarnings.tiers ?? DEFAULT_BONUS_TIERS,
+            bonusTierEarnings: { orderThreshold: bonusTierEarnings.orderThreshold },
+            petrol,
+          },
         }),
       });
 
@@ -375,7 +376,6 @@ export function HistoryMonthRow({
                 title={`Salary from branch ${record.branchCode}`}
               />
             )}
-            <StatusPill status={status} />
           </div>
           <div className="flex items-center gap-1">
             <button
@@ -417,10 +417,10 @@ export function HistoryMonthRow({
             value={formatRM(record.baseSalary)}
           />
           <StatChip
-            label="Incentive"
-            value={record.incentive > 0 ? formatRM(record.incentive) : "—"}
+            label="Bonus Tier"
+            value={record.bonusTierEarnings > 0 ? formatRM(record.bonusTierEarnings) : "—"}
             color="#12B981"
-            muted={record.incentive === 0}
+            muted={record.bonusTierEarnings === 0}
           />
           <StatChip
             label={`Petrol${record.petrolQualifyingDays > 0 ? ` · ${record.petrolQualifyingDays}d` : ""}`}
@@ -496,58 +496,73 @@ export function HistoryMonthRow({
               </div>
             </div>
 
-            {/* Incentive — green accent with toggle */}
+            {/* Bonus Tier — green accent with toggle */}
             <div>
               <label className="block text-[0.68rem] font-medium tracking-[0.05em] uppercase mb-2" style={{ color: "#12B981" }}>
-                Incentive
+                Bonus Tier
               </label>
               <div className="space-y-1.5">
                 <div className="flex items-center gap-3">
                   <span className="text-[0.75rem] text-on-surface-variant w-36">Eligible</span>
                   <button
                     onClick={() => {
-                      if (incentive.orderThreshold > 0) {
-                        setIncentive((prev) => ({ ...prev, orderThreshold: 0 }));
+                      if (bonusTierEarnings.orderThreshold > 0) {
+                        setBonusTier((prev) => ({ ...prev, orderThreshold: 0 }));
                       } else {
-                        setIncentive((prev) => ({ ...prev, orderThreshold: 2000 }));
+                        setBonusTier((prev) => ({ ...prev, orderThreshold: 2000 }));
                       }
                     }}
                     className="relative w-9 h-5 rounded-full transition-colors shrink-0"
-                    style={{ backgroundColor: incentive.orderThreshold > 0 ? "#12B981" : "rgba(195, 198, 214, 0.4)" }}
+                    style={{ backgroundColor: bonusTierEarnings.orderThreshold > 0 ? "#12B981" : "rgba(195, 198, 214, 0.4)" }}
                   >
                     <span
                       className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
-                        incentive.orderThreshold > 0 ? "translate-x-4" : ""
+                        bonusTierEarnings.orderThreshold > 0 ? "translate-x-4" : ""
                       }`}
                     />
                   </button>
                 </div>
-                {incentive.orderThreshold > 0 ? (
+                {bonusTierEarnings.orderThreshold > 0 ? (
                   <>
                     <div className="flex items-center gap-3">
                       <span className="text-[0.75rem] text-on-surface-variant w-36">Order threshold</span>
                       <IntField
-                        value={incentive.orderThreshold}
-                        onChange={(v) => setIncentive((prev) => ({ ...prev, orderThreshold: v }))}
+                        value={bonusTierEarnings.orderThreshold}
+                        onChange={(v) => setBonusTier((prev) => ({ ...prev, orderThreshold: v }))}
                         className={FIELD_CLASS}
                       />
                       <span className="text-[0.72rem] text-on-surface-variant">orders/month</span>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-[0.75rem] text-on-surface-variant w-36">Incentive amount</span>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[0.75rem] text-on-surface-variant">RM</span>
-                        <DecimalField
-                          value={incentive.incentiveAmount}
-                          onChange={(v) => setIncentive((prev) => ({ ...prev, incentiveAmount: v }))}
-                          className={FIELD_CLASS}
-                          showStepper
-                        />
-                      </div>
+                    <div className="space-y-1.5">
+                      <span className="text-[0.72rem] text-on-surface-variant/70 block">
+                        Rate per post-threshold parcel (by weight)
+                      </span>
+                      {(bonusTierEarnings.tiers ?? DEFAULT_BONUS_TIERS).map((t, i) => (
+                        <div key={t.tier} className="flex items-center gap-3">
+                          <span className="text-[0.75rem] text-on-surface-variant w-36">
+                            T{t.tier} ({t.minWeight}{t.maxWeight === null ? "+" : `–${t.maxWeight}`} kg)
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                            <DecimalField
+                              value={t.commission}
+                              onChange={(v) =>
+                                setBonusTier((prev) => {
+                                  const next = [...(prev.tiers ?? DEFAULT_BONUS_TIERS)];
+                                  next[i] = { ...next[i], commission: v };
+                                  return { ...prev, tiers: next };
+                                })
+                              }
+                              className={FIELD_CLASS}
+                              showStepper
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </>
                 ) : (
-                  <p className="text-[0.75rem] text-on-surface-variant/50 ml-1">Incentive disabled</p>
+                  <p className="text-[0.75rem] text-on-surface-variant/50 ml-1">Bonus Tier disabled</p>
                 )}
               </div>
             </div>

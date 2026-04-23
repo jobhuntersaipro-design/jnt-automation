@@ -23,7 +23,7 @@ export async function getPayrollHistory(agentId: string) {
       _sum: {
         netSalary: true,
         baseSalary: true,
-        incentive: true,
+        bonusTierEarnings: true,
         petrolSubsidy: true,
         penalty: true,
         advance: true,
@@ -43,7 +43,7 @@ export async function getPayrollHistory(agentId: string) {
       dispatcherCount: u._count.salaryRecords,
       totalNetPayout: s?.netSalary ?? 0,
       totalBaseSalary: s?.baseSalary ?? 0,
-      totalIncentive: s?.incentive ?? 0,
+      totalBonusTierEarnings: s?.bonusTierEarnings ?? 0,
       totalPetrolSubsidy: s?.petrolSubsidy ?? 0,
       totalDeductions: (s?.penalty ?? 0) + (s?.advance ?? 0),
     };
@@ -75,9 +75,14 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
 
   const summary = {
     totalNetPayout: records.reduce((sum, r) => sum + r.netSalary, 0),
-    totalBaseSalary: records.reduce((sum, r) => sum + r.baseSalary, 0),
-    totalIncentive: records.reduce((sum, r) => sum + r.incentive, 0),
+    // "Base Salary" here = default-tier + bonus-tier earnings combined.
+    // Per-row table breaks these out into two sub-columns under a grouped header.
+    totalBaseSalary: records.reduce(
+      (sum, r) => sum + r.baseSalary + r.bonusTierEarnings,
+      0,
+    ),
     totalPetrolSubsidy: records.reduce((sum, r) => sum + r.petrolSubsidy, 0),
+    totalCommission: records.reduce((sum, r) => sum + r.commission, 0),
     totalDeductions: records.reduce((sum, r) => sum + r.penalty + r.advance, 0),
   };
 
@@ -101,16 +106,13 @@ export async function getSalaryRecordsByUpload(uploadId: string, agentId: string
       icNo: r.dispatcher.icNo,
       totalOrders: r.totalOrders,
       baseSalary: r.baseSalary,
-      incentive: r.incentive,
+      bonusTierEarnings: r.bonusTierEarnings,
       petrolSubsidy: r.petrolSubsidy,
-      petrolQualifyingDays: r.petrolQualifyingDays,
+      commission: r.commission,
       penalty: r.penalty,
       advance: r.advance,
       netSalary: r.netSalary,
-      weightTiersSnapshot: r.weightTiersSnapshot,
-      incentiveSnapshot: r.incentiveSnapshot,
-      petrolSnapshot: r.petrolSnapshot,
-      wasRecalculated: r.updatedAt.getTime() - r.createdAt.getTime() > 1000,
+      bonusTierSnapshot: r.bonusTierSnapshot,
     })),
     summary,
   };

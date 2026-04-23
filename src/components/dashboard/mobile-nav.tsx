@@ -8,6 +8,7 @@ import { useClickOutside } from "@/lib/hooks/use-click-outside";
 
 const BASE_ITEMS = [
   { href: "/dashboard", label: "Overview" },
+  { href: "/branches", label: "Branches" },
   { href: "/dispatchers", label: "Dispatchers" },
   { href: "/staff", label: "Staff" },
 ];

@@ -10,7 +10,8 @@ interface DispatcherInput {
   name: string;
   icNo: string;
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
-  incentiveRule: { orderThreshold: number; incentiveAmount: number };
+  bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number };
   petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
 }
 
@@ -68,9 +69,15 @@ export async function POST(
         { status: 400 },
       );
     }
-    if (!d.incentiveRule || d.incentiveRule.incentiveAmount == null) {
+    if (!d.incentiveRule || d.incentiveRule.orderThreshold == null) {
       return NextResponse.json(
         { error: `Incentive rule required for ${d.name}` },
+        { status: 400 },
+      );
+    }
+    if (!d.bonusTiers || d.bonusTiers.length !== 3) {
+      return NextResponse.json(
+        { error: `3 bonusTierEarnings tiers required for ${d.name}` },
         { status: 400 },
       );
     }
@@ -141,8 +148,17 @@ export async function POST(
         data: {
           dispatcherId: dispatcher.id,
           orderThreshold: d.incentiveRule.orderThreshold,
-          incentiveAmount: d.incentiveRule.incentiveAmount,
         },
+      });
+
+      await tx.bonusTier.createMany({
+        data: d.bonusTiers.map((t) => ({
+          dispatcherId: dispatcher.id,
+          tier: t.tier,
+          minWeight: t.minWeight,
+          maxWeight: t.maxWeight,
+          commission: t.commission,
+        })),
       });
 
       await tx.petrolRule.create({

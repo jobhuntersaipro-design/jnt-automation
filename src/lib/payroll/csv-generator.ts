@@ -4,8 +4,9 @@ interface SalaryRow {
   branchCode: string;
   totalOrders: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
+  commission: number;
   penalty: number;
   advance: number;
   netSalary: number;
@@ -31,9 +32,10 @@ export function generatePayrollCSV(records: SalaryRow[]): string {
     "Dispatcher Name",
     "Branch",
     "Total Orders",
-    "Base Salary",
-    "Incentive",
+    "Default Tier",
+    "Bonus Tier",
     "Petrol Subsidy",
+    "Commission",
     "Penalty",
     "Advance",
     "Net Salary",
@@ -46,8 +48,9 @@ export function generatePayrollCSV(records: SalaryRow[]): string {
       escapeCSV(r.branchCode),
       String(r.totalOrders),
       formatAmount(r.baseSalary),
-      formatAmount(r.incentive),
+      formatAmount(r.bonusTierEarnings),
       formatAmount(r.petrolSubsidy),
+      formatAmount(r.commission),
       formatAmount(r.penalty),
       formatAmount(r.advance),
       formatAmount(r.netSalary),
@@ -59,13 +62,23 @@ export function generatePayrollCSV(records: SalaryRow[]): string {
     (acc, r) => ({
       totalOrders: acc.totalOrders + r.totalOrders,
       baseSalary: acc.baseSalary + r.baseSalary,
-      incentive: acc.incentive + r.incentive,
+      bonusTierEarnings: acc.bonusTierEarnings + r.bonusTierEarnings,
       petrolSubsidy: acc.petrolSubsidy + r.petrolSubsidy,
+      commission: acc.commission + r.commission,
       penalty: acc.penalty + r.penalty,
       advance: acc.advance + r.advance,
       netSalary: acc.netSalary + r.netSalary,
     }),
-    { totalOrders: 0, baseSalary: 0, incentive: 0, petrolSubsidy: 0, penalty: 0, advance: 0, netSalary: 0 },
+    {
+      totalOrders: 0,
+      baseSalary: 0,
+      bonusTierEarnings: 0,
+      petrolSubsidy: 0,
+      commission: 0,
+      penalty: 0,
+      advance: 0,
+      netSalary: 0,
+    },
   );
 
   const totalRow = [
@@ -74,8 +87,9 @@ export function generatePayrollCSV(records: SalaryRow[]): string {
     "",
     String(totals.totalOrders),
     formatAmount(totals.baseSalary),
-    formatAmount(totals.incentive),
+    formatAmount(totals.bonusTierEarnings),
     formatAmount(totals.petrolSubsidy),
+    formatAmount(totals.commission),
     formatAmount(totals.penalty),
     formatAmount(totals.advance),
     formatAmount(totals.netSalary),

@@ -107,19 +107,31 @@ export async function PATCH(
         });
       }
 
-      // Upsert incentive rule
+      // Upsert bonusTierEarnings rule (threshold only)
       if (body.incentiveRule) {
         await tx.incentiveRule.upsert({
           where: { dispatcherId: id },
           create: {
             dispatcherId: id,
             orderThreshold: body.incentiveRule.orderThreshold,
-            incentiveAmount: body.incentiveRule.incentiveAmount,
           },
           update: {
             orderThreshold: body.incentiveRule.orderThreshold,
-            incentiveAmount: body.incentiveRule.incentiveAmount,
           },
+        });
+      }
+
+      // Replace bonusTierEarnings tiers (same delete-then-createMany pattern as weight tiers)
+      if (body.bonusTiers) {
+        await tx.bonusTier.deleteMany({ where: { dispatcherId: id } });
+        await tx.bonusTier.createMany({
+          data: body.bonusTiers.map((it) => ({
+            dispatcherId: id,
+            tier: it.tier,
+            minWeight: it.minWeight,
+            maxWeight: it.maxWeight,
+            commission: it.commission,
+          })),
         });
       }
 

@@ -10,8 +10,9 @@ const UpdateEntrySchema = z.object({
   dispatcherId: z.string().min(1),
   totalOrders: z.number().int().min(0).max(100_000),
   baseSalary: z.number().min(0).max(1_000_000),
-  incentive: z.number().min(0).max(100_000),
+  bonusTierEarnings: z.number().min(0).max(100_000),
   petrolSubsidy: z.number().min(0).max(100_000),
+  commission: z.number().min(0).max(100_000),
   penalty: z.number().min(0).max(100_000),
   advance: z.number().min(0).max(100_000),
 });
@@ -61,6 +62,7 @@ export async function POST(
       include: {
         weightTiers: { orderBy: { tier: "asc" } },
         incentiveRule: true,
+        bonusTiers: { orderBy: { tier: "asc" } },
         petrolRule: true,
       },
     });
@@ -73,8 +75,9 @@ export async function POST(
 
         const netSalary =
           update.baseSalary +
-          update.incentive +
-          update.petrolSubsidy -
+          update.bonusTierEarnings +
+          update.petrolSubsidy +
+          update.commission -
           update.penalty -
           update.advance;
 
@@ -88,8 +91,9 @@ export async function POST(
           data: {
             totalOrders: update.totalOrders,
             baseSalary: update.baseSalary,
-            incentive: update.incentive,
+            bonusTierEarnings: update.bonusTierEarnings,
             petrolSubsidy: update.petrolSubsidy,
+            commission: update.commission,
             penalty: update.penalty,
             advance: update.advance,
             netSalary,
@@ -99,10 +103,15 @@ export async function POST(
               maxWeight: t.maxWeight,
               commission: t.commission,
             })),
-            incentiveSnapshot: dispatcher.incentiveRule
+            bonusTierSnapshot: dispatcher.incentiveRule
               ? {
                   orderThreshold: dispatcher.incentiveRule.orderThreshold,
-                  incentiveAmount: dispatcher.incentiveRule.incentiveAmount,
+                  tiers: dispatcher.bonusTiers.map((t) => ({
+                    tier: t.tier,
+                    minWeight: t.minWeight,
+                    maxWeight: t.maxWeight,
+                    commission: t.commission,
+                  })),
                 }
               : undefined,
             petrolSnapshot: dispatcher.petrolRule

@@ -3,7 +3,7 @@ import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { MonthlyNetPayoutTrend } from "@/components/dashboard/monthly-net-payout-trend";
 import { BranchDistribution } from "@/components/dashboard/branch-distribution";
 import { SalaryBreakdown } from "@/components/dashboard/salary-breakdown";
-import { IncentiveHitRate } from "@/components/dashboard/incentive-hit-rate";
+import { BonusTierHitRate } from "@/components/dashboard/bonus-tier-hit-rate";
 import { TopDispatchers } from "@/components/dashboard/top-dispatchers";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { OverviewExport } from "@/components/dashboard/overview-export";
@@ -99,7 +99,7 @@ export default async function DashboardPage({
             <SalaryBreakdown data={breakdown} />
           </ChartErrorBoundary>
           <ChartErrorBoundary>
-            <IncentiveHitRate data={hitRate} />
+            <BonusTierHitRate data={hitRate} />
           </ChartErrorBoundary>
         </div>
 

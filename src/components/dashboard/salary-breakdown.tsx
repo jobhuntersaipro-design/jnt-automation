@@ -13,7 +13,7 @@ import { CHART_COLORS } from "@/lib/chart-colors";
 
 const SEGMENTS = [
   { key: "baseSalary", label: "Base Salary", color: CHART_COLORS.brand },
-  { key: "incentive", label: "Monthly Incentive", color: CHART_COLORS.incentive },
+  { key: "bonusTierEarnings", label: "Monthly Bonus Tier", color: CHART_COLORS.bonusTierEarnings },
   { key: "petrolSubsidy", label: "Petrol Subsidy", color: CHART_COLORS.petrolSubsidy },
   { key: "deductions", label: "Penalty / Deductions", color: CHART_COLORS.deductions },
 ] as const;
@@ -58,7 +58,7 @@ function TooltipContent({
 type BreakdownPoint = {
   month: string;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   deductions: number;
 };

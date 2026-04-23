@@ -6,7 +6,13 @@ import { updateUploadStatus } from "@/lib/db/upload";
 import { parseExcelFromR2 } from "./parser";
 import { splitDispatchers } from "./dispatcher-check";
 import { calculateSalary } from "./calculator";
-import type { SalaryResult, DispatcherRules, WeightTierInput, IncentiveRuleInput, PetrolRuleInput } from "./calculator";
+import type {
+  SalaryResult,
+  DispatcherRules,
+  WeightTierInput,
+  BonusTierSnapshot,
+  PetrolRuleInput,
+} from "./calculator";
 import type { UnknownDispatcher } from "./dispatcher-check";
 import {
   setProgress,
@@ -137,6 +143,7 @@ export async function calculateAfterConfirm(uploadId: string) {
         include: {
           weightTiers: { orderBy: { tier: "asc" } },
           incentiveRule: true,
+          bonusTiers: { orderBy: { tier: "asc" } },
           petrolRule: true,
         },
       },
@@ -178,8 +185,13 @@ export async function calculateAfterConfirm(uploadId: string) {
       })),
       incentiveRule: {
         orderThreshold: d.incentiveRule.orderThreshold,
-        incentiveAmount: d.incentiveRule.incentiveAmount,
       },
+      bonusTiers: d.bonusTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
       petrolRule: {
         isEligible: d.petrolRule.isEligible,
         dailyThreshold: d.petrolRule.dailyThreshold,
@@ -209,7 +221,7 @@ export async function calculateAfterConfirm(uploadId: string) {
     extId: r.extId,
     totalOrders: r.totalOrders,
     baseSalary: r.baseSalary,
-    incentive: r.incentive,
+    bonusTierEarnings: r.bonusTierEarnings,
     petrolSubsidy: r.petrolSubsidy,
     petrolQualifyingDays: r.petrolQualifyingDays,
     penalty: r.penalty,
@@ -217,7 +229,7 @@ export async function calculateAfterConfirm(uploadId: string) {
     netSalary: r.netSalary,
     lineItems: [], // omitted — re-parsed from R2 at confirmation
     weightTiersSnapshot: r.weightTiersSnapshot,
-    incentiveSnapshot: r.incentiveSnapshot,
+    bonusTierSnapshot: r.bonusTierSnapshot,
     petrolSnapshot: r.petrolSnapshot,
   }));
 
@@ -278,6 +290,7 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
         include: {
           weightTiers: { orderBy: { tier: "asc" } },
           incentiveRule: true,
+          bonusTiers: { orderBy: { tier: "asc" } },
           petrolRule: true,
         },
       },
@@ -304,8 +317,13 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
       })),
       incentiveRule: {
         orderThreshold: d.incentiveRule.orderThreshold,
-        incentiveAmount: d.incentiveRule.incentiveAmount,
       },
+      bonusTiers: d.bonusTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
       petrolRule: {
         isEligible: d.petrolRule.isEligible,
         dailyThreshold: d.petrolRule.dailyThreshold,
@@ -319,7 +337,7 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
       extId: result.extId,
       totalOrders: result.totalOrders,
       baseSalary: result.baseSalary,
-      incentive: result.incentive,
+      bonusTierEarnings: result.bonusTierEarnings,
       petrolSubsidy: result.petrolSubsidy,
       petrolQualifyingDays: result.petrolQualifyingDays,
       penalty: result.penalty,
@@ -327,7 +345,7 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
       netSalary: result.netSalary,
       lineItems: [],
       weightTiersSnapshot: result.weightTiersSnapshot,
-      incentiveSnapshot: result.incentiveSnapshot,
+      bonusTierSnapshot: result.bonusTierSnapshot,
       petrolSnapshot: result.petrolSnapshot,
     });
   }
@@ -369,6 +387,7 @@ export interface SerializedLineItem {
   weight: number;
   commission: number;
   deliveryDate: string | null;
+  isBonusTier: boolean;
 }
 
 export interface PreviewResult {
@@ -376,7 +395,7 @@ export interface PreviewResult {
   extId: string;
   totalOrders: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   petrolQualifyingDays: number;
   penalty: number;
@@ -384,7 +403,7 @@ export interface PreviewResult {
   netSalary: number;
   lineItems: SerializedLineItem[];
   weightTiersSnapshot: WeightTierInput[];
-  incentiveSnapshot: IncentiveRuleInput;
+  bonusTierSnapshot: BonusTierSnapshot;
   petrolSnapshot: PetrolRuleInput;
 }
 

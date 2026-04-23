@@ -63,6 +63,7 @@ export async function POST(req: NextRequest) {
 
   const defs = await getAgentDefaults(agentId);
   const wt = defs.weightTiers;
+  const it = defs.bonusTiers;
   const ir = defs.incentiveRule;
   const pr = defs.petrolRule;
 
@@ -98,7 +99,17 @@ export async function POST(req: NextRequest) {
     });
 
     await tx.incentiveRule.create({
-      data: { dispatcherId: d.id, orderThreshold: ir.orderThreshold, incentiveAmount: ir.incentiveAmount },
+      data: { dispatcherId: d.id, orderThreshold: ir.orderThreshold },
+    });
+
+    await tx.bonusTier.createMany({
+      data: it.map((t) => ({
+        dispatcherId: d.id,
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      })),
     });
 
     await tx.petrolRule.create({
@@ -121,6 +132,7 @@ export async function POST(req: NextRequest) {
       isComplete: computeIsComplete(dispatcher.name, dispatcher.icNo, dispatcher.extId),
       rawIcNo: dispatcher.icNo,
       weightTiers: wt,
+      bonusTiers: it,
       incentiveRule: ir,
       petrolRule: pr,
     },

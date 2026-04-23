@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getMonthDetail } from "@/lib/db/staff";
-import { buildTierBreakdown, type WeightTierSnapshot } from "@/lib/staff/month-detail";
+import {
+  buildTierBreakdown,
+  type BonusTierSnapshotRow,
+  type WeightTierSnapshot,
+} from "@/lib/staff/month-detail";
+import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailCsv } from "@/lib/staff/month-detail-csv";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
 
@@ -20,13 +25,14 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Extra tenant check: URL's [id] must match the salary record's dispatcher
   if (detail.dispatcher.id !== id) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const tiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
-  const tierBreakdown = buildTierBreakdown(detail.lineItems, tiers);
+  const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
+  const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
+  const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
+  const tierBreakdown = buildTierBreakdown(detail.lineItems, weightTiers, bonusTiers);
   const csv = generateMonthDetailCsv(detail, tierBreakdown);
   const filename = monthDetailFilename(
     detail.year,

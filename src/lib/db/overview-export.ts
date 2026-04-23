@@ -8,7 +8,7 @@ type WeightTierSnapshot = {
   commission: number;
 };
 
-type IncentiveSnapshot = {
+type BonusTierSnapshot = {
   orderThreshold: number;
   incentiveAmount: number;
 };
@@ -25,7 +25,7 @@ export interface DispatcherExportRow {
   branch: string;
   totalOrders: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   penalty: number;
   advance: number;
@@ -105,13 +105,13 @@ export async function getDispatcherExportData(
       year: true,
       totalOrders: true,
       baseSalary: true,
-      incentive: true,
+      bonusTierEarnings: true,
       petrolSubsidy: true,
       penalty: true,
       advance: true,
       netSalary: true,
       weightTiersSnapshot: true,
-      incentiveSnapshot: true,
+      bonusTierSnapshot: true,
       petrolSnapshot: true,
       dispatcher: {
         select: {
@@ -129,7 +129,7 @@ export async function getDispatcherExportData(
 
   return records.map((r) => {
     const tiers = (r.weightTiersSnapshot as WeightTierSnapshot[] | null) ?? [];
-    const incSnap = (r.incentiveSnapshot as IncentiveSnapshot | null) ?? {
+    const incSnap = (r.bonusTierSnapshot as BonusTierSnapshot | null) ?? {
       orderThreshold: 0,
       incentiveAmount: 0,
     };
@@ -149,7 +149,7 @@ export async function getDispatcherExportData(
       branch: r.dispatcher.branch.code,
       totalOrders: r.totalOrders,
       baseSalary: r.baseSalary,
-      incentive: r.incentive,
+      bonusTierEarnings: r.bonusTierEarnings,
       petrolSubsidy: r.petrolSubsidy,
       penalty: r.penalty,
       advance: r.advance,

@@ -144,7 +144,7 @@ export async function getAgentView(agentId: string) {
   // Get summary stats
   const salaryAgg = await prisma.salaryRecord.aggregate({
     where: { dispatcher: { branch: { agentId } } },
-    _sum: { netSalary: true, baseSalary: true, incentive: true, petrolSubsidy: true, penalty: true, advance: true },
+    _sum: { netSalary: true, baseSalary: true, bonusTierEarnings: true, petrolSubsidy: true, penalty: true, advance: true },
     _count: true,
   });
 
@@ -195,7 +195,7 @@ export async function getAgentView(agentId: string) {
     summary: {
       totalNetSalary: salaryAgg._sum.netSalary ?? 0,
       totalBaseSalary: salaryAgg._sum.baseSalary ?? 0,
-      totalIncentive: salaryAgg._sum.incentive ?? 0,
+      totalBonusTierEarnings: salaryAgg._sum.bonusTierEarnings ?? 0,
       totalPetrol: salaryAgg._sum.petrolSubsidy ?? 0,
       totalPenalty: salaryAgg._sum.penalty ?? 0,
       totalAdvance: salaryAgg._sum.advance ?? 0,

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Download, FileText, TrendingUp } from "lucide-react";
 import { HistoryMonthRow } from "./history-month-row";
 import type { HistoryRecord } from "./history-month-row";
+import { DispatcherTrendChart } from "./dispatcher-trend-chart";
 
 interface HistoryTabProps {
   dispatcherId: string;
@@ -149,6 +150,17 @@ export function HistoryTab({ dispatcherId, dispatcherName }: HistoryTabProps) {
           {totals.months} month{totals.months !== 1 ? "s" : ""} · {totals.totalOrders.toLocaleString()} order{totals.totalOrders !== 1 ? "s" : ""}
         </p>
       </div>
+
+      {/* Performance trend (Orders / Net / Penalty) */}
+      <DispatcherTrendChart
+        records={records.map((r) => ({
+          month: r.month,
+          year: r.year,
+          totalOrders: r.totalOrders,
+          netSalary: r.netSalary,
+          penalty: r.penalty,
+        }))}
+      />
 
       {/* Records list */}
       <div className="space-y-3">

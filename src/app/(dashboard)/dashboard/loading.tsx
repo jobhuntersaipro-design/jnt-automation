@@ -55,7 +55,7 @@ export default function DashboardLoading() {
           <ChartSkeleton />
         </div>
 
-        {/* Row 3: salary breakdown + incentive hit rate */}
+        {/* Row 3: salary breakdown + bonusTierEarnings hit rate */}
         <div className="grid grid-cols-2 gap-4">
           <ChartSkeleton />
           <ChartSkeleton />

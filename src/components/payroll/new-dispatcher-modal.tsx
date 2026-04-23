@@ -15,7 +15,9 @@ interface DispatcherFormState {
   t2Commission: number;
   t3Commission: number;
   incentiveThreshold: number;
-  incentiveAmount: string; // string to allow empty
+  incentiveT1: string;
+  incentiveT2: string;
+  incentiveT3: string;
   petrolEligible: boolean;
   petrolThreshold: number;
   petrolAmount: number;
@@ -36,7 +38,9 @@ const DEFAULT_FORM: DispatcherFormState = {
   t2Commission: 1.4,
   t3Commission: 2.2,
   incentiveThreshold: 2000,
-  incentiveAmount: "",
+  incentiveT1: "1.50",
+  incentiveT2: "2.10",
+  incentiveT3: "3.30",
   petrolEligible: false,
   petrolThreshold: 70,
   petrolAmount: 15,
@@ -49,8 +53,9 @@ function isFormComplete(form: DispatcherFormState): boolean {
     form.t2Commission > 0 &&
     form.t3Commission > 0 &&
     form.incentiveThreshold > 0 &&
-    form.incentiveAmount !== "" &&
-    Number(form.incentiveAmount) > 0
+    Number(form.incentiveT1) > 0 &&
+    Number(form.incentiveT2) > 0 &&
+    Number(form.incentiveT3) > 0
   );
 }
 
@@ -99,8 +104,12 @@ export function NewDispatcherModal({
           ],
           incentiveRule: {
             orderThreshold: f.incentiveThreshold,
-            incentiveAmount: Number(f.incentiveAmount),
           },
+          bonusTiers: [
+            { tier: 1, minWeight: 0, maxWeight: 5, commission: Number(f.incentiveT1) },
+            { tier: 2, minWeight: 5.01, maxWeight: 10, commission: Number(f.incentiveT2) },
+            { tier: 3, minWeight: 10.01, maxWeight: null, commission: Number(f.incentiveT3) },
+          ],
           petrolRule: {
             isEligible: f.petrolEligible,
             dailyThreshold: f.petrolThreshold,
@@ -260,15 +269,15 @@ export function NewDispatcherModal({
                       </div>
                     </div>
 
-                    {/* Incentive */}
+                    {/* Bonus Tier */}
                     <div>
                       <label className="block text-[0.75rem] font-medium text-emerald-600 uppercase tracking-wider mb-2">
-                        Monthly Incentive
+                        Monthly Bonus Tier
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-2">
                         <div>
                           <span className="block text-[0.72rem] text-on-surface-variant mb-1">
-                            Min Orders
+                            Min Orders (threshold — #N+1 onwards earn bonusTierEarnings rate)
                           </span>
                           <input
                             type="number"
@@ -278,22 +287,23 @@ export function NewDispatcherModal({
                             className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
                           />
                         </div>
-                        <div>
-                          <span className="block text-[0.72rem] text-on-surface-variant mb-1">
-                            Amount
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <span className="text-[0.78rem] text-on-surface-variant">RM</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={1}
-                              value={form.incentiveAmount}
-                              onChange={(e) => updateForm(d.extId, "incentiveAmount", e.target.value)}
-                              placeholder="Required"
-                              className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums placeholder:text-on-surface-variant/40"
-                            />
-                          </div>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(["incentiveT1", "incentiveT2", "incentiveT3"] as const).map((key, i) => (
+                            <div key={key}>
+                              <span className="block text-[0.7rem] text-on-surface-variant mb-1">
+                                T{i + 1} rate (RM)
+                              </span>
+                              <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                value={form[key]}
+                                onChange={(e) => updateForm(d.extId, key, e.target.value)}
+                                placeholder="Required"
+                                className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums placeholder:text-on-surface-variant/40"
+                              />
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>

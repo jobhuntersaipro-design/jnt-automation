@@ -145,7 +145,7 @@ export function RulesSummary({
                     <th className="py-1.5 px-2 font-medium">T1</th>
                     <th className="py-1.5 px-2 font-medium">T2</th>
                     <th className="py-1.5 px-2 font-medium">T3</th>
-                    <th className="py-1.5 px-2 font-medium">Incentive</th>
+                    <th className="py-1.5 px-2 font-medium">Bonus Tier</th>
                     <th className="py-1.5 px-2 font-medium">Petrol</th>
                     {hasPreviousData && <th className="py-1.5 pl-2 pr-4 font-medium">Changes</th>}
                   </tr>
@@ -180,7 +180,12 @@ export function RulesSummary({
                         );
                       })}
                       <td className="py-2 px-2 tabular-nums text-on-surface">
-                        {formatRM(row.incentiveAmount)}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="text-[0.7rem] text-on-surface-variant/70">≥{row.orderThreshold.toLocaleString()}:</span>
+                          <span className="px-1.5 py-0.5 text-[0.7rem] font-medium bg-emerald-50 text-emerald-900/80 rounded">T1 {formatRM(row.incentiveTier1)}</span>
+                          <span className="px-1.5 py-0.5 text-[0.7rem] font-medium bg-emerald-50 text-emerald-900/80 rounded">T2 {formatRM(row.incentiveTier2)}</span>
+                          <span className="px-1.5 py-0.5 text-[0.7rem] font-medium bg-emerald-50 text-emerald-900/80 rounded">T3 {formatRM(row.incentiveTier3)}</span>
+                        </div>
                       </td>
                       <td className="py-2 px-2">
                         {row.petrolEligible ? (

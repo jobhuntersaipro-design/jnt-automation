@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getEffectiveAgentId } from "@/lib/impersonation";
-import { generateEmployeePayslipPdf, countParcelsPerTier } from "@/lib/staff/payslip-generator";
+import {
+  generateEmployeePayslipPdf,
+  countParcelsPerTier,
+  countBonusParcelsPerTier,
+} from "@/lib/staff/payslip-generator";
 import type { EmployeePayslipInput } from "@/lib/staff/payslip-generator";
 
 const MONTH_NAMES = [
@@ -65,8 +69,9 @@ export async function POST(
   // Auto-match dispatcher by name + branch (case-insensitive)
   let dispatcherData: {
     tierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
-    incentive: number;
+    bonusTierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
     petrolSubsidy: number;
+    commission: number;
     penalty: number;
     advance: number;
   } | null = null;
@@ -88,7 +93,7 @@ export async function POST(
           year,
         },
         include: {
-          lineItems: { select: { weight: true, commission: true } },
+          lineItems: { select: { weight: true, commission: true, isBonusTier: true } },
         },
       });
 
@@ -99,10 +104,15 @@ export async function POST(
           maxWeight: number | null;
           commission: number;
         }[];
+        const bonusSnap = dispatcherSalary.bonusTierSnapshot as
+          | { orderThreshold: number; tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }> }
+          | null;
+        const bonusSnapshot = bonusSnap?.tiers ?? [];
         dispatcherData = {
           tierBreakdowns: countParcelsPerTier(dispatcherSalary.lineItems, snapshot),
-          incentive: dispatcherSalary.incentive,
+          bonusTierBreakdowns: countBonusParcelsPerTier(dispatcherSalary.lineItems, bonusSnapshot),
           petrolSubsidy: dispatcherSalary.petrolSubsidy,
+          commission: dispatcherSalary.commission,
           penalty: dispatcherSalary.penalty,
           advance: dispatcherSalary.advance,
         };
@@ -133,8 +143,9 @@ export async function POST(
     kpiAllowance: salaryRecord.kpiAllowance,
     otherAllowance: salaryRecord.otherAllowance,
     dispatcherTierBreakdowns: dispatcherData?.tierBreakdowns,
-    dispatcherIncentive: dispatcherData?.incentive,
+    dispatcherBonusTierBreakdowns: dispatcherData?.bonusTierBreakdowns,
     dispatcherPetrolSubsidy: dispatcherData?.petrolSubsidy,
+    dispatcherCommission: dispatcherData?.commission,
     dispatcherPenalty: dispatcherData?.penalty,
     dispatcherAdvance: dispatcherData?.advance,
     epfEmployee: salaryRecord.epfEmployee,

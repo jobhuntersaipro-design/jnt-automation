@@ -530,7 +530,7 @@ export function DispatchersClient({
             <div className={`${ROW_GRID} px-5 pt-2.5 pb-0`}>
               <span /><span /><span /><span /><span />
               <span />
-              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#12B981", borderColor: "rgba(18, 185, 129, 0.3)" }}>Incentive</span>
+              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#12B981", borderColor: "rgba(18, 185, 129, 0.3)" }}>Bonus Tier</span>
               <span />
               <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#D4A017", borderColor: "rgba(251, 192, 36, 0.35)" }}>Petrol</span>
               <span /><span />

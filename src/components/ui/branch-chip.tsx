@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getBranchColor } from "@/lib/branch-colors";
 
 type BranchChipSize = "sm" | "md";
@@ -16,6 +17,12 @@ interface BranchChipProps {
   variant?: BranchChipVariant;
   title?: string;
   className?: string;
+  /**
+   * Wrap the chip in a link to the branch detail page. Defaults to true when
+   * a non-empty code is provided. Pass `false` for chart legends or anywhere
+   * a click would compete with other interactions on the same row.
+   */
+  asLink?: boolean;
 }
 
 const SIZE_CHIP: Record<BranchChipSize, string> = {
@@ -39,49 +46,66 @@ export function BranchChip({
   variant = "solid",
   title,
   className = "",
+  asLink,
 }: BranchChipProps) {
   const c = getBranchColor(code);
-  const hoverTitle = title ?? (code ? `Branch ${code}` : undefined);
+  const hoverTitle = title ?? (code ? `Open branch ${code}` : undefined);
 
-  if (variant === "dot") {
+  const chip = (() => {
+    if (variant === "dot") {
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 font-medium tabular-nums text-on-surface-variant ${SIZE_CHIP[size]} ${className}`}
+          title={hoverTitle}
+        >
+          <span
+            aria-hidden
+            className={`rounded-full ${SIZE_DOT[size]}`}
+            style={{ backgroundColor: c.hexSolid }}
+          />
+          {code || "—"}
+        </span>
+      );
+    }
+
+    if (variant === "muted") {
+      return (
+        <span
+          className={`inline-flex items-center gap-1.5 font-medium tabular-nums bg-surface-low text-on-surface-variant rounded-md ring-1 ring-inset ring-outline-variant/30 ${SIZE_CHIP[size]} ${className}`}
+          title={hoverTitle}
+        >
+          <span
+            aria-hidden
+            className={`rounded-full ${SIZE_DOT[size]}`}
+            style={{ backgroundColor: c.hexSolid }}
+          />
+          {code || "—"}
+        </span>
+      );
+    }
+
+    // solid (default)
     return (
       <span
-        className={`inline-flex items-center gap-1.5 font-medium tabular-nums text-on-surface-variant ${SIZE_CHIP[size]} ${className}`}
+        className={`inline-flex items-center font-medium tabular-nums rounded-md ring-1 ring-inset ${c.bg} ${c.text} ${c.ring} ${SIZE_CHIP[size]} ${className}`}
         title={hoverTitle}
       >
-        <span
-          aria-hidden
-          className={`rounded-full ${SIZE_DOT[size]}`}
-          style={{ backgroundColor: c.hexSolid }}
-        />
         {code || "—"}
       </span>
     );
-  }
+  })();
 
-  if (variant === "muted") {
-    return (
-      <span
-        className={`inline-flex items-center gap-1.5 font-medium tabular-nums bg-surface-low text-on-surface-variant rounded-md ring-1 ring-inset ring-outline-variant/30 ${SIZE_CHIP[size]} ${className}`}
-        title={hoverTitle}
-      >
-        <span
-          aria-hidden
-          className={`rounded-full ${SIZE_DOT[size]}`}
-          style={{ backgroundColor: c.hexSolid }}
-        />
-        {code || "—"}
-      </span>
-    );
-  }
+  const shouldLink = (asLink ?? true) && Boolean(code);
+  if (!shouldLink) return chip;
 
-  // solid (default)
   return (
-    <span
-      className={`inline-flex items-center font-medium tabular-nums rounded-md ring-1 ring-inset ${c.bg} ${c.text} ${c.ring} ${SIZE_CHIP[size]} ${className}`}
-      title={hoverTitle}
+    <Link
+      href={`/branches/${encodeURIComponent(code)}`}
+      onClick={(e) => e.stopPropagation()}
+      className="inline-flex items-center rounded-md cursor-pointer transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-1"
+      aria-label={`Open branch ${code}`}
     >
-      {code || "—"}
-    </span>
+      {chip}
+    </Link>
   );
 }

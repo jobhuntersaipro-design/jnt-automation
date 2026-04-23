@@ -150,7 +150,7 @@ export async function getMonthlyPayoutTrend(
 export type BreakdownPoint = {
   month: string;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   deductions: number;
 };
@@ -168,7 +168,7 @@ export async function getSalaryBreakdown(
     where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
     _sum: {
       baseSalary: true,
-      incentive: true,
+      bonusTierEarnings: true,
       petrolSubsidy: true,
       penalty: true,
       advance: true,
@@ -179,17 +179,17 @@ export async function getSalaryBreakdown(
   return records.map((r) => ({
     month: MONTH_ABBR[r.month - 1],
     baseSalary: r._sum.baseSalary ?? 0,
-    incentive: r._sum.incentive ?? 0,
+    bonusTierEarnings: r._sum.bonusTierEarnings ?? 0,
     petrolSubsidy: r._sum.petrolSubsidy ?? 0,
     deductions: (r._sum.penalty ?? 0) + (r._sum.advance ?? 0),
   }));
 }
 
-// ─── Incentive Hit Rate ───────────────────────────────────────
+// ─── Bonus Tier Hit Rate ───────────────────────────────────────
 
 export type HitRatePoint = { month: string; rate: number };
 
-export async function getIncentiveHitRate(
+export async function getBonusTierHitRate(
   agentId: string,
   filters: Filters,
 ): Promise<HitRatePoint[]> {
@@ -249,7 +249,7 @@ export type DispatcherRow = {
   avatarUrl: string | null;
   totalOrders: number;
   baseSalary: number;
-  incentive: number;
+  bonusTierEarnings: number;
   petrolSubsidy: number;
   penalty: number;
   advance: number;
@@ -269,7 +269,7 @@ export async function getTopDispatchers(
   const aggregated = await prisma.salaryRecord.groupBy({
     by: ["dispatcherId"],
     where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
-    _sum: { totalOrders: true, baseSalary: true, incentive: true, petrolSubsidy: true, penalty: true, advance: true, netSalary: true },
+    _sum: { totalOrders: true, baseSalary: true, bonusTierEarnings: true, petrolSubsidy: true, penalty: true, advance: true, netSalary: true },
     orderBy: { _sum: { netSalary: "desc" } },
   });
 
@@ -294,7 +294,7 @@ export async function getTopDispatchers(
       avatarUrl: d.avatarUrl,
       totalOrders: r._sum.totalOrders ?? 0,
       baseSalary: r._sum.baseSalary ?? 0,
-      incentive: r._sum.incentive ?? 0,
+      bonusTierEarnings: r._sum.bonusTierEarnings ?? 0,
       petrolSubsidy: r._sum.petrolSubsidy ?? 0,
       penalty: r._sum.penalty ?? 0,
       advance: r._sum.advance ?? 0,

@@ -51,14 +51,27 @@ export async function POST(req: NextRequest) {
         ),
       });
 
-      // Incentive rules: delete existing + bulk create
+      // Incentive rule (orderThreshold): delete existing + bulk create
       await tx.incentiveRule.deleteMany({ where: { dispatcherId: { in: ids } } });
       await tx.incentiveRule.createMany({
         data: ids.map((dispatcherId) => ({
           dispatcherId,
           orderThreshold: body.incentiveRule.orderThreshold,
-          incentiveAmount: body.incentiveRule.incentiveAmount,
         })),
+      });
+
+      // Bonus tiers: delete existing + bulk create
+      await tx.bonusTier.deleteMany({ where: { dispatcherId: { in: ids } } });
+      await tx.bonusTier.createMany({
+        data: ids.flatMap((dispatcherId) =>
+          body.bonusTiers.map((it) => ({
+            dispatcherId,
+            tier: it.tier,
+            minWeight: it.minWeight,
+            maxWeight: it.maxWeight,
+            commission: it.commission,
+          })),
+        ),
       });
 
       // Petrol rules: delete existing + bulk create

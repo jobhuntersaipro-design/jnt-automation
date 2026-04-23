@@ -22,9 +22,11 @@ interface ReadyToConfirmProps {
 
 interface SummaryState {
   totalNetPayout: number;
+  /** Default-tier + bonus-tier commissions combined. */
   totalBaseSalary: number;
-  totalIncentive: number;
   totalPetrolSubsidy: number;
+  /** Manual additive commission; 0 at preview time. */
+  totalCommission: number;
   totalDeductions: number;
 }
 
@@ -96,8 +98,8 @@ export function ReadyToConfirm({
   const [summary, setSummary] = useState<SummaryState>({
     totalNetPayout: 0,
     totalBaseSalary: 0,
-    totalIncentive: 0,
     totalPetrolSubsidy: 0,
+    totalCommission: 0,
     totalDeductions: 0,
   });
   const [dispatcherNames, setDispatcherNames] = useState<DispatcherNameMap>({});
@@ -227,8 +229,8 @@ export function ReadyToConfirm({
           <PreviewSummaryCards
             totalNetPayout={summary.totalNetPayout}
             totalBaseSalary={summary.totalBaseSalary}
-            totalIncentive={summary.totalIncentive}
             totalPetrolSubsidy={summary.totalPetrolSubsidy}
+            totalCommission={summary.totalCommission}
             totalDeductions={summary.totalDeductions}
           />
 
@@ -269,12 +271,6 @@ export function ReadyToConfirm({
                 <span className="text-on-surface-variant">Base Salary</span>
                 <span className="font-medium text-on-surface tabular-nums">
                   RM {summary.totalBaseSalary.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-              <div className="flex justify-between py-2 border-b border-outline-variant/10">
-                <span className="text-on-surface-variant">Incentive</span>
-                <span className="font-medium text-on-surface tabular-nums">
-                  RM {summary.totalIncentive.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
               <div className="flex justify-between py-2 border-b border-outline-variant/10">

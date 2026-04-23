@@ -45,9 +45,13 @@ model AgentDefault {
   tier2Commission    Float   @default(1.40)
   tier3MinWeight     Float   @default(10.01)
   tier3Commission    Float   @default(2.20)
-  // Incentive
-  orderThreshold     Int     @default(2000)
-  incentiveAmount    Float   @default(200)
+  // Bonus tiers — apply to parcels above orderThreshold (e.g. #2001+).
+  // Weight ranges mirror the weight tiers above; only the commission rates
+  // are independently configurable. Defaults are a 50% uplift over weight tiers.
+  orderThreshold          Int     @default(2000)
+  bonusTier1Commission    Float   @default(1.50)
+  bonusTier2Commission    Float   @default(2.10)
+  bonusTier3Commission    Float   @default(3.30)
   // Petrol
   petrolEligible     Boolean @default(true)
   dailyThreshold     Int     @default(70)
@@ -131,6 +135,7 @@ model Dispatcher {
   assignments   DispatcherAssignment[]
   weightTiers   WeightTier[]
   incentiveRule IncentiveRule?
+  bonusTiers    BonusTier[]
   petrolRule    PetrolRule?
   salaryRecords SalaryRecord[]
   employees     Employee[]
@@ -185,11 +190,26 @@ model WeightTier {
 }
 
 model IncentiveRule {
-  id              String     @id @default(cuid())
-  dispatcherId    String     @unique
-  orderThreshold  Int        @default(2000)
-  incentiveAmount Float
-  dispatcher      Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+  id             String     @id @default(cuid())
+  dispatcherId   String     @unique
+  orderThreshold Int        @default(2000)
+  dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+}
+
+// Bonus tiers apply to parcels after the dispatcher crosses orderThreshold
+// (e.g. parcel #2001 onward). Weight boundaries mirror WeightTier; commissions
+// are independently configurable. Typically 3 rows per dispatcher.
+model BonusTier {
+  id           String     @id @default(cuid())
+  dispatcherId String
+  tier         Int        // 1, 2, or 3
+  minWeight    Float
+  maxWeight    Float?     // null = no upper bound (tier 3)
+  commission   Float      // RM flat rate per post-threshold parcel in this tier
+  dispatcher   Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatcherId, tier])
+  @@index([dispatcherId])
 }
 
 model PetrolRule {
@@ -329,18 +349,19 @@ model SalaryRecord {
   month        Int
   year         Int
 
-  totalOrders   Int
-  baseSalary    Float
-  incentive     Float @default(0)
-  petrolSubsidy Float @default(0)
-  penalty       Float @default(0)
-  advance       Float @default(0)
-  netSalary     Float
+  totalOrders       Int
+  baseSalary        Float
+  bonusTierEarnings Float @default(0)  // total commission from parcels priced at BonusTier rate (post-threshold)
+  petrolSubsidy     Float @default(0)
+  commission        Float @default(0)  // manual additive commission entered by user, rolls into netSalary
+  penalty           Float @default(0)
+  advance           Float @default(0)
+  netSalary         Float
   petrolQualifyingDays Int @default(0)
 
   // Snapshots of rules used for this salary calculation (JSON)
   weightTiersSnapshot Json?  // Array<{ tier, minWeight, maxWeight, commission }>
-  incentiveSnapshot   Json?  // { orderThreshold, incentiveAmount }
+  bonusTierSnapshot   Json?  // New shape: { orderThreshold, tiers: [{tier,minWeight,maxWeight,commission}] }. Legacy shape (pre-bonus-tiers): { orderThreshold, incentiveAmount }. Use readBonusTierSnapshot to discriminate.
   petrolSnapshot      Json?  // { isEligible, dailyThreshold, subsidyAmount }
 
   lineItems  SalaryLineItem[]
@@ -363,6 +384,7 @@ model SalaryLineItem {
   weight         Float
   commission     Float
   deliveryDate   DateTime?
+  isBonusTier    Boolean      @default(false) // true when this parcel was priced at the dispatcher's BonusTier (i.e. the parcel fell after orderThreshold)
   salaryRecord   SalaryRecord @relation(fields: [salaryRecordId], references: [id], onDelete: Cascade)
 
   @@index([salaryRecordId])

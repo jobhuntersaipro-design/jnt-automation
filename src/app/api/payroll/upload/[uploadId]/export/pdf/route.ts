@@ -38,22 +38,27 @@ export async function GET(
     r.extId,
     String(r.totalOrders),
     fmt(r.baseSalary),
-    r.incentive > 0 ? fmt(r.incentive) : "—",
+    r.bonusTierEarnings > 0 ? fmt(r.bonusTierEarnings) : "—",
     r.petrolSubsidy > 0 ? fmt(r.petrolSubsidy) : "—",
     r.penalty > 0 ? fmt(r.penalty) : "—",
     r.advance > 0 ? fmt(r.advance) : "—",
+    r.commission > 0 ? fmt(r.commission) : "—",
     fmt(r.netSalary),
   ]);
+
+  const totalDefaultTier = records.reduce((s, r) => s + r.baseSalary, 0);
+  const totalBonusTier = records.reduce((s, r) => s + r.bonusTierEarnings, 0);
 
   const footer = [
     "TOTAL",
     "",
     String(records.reduce((s, r) => s + r.totalOrders, 0)),
-    fmt(summary.totalBaseSalary),
-    fmt(summary.totalIncentive),
+    fmt(totalDefaultTier),
+    fmt(totalBonusTier),
     fmt(summary.totalPetrolSubsidy),
     "",
     "",
+    fmt(summary.totalCommission),
     fmt(summary.totalNetPayout),
   ];
 
@@ -71,11 +76,12 @@ export async function GET(
       { label: "Dispatcher", flex: 3 },
       { label: "ID", flex: 2 },
       { label: "Orders", flex: 1, align: "right", tabular: true },
-      { label: "Base", flex: 1.4, align: "right", tabular: true },
-      { label: "Incentive", flex: 1.4, align: "right", tabular: true },
+      { label: "Default Tier", flex: 1.4, align: "right", tabular: true },
+      { label: "Bonus Tier", flex: 1.4, align: "right", tabular: true },
       { label: "Petrol", flex: 1.4, align: "right", tabular: true },
       { label: "Penalty", flex: 1.2, align: "right", tabular: true },
       { label: "Advance", flex: 1.2, align: "right", tabular: true },
+      { label: "Commission", flex: 1.3, align: "right", tabular: true },
       { label: "Net (RM)", flex: 1.5, align: "right", tabular: true },
     ],
     rows,

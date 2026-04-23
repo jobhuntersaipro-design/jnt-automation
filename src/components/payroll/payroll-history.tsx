@@ -99,7 +99,7 @@ export interface PayrollRecord {
   dispatcherCount: number;
   totalNetPayout: number;
   totalBaseSalary: number;
-  totalIncentive: number;
+  totalBonusTierEarnings: number;
   totalPetrolSubsidy: number;
   totalDeductions: number;
 }
@@ -391,11 +391,11 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
         count: acc.count + 1,
         net: acc.net + r.totalNetPayout,
         base: acc.base + r.totalBaseSalary,
-        incentive: acc.incentive + r.totalIncentive,
+        bonusTierEarnings: acc.bonusTierEarnings + r.totalBonusTierEarnings,
         petrol: acc.petrol + r.totalPetrolSubsidy,
         deductions: acc.deductions + r.totalDeductions,
       }),
-      { count: 0, net: 0, base: 0, incentive: 0, petrol: 0, deductions: 0 },
+      { count: 0, net: 0, base: 0, bonusTierEarnings: 0, petrol: 0, deductions: 0 },
     );
   }, [filtered]);
 
@@ -499,7 +499,7 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
               Base
             </span>
             <span className="text-[0.65rem] font-medium uppercase tracking-wider text-emerald-700/80 text-right">
-              Incentive
+              Bonus Tier
             </span>
             <span className="text-[0.65rem] font-medium uppercase tracking-wider text-amber-700/80 text-right">
               Petrol
@@ -536,10 +536,10 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
                 </span>
                 <span
                   className={`text-[0.82rem] tabular-nums text-right whitespace-nowrap ${
-                    r.totalIncentive > 0 ? "text-emerald-700" : "text-on-surface-variant/40"
+                    r.totalBonusTierEarnings > 0 ? "text-emerald-700" : "text-on-surface-variant/40"
                   }`}
                 >
-                  {r.totalIncentive > 0 ? `RM ${formatRM(r.totalIncentive)}` : "—"}
+                  {r.totalBonusTierEarnings > 0 ? `RM ${formatRM(r.totalBonusTierEarnings)}` : "—"}
                 </span>
                 <span
                   className={`text-[0.82rem] tabular-nums text-right whitespace-nowrap ${
@@ -582,10 +582,10 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
               </span>
               <span
                 className={`tabular-nums text-right whitespace-nowrap ${
-                  totals.incentive > 0 ? "text-emerald-700" : "text-on-surface-variant/40"
+                  totals.bonusTierEarnings > 0 ? "text-emerald-700" : "text-on-surface-variant/40"
                 }`}
               >
-                {totals.incentive > 0 ? `RM ${formatRM(totals.incentive)}` : "—"}
+                {totals.bonusTierEarnings > 0 ? `RM ${formatRM(totals.bonusTierEarnings)}` : "—"}
               </span>
               <span
                 className={`tabular-nums text-right whitespace-nowrap ${

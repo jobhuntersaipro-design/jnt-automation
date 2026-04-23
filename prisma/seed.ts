@@ -8,8 +8,8 @@ const prisma = new PrismaClient({ adapter });
 
 // ─── Helpers ──────────────────────────────────────────────────
 
-function netSalary(base: number, incentive: number, petrol: number, penalty = 0, advance = 0) {
-  return base + incentive + petrol - penalty - advance;
+function netSalary(base: number, bonusTierEarnings: number, petrol: number, penalty = 0, advance = 0) {
+  return base + bonusTierEarnings + petrol - penalty - advance;
 }
 
 async function seedWeightTiers(dispatcherId: string) {
@@ -102,9 +102,21 @@ async function main() {
         create: {
           dispatcherId: dispatcher.id,
           orderThreshold: 2000,
-          incentiveAmount: t.incentiveAmt,
         },
       });
+
+      const existingBonusTiers = await prisma.bonusTier.count({
+        where: { dispatcherId: dispatcher.id },
+      });
+      if (existingBonusTiers === 0) {
+        await prisma.bonusTier.createMany({
+          data: [
+            { dispatcherId: dispatcher.id, tier: 1, minWeight: 0, maxWeight: 5, commission: 1.5 },
+            { dispatcherId: dispatcher.id, tier: 2, minWeight: 5.01, maxWeight: 10, commission: 2.1 },
+            { dispatcherId: dispatcher.id, tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
+          ],
+        });
+      }
 
       await prisma.petrolRule.upsert({
         where: { dispatcherId: dispatcher.id },
@@ -130,30 +142,30 @@ async function main() {
     { month: 3, year: 2026, label: "Mar 2026" },
   ];
 
-  const salaryByMonth: Record<number, { totalOrders: number; base: number; incentive: number; petrol: number; penalty: number; advance: number }[]> = {
+  const salaryByMonth: Record<number, { totalOrders: number; base: number; bonusTierEarnings: number; petrol: number; penalty: number; advance: number }[]> = {
     1: [
-      { totalOrders: 2450, base: 3800, incentive: 300, petrol: 120, penalty: 50,  advance: 200 },
-      { totalOrders: 2210, base: 3420, incentive: 280, petrol: 105, penalty: 0,   advance: 100 },
-      { totalOrders: 1980, base: 3100, incentive: 320, petrol: 0,   penalty: 80,  advance: 0   },
-      { totalOrders: 2050, base: 3250, incentive: 260, petrol: 90,  penalty: 0,   advance: 150 },
-      { totalOrders: 1870, base: 2950, incentive: 300, petrol: 0,   penalty: 30,  advance: 0   },
-      { totalOrders: 2100, base: 3300, incentive: 270, petrol: 75,  penalty: 0,   advance: 0   },
+      { totalOrders: 2450, base: 3800, bonusTierEarnings: 300, petrol: 120, penalty: 50,  advance: 200 },
+      { totalOrders: 2210, base: 3420, bonusTierEarnings: 280, petrol: 105, penalty: 0,   advance: 100 },
+      { totalOrders: 1980, base: 3100, bonusTierEarnings: 320, petrol: 0,   penalty: 80,  advance: 0   },
+      { totalOrders: 2050, base: 3250, bonusTierEarnings: 260, petrol: 90,  penalty: 0,   advance: 150 },
+      { totalOrders: 1870, base: 2950, bonusTierEarnings: 300, petrol: 0,   penalty: 30,  advance: 0   },
+      { totalOrders: 2100, base: 3300, bonusTierEarnings: 270, petrol: 75,  penalty: 0,   advance: 0   },
     ],
     2: [
-      { totalOrders: 2520, base: 3920, incentive: 300, petrol: 135, penalty: 0,   advance: 200 },
-      { totalOrders: 2280, base: 3540, incentive: 280, petrol: 120, penalty: 60,  advance: 0   },
-      { totalOrders: 2060, base: 3210, incentive: 320, petrol: 0,   penalty: 0,   advance: 100 },
-      { totalOrders: 2130, base: 3370, incentive: 260, petrol: 105, penalty: 40,  advance: 150 },
-      { totalOrders: 1920, base: 3040, incentive: 300, petrol: 0,   penalty: 0,   advance: 0   },
-      { totalOrders: 2190, base: 3430, incentive: 270, petrol: 90,  penalty: 25,  advance: 0   },
+      { totalOrders: 2520, base: 3920, bonusTierEarnings: 300, petrol: 135, penalty: 0,   advance: 200 },
+      { totalOrders: 2280, base: 3540, bonusTierEarnings: 280, petrol: 120, penalty: 60,  advance: 0   },
+      { totalOrders: 2060, base: 3210, bonusTierEarnings: 320, petrol: 0,   penalty: 0,   advance: 100 },
+      { totalOrders: 2130, base: 3370, bonusTierEarnings: 260, petrol: 105, penalty: 40,  advance: 150 },
+      { totalOrders: 1920, base: 3040, bonusTierEarnings: 300, petrol: 0,   penalty: 0,   advance: 0   },
+      { totalOrders: 2190, base: 3430, bonusTierEarnings: 270, petrol: 90,  penalty: 25,  advance: 0   },
     ],
     3: [
-      { totalOrders: 2680, base: 4120, incentive: 300, petrol: 150, penalty: 0,   advance: 300 },
-      { totalOrders: 2410, base: 3720, incentive: 280, petrol: 135, penalty: 70,  advance: 0   },
-      { totalOrders: 2200, base: 3430, incentive: 320, petrol: 0,   penalty: 0,   advance: 200 },
-      { totalOrders: 2310, base: 3560, incentive: 260, petrol: 120, penalty: 50,  advance: 0   },
-      { totalOrders: 2080, base: 3210, incentive: 300, petrol: 0,   penalty: 0,   advance: 100 },
-      { totalOrders: 2350, base: 3640, incentive: 270, petrol: 105, penalty: 35,  advance: 150 },
+      { totalOrders: 2680, base: 4120, bonusTierEarnings: 300, petrol: 150, penalty: 0,   advance: 300 },
+      { totalOrders: 2410, base: 3720, bonusTierEarnings: 280, petrol: 135, penalty: 70,  advance: 0   },
+      { totalOrders: 2200, base: 3430, bonusTierEarnings: 320, petrol: 0,   penalty: 0,   advance: 200 },
+      { totalOrders: 2310, base: 3560, bonusTierEarnings: 260, petrol: 120, penalty: 50,  advance: 0   },
+      { totalOrders: 2080, base: 3210, bonusTierEarnings: 300, petrol: 0,   penalty: 0,   advance: 100 },
+      { totalOrders: 2350, base: 3640, bonusTierEarnings: 270, petrol: 105, penalty: 35,  advance: 150 },
     ],
   };
 
@@ -177,14 +189,14 @@ async function main() {
         const t = dispatcherTemplates[i];
         const dispatcherId = dispatcherIds[`${branchLabel}-${t.extId}`];
         const s = salaryData[i];
-        const net = netSalary(s.base, s.incentive, s.petrol, s.penalty, s.advance);
+        const net = netSalary(s.base, s.bonusTierEarnings, s.petrol, s.penalty, s.advance);
 
         await prisma.salaryRecord.upsert({
           where: { dispatcherId_uploadId: { dispatcherId, uploadId: upload.id } },
           update: {
             totalOrders: s.totalOrders,
             baseSalary: s.base,
-            incentive: s.incentive,
+            bonusTierEarnings: s.bonusTierEarnings,
             petrolSubsidy: s.petrol,
             penalty: s.penalty,
             advance: s.advance,
@@ -197,7 +209,7 @@ async function main() {
             year,
             totalOrders: s.totalOrders,
             baseSalary: s.base,
-            incentive: s.incentive,
+            bonusTierEarnings: s.bonusTierEarnings,
             petrolSubsidy: s.petrol,
             penalty: s.penalty,
             advance: s.advance,

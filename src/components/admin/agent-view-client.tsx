@@ -97,7 +97,7 @@ function OverviewTab({ data }: { data: AgentView }) {
         {[
           { label: "Total Net Salary", value: summary.totalNetSalary, highlight: true },
           { label: "Base Salary", value: summary.totalBaseSalary },
-          { label: "Incentive", value: summary.totalIncentive },
+          { label: "Bonus Tier", value: summary.totalBonusTierEarnings },
           { label: "Petrol Subsidy", value: summary.totalPetrol },
         ].map(({ label, value, highlight }) => (
           <div

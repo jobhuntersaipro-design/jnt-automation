@@ -5,19 +5,34 @@ import { getPreviewData, updatePreviewData } from "@/lib/upload/pipeline";
 
 export interface PreviewSummary {
   totalNetPayout: number;
+  /** Default-tier + bonus-tier commissions combined. */
   totalBaseSalary: number;
-  totalIncentive: number;
   totalPetrolSubsidy: number;
+  /** Manual additive commission; always 0 at preview time. */
+  totalCommission: number;
   totalDeductions: number;
   dispatcherCount: number;
 }
 
-function computeSummary(results: { baseSalary: number; incentive: number; petrolSubsidy: number; penalty: number; advance: number; netSalary: number }[]): PreviewSummary {
+function computeSummary(
+  results: {
+    baseSalary: number;
+    bonusTierEarnings: number;
+    petrolSubsidy: number;
+    commission?: number;
+    penalty: number;
+    advance: number;
+    netSalary: number;
+  }[],
+): PreviewSummary {
   return {
     totalNetPayout: results.reduce((sum, r) => sum + r.netSalary, 0),
-    totalBaseSalary: results.reduce((sum, r) => sum + r.baseSalary, 0),
-    totalIncentive: results.reduce((sum, r) => sum + r.incentive, 0),
+    totalBaseSalary: results.reduce(
+      (sum, r) => sum + r.baseSalary + r.bonusTierEarnings,
+      0,
+    ),
     totalPetrolSubsidy: results.reduce((sum, r) => sum + r.petrolSubsidy, 0),
+    totalCommission: results.reduce((sum, r) => sum + (r.commission ?? 0), 0),
     totalDeductions: results.reduce((sum, r) => sum + r.penalty + r.advance, 0),
     dispatcherCount: results.length,
   };
@@ -87,11 +102,11 @@ export async function PATCH(
   }
 
   const body = await req.json();
-  const { dispatcherId, penalty, advance, incentive, petrolSubsidy, weightTiers } = body as {
+  const { dispatcherId, penalty, advance, bonusTierEarnings, petrolSubsidy, weightTiers } = body as {
     dispatcherId: string;
     penalty?: number;
     advance?: number;
-    incentive?: number;
+    bonusTierEarnings?: number;
     petrolSubsidy?: number;
     weightTiers?: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }>;
   };
@@ -115,7 +130,7 @@ export async function PATCH(
   // Update fields if provided
   if (typeof penalty === "number") result.penalty = penalty;
   if (typeof advance === "number") result.advance = advance;
-  if (typeof incentive === "number") result.incentive = incentive;
+  if (typeof bonusTierEarnings === "number") result.bonusTierEarnings = bonusTierEarnings;
   if (typeof petrolSubsidy === "number") result.petrolSubsidy = petrolSubsidy;
 
   // If weight tiers changed, recalculate base salary
@@ -144,7 +159,7 @@ export async function PATCH(
   }
 
   result.netSalary = Math.round(
-    (result.baseSalary + result.incentive + result.petrolSubsidy - result.penalty - result.advance) * 100,
+    (result.baseSalary + result.bonusTierEarnings + result.petrolSubsidy - result.penalty - result.advance) * 100,
   ) / 100;
 
   await updatePreviewData(uploadId, preview);

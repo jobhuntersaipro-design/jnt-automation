@@ -93,7 +93,8 @@ function IntegerInput({ value, onChange, className }: {
 
 interface DefaultValues {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
-  incentiveRule: { orderThreshold: number; incentiveAmount: number };
+  bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
+  incentiveRule: { orderThreshold: number };
   petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
 }
 
@@ -108,7 +109,7 @@ interface DefaultsDrawerProps {
 export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }: DefaultsDrawerProps) {
   const [values, setValues] = useState<DefaultValues>(initialValues);
   const [applying, setApplying] = useState(false);
-  const [incentiveEnabled, setIncentiveEnabled] = useState(initialValues.incentiveRule.orderThreshold > 0);
+  const [incentiveEnabled, setBonusTierEnabled] = useState(initialValues.incentiveRule.orderThreshold > 0);
 
   const INPUT =
     "w-full px-2.5 py-1.5 text-[0.84rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40";
@@ -214,10 +215,10 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
             </div>
           </section>
 
-          {/* Incentive */}
+          {/* Bonus Tier */}
           <section>
             <h3 className="text-[0.72rem] font-medium tracking-[0.05em] uppercase mb-3" style={{ color: "#12B981" }}>
-              Incentive
+              Bonus Tier
             </h3>
             <div className="flex items-center gap-3 mb-3">
               <label className="text-[0.78rem] text-on-surface-variant">Eligible by default</label>
@@ -227,16 +228,13 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
                 aria-checked={incentiveEnabled}
                 onClick={() => {
                   const next = !incentiveEnabled;
-                  setIncentiveEnabled(next);
+                  setBonusTierEnabled(next);
                   if (!next) {
-                    setValues((v) => ({ ...v, incentiveRule: { ...v.incentiveRule, orderThreshold: 0 } }));
+                    setValues((v) => ({ ...v, incentiveRule: { orderThreshold: 0 } }));
                   } else {
                     setValues((v) => ({
                       ...v,
-                      incentiveRule: {
-                        orderThreshold: v.incentiveRule.orderThreshold || 2000,
-                        incentiveAmount: v.incentiveRule.incentiveAmount || 200,
-                      },
+                      incentiveRule: { orderThreshold: v.incentiveRule.orderThreshold || 2000 },
                     }));
                   }
                 }}
@@ -247,27 +245,50 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
               </button>
             </div>
             {incentiveEnabled ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-3">
                 <div>
                   <label className="block text-[0.68rem] text-on-surface-variant mb-1">Min Orders / Month</label>
                   <IntegerInput
                     value={values.incentiveRule.orderThreshold}
-                    onChange={(n) => setValues((v) => ({ ...v, incentiveRule: { ...v.incentiveRule, orderThreshold: n } }))}
+                    onChange={(n) => setValues((v) => ({ ...v, incentiveRule: { orderThreshold: n } }))}
                     className={INPUT}
                   />
                 </div>
                 <div>
-                  <label className="block text-[0.68rem] text-on-surface-variant mb-1">Amount (RM)</label>
-                  <DecimalInput
-                    value={values.incentiveRule.incentiveAmount}
-                    onChange={(n) => setValues((v) => ({ ...v, incentiveRule: { ...v.incentiveRule, incentiveAmount: n } }))}
-                    className={INPUT}
-                    cents
-                  />
+                  <label className="block text-[0.68rem] text-on-surface-variant mb-1">
+                    Tier Rates (RM per post-threshold parcel)
+                  </label>
+                  <p className="text-[0.62rem] text-on-surface-variant/70 mb-2">
+                    Weight ranges follow the base tiers above.
+                  </p>
+                  <div className="grid grid-cols-[2.5rem_1fr_1fr_1fr] gap-x-2 items-center">
+                    <span className="text-[0.62rem] text-on-surface-variant/60 text-center">Tier</span>
+                    <span className="text-[0.62rem] text-on-surface-variant/60 text-center">T1</span>
+                    <span className="text-[0.62rem] text-on-surface-variant/60 text-center">T2</span>
+                    <span className="text-[0.62rem] text-on-surface-variant/60 text-center">T3</span>
+                  </div>
+                  <div className="grid grid-cols-[2.5rem_1fr_1fr_1fr] gap-x-2 items-center mt-1.5">
+                    <span className="text-[0.72rem] text-on-surface-variant text-center">RM</span>
+                    {values.bonusTiers.map((tier, i) => (
+                      <DecimalInput
+                        key={tier.tier}
+                        value={tier.commission}
+                        onChange={(n) => {
+                          setValues((v) => ({
+                            ...v,
+                            bonusTiers: v.bonusTiers.map((t, idx) =>
+                              idx === i ? { ...t, commission: n } : t,
+                            ),
+                          }));
+                        }}
+                        className={INPUT}
+                      />
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (
-              <p className="text-[0.75rem] text-on-surface-variant/50">Incentive will be off for all dispatchers.</p>
+              <p className="text-[0.75rem] text-on-surface-variant/50">Bonus Tier will be off for all dispatchers.</p>
             )}
           </section>
 
