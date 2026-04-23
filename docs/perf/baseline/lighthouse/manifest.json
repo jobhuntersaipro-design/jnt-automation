@@ -1,0 +1,38 @@
+[
+  {
+    "url": "http://localhost:3000/auth/login",
+    "isRepresentativeRun": false,
+    "htmlPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_03.report.html",
+    "jsonPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_03.report.json",
+    "summary": {
+      "performance": 1,
+      "accessibility": 0.9,
+      "best-practices": 1,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3000/auth/login",
+    "isRepresentativeRun": false,
+    "htmlPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_14.report.html",
+    "jsonPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_14.report.json",
+    "summary": {
+      "performance": 1,
+      "accessibility": 0.9,
+      "best-practices": 1,
+      "seo": 1
+    }
+  },
+  {
+    "url": "http://localhost:3000/auth/login",
+    "isRepresentativeRun": true,
+    "htmlPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_25.report.html",
+    "jsonPath": "/Users/chrislam/jnt-automation/docs/perf/baseline/lighthouse/auth_login-2026_04_23_07_52_25.report.json",
+    "summary": {
+      "performance": 1,
+      "accessibility": 0.9,
+      "best-practices": 1,
+      "seo": 1
+    }
+  }
+]

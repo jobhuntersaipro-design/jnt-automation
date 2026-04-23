@@ -1,0 +1,112 @@
+
+> jnt_automation@0.1.0 build
+> next build
+
+▲ Next.js 16.2.1 (Turbopack)
+- Environments: .env.local, .env
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 5.0s
+  Running TypeScript ...
+  Finished TypeScript in 4.8s ...
+  Collecting page data using 13 workers ...
+  Generating static pages using 13 workers (0/42) ...
+  Generating static pages using 13 workers (10/42) 
+  Generating static pages using 13 workers (20/42) 
+  Generating static pages using 13 workers (31/42) 
+✓ Generating static pages using 13 workers (42/42) in 187ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ƒ /admin
+├ ƒ /admin/view/[agentId]
+├ ƒ /api/admin/agents
+├ ƒ /api/admin/agents/[agentId]
+├ ƒ /api/admin/agents/[agentId]/branches
+├ ƒ /api/admin/impersonate
+├ ƒ /api/admin/payments
+├ ƒ /api/admin/payments/[paymentId]
+├ ƒ /api/auth/[...nextauth]
+├ ƒ /api/auth/forgot-password
+├ ƒ /api/auth/register
+├ ƒ /api/auth/reset-password
+├ ƒ /api/branches
+├ ƒ /api/dispatchers/month-detail/bulk/[jobId]/download
+├ ƒ /api/dispatchers/month-detail/bulk/[jobId]/status
+├ ƒ /api/dispatchers/month-detail/bulk/active
+├ ƒ /api/dispatchers/month-detail/bulk/recent
+├ ƒ /api/dispatchers/month-detail/bulk/start
+├ ƒ /api/employee-payroll/[month]/[year]
+├ ƒ /api/employee-payroll/[month]/[year]/payslip/[employeeId]
+├ ƒ /api/employee-payroll/[month]/[year]/payslips
+├ ƒ /api/employee-payroll/history
+├ ƒ /api/employees
+├ ƒ /api/employees/[id]
+├ ƒ /api/notifications
+├ ƒ /api/overview/export/csv
+├ ƒ /api/overview/export/pdf
+├ ƒ /api/payroll
+├ ƒ /api/payroll/[branchCode]/[month]/[year]
+├ ƒ /api/payroll/upload/[uploadId]/export/csv
+├ ƒ /api/payroll/upload/[uploadId]/export/pdf
+├ ƒ /api/payroll/upload/[uploadId]/payslips
+├ ƒ /api/payroll/upload/[uploadId]/recalculate
+├ ƒ /api/payroll/upload/[uploadId]/salary-records
+├ ƒ /api/settings/account
+├ ƒ /api/settings/avatar
+├ ƒ /api/settings/company
+├ ƒ /api/settings/password
+├ ƒ /api/settings/profile
+├ ƒ /api/settings/stamp
+├ ƒ /api/staff
+├ ƒ /api/staff/[id]
+├ ƒ /api/staff/[id]/avatar
+├ ƒ /api/staff/[id]/avatar/default
+├ ƒ /api/staff/[id]/export/csv
+├ ƒ /api/staff/[id]/export/pdf
+├ ƒ /api/staff/[id]/history
+├ ƒ /api/staff/[id]/history/[salaryRecordId]/export/csv
+├ ƒ /api/staff/[id]/history/[salaryRecordId]/export/pdf
+├ ƒ /api/staff/[id]/pin
+├ ƒ /api/staff/[id]/recalculate
+├ ƒ /api/staff/[id]/settings
+├ ƒ /api/staff/apply-defaults
+├ ƒ /api/staff/defaults
+├ ƒ /api/upload/[uploadId]
+├ ƒ /api/upload/[uploadId]/calculate
+├ ƒ /api/upload/[uploadId]/confirm
+├ ƒ /api/upload/[uploadId]/preview
+├ ƒ /api/upload/[uploadId]/process
+├ ƒ /api/upload/[uploadId]/process-unknown
+├ ƒ /api/upload/[uploadId]/retry
+├ ƒ /api/upload/[uploadId]/rules-summary
+├ ƒ /api/upload/[uploadId]/setup-dispatchers
+├ ƒ /api/upload/[uploadId]/status
+├ ƒ /api/upload/cleanup-r2
+├ ƒ /api/upload/detect
+├ ƒ /api/upload/init
+├ ƒ /api/upload/worker
+├ ƒ /auth/forgot-password
+├ ƒ /auth/login
+├ ƒ /auth/pending
+├ ƒ /auth/register
+├ ƒ /auth/reset-password
+├ ƒ /branches
+├ ƒ /branches/[code]
+├ ƒ /dashboard
+├ ƒ /dispatchers
+├ ƒ /dispatchers/history/[salaryRecordId]
+├ ƒ /dispatchers/payroll/[uploadId]
+├ ƒ /payroll
+├ ƒ /payroll/[uploadId]
+├ ƒ /settings
+└ ƒ /staff
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

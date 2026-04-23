@@ -1,0 +1,20 @@
+{
+  "ci": {
+    "collect": {
+      "url": ["http://localhost:3000/auth/login"],
+      "startServerCommand": "npm run start",
+      "startServerReadyPattern": "Ready in",
+      "startServerReadyTimeout": 60000,
+      "numberOfRuns": 3,
+      "settings": {
+        "preset": "desktop",
+        "chromeFlags": "--no-sandbox --disable-gpu"
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": "./docs/perf/baseline/lighthouse",
+      "reportFilenamePattern": "%%PATHNAME%%-%%DATETIME%%.report.%%EXTENSION%%"
+    }
+  }
+}
