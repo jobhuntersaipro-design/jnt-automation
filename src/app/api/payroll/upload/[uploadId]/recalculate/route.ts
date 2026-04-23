@@ -5,13 +5,14 @@ import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
+import { repriceSalary } from "@/lib/payroll/re-price";
 
+// Only penalty/advance/commission are trusted from the client. totalOrders /
+// baseSalary / bonusTierEarnings / petrolSubsidy are re-derived server-side
+// from SalaryLineItem rows against the dispatcher's CURRENT rules — rate
+// changes in settings must flow through on save.
 const UpdateEntrySchema = z.object({
   dispatcherId: z.string().min(1),
-  totalOrders: z.number().int().min(0).max(100_000),
-  baseSalary: z.number().min(0).max(1_000_000),
-  bonusTierEarnings: z.number().min(0).max(100_000),
-  petrolSubsidy: z.number().min(0).max(100_000),
   commission: z.number().min(0).max(100_000),
   penalty: z.number().min(0).max(100_000),
   advance: z.number().min(0).max(100_000),
@@ -68,63 +69,127 @@ export async function POST(
     });
     const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d]));
 
+    // Pre-load existing SalaryRecord ids + line items for every dispatcher in
+    // this batch so the transaction can re-price without a second round-trip.
+    const salaryRecords = await prisma.salaryRecord.findMany({
+      where: { uploadId, dispatcherId: { in: dispatcherIds } },
+      select: {
+        id: true,
+        dispatcherId: true,
+        lineItems: {
+          select: {
+            id: true,
+            waybillNumber: true,
+            weight: true,
+            deliveryDate: true,
+            isBonusTier: true,
+            commission: true,
+          },
+        },
+      },
+    });
+    const recordByDispatcher = new Map(
+      salaryRecords.map((r) => [r.dispatcherId, r]),
+    );
+
     await prisma.$transaction(async (tx) => {
-      await Promise.all(updates.map((update) => {
+      await Promise.all(updates.map(async (update) => {
         const dispatcher = dispatcherMap.get(update.dispatcherId);
-        if (!dispatcher) return Promise.resolve();
+        const record = recordByDispatcher.get(update.dispatcherId);
+        if (!dispatcher || !record) return;
+
+        const weightTiers = dispatcher.weightTiers.map((t) => ({
+          tier: t.tier,
+          minWeight: t.minWeight,
+          maxWeight: t.maxWeight,
+          commission: t.commission,
+        }));
+        const bonusTiers = dispatcher.bonusTiers.map((t) => ({
+          tier: t.tier,
+          minWeight: t.minWeight,
+          maxWeight: t.maxWeight,
+          commission: t.commission,
+        }));
+        const orderThreshold = dispatcher.incentiveRule?.orderThreshold ?? 0;
+        const petrolRule = dispatcher.petrolRule ?? {
+          isEligible: false,
+          dailyThreshold: 70,
+          subsidyAmount: 15,
+        };
+
+        // Re-price line items in-memory against current rules.
+        const repriced = repriceSalary(
+          record.lineItems.map((li) => ({
+            waybillNumber: li.waybillNumber,
+            weight: li.weight,
+            deliveryDate: li.deliveryDate,
+            isBonusTier: li.isBonusTier,
+          })),
+          weightTiers,
+          bonusTiers,
+          orderThreshold,
+          petrolRule,
+        );
+
+        // If any line item changed commission or flag, delete all + createMany.
+        // A single dispatcher can have thousands of line items so doing per-row
+        // Prisma updates in an interactive transaction overwhelms the connection
+        // pool. Delete + bulk insert is two queries regardless of row count.
+        // Skip entirely when nothing changed.
+        const anyChanged = record.lineItems.some(
+          (orig, i) =>
+            orig.commission !== repriced.items[i].commission ||
+            orig.isBonusTier !== repriced.items[i].isBonusTier,
+        );
+        if (anyChanged) {
+          await tx.salaryLineItem.deleteMany({ where: { salaryRecordId: record.id } });
+          await tx.salaryLineItem.createMany({
+            data: record.lineItems.map((orig, i) => ({
+              salaryRecordId: record.id,
+              waybillNumber: orig.waybillNumber,
+              weight: orig.weight,
+              commission: repriced.items[i].commission,
+              isBonusTier: repriced.items[i].isBonusTier,
+              deliveryDate: orig.deliveryDate,
+            })),
+          });
+        }
 
         const netSalary =
-          update.baseSalary +
-          update.bonusTierEarnings +
-          update.petrolSubsidy +
+          repriced.baseSalary +
+          repriced.bonusTierEarnings +
+          repriced.petrolSubsidy +
           update.commission -
           update.penalty -
           update.advance;
 
-        return tx.salaryRecord.update({
-          where: {
-            dispatcherId_uploadId: {
-              dispatcherId: update.dispatcherId,
-              uploadId,
-            },
-          },
+        await tx.salaryRecord.update({
+          where: { id: record.id },
           data: {
-            totalOrders: update.totalOrders,
-            baseSalary: update.baseSalary,
-            bonusTierEarnings: update.bonusTierEarnings,
-            petrolSubsidy: update.petrolSubsidy,
+            totalOrders: record.lineItems.length,
+            baseSalary: repriced.baseSalary,
+            bonusTierEarnings: repriced.bonusTierEarnings,
+            petrolSubsidy: repriced.petrolSubsidy,
+            petrolQualifyingDays: repriced.petrolQualifyingDays,
             commission: update.commission,
             penalty: update.penalty,
             advance: update.advance,
-            netSalary,
-            weightTiersSnapshot: dispatcher.weightTiers.map((t) => ({
-              tier: t.tier,
-              minWeight: t.minWeight,
-              maxWeight: t.maxWeight,
-              commission: t.commission,
-            })),
+            netSalary: Math.round(netSalary * 100) / 100,
+            weightTiersSnapshot: weightTiers,
             bonusTierSnapshot: dispatcher.incentiveRule
-              ? {
-                  orderThreshold: dispatcher.incentiveRule.orderThreshold,
-                  tiers: dispatcher.bonusTiers.map((t) => ({
-                    tier: t.tier,
-                    minWeight: t.minWeight,
-                    maxWeight: t.maxWeight,
-                    commission: t.commission,
-                  })),
-                }
+              ? { orderThreshold, tiers: bonusTiers }
               : undefined,
             petrolSnapshot: dispatcher.petrolRule
               ? {
-                  isEligible: dispatcher.petrolRule.isEligible,
-                  dailyThreshold: dispatcher.petrolRule.dailyThreshold,
-                  subsidyAmount: dispatcher.petrolRule.subsidyAmount,
+                  isEligible: petrolRule.isEligible,
+                  dailyThreshold: petrolRule.dailyThreshold,
+                  subsidyAmount: petrolRule.subsidyAmount,
                 }
               : undefined,
           },
         });
       }));
-    }, { timeout: 30000 });
+    }, { timeout: 60000 });
 
     revalidatePath("/dispatchers");
     revalidatePath("/dashboard");

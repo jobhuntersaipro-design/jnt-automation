@@ -295,17 +295,17 @@ export function SalaryTable({
   const modifiedCount = editedRecords.size;
   const preEditSummary = computeSummary(preEditRecords);
 
-  // Save & Regenerate
+  // Save & Regenerate — re-prices every dispatcher against current settings.
+  // When rows have been edited (penalty/advance/commission), only those
+  // records go up. When none are edited, we post EVERY record so a pure
+  // rate-change in dispatcher settings flows through the re-pricer too.
   const handleSave = async () => {
     setShowConfirm(false);
     setSaving(true);
     try {
-      const updates = Array.from(editedRecords.values()).map((r) => ({
+      const source = editedRecords.size > 0 ? Array.from(editedRecords.values()) : records;
+      const updates = source.map((r) => ({
         dispatcherId: r.dispatcherId,
-        totalOrders: r.totalOrders,
-        baseSalary: r.baseSalary,
-        bonusTierEarnings: r.bonusTierEarnings,
-        petrolSubsidy: r.petrolSubsidy,
         commission: r.commission,
         penalty: r.penalty,
         advance: r.advance,
@@ -474,7 +474,7 @@ export function SalaryTable({
             <div className="flex-1 text-[0.82rem] text-on-surface-variant">
               {modifiedCount > 0
                 ? `${modifiedCount} dispatcher${modifiedCount !== 1 ? "s" : ""} modified`
-                : "No changes yet — edit penalty, advance, or commission."}
+                : "No row edits — Save & Regenerate will re-price every dispatcher against current settings."}
             </div>
             <button
               onClick={cancelEdit}
@@ -485,10 +485,14 @@ export function SalaryTable({
             </button>
             <button
               onClick={() => setShowConfirm(true)}
-              disabled={modifiedCount === 0 || saving}
+              disabled={saving}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 text-[0.82rem] font-medium text-white bg-brand rounded-md hover:bg-brand/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {saving ? "Saving..." : `Save & Regenerate (${modifiedCount})`}
+              {saving
+                ? "Saving..."
+                : modifiedCount > 0
+                  ? `Save & Regenerate (${modifiedCount})`
+                  : "Save & Regenerate"}
             </button>
           </>
         ) : (
