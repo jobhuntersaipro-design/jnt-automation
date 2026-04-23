@@ -44,6 +44,12 @@ export const applyDefaultsBodySchema = defaultsBodySchema.extend({
   dispatcherIds: z.array(z.string()).optional(),
 });
 
+export const adjustmentsSchema = z.object({
+  commission: z.number().min(0).max(100_000).optional(),
+  penalty: z.number().min(0).max(100_000).optional(),
+  advance: z.number().min(0).max(100_000).optional(),
+});
+
 export const recalculateBodySchema = z.object({
   salaryRecordId: z.string().min(1),
   updatedSnapshot: z.object({
@@ -52,4 +58,5 @@ export const recalculateBodySchema = z.object({
     bonusTierEarnings: incentiveRuleSchema.optional(),
     petrol: petrolRuleSchema.optional(),
   }),
+  adjustments: adjustmentsSchema.optional(),
 });

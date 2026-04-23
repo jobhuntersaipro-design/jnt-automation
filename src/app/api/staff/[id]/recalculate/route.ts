@@ -54,12 +54,13 @@ export async function POST(
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
     }
-    const { salaryRecordId, updatedSnapshot } = parsed.data;
+    const { salaryRecordId, updatedSnapshot, adjustments } = parsed.data;
 
     const record = await prisma.salaryRecord.findFirst({
       where: { id: salaryRecordId, dispatcherId: id },
       select: {
         id: true,
+        commission: true,
         penalty: true,
         advance: true,
         weightTiersSnapshot: true,
@@ -162,8 +163,20 @@ export async function POST(
       }
     }
 
+    // Resolve effective adjustment values — client-supplied overrides (each
+    // optional) fall back to the record's existing values so the drawer can
+    // send only the fields the user actually changed.
+    const effectiveCommission = adjustments?.commission ?? record.commission;
+    const effectivePenalty = adjustments?.penalty ?? record.penalty;
+    const effectiveAdvance = adjustments?.advance ?? record.advance;
+
     const netSalary =
-      baseSalary + bonusTierEarnings + petrolSubsidy - record.penalty - record.advance;
+      baseSalary +
+      bonusTierEarnings +
+      petrolSubsidy +
+      effectiveCommission -
+      effectivePenalty -
+      effectiveAdvance;
 
     const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -191,6 +204,9 @@ export async function POST(
           totalOrders,
           bonusTierEarnings: round2(bonusTierEarnings),
           petrolSubsidy: round2(petrolSubsidy),
+          commission: round2(effectiveCommission),
+          penalty: round2(effectivePenalty),
+          advance: round2(effectiveAdvance),
           netSalary: round2(netSalary),
           weightTiersSnapshot: weightTiers as unknown as InputJsonValue,
           bonusTierSnapshot: {

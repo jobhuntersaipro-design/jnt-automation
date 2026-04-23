@@ -55,6 +55,7 @@ export interface HistoryRecord {
   bonusTierEarnings: number;
   petrolSubsidy: number;
   petrolQualifyingDays: number;
+  commission: number;
   penalty: number;
   advance: number;
   totalOrders: number;
@@ -204,6 +205,9 @@ export function HistoryMonthRow({
   const [tiers, setTiers] = useState<WeightTierSnapshot[]>(originalTiers);
   const [bonusTierEarnings, setBonusTier] = useState<BonusTierSnapshot>(originalBonusTier);
   const [petrol, setPetrol] = useState<PetrolSnapshot>(originalPetrol);
+  const [commission, setCommission] = useState<number>(record.commission);
+  const [penalty, setPenalty] = useState<number>(record.penalty);
+  const [advance, setAdvance] = useState<number>(record.advance);
   const [showConfirm, setShowConfirm] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -263,8 +267,17 @@ export function HistoryMonthRow({
     if (originalPetrol.subsidyAmount !== petrol.subsidyAmount) {
       diffs.push({ field: "Petrol subsidy amount", from: formatRM(originalPetrol.subsidyAmount), to: formatRM(petrol.subsidyAmount) });
     }
+    if (record.commission !== commission) {
+      diffs.push({ field: "Commission", from: formatRM(record.commission), to: formatRM(commission) });
+    }
+    if (record.penalty !== penalty) {
+      diffs.push({ field: "Penalty", from: formatRM(record.penalty), to: formatRM(penalty) });
+    }
+    if (record.advance !== advance) {
+      diffs.push({ field: "Advance", from: formatRM(record.advance), to: formatRM(advance) });
+    }
     return diffs;
-  }, [tiers, bonusTierEarnings, petrol, originalTiers, originalBonusTier, originalPetrol]);
+  }, [tiers, bonusTierEarnings, petrol, commission, penalty, advance, originalTiers, originalBonusTier, originalPetrol, record.commission, record.penalty, record.advance]);
 
   const hasChanges = changes.length > 0;
 
@@ -272,6 +285,9 @@ export function HistoryMonthRow({
     setTiers(originalTiers);
     setBonusTier(originalBonusTier);
     setPetrol(originalPetrol);
+    setCommission(record.commission);
+    setPenalty(record.penalty);
+    setAdvance(record.advance);
     onToggle();
   }
 
@@ -289,6 +305,7 @@ export function HistoryMonthRow({
             bonusTierEarnings: { orderThreshold: bonusTierEarnings.orderThreshold },
             petrol,
           },
+          adjustments: { commission, penalty, advance },
         }),
       });
 
@@ -429,6 +446,12 @@ export function HistoryMonthRow({
             muted={record.petrolSubsidy === 0}
           />
           <StatChip
+            label="Commission"
+            value={record.commission > 0 ? formatRM(record.commission) : "—"}
+            color="#12B981"
+            muted={record.commission === 0}
+          />
+          <StatChip
             label="Penalty"
             value={record.penalty > 0 ? formatRM(record.penalty) : "—"}
             color="var(--color-critical)"
@@ -440,7 +463,7 @@ export function HistoryMonthRow({
             color="var(--color-critical)"
             muted={record.advance === 0}
           />
-          <div className="col-span-2 flex flex-col items-end justify-end border-l border-outline-variant/20 pl-3">
+          <div className="flex flex-col items-end justify-end border-l border-outline-variant/20 pl-3">
             <span className="text-[0.6rem] uppercase tracking-wider text-on-surface-variant/70 font-medium">
               Net Salary
             </span>
@@ -603,6 +626,51 @@ export function HistoryMonthRow({
                     <DecimalField
                       value={petrol.subsidyAmount}
                       onChange={(v) => setPetrol((prev) => ({ ...prev, subsidyAmount: v }))}
+                      className={FIELD_CLASS}
+                      showStepper
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Adjustments — commission (additive), penalty + advance (deductions) */}
+            <div>
+              <label className="block text-[0.68rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase mb-2">
+                Adjustments
+              </label>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <span className="text-[0.75rem] w-36" style={{ color: "#12B981" }}>Commission</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                    <DecimalField
+                      value={commission}
+                      onChange={setCommission}
+                      className={FIELD_CLASS}
+                      showStepper
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[0.75rem] w-36" style={{ color: "var(--color-critical)" }}>Penalty</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                    <DecimalField
+                      value={penalty}
+                      onChange={setPenalty}
+                      className={FIELD_CLASS}
+                      showStepper
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-[0.75rem] w-36" style={{ color: "var(--color-critical)" }}>Advance</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                    <DecimalField
+                      value={advance}
+                      onChange={setAdvance}
                       className={FIELD_CLASS}
                       showStepper
                     />
