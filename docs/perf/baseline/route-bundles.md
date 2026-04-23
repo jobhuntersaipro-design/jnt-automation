@@ -1,6 +1,6 @@
 # Per-Route Initial JS Bundle
 
-Captured: 2026-04-23T08:07:12.630Z
+Captured: 2026-04-23T08:40:25.801Z
 
 Sum of client chunks referenced by each route's
 `page_client-reference-manifest.js`. This is the JS the browser

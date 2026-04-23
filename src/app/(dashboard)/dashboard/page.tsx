@@ -8,11 +8,16 @@ import { TopDispatchers } from "@/components/dashboard/top-dispatchers";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { OverviewExport } from "@/components/dashboard/overview-export";
 import { ChartErrorBoundary } from "@/components/ui/chart-error-boundary";
-import { fetchDashboardData } from "@/lib/db/overview-cached";
+import {
+  fetchSummary,
+  fetchTrend,
+  fetchBranchDist,
+  fetchBreakdown,
+  fetchHitRate,
+  fetchTopDispatchers,
+} from "@/lib/db/overview-cached";
 import type { Filters } from "@/lib/db/overview";
 import { prisma } from "@/lib/prisma";
-
-export const dynamic = "force-dynamic";
 
 type SearchParams = {
   branches?: string;
@@ -22,6 +27,66 @@ type SearchParams = {
   toYear?: string;
 };
 
+/** Skeleton block sized like a chart card — keeps layout stable while streaming. */
+function ChartSkeleton({ heightClass = "h-72" }: { heightClass?: string }) {
+  return (
+    <div
+      className={`rounded-xl bg-surface-container-lowest border border-outline-variant/15 ${heightClass} animate-pulse`}
+    />
+  );
+}
+
+async function SummaryCardsAsync({
+  agentId,
+  filters,
+}: {
+  agentId: string;
+  filters: Filters;
+}) {
+  const data = await fetchSummary(agentId, filters);
+  return <SummaryCards data={data} filters={filters} />;
+}
+
+async function TrendChart({ agentId, filters }: { agentId: string; filters: Filters }) {
+  const data = await fetchTrend(agentId, filters);
+  return <MonthlyNetPayoutTrend data={data} />;
+}
+
+async function BranchDistChart({ agentId, filters }: { agentId: string; filters: Filters }) {
+  const data = await fetchBranchDist(agentId, filters);
+  return <BranchDistribution data={data} />;
+}
+
+async function BreakdownChart({ agentId, filters }: { agentId: string; filters: Filters }) {
+  const data = await fetchBreakdown(agentId, filters);
+  return <SalaryBreakdown data={data} />;
+}
+
+async function HitRateChart({ agentId, filters }: { agentId: string; filters: Filters }) {
+  const data = await fetchHitRate(agentId, filters);
+  return <BonusTierHitRate data={data} />;
+}
+
+async function TopDispatchersTable({
+  agentId,
+  filters,
+}: {
+  agentId: string;
+  filters: Filters;
+}) {
+  const data = await fetchTopDispatchers(agentId, filters);
+  return (
+    <TopDispatchers
+      data={data}
+      action={
+        <div key="export">
+          <OverviewExport />
+        </div>
+      }
+    />
+  );
+}
+
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -30,8 +95,7 @@ export default async function DashboardPage({
   const params = await searchParams;
 
   const now = new Date();
-  // Default to previous month as toMonth — current month rarely has complete data
-  let defaultToMonth = now.getMonth(); // getMonth() is 0-indexed, so this is last month (1-indexed)
+  let defaultToMonth = now.getMonth();
   let defaultToYear = now.getFullYear();
   if (defaultToMonth === 0) { defaultToMonth = 12; defaultToYear--; }
   let defaultFromMonth = defaultToMonth - 2;
@@ -50,11 +114,13 @@ export default async function DashboardPage({
   const effective = await getEffectiveAgentId();
   const agentId = effective!.agentId;
 
-  const [[summary, trend, branchDist, breakdown, hitRate, dispatchers], allBranches] = await Promise.all([
-    fetchDashboardData(agentId, filters),
-    prisma.branch.findMany({ where: { agentId }, select: { code: true } }),
-  ]);
-
+  // Only the branch codes for the filter UI are awaited up-front — everything
+  // else streams inside its own Suspense boundary so slow charts don't block
+  // fast ones (or the header).
+  const allBranches = await prisma.branch.findMany({
+    where: { agentId },
+    select: { code: true },
+  });
   const branchCodes = allBranches.map((b: { code: string }) => b.code);
 
   return (
@@ -81,38 +147,41 @@ export default async function DashboardPage({
 
       {/* Content */}
       <main className="px-4 lg:px-8 pb-16 space-y-4 lg:space-y-6">
-        <div>
-          <SummaryCards data={summary} filters={filters} />
+        <Suspense fallback={<ChartSkeleton heightClass="h-32" />}>
+          <SummaryCardsAsync agentId={agentId} filters={filters} />
+        </Suspense>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <ChartErrorBoundary>
+            <Suspense fallback={<ChartSkeleton />}>
+              <TrendChart agentId={agentId} filters={filters} />
+            </Suspense>
+          </ChartErrorBoundary>
+          <ChartErrorBoundary>
+            <Suspense fallback={<ChartSkeleton />}>
+              <BranchDistChart agentId={agentId} filters={filters} />
+            </Suspense>
+          </ChartErrorBoundary>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <ChartErrorBoundary>
-            <MonthlyNetPayoutTrend data={trend} />
+            <Suspense fallback={<ChartSkeleton />}>
+              <BreakdownChart agentId={agentId} filters={filters} />
+            </Suspense>
           </ChartErrorBoundary>
           <ChartErrorBoundary>
-            <BranchDistribution data={branchDist} />
-          </ChartErrorBoundary>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartErrorBoundary>
-            <SalaryBreakdown data={breakdown} />
-          </ChartErrorBoundary>
-          <ChartErrorBoundary>
-            <BonusTierHitRate data={hitRate} />
+            <Suspense fallback={<ChartSkeleton />}>
+              <HitRateChart agentId={agentId} filters={filters} />
+            </Suspense>
           </ChartErrorBoundary>
         </div>
 
         <div>
           <ChartErrorBoundary>
-            <TopDispatchers
-              data={dispatchers}
-              action={
-                <div key="export">
-                  <OverviewExport />
-                </div>
-              }
-            />
+            <Suspense fallback={<ChartSkeleton heightClass="h-80" />}>
+              <TopDispatchersTable agentId={agentId} filters={filters} />
+            </Suspense>
           </ChartErrorBoundary>
         </div>
       </main>
