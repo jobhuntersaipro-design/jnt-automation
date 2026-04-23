@@ -314,6 +314,9 @@ export function DispatchersClient({
     setItems((prev) => prev.map((d) =>
       d.id === dispatcherId ? { ...d, avatarUrl } : d,
     ));
+    setDrawerDispatcher((prev) =>
+      prev && prev.id === dispatcherId ? { ...prev, avatarUrl } : prev,
+    );
   }
 
   function handleSaveAll() {
@@ -656,6 +659,7 @@ export function DispatchersClient({
         <DispatcherDrawer
           dispatcher={drawerDispatcher}
           onClose={() => setDrawerDispatcher(null)}
+          onAvatarChange={handleAvatarChange}
         />
       )}
 

@@ -177,6 +177,12 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     finally { setAvatarUploading(false); }
   }
 
+  // Avatar can be mutated from the drawer too — resync whenever the prop
+  // changes, not just on full server refresh (dataVersion).
+  useEffect(() => {
+    setAvatarUrl(dispatcher.avatarUrl);
+  }, [dispatcher.avatarUrl]);
+
   const [icNo, setIcNo] = useState(dispatcher.rawIcNo);
   const [icError, setIcError] = useState<string | null>(null);
   const [branchCode, setBranchCode] = useState(dispatcher.branchCode);

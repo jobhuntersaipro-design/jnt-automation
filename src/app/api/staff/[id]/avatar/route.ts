@@ -60,7 +60,10 @@ export async function POST(
       }),
     );
 
-    const avatarUrl = `${R2_PUBLIC_URL}/${key}`;
+    // Append a cache-buster so browsers refetch after an in-place re-upload —
+    // the R2 object key is deterministic per dispatcher, so without ?v= the
+    // client keeps showing the previous image.
+    const avatarUrl = `${R2_PUBLIC_URL}/${key}?v=${Date.now()}`;
 
     await prisma.dispatcher.update({
       where: { id },
@@ -96,8 +99,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    if (dispatcher.avatarUrl) {
-      const key = dispatcher.avatarUrl.replace(`${R2_PUBLIC_URL}/`, "");
+    if (dispatcher.avatarUrl && dispatcher.avatarUrl.startsWith(`${R2_PUBLIC_URL}/`)) {
+      const key = dispatcher.avatarUrl.replace(`${R2_PUBLIC_URL}/`, "").split("?")[0];
       try {
         await r2.send(
           new DeleteObjectCommand({
