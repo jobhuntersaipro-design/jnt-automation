@@ -334,40 +334,82 @@ export function SalaryTable({
     }
   };
 
-  // Generate payslips
+  // Generate payslips — single dispatchers stream back a PDF synchronously
+  // (fast path, users expect instant download), multi-dispatcher requests
+  // queue a background job so the request doesn't block for 10 s+.
   const handleGeneratePayslips = async () => {
     if (selectedIds.size === 0) return;
     const ok = await checkPayslipSetup();
     if (!ok) return;
+
+    const ids = Array.from(selectedIds);
     setGenerating(true);
+
+    // Single payslip — keep sync flow for instant PDF download.
+    if (ids.length === 1) {
+      try {
+        const res = await fetch(`/api/payroll/upload/${uploadId}/payslips`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dispatcherIds: ids }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          toast.error(data.error || "Failed to generate payslip");
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const disposition = res.headers.get("Content-Disposition") || "";
+        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+        const monthStr = String(month).padStart(2, "0");
+        a.download = filenameMatch?.[1] || `payslip_${branchCode}_${monthStr}_${year}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast.success("Payslip downloaded");
+      } catch {
+        toast.error("Failed to generate payslip");
+      } finally {
+        setGenerating(false);
+      }
+      return;
+    }
+
+    // Multi-dispatcher — queue a background job, hand off to the bell.
     try {
-      const res = await fetch(`/api/payroll/upload/${uploadId}/payslips`, {
+      const res = await fetch(`/api/payroll/upload/${uploadId}/payslips/start`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ dispatcherIds: Array.from(selectedIds) }),
+        body: JSON.stringify({ dispatcherIds: ids }),
       });
-
       if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "Failed to generate payslips");
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to queue payslips");
         return;
       }
-
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const disposition = res.headers.get("Content-Disposition") || "";
-      const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
-      const monthStr = String(month).padStart(2, "0");
-      a.download = filenameMatch?.[1] || `payslips_${branchCode}_${monthStr}_${year}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast.success("Payslips downloaded");
+      const { jobId } = (await res.json().catch(() => ({}))) as { jobId?: string };
+      if (jobId) {
+        const { announceBulkExportStarted } = await import(
+          "@/components/dashboard/bulk-jobs-indicator"
+        );
+        announceBulkExportStarted({
+          jobId,
+          year,
+          month,
+          format: "pdf",
+          kind: "payslip",
+          branchCode,
+        });
+      }
+      toast.success(`Generating ${ids.length} payslips`, {
+        description: "Check the bell for progress — you'll get a download when it's ready.",
+      });
     } catch {
-      toast.error("Failed to generate payslips");
+      toast.error("Failed to queue payslips");
     } finally {
       setGenerating(false);
     }

@@ -74,8 +74,11 @@ export async function runBulkExport(jobId: string): Promise<void> {
     await updateJob(jobId, { total: details.length, stage: "generating" });
 
     // 2. Generate files in a bounded pool. CSV is cheap (string join),
-    //    PDF is CPU-bound so we keep concurrency low.
-    const concurrency = job.format === "pdf" ? 3 : 8;
+    //    PDF is CPU-bound so we keep concurrency low. PDF bumped 3→4 in
+    //    phase 3 of the perf spec (33% faster on bulk exports; matches
+    //    the payslip-bulk-worker pool). Benchmark against a 100-person
+    //    export before going higher.
+    const concurrency = job.format === "pdf" ? 4 : 8;
     let completed = 0;
 
     type GeneratedFile = { fileName: string; data: Uint8Array | string };

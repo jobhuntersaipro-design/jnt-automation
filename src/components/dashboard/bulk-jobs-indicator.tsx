@@ -11,6 +11,8 @@ export type BulkJobStage =
   | "uploading"
   | "done";
 
+export type BulkJobKind = "month-detail" | "payslip";
+
 export interface ActiveJob {
   jobId: string;
   status: "queued" | "running" | "done" | "failed";
@@ -20,6 +22,7 @@ export interface ActiveJob {
   year: number;
   month: number;
   format: "csv" | "pdf";
+  kind?: BulkJobKind;
   startedAt: number | null;
 }
 
@@ -28,10 +31,21 @@ interface SeededJob {
   year: number;
   month: number;
   format: "csv" | "pdf";
+  kind?: BulkJobKind;
+  /** Payslip jobs only — carried through for the zip filename */
+  branchCode?: string;
 }
 
-function zipName(year: number, month: number): string {
+function zipName(
+  year: number,
+  month: number,
+  kind: BulkJobKind | undefined,
+  branchCode: string | undefined,
+): string {
   const mm = String(month).padStart(2, "0");
+  if (kind === "payslip") {
+    return `payslips_${branchCode ?? "export"}_${mm}_${year}.zip`;
+  }
   return `${year}_${mm}_details.zip`;
 }
 
@@ -219,8 +233,12 @@ class BulkJobsStore {
           const status = await statusRes.json();
           if (status.status === "done") {
             this.justFinished.set(jobId, Date.now());
-            const filename = zipName(prev.year, prev.month);
-            toast.success(`${prev.format.toUpperCase()} export ready`, {
+            const filename = zipName(prev.year, prev.month, prev.kind, prev.branchCode);
+            const title =
+              prev.kind === "payslip"
+                ? "Payslips ready"
+                : `${prev.format.toUpperCase()} export ready`;
+            toast.success(title, {
               description: filename,
               duration: 15_000,
               action: {
@@ -242,11 +260,17 @@ class BulkJobsStore {
       this.activeJobs = next;
       for (const j of next) {
         if (this.finalized.has(j.jobId)) continue;
+        // Preserve seed-provided context (branchCode) — tick data doesn't
+        // include it, so merge rather than overwrite if we've already seen
+        // this job via announceBulkExportStarted.
+        const existing = this.watched.get(j.jobId);
         this.watched.set(j.jobId, {
           jobId: j.jobId,
           year: j.year,
           month: j.month,
           format: j.format,
+          kind: j.kind ?? existing?.kind,
+          branchCode: existing?.branchCode,
         });
       }
       // Prune old justFinished entries (anything > 5× the window)

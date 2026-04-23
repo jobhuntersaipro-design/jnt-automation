@@ -26,6 +26,8 @@ export async function GET(
     year: job.year,
     month: job.month,
     format: job.format,
+    kind: job.kind ?? "month-detail",
+    branchCode: job.branchCode,
     startedAt: job.startedAt,
     error: job.error,
     ready: job.status === "done",

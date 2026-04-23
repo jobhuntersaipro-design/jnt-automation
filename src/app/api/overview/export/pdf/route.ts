@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Redis } from "@upstash/redis";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import {
   getDispatcherExportData,
@@ -7,10 +8,54 @@ import {
 import type { Filters } from "@/lib/db/overview";
 import { renderSummaryTablePdf } from "@/lib/pdf/summary-table";
 
+const redis = Redis.fromEnv();
+const PDF_CACHE_TTL = 5 * 60; // match overview-cached data TTL
+
 function fmt(n: number): string {
   return n.toLocaleString("en-MY", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  });
+}
+
+function pdfCacheKey(agentId: string, type: string, filters: Filters): string {
+  const sortedBranches = [...filters.selectedBranchCodes].sort().join(",");
+  return `overview-pdf:${agentId}:${type}:${filters.fromMonth}-${filters.fromYear}:${filters.toMonth}-${filters.toYear}:${sortedBranches}`;
+}
+
+async function readPdfCache(key: string): Promise<Uint8Array | null> {
+  try {
+    const b64 = await redis.get<string>(key);
+    if (!b64) return null;
+    return new Uint8Array(Buffer.from(b64, "base64"));
+  } catch {
+    return null;
+  }
+}
+
+async function writePdfCache(key: string, bytes: Uint8Array): Promise<void> {
+  try {
+    const b64 = Buffer.from(bytes).toString("base64");
+    await redis.set(key, b64, { ex: PDF_CACHE_TTL });
+  } catch {
+    // Caching is best-effort — a Redis outage must not break downloads
+  }
+}
+
+function pdfResponse(bytes: Uint8Array, filename: string): NextResponse {
+  // Re-wrap into a fresh Uint8Array so the NextResponse BodyInit overload
+  // matches — Uint8Array<ArrayBufferLike> isn't directly assignable, but
+  // a new ArrayBuffer-backed view is.
+  const body = new Uint8Array(bytes.byteLength);
+  body.set(bytes);
+  return new NextResponse(body, {
+    status: 200,
+    headers: {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+      // Browsers can reuse the blob on repeat clicks without a round-trip
+      "Cache-Control": `private, max-age=${PDF_CACHE_TTL}`,
+    },
   });
 }
 
@@ -52,6 +97,19 @@ export async function GET(req: NextRequest) {
     timeStyle: "short",
   });
 
+  // Serve rendered PDFs from Redis when available — @react-pdf/renderer is
+  // CPU-bound (100–500 ms). A repeat click on Download within the 5-min
+  // overview data TTL reuses the prior render.
+  const cacheKey = pdfCacheKey(effective.agentId, type, filters);
+  const cached = await readPdfCache(cacheKey);
+  if (cached) {
+    const filename =
+      type === "branch"
+        ? "overview_branch_performance.pdf"
+        : "overview_dispatcher_performance.pdf";
+    return pdfResponse(cached, filename);
+  }
+
   if (type === "branch") {
     const rows = await getBranchExportData(effective.agentId, filters);
     const pdf = await renderSummaryTablePdf({
@@ -76,13 +134,9 @@ export async function GET(req: NextRequest) {
         fmt(r.totalNetPayout),
       ]),
     });
-    return new NextResponse(new Uint8Array(pdf), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="overview_branch_performance.pdf"`,
-      },
-    });
+    const bytes = new Uint8Array(pdf);
+    await writePdfCache(cacheKey, bytes);
+    return pdfResponse(bytes, "overview_branch_performance.pdf");
   }
 
   const rows = await getDispatcherExportData(effective.agentId, filters);
@@ -119,11 +173,7 @@ export async function GET(req: NextRequest) {
     ]),
   });
 
-  return new NextResponse(new Uint8Array(pdf), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="overview_dispatcher_performance.pdf"`,
-    },
-  });
+  const bytes = new Uint8Array(pdf);
+  await writePdfCache(cacheKey, bytes);
+  return pdfResponse(bytes, "overview_dispatcher_performance.pdf");
 }

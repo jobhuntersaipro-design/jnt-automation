@@ -25,6 +25,7 @@ export async function GET() {
       year: j.year,
       month: j.month,
       format: j.format,
+      kind: j.kind ?? "month-detail",
       startedAt: j.startedAt ?? null,
     })),
   });

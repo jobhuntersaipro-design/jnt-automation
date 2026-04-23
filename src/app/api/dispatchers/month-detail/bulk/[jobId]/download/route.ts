@@ -37,7 +37,10 @@ export async function GET(
 
   const bytes = await obj.Body.transformToByteArray();
   const mm = String(job.month).padStart(2, "0");
-  const filename = `${job.year}_${mm}_details.zip`;
+  const filename =
+    job.kind === "payslip"
+      ? `payslips_${job.branchCode ?? "export"}_${mm}_${job.year}.zip`
+      : `${job.year}_${mm}_details.zip`;
 
   return new NextResponse(new Uint8Array(bytes), {
     status: 200,

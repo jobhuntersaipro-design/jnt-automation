@@ -14,6 +14,7 @@ import {
   downloadZip,
   useActiveJobs,
   type ActiveJob,
+  type BulkJobKind,
   type BulkJobStage,
 } from "./bulk-jobs-indicator";
 
@@ -26,6 +27,8 @@ export interface RecentJob {
   year: number;
   month: number;
   format: "csv" | "pdf";
+  kind?: BulkJobKind;
+  branchCode?: string;
   error?: string;
   startedAt: number | null;
   createdAt: number;
@@ -74,8 +77,16 @@ function formatEta(
   return `~${Math.round(mins / 60)} h remaining`;
 }
 
-function zipName(year: number, month: number): string {
+function zipName(
+  year: number,
+  month: number,
+  kind?: BulkJobKind,
+  branchCode?: string,
+): string {
   const mm = String(month).padStart(2, "0");
+  if (kind === "payslip") {
+    return `payslips_${branchCode ?? "export"}_${mm}_${year}.zip`;
+  }
   return `${year}_${mm}_details.zip`;
 }
 
@@ -163,7 +174,7 @@ export function DownloadsPanel() {
   }, [active, recent]);
 
   const handleDownload = useCallback((job: RecentJob) => {
-    void downloadZip(job.jobId, zipName(job.year, job.month));
+    void downloadZip(job.jobId, zipName(job.year, job.month, job.kind, job.branchCode));
   }, []);
 
   const handleRetry = useCallback(
@@ -276,7 +287,8 @@ function DownloadRow({
   onRetry: () => void;
 }) {
   const label = formatLabel(job.year, job.month);
-  const formatLabel_ = job.format.toUpperCase();
+  const formatLabel_ =
+    job.kind === "payslip" ? "Payslips" : `${job.format.toUpperCase()} export`;
 
   if (job.status === "queued" || job.status === "running") {
     const pct =
@@ -297,7 +309,7 @@ function DownloadRow({
         <div className="flex items-center gap-2">
           <Loader2 className="w-3.5 h-3.5 text-brand animate-spin" aria-hidden />
           <span className="text-[0.78rem] font-medium text-on-surface">
-            {formatLabel_} export · {label}
+            {formatLabel_} · {label}
           </span>
           {stage !== "generating" || job.total === 0 ? null : (
             <span className="ml-auto text-[0.72rem] text-on-surface-variant tabular-nums">
@@ -331,10 +343,10 @@ function DownloadRow({
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-[0.78rem] font-medium text-on-surface">
-              {formatLabel_} export · {label}
+              {formatLabel_} · {label}
             </p>
             <p className="text-[0.7rem] text-on-surface-variant">
-              {relative(job.updatedAt)} · {zipName(job.year, job.month)}
+              {relative(job.updatedAt)} · {zipName(job.year, job.month, job.kind, job.branchCode)}
             </p>
           </div>
           <button
@@ -362,7 +374,7 @@ function DownloadRow({
         <XCircle className="w-3.5 h-3.5 text-critical" aria-hidden />
         <div className="min-w-0 flex-1">
           <p className="text-[0.78rem] font-medium text-on-surface">
-            {formatLabel_} export · {label}
+            {formatLabel_} · {label}
           </p>
           <p className="text-[0.7rem] text-critical truncate">
             {job.error || "Export failed"}

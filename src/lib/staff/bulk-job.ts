@@ -17,12 +17,28 @@ export type BulkJobStage =
   | "uploading"
   | "done";
 
+/**
+ * What the job is generating. `month-detail` is the original flow —
+ * parcel-level CSV/PDF for every dispatcher in a given month. `payslip`
+ * generates per-dispatcher payslip PDFs (pinned to a specific upload +
+ * subset of dispatchers) and hands back a zip.
+ */
+export type BulkJobKind = "month-detail" | "payslip";
+
 export interface BulkJob {
   jobId: string;
   agentId: string;
   year: number;
   month: number;
   format: "csv" | "pdf";
+  /** Default "month-detail" for backward compat with pre-Phase-3 records. */
+  kind?: BulkJobKind;
+  /** Payslip jobs only: the upload these payslips belong to. */
+  uploadId?: string;
+  /** Payslip jobs only: the specific dispatchers to generate for. */
+  dispatcherIds?: string[];
+  /** Payslip jobs only: branch code — used for the zip filename. */
+  branchCode?: string;
   status: BulkJobStatus;
   stage: BulkJobStage;
   /** Files generated so far */
@@ -55,6 +71,7 @@ export async function createJob(
   const now = Date.now();
   const job: BulkJob = {
     ...data,
+    kind: data.kind ?? "month-detail",
     status: "queued",
     stage: "queued",
     done: 0,

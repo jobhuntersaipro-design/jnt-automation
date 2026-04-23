@@ -25,6 +25,8 @@ export async function GET() {
       year: j.year,
       month: j.month,
       format: j.format,
+      kind: j.kind ?? "month-detail",
+      branchCode: j.branchCode,
       error: j.error,
       startedAt: j.startedAt ?? null,
       createdAt: j.createdAt,
