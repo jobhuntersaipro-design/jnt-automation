@@ -7,6 +7,7 @@ import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, 
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
 import { BranchChip } from "@/components/ui/branch-chip";
+import { EmployeeAvatarView } from "./employee-avatar-view";
 
 const EmployeeDrawer = dynamic(
   () => import("./employee-drawer").then((m) => m.EmployeeDrawer),
@@ -201,11 +202,14 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
               onClick={() => setDrawerEmployee(emp)}
               className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
             >
-              {/* Employee name + initials avatar */}
+              {/* Employee avatar + name */}
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-surface-dim flex items-center justify-center text-[0.68rem] font-semibold text-on-surface-variant shrink-0">
-                  {emp.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase()}
-                </div>
+                <EmployeeAvatarView
+                  name={emp.name}
+                  gender={emp.gender}
+                  avatarUrl={emp.avatarUrl}
+                  dispatcherAvatarUrl={emp.dispatcherAvatarUrl}
+                />
                 <div>
                   <p className="text-[0.84rem] font-medium text-on-surface leading-tight">{emp.name}</p>
                 </div>

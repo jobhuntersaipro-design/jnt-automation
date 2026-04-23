@@ -6,6 +6,8 @@ import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
 import { BranchChip } from "@/components/ui/branch-chip"
+import { EmployeeAvatarView } from "./employee-avatar-view"
+import type { Gender } from "@/generated/prisma/client"
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard"
 import {
   calculateStatutory,
@@ -25,6 +27,9 @@ interface PayrollEntry {
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER"
   branchCode: string | null
   icNo: string | null
+  gender: Gender
+  avatarUrl: string | null
+  dispatcherAvatarUrl: string | null
   hasDispatcherMatch: boolean
   dispatcherGross: number
   dispatcherPenalty: number
@@ -553,7 +558,7 @@ export function PayrollTab() {
         </div>
       ) : entries.length === 0 ? (
         <div className="text-center py-16 text-on-surface-variant text-[0.85rem]">
-          No employees found. Add employees in the Employees tab first.
+          No employees found. Add employees in the Settings tab first.
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -620,11 +625,21 @@ export function PayrollTab() {
 
                     {/* Employee */}
                     <td className="py-2.5 pl-3">
-                      <div className="text-[0.8rem] font-medium text-on-surface leading-tight">
-                        {entry.name}
-                      </div>
-                      <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
-                        {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? ` + Dispatcher` : ""}
+                      <div className="flex items-center gap-2.5">
+                        <EmployeeAvatarView
+                          name={entry.name}
+                          gender={entry.gender}
+                          avatarUrl={entry.avatarUrl}
+                          dispatcherAvatarUrl={entry.dispatcherAvatarUrl}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate">
+                            {entry.name}
+                          </div>
+                          <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
+                            {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? " + Dispatcher" : ""}
+                          </div>
+                        </div>
                       </div>
                     </td>
 

@@ -46,6 +46,7 @@ export async function GET(
       where: { agentId },
       include: {
         branch: { select: { id: true, code: true } },
+        dispatcher: { select: { avatarUrl: true } },
         salaryRecords: {
           where: { month, year },
           take: 1,
@@ -101,6 +102,9 @@ export async function GET(
           type: emp.type,
           branchCode: emp.branch?.code ?? null,
           icNo: emp.icNo ?? null,
+          gender: emp.gender,
+          avatarUrl: emp.avatarUrl,
+          dispatcherAvatarUrl: emp.dispatcher?.avatarUrl ?? null,
           hasDispatcherMatch,
           dispatcherGross,
           dispatcherPenalty,
@@ -135,6 +139,9 @@ export async function GET(
         type: emp.type,
         branchCode: emp.branch?.code ?? null,
         icNo: emp.icNo ?? null,
+        gender: emp.gender,
+        avatarUrl: emp.avatarUrl,
+        dispatcherAvatarUrl: emp.dispatcher?.avatarUrl ?? null,
         hasDispatcherMatch,
         dispatcherGross,
         dispatcherPenalty,
