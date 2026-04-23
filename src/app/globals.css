@@ -158,6 +158,11 @@
   padding-right: 36px !important;
 }
 
+/* Green left-border for toasts explicitly tagged as "green success" */
+[data-sonner-toast].toast-success-green {
+  border-left-color: #12B981 !important;
+}
+
 @layer utilities {
     .font-display {
         font-family: var(--font-manrope), system-ui, sans-serif;

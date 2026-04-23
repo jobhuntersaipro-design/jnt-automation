@@ -53,7 +53,7 @@ function LoginForm() {
         return;
       }
 
-      router.push("/dashboard");
+      router.push("/dashboard?welcome=1");
     } catch (err) {
       setLoading(false);
       const code = (err as { code?: string })?.code;
@@ -78,7 +78,7 @@ function LoginForm() {
       </div>
 
       <button
-        onClick={() => signIn("google", { redirectTo: "/dashboard" })}
+        onClick={() => signIn("google", { redirectTo: "/dashboard?welcome=1" })}
         className="w-full flex items-center justify-center gap-3 border border-outline-variant rounded-md py-2.5 px-4 text-sm font-medium text-on-surface hover:bg-surface-hover transition-colors"
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5" aria-hidden="true">

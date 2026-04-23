@@ -5,6 +5,7 @@ import { NotificationBell } from "@/components/dashboard/notification-bell";
 import { BulkJobsIndicator } from "@/components/dashboard/bulk-jobs-indicator";
 import { AccountMenu } from "@/components/dashboard/account-menu";
 import { BfcacheFix } from "@/components/dashboard/bfcache-fix";
+import { WelcomeToast } from "@/components/dashboard/welcome-toast";
 import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
@@ -25,6 +26,7 @@ export default async function DashboardLayout({
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       <BfcacheFix />
+      <WelcomeToast />
       {isImpersonating && (
         <ImpersonationBanner agentName={effective!.impersonatedName!} />
       )}
