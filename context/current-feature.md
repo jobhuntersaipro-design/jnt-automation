@@ -1,16 +1,30 @@
-# Current Feature
+# Current Feature: Web Performance Optimization
 
 ## Status
 
-None — ready for next feature.
+In Progress
 
 ## Goals
 
-_No active feature. Use `/feature load <spec-path>` or describe the next feature to start._
+- Establish a measured performance baseline (Lighthouse, bundle analyzer, server timings, Neon slow queries) before shipping any fix — commit artifacts to `docs/perf/baseline/`.
+- **Phase 1 — Client bundle quick wins:** lazy-load drawers/dialogs/charts via `next/dynamic`, memoize hot table rows, collapse redundant polling timers, replace remaining raw `<img>` tags with `next/image`, remove unused deps. Target: first-load JS on `/dashboard` drops ≥ 30%.
+- **Phase 2 — Database & queries:** add composite indexes (`Branch(agentId, code)`, `Dispatcher(agentId, branchId)`, `Notification(agentId, isRead, createdAt)`), drop `force-dynamic` on `/dashboard` so the 5-min `unstable_cache` works, split dashboard charts into individual `<Suspense>` boundaries, paginate `/dispatchers`, slim `getDispatchers` includes.
+- **Phase 3 — Async jobs:** move inline PDF generation for `/api/payroll/upload/[id]/payslips` and `/api/employee-payroll/[m]/[y]/payslips` onto the existing bulk-job + Downloads Center system; cache rendered overview PDFs in Redis; raise bulk export PDF concurrency.
+- **Phase 4 — Asset & network hygiene:** serve R2 avatars through `next/image` (remote-patterns) or Cloudflare Image Resizing; add `Cache-Control` headers to static/derived GET endpoints; verify `<Link prefetch>` on nav.
+- Success: Lighthouse mobile ≥ 85 on `/dashboard`; first-load JS ≤ 250KB gzipped on `/dashboard` and `/dispatchers`; `/payslips` P95 < 500ms; no Playwright smoke regressions.
 
 ## Notes
 
-_Populated when a feature is loaded._
+- Full spec: [context/features/web-performance-optimization-spec.md](context/features/web-performance-optimization-spec.md).
+- Audit sources: two parallel `Explore` agents (client bundle + server/DB), 2026-04-23. Key findings:
+  - 67 `"use client"` files, **zero** `next/dynamic` usage — biggest single lever.
+  - No `React.memo` anywhere — table rows re-render on every keystroke during payroll editing.
+  - `/dashboard` sets `export const dynamic = "force-dynamic"` which bypasses the already-wired `unstable_cache`.
+  - Missing composite index for `SalaryRecord → Dispatcher → Branch.code` filter path (used by all 6 overview queries).
+  - `/api/payroll/upload/[id]/payslips` renders up to 50 PDFs inline (~10s+, timeout risk); the bulk-job pattern from the dispatcher month-detail feature already solves this — reuse it.
+- Heavy deps (`@react-pdf/renderer`, `exceljs`, `jszip`, `@aws-sdk/*`, `bcryptjs`) are already server-only — no fixes needed there. Fonts are correctly set up via `next/font` — no fixes needed there. No third-party `<Script>` tags — no fixes needed there.
+- Out of scope for this feature (planned separately): full RSC migration of `admin-client.tsx` / `settings-client.tsx` / `payroll-tab.tsx` (all 600–900 lines); replacing Recharts with a lighter chart lib; edge-runtime migration.
+- Rollout: Phase 0 → 1 → 2 sequential (each ships with its own measurement delta). Phases 3 and 4 can run in parallel after Phase 2.
 
 ## History
 
