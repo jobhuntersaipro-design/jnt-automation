@@ -201,8 +201,8 @@ export function MonthDetailClient({
                 alt=""
                 width={40}
                 height={40}
+                sizes="40px"
                 className="w-full h-full object-cover"
-                unoptimized
               />
             ) : (
               initials

@@ -246,8 +246,8 @@ export function AvatarEditDialog({
                 alt={dispatcherName}
                 width={112}
                 height={112}
+                sizes="112px"
                 className="w-full h-full object-cover"
-                unoptimized
               />
             ) : (
               initials

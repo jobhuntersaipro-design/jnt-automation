@@ -67,7 +67,14 @@ export function DispatcherAvatar({
         aria-label="Edit avatar"
       >
         {avatarUrl ? (
-          <Image src={avatarUrl} alt="" width={px} height={px} className="w-full h-full object-cover" unoptimized />
+          <Image
+            src={avatarUrl}
+            alt=""
+            width={px}
+            height={px}
+            sizes={`${px}px`}
+            className="w-full h-full object-cover"
+          />
         ) : (
           initials
         )}

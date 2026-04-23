@@ -446,7 +446,14 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
           title={avatarUrl ? "View photo" : "Upload photo"}
         >
           {avatarUrl ? (
-            <Image src={avatarUrl} alt="" width={32} height={32} className="w-full h-full object-cover" unoptimized />
+            <Image
+              src={avatarUrl}
+              alt=""
+              width={32}
+              height={32}
+              sizes="32px"
+              className="w-full h-full object-cover"
+            />
           ) : (
             initials
           )}
@@ -487,9 +494,9 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
               alt={dispatcher.name}
               width={400}
               height={400}
+              sizes="400px"
               className="w-full h-full rounded-2xl object-cover shadow-[0_12px_40px_-12px_rgba(25,28,29,0.3)]"
               style={{ outline: `3px solid ${ringColor}`, outlineOffset: "3px" }}
-              unoptimized
             />
             <div className="absolute -top-3 -right-3 flex gap-1.5">
               <button

@@ -46,6 +46,10 @@ export async function GET(req: NextRequest) {
     headers: {
       "Content-Type": "text/csv",
       "Content-Disposition": `attachment; filename="${fileName}"`,
+      // Matches the 5-min overview data cache — repeat clicks within the
+      // window reuse the browser's copy. `private` because the CSV is
+      // agent-scoped and must not land in a shared cache.
+      "Cache-Control": "private, max-age=60",
     },
   });
 }
