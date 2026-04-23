@@ -6,6 +6,12 @@ import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
 import { repriceSalary } from "@/lib/payroll/re-price";
+import {
+  bucketLineItemChanges,
+  rulesMatchSnapshot,
+} from "@/lib/payroll/re-price-helpers";
+
+export const maxDuration = 120;
 
 // Only penalty/advance/commission are trusted from the client. totalOrders /
 // baseSalary / bonusTierEarnings / petrolSubsidy are re-derived server-side
@@ -21,6 +27,29 @@ const UpdateEntrySchema = z.object({
 const BodySchema = z.object({
   updates: z.array(UpdateEntrySchema).min(1).max(500),
 });
+
+// Parallel pool — matches the pattern in upload/confirm and bulk-export-worker.
+async function runPool<T, R>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  async function next(): Promise<void> {
+    while (true) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      results[i] = await worker(items[i], i);
+    }
+  }
+  const runners = Array.from({ length: Math.min(concurrency, items.length) }, () => next());
+  await Promise.all(runners);
+  return results;
+}
+
+const POOL_CONCURRENCY = 4;
+const PER_DISPATCHER_TX_TIMEOUT_MS = 20_000;
 
 export async function POST(
   req: NextRequest,
@@ -53,8 +82,10 @@ export async function POST(
   const { updates } = parsed.data;
 
   try {
-    // Batch-load all dispatchers with agent scope (fixes N+1 + IDOR)
     const dispatcherIds = updates.map((u) => u.dispatcherId);
+
+    // Agent-scoped dispatcher lookup — doubles as IDOR guard: anything not in
+    // the result is silently skipped downstream.
     const dispatchers = await prisma.dispatcher.findMany({
       where: {
         id: { in: dispatcherIds },
@@ -69,132 +100,156 @@ export async function POST(
     });
     const dispatcherMap = new Map(dispatchers.map((d) => [d.id, d]));
 
-    // Pre-load existing SalaryRecord ids + line items for every dispatcher in
-    // this batch so the transaction can re-price without a second round-trip.
+    // NOTE: no `include: { lineItems }` here — pulling every line item for
+    // every dispatcher at once blew the Vercel memory + tx timeout. Load them
+    // per-dispatcher inside the pool, and only when we can't short-circuit.
     const salaryRecords = await prisma.salaryRecord.findMany({
       where: { uploadId, dispatcherId: { in: dispatcherIds } },
       select: {
         id: true,
         dispatcherId: true,
-        lineItems: {
-          select: {
-            id: true,
-            waybillNumber: true,
-            weight: true,
-            deliveryDate: true,
-            isBonusTier: true,
-            commission: true,
-          },
-        },
+        commission: true,
+        penalty: true,
+        advance: true,
+        weightTiersSnapshot: true,
+        bonusTierSnapshot: true,
+        petrolSnapshot: true,
       },
     });
-    const recordByDispatcher = new Map(
-      salaryRecords.map((r) => [r.dispatcherId, r]),
-    );
+    const recordByDispatcher = new Map(salaryRecords.map((r) => [r.dispatcherId, r]));
 
-    await prisma.$transaction(async (tx) => {
-      await Promise.all(updates.map(async (update) => {
-        const dispatcher = dispatcherMap.get(update.dispatcherId);
-        const record = recordByDispatcher.get(update.dispatcherId);
-        if (!dispatcher || !record) return;
+    await runPool(updates, POOL_CONCURRENCY, async (update) => {
+      const dispatcher = dispatcherMap.get(update.dispatcherId);
+      const record = recordByDispatcher.get(update.dispatcherId);
+      if (!dispatcher || !record) return;
 
-        const weightTiers = dispatcher.weightTiers.map((t) => ({
-          tier: t.tier,
-          minWeight: t.minWeight,
-          maxWeight: t.maxWeight,
-          commission: t.commission,
-        }));
-        const bonusTiers = dispatcher.bonusTiers.map((t) => ({
-          tier: t.tier,
-          minWeight: t.minWeight,
-          maxWeight: t.maxWeight,
-          commission: t.commission,
-        }));
-        const orderThreshold = dispatcher.incentiveRule?.orderThreshold ?? 0;
-        const petrolRule = dispatcher.petrolRule ?? {
-          isEligible: false,
-          dailyThreshold: 70,
-          subsidyAmount: 15,
-        };
-
-        // Re-price line items in-memory against current rules.
-        const repriced = repriceSalary(
-          record.lineItems.map((li) => ({
-            waybillNumber: li.waybillNumber,
-            weight: li.weight,
-            deliveryDate: li.deliveryDate,
-            isBonusTier: li.isBonusTier,
-          })),
-          weightTiers,
-          bonusTiers,
-          orderThreshold,
-          petrolRule,
-        );
-
-        // If any line item changed commission or flag, delete all + createMany.
-        // A single dispatcher can have thousands of line items so doing per-row
-        // Prisma updates in an interactive transaction overwhelms the connection
-        // pool. Delete + bulk insert is two queries regardless of row count.
-        // Skip entirely when nothing changed.
-        const anyChanged = record.lineItems.some(
-          (orig, i) =>
-            orig.commission !== repriced.items[i].commission ||
-            orig.isBonusTier !== repriced.items[i].isBonusTier,
-        );
-        if (anyChanged) {
-          await tx.salaryLineItem.deleteMany({ where: { salaryRecordId: record.id } });
-          await tx.salaryLineItem.createMany({
-            data: record.lineItems.map((orig, i) => ({
-              salaryRecordId: record.id,
-              waybillNumber: orig.waybillNumber,
-              weight: orig.weight,
-              commission: repriced.items[i].commission,
-              isBonusTier: repriced.items[i].isBonusTier,
-              deliveryDate: orig.deliveryDate,
-            })),
-          });
-        }
-
-        const netSalary =
-          repriced.baseSalary +
-          repriced.bonusTierEarnings +
-          repriced.petrolSubsidy +
-          update.commission -
-          update.penalty -
-          update.advance;
-
-        await tx.salaryRecord.update({
-          where: { id: record.id },
-          data: {
-            totalOrders: record.lineItems.length,
-            baseSalary: repriced.baseSalary,
-            bonusTierEarnings: repriced.bonusTierEarnings,
-            petrolSubsidy: repriced.petrolSubsidy,
-            petrolQualifyingDays: repriced.petrolQualifyingDays,
-            commission: update.commission,
-            penalty: update.penalty,
-            advance: update.advance,
-            netSalary: Math.round(netSalary * 100) / 100,
-            weightTiersSnapshot: weightTiers,
-            bonusTierSnapshot: dispatcher.incentiveRule
-              ? { orderThreshold, tiers: bonusTiers }
-              : undefined,
-            petrolSnapshot: dispatcher.petrolRule
-              ? {
-                  isEligible: petrolRule.isEligible,
-                  dailyThreshold: petrolRule.dailyThreshold,
-                  subsidyAmount: petrolRule.subsidyAmount,
-                }
-              : undefined,
-          },
-        });
+      const weightTiers = dispatcher.weightTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
       }));
-    }, { timeout: 60000 });
+      const bonusTiers = dispatcher.bonusTiers.map((t) => ({
+        tier: t.tier,
+        minWeight: t.minWeight,
+        maxWeight: t.maxWeight,
+        commission: t.commission,
+      }));
+      const orderThreshold = dispatcher.incentiveRule?.orderThreshold ?? 0;
+      const petrolRule = dispatcher.petrolRule ?? {
+        isEligible: false,
+        dailyThreshold: 70,
+        subsidyAmount: 15,
+      };
+      const petrolForReprice = {
+        isEligible: petrolRule.isEligible,
+        dailyThreshold: petrolRule.dailyThreshold,
+        subsidyAmount: petrolRule.subsidyAmount,
+      };
+
+      // No-op short-circuit: if current rules exactly match the stored
+      // snapshot AND the client hasn't changed commission/penalty/advance,
+      // there is literally nothing to do for this dispatcher.
+      const summaryUnchanged =
+        update.commission === record.commission &&
+        update.penalty === record.penalty &&
+        update.advance === record.advance;
+
+      if (
+        summaryUnchanged &&
+        rulesMatchSnapshot(
+          { weightTiers, bonusTiers, orderThreshold, petrol: petrolForReprice },
+          {
+            weightTiersSnapshot: record.weightTiersSnapshot,
+            bonusTierSnapshot: record.bonusTierSnapshot,
+            petrolSnapshot: record.petrolSnapshot,
+          },
+        )
+      ) {
+        return;
+      }
+
+      // Load this dispatcher's line items (only for dispatchers that
+      // actually need repricing or a summary write).
+      const lineItems = await prisma.salaryLineItem.findMany({
+        where: { salaryRecordId: record.id },
+        select: {
+          id: true,
+          waybillNumber: true,
+          weight: true,
+          deliveryDate: true,
+          isBonusTier: true,
+          commission: true,
+        },
+      });
+
+      const repriced = repriceSalary(
+        lineItems.map((li) => ({
+          waybillNumber: li.waybillNumber,
+          weight: li.weight,
+          deliveryDate: li.deliveryDate,
+          isBonusTier: li.isBonusTier,
+        })),
+        weightTiers,
+        bonusTiers,
+        orderThreshold,
+        petrolForReprice,
+      );
+
+      const buckets = bucketLineItemChanges(lineItems, repriced.items);
+
+      const netSalary =
+        repriced.baseSalary +
+        repriced.bonusTierEarnings +
+        repriced.petrolSubsidy +
+        update.commission -
+        update.penalty -
+        update.advance;
+
+      // Per-dispatcher short transaction — bounded work, bounded time,
+      // recoverable on failure.
+      await prisma.$transaction(
+        async (tx) => {
+          for (const bucket of buckets) {
+            await tx.salaryLineItem.updateMany({
+              where: { id: { in: bucket.ids } },
+              data: { commission: bucket.commission, isBonusTier: bucket.isBonusTier },
+            });
+          }
+
+          await tx.salaryRecord.update({
+            where: { id: record.id },
+            data: {
+              totalOrders: lineItems.length,
+              baseSalary: repriced.baseSalary,
+              bonusTierEarnings: repriced.bonusTierEarnings,
+              petrolSubsidy: repriced.petrolSubsidy,
+              petrolQualifyingDays: repriced.petrolQualifyingDays,
+              commission: update.commission,
+              penalty: update.penalty,
+              advance: update.advance,
+              netSalary: Math.round(netSalary * 100) / 100,
+              weightTiersSnapshot: weightTiers,
+              bonusTierSnapshot: dispatcher.incentiveRule
+                ? { orderThreshold, tiers: bonusTiers }
+                : undefined,
+              petrolSnapshot: dispatcher.petrolRule
+                ? {
+                    isEligible: petrolRule.isEligible,
+                    dailyThreshold: petrolRule.dailyThreshold,
+                    subsidyAmount: petrolRule.subsidyAmount,
+                  }
+                : undefined,
+            },
+          });
+        },
+        { timeout: PER_DISPATCHER_TX_TIMEOUT_MS },
+      );
+    });
 
     revalidatePath("/dispatchers");
     revalidatePath("/dashboard");
 
-    // Notify
     await createNotification({
       agentId: effective.agentId,
       type: "recalculate",
