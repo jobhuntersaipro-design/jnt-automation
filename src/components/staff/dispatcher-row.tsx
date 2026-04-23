@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
+import { createPortal } from "react-dom";
 import { Pin, Trash2, Pencil, Clock } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
@@ -106,6 +107,75 @@ function DecimalInput({ value, onChange, className, onClick, cents }: {
 
 /** Grid: check | name | branch | IC | tiers | sep | bonusTierEarnings(3) | sep | petrol(3) | status | actions */
 export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.5fr] items-center gap-x-1.5";
+
+/**
+ * Portaled popover that anchors to a button. Escapes the table's
+ * `overflow-x-auto` clip so tier editors remain visible and interactive.
+ */
+function TierPopover({
+  open,
+  anchorRef,
+  onClose,
+  width,
+  children,
+}: {
+  open: boolean;
+  anchorRef: React.RefObject<HTMLElement | null>;
+  onClose: () => void;
+  width: number;
+  children: React.ReactNode;
+}) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    function measure() {
+      const el = anchorRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      const preferredLeft = rect.left + rect.width / 2 - width / 2;
+      const clampedLeft = Math.min(
+        Math.max(preferredLeft, 8),
+        window.innerWidth - width - 8,
+      );
+      setPos({ top: rect.bottom + 6, left: clampedLeft });
+    }
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [open, anchorRef, width]);
+
+  useEffect(() => {
+    if (!open) return;
+    function handler(e: MouseEvent) {
+      const t = e.target as Node;
+      if (anchorRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
+      onClose();
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open, anchorRef, onClose]);
+
+  if (!open || !pos || typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      style={{ position: "fixed", top: pos.top, left: pos.left, width }}
+      className="z-50 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-3.5"
+      onClick={(e) => e.stopPropagation()}
+    >
+      {children}
+    </div>,
+    document.body,
+  );
+}
 
 interface DispatcherRowProps {
   dispatcher: StaffDispatcher;
@@ -229,21 +299,11 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     onDirtyChange(dispatcher.id, isDirty);
   }, [isDirty, dispatcher.id, onDirtyChange]);
 
-  // Tier popover
+  // Tier popover (anchor + portal wiring). The outside-click + positioning
+  // is handled by TierPopover itself.
   const [editingTier, setEditingTier] = useState<number | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  // Close popover on outside click
-  useEffect(() => {
-    if (editingTier === null) return;
-    function handleClick(e: MouseEvent) {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setEditingTier(null);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [editingTier]);
+  const weightTierAnchorRef = useRef<HTMLButtonElement>(null);
+  const bonusTierAnchorRef = useRef<HTMLButtonElement>(null);
 
   const [saving, setSaving] = useState(false);
 
@@ -328,17 +388,6 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
   }
 
   const [editingBonusTier, setEditingBonusTier] = useState(false);
-  const incentivePopoverRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!editingBonusTier) return;
-    function onClick(e: MouseEvent) {
-      if (incentivePopoverRef.current && !incentivePopoverRef.current.contains(e.target as Node)) {
-        setEditingBonusTier(false);
-      }
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [editingBonusTier]);
 
   const liveGender = deriveGenderClient(icNo);
   const ringColor =
@@ -448,8 +497,9 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       </div>
 
       {/* Weight Tier Chips */}
-      <div className="relative group/tiers">
+      <div className="group/tiers">
         <button
+          ref={weightTierAnchorRef}
           onClick={(e) => { e.stopPropagation(); setEditingTier(editingTier === null ? 0 : null); }}
           className="flex items-center gap-1 w-full justify-center cursor-pointer"
         >
@@ -464,67 +514,64 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
           <Pencil size={11} className="text-on-surface-variant/0 group-hover/tiers:text-on-surface-variant/50 transition-colors ml-0.5 shrink-0" />
         </button>
 
-        {/* Tier edit popover — all 3 tiers at once */}
-        {editingTier !== null && (
-          <div
-            ref={popoverRef}
-            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-3.5 w-80"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-[0.68rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] mb-2.5">
-              Weight Tiers
-            </p>
-            {/* Column labels */}
-            <div className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center mb-1">
-              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Tier</span>
-              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Min (kg)</span>
-              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Max (kg)</span>
-              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
-            </div>
-            <div className="space-y-1.5">
-              {weightTiers.map((tier, i) => (
-                <div key={tier.tier} className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center">
-                  <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
+        <TierPopover
+          open={editingTier !== null}
+          anchorRef={weightTierAnchorRef}
+          onClose={() => setEditingTier(null)}
+          width={320}
+        >
+          <p className="text-[0.68rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] mb-2.5">
+            Weight Tiers
+          </p>
+          <div className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center mb-1">
+            <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Tier</span>
+            <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Min (kg)</span>
+            <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Max (kg)</span>
+            <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
+          </div>
+          <div className="space-y-1.5">
+            {weightTiers.map((tier, i) => (
+              <div key={tier.tier} className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center">
+                <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={tier.minWeight}
+                  disabled={i === 0}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(",", ".");
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "minWeight", v);
+                  }}
+                  className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
+                />
+                {i === 2 ? (
+                  <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
+                ) : (
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={tier.minWeight}
-                    disabled={i === 0}
+                    value={tier.maxWeight ?? ""}
                     onChange={(e) => {
                       const v = e.target.value.replace(",", ".");
-                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "minWeight", v);
-                    }}
-                    className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
-                  />
-                  {i === 2 ? (
-                    <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
-                  ) : (
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={tier.maxWeight ?? ""}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(",", ".");
-                        if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "maxWeight", v);
-                      }}
-                      className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
-                    />
-                  )}
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={tier.commission}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(",", ".");
-                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "commission", v);
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "maxWeight", v);
                     }}
                     className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                   />
-                </div>
-              ))}
-            </div>
+                )}
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={tier.commission}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(",", ".");
+                    if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "commission", v);
+                  }}
+                  className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                />
+              </div>
+            ))}
           </div>
-        )}
+        </TierPopover>
       </div>
 
       {/* ── Separator ── */}
@@ -561,13 +608,14 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
       )}
 
-      {/* Bonus Tier Chips — mirrors the Weight Tier popover pattern. */}
+      {/* Bonus Tier Chips — portaled for the same overflow-clip reason as weight tiers. */}
       {incentiveEnabled ? (
-        <div className="relative group/itiers">
+        <div className="group/itiers">
           <button
+            ref={bonusTierAnchorRef}
             onClick={(e) => { e.stopPropagation(); setEditingBonusTier((v) => !v); }}
             className="flex items-center gap-1 w-full justify-center cursor-pointer"
-            title="Edit bonusTierEarnings tier rates"
+            title="Edit bonus tier rates"
           >
             {bonusTiers.map((tier) => (
               <span
@@ -580,41 +628,40 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
             <Pencil size={11} className="text-on-surface-variant/0 group-hover/itiers:text-on-surface-variant/50 transition-colors ml-0.5 shrink-0" />
           </button>
 
-          {editingBonusTier && (
-            <div
-              ref={incentivePopoverRef}
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.18)] border border-outline-variant/20 p-3.5 w-64"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-[0.68rem] font-semibold text-emerald-700 uppercase tracking-[0.05em] mb-2.5">
-                Bonus Tiers (post-threshold)
-              </p>
-              <p className="text-[0.64rem] text-on-surface-variant/70 mb-2">
-                Applied to parcels after #{orderThreshold.toLocaleString()}. Weight ranges mirror the base tiers.
-              </p>
-              <div className="grid grid-cols-[2rem_1fr] gap-x-2 items-center mb-1">
-                <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Tier</span>
-                <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
-              </div>
-              <div className="space-y-1.5">
-                {bonusTiers.map((tier, i) => (
-                  <div key={tier.tier} className="grid grid-cols-[2rem_1fr] gap-x-2 items-center">
-                    <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={tier.commission}
-                      onChange={(e) => {
-                        const v = e.target.value.replace(",", ".");
-                        if (v === "" || /^\d*\.?\d*$/.test(v)) handleBonusTierRateChange(i, v);
-                      }}
-                      className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-emerald-50 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/40"
-                    />
-                  </div>
-                ))}
-              </div>
+          <TierPopover
+            open={editingBonusTier}
+            anchorRef={bonusTierAnchorRef}
+            onClose={() => setEditingBonusTier(false)}
+            width={256}
+          >
+            <p className="text-[0.68rem] font-semibold text-emerald-700 uppercase tracking-[0.05em] mb-2.5">
+              Bonus Tiers (post-threshold)
+            </p>
+            <p className="text-[0.64rem] text-on-surface-variant/70 mb-2">
+              Applied to parcels after #{orderThreshold.toLocaleString()}. Weight ranges mirror the base tiers.
+            </p>
+            <div className="grid grid-cols-[2rem_1fr] gap-x-2 items-center mb-1">
+              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Tier</span>
+              <span className="text-[0.6rem] text-on-surface-variant/60 text-center">Rate (RM)</span>
             </div>
-          )}
+            <div className="space-y-1.5">
+              {bonusTiers.map((tier, i) => (
+                <div key={tier.tier} className="grid grid-cols-[2rem_1fr] gap-x-2 items-center">
+                  <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={tier.commission}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(",", ".");
+                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleBonusTierRateChange(i, v);
+                    }}
+                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-emerald-50 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/40"
+                  />
+                </div>
+              ))}
+            </div>
+          </TierPopover>
         </div>
       ) : (
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>

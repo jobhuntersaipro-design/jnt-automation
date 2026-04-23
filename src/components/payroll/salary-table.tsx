@@ -474,7 +474,7 @@ export function SalaryTable({
             <div className="flex-1 text-[0.82rem] text-on-surface-variant">
               {modifiedCount > 0
                 ? `${modifiedCount} dispatcher${modifiedCount !== 1 ? "s" : ""} modified`
-                : "No changes yet — edit any bonus tier, petrol, commission, penalty, or advance cell."}
+                : "No changes yet — edit penalty, advance, or commission."}
             </div>
             <button
               onClick={cancelEdit}
@@ -670,26 +670,32 @@ export function SalaryTable({
                     </td>
                     {editMode ? (
                       <>
+                        {/* Read-only: Orders, Default Tier, Bonus Tier, Petrol */}
                         <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
                           {r.totalOrders.toLocaleString()}
                         </td>
                         <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
                           {formatRM(r.baseSalary)}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <EditableCell
-                            value={r.bonusTierEarnings}
-                            isAmount
-                            onChange={(v) => updateField(r.dispatcherId, "bonusTierEarnings", v)}
-                          />
+                        <td
+                          className="py-2.5 px-3 text-right tabular-nums"
+                          style={{
+                            color: r.bonusTierEarnings > 0 ? "#12B981" : "var(--color-on-surface-variant)",
+                            opacity: r.bonusTierEarnings > 0 ? 1 : 0.4,
+                          }}
+                        >
+                          {r.bonusTierEarnings > 0 ? formatRM(r.bonusTierEarnings) : "—"}
                         </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <EditableCell
-                            value={r.petrolSubsidy}
-                            isAmount
-                            onChange={(v) => updateField(r.dispatcherId, "petrolSubsidy", v)}
-                          />
+                        <td
+                          className="py-2.5 px-3 text-right tabular-nums"
+                          style={{
+                            color: r.petrolSubsidy > 0 ? "#B27F08" : "var(--color-on-surface-variant)",
+                            opacity: r.petrolSubsidy > 0 ? 1 : 0.4,
+                          }}
+                        >
+                          {r.petrolSubsidy > 0 ? formatRM(r.petrolSubsidy) : "—"}
                         </td>
+                        {/* Editable: Penalty, Advance, Commission */}
                         <td className="py-2.5 px-3 text-right">
                           <EditableCell
                             value={r.penalty}
