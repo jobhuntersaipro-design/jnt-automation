@@ -20,6 +20,15 @@ interface EmployeeEntry {
   pcb: number
   penalty: number
   advance: number
+  // Optional statutory overrides. When present, trust the client (user
+  // edited the amount manually). When absent, fall back to auto-calc
+  // from the combined gross.
+  epfEmployee?: number
+  socsoEmployee?: number
+  eisEmployee?: number
+  epfEmployer?: number
+  socsoEmployer?: number
+  eisEmployer?: number
 }
 
 export async function GET(
@@ -314,7 +323,21 @@ export async function POST(
               )
 
         const totalGross = employeeGross + dispatcherGross
-        const statutory = calculateStatutory(totalGross)
+        const computed = calculateStatutory(totalGross)
+
+        // Honor client statutory overrides when present (user edited the
+        // field manually — including clearing to 0). Fall back to the
+        // auto-computed value only when the field is missing from the
+        // payload. Without this, a user who clears EPF can't save zero
+        // because we'd silently overwrite with the computed amount.
+        const statutory = {
+          epfEmployee: entry.epfEmployee ?? computed.epfEmployee,
+          socsoEmployee: entry.socsoEmployee ?? computed.socsoEmployee,
+          eisEmployee: entry.eisEmployee ?? computed.eisEmployee,
+          epfEmployer: entry.epfEmployer ?? computed.epfEmployer,
+          socsoEmployer: entry.socsoEmployer ?? computed.socsoEmployer,
+          eisEmployer: entry.eisEmployer ?? computed.eisEmployer,
+        }
 
         // Combined penalty/advance: dispatcher + manual employee entry
         const dispatcherPenalty = dispatcherRecord?.penalty ?? 0

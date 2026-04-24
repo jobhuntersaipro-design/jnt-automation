@@ -280,6 +280,15 @@ export function PayrollTab() {
         pcb: e.pcb,
         penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
         advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
+        // Statutory overrides — let users persist manual edits (including
+        // explicit zeros). Omitted fields would otherwise be recomputed
+        // server-side from gross, overwriting any cleared value.
+        epfEmployee: e.epfEmployee,
+        socsoEmployee: e.socsoEmployee,
+        eisEmployee: e.eisEmployee,
+        epfEmployer: e.epfEmployer,
+        socsoEmployer: e.socsoEmployer,
+        eisEmployer: e.eisEmployer,
       }))
 
       const res = await fetch(`/api/employee-payroll/${month}/${year}`, {
