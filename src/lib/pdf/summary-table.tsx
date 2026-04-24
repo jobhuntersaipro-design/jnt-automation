@@ -1,22 +1,14 @@
-import React from "react";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  StyleSheet,
-  renderToBuffer,
-} from "@react-pdf/renderer";
-
 /**
  * Shared renderer for "header + dense table + totals" PDF exports used by
- * /api/payroll/upload/[uploadId]/export/pdf,
- * /api/staff/[id]/export/pdf, and
- * /api/overview/export/pdf.
+ *   /api/payroll/upload/[uploadId]/export/pdf,
+ *   /api/staff/[id]/export/pdf, and
+ *   /api/overview/export/pdf.
  *
- * The layout intentionally mirrors the CSV shape so PDFs carry the same
- * fields in the same order — no design-system work, just legible data.
+ * Backed by pdfkit (imperative). Replaces a previous @react-pdf/renderer
+ * version; same `renderSummaryTablePdf(input) → Buffer` signature so the
+ * three callers don't know the difference.
  */
+import PDFDocument from "pdfkit";
 
 export type Alignment = "left" | "right" | "center";
 
@@ -26,7 +18,7 @@ export interface SummaryColumn {
   /** Flex weight — columns with higher values get wider space. Default 1. */
   flex?: number;
   align?: Alignment;
-  /** If true, cells render with `tabular-nums`-style monospace digits. */
+  /** If true, cells render in Courier (monospace) for tabular digit alignment. */
   tabular?: boolean;
 }
 
@@ -42,163 +34,221 @@ export interface SummaryTableInput {
   footer?: string[];
 }
 
-const styles = StyleSheet.create({
-  page: {
-    padding: 32,
-    fontSize: 9,
-    fontFamily: "Helvetica",
-    color: "#191c1d",
-  },
-  header: {
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#c3c6d6",
-    paddingBottom: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontFamily: "Helvetica-Bold",
-    color: "#191c1d",
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 11,
-    color: "#424654",
-    marginBottom: 6,
-  },
-  meta: {
-    fontSize: 8,
-    color: "#424654",
-    marginTop: 2,
-  },
-  tableHeaderRow: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    borderBottomColor: "#424654",
-    paddingBottom: 4,
-    marginBottom: 2,
-  },
-  tableHeaderCell: {
-    fontSize: 7,
-    fontFamily: "Helvetica-Bold",
-    color: "#424654",
-    letterSpacing: 0.6,
-    textTransform: "uppercase",
-    paddingRight: 4,
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 3,
-    borderBottomWidth: 0.5,
-    borderBottomColor: "#e7e8e9",
-  },
-  tableCell: {
-    fontSize: 9,
-    color: "#191c1d",
-    paddingRight: 4,
-  },
-  tableCellTabular: {
-    fontSize: 9,
-    fontFamily: "Courier",
-    color: "#191c1d",
-    paddingRight: 4,
-  },
-  footerRow: {
-    flexDirection: "row",
-    paddingVertical: 5,
-    borderTopWidth: 1,
-    borderTopColor: "#424654",
-    marginTop: 2,
-  },
-  footerCell: {
-    fontSize: 9,
-    fontFamily: "Helvetica-Bold",
-    color: "#191c1d",
-    paddingRight: 4,
-  },
-  pageNumber: {
-    position: "absolute",
-    bottom: 16,
-    right: 32,
-    fontSize: 8,
-    color: "#424654",
-  },
-});
+// Landscape A4 at 72 dpi = 841.89 × 595.28 pt. Round to ints for layout.
+const PAGE_WIDTH = 842;
+const PAGE_HEIGHT = 595;
+const PAGE_MARGIN = 32;
+const CONTENT_WIDTH = PAGE_WIDTH - PAGE_MARGIN * 2;
 
-function cellStyle(col: SummaryColumn, kind: "header" | "body" | "footer") {
-  const base =
-    kind === "header"
-      ? styles.tableHeaderCell
-      : kind === "footer"
-        ? styles.footerCell
-        : col.tabular
-          ? styles.tableCellTabular
-          : styles.tableCell;
-  return {
-    ...base,
-    flex: col.flex ?? 1,
-    textAlign: col.align ?? "left",
-  };
+const HEADER_ROW_HEIGHT = 14;
+const BODY_ROW_HEIGHT = 14;
+const FOOTER_ROW_HEIGHT = 16;
+const BOTTOM_LIMIT = PAGE_HEIGHT - PAGE_MARGIN - 18; // leave room for page-number strip
+
+const C_TEXT = "#191c1d";
+const C_MUTED = "#424654";
+const C_RULE = "#424654";
+const C_ROW_RULE = "#e7e8e9";
+const C_HEADER_RULE = "#c3c6d6";
+
+interface LaidOutColumn extends SummaryColumn {
+  x: number;
+  w: number;
 }
 
-function SummaryTablePdf({ title, subtitle, meta, columns, rows, footer }: SummaryTableInput) {
-  return (
-    <Document>
-      <Page size="A4" orientation="landscape" style={styles.page} wrap>
-        <View style={styles.header} fixed>
-          <Text style={styles.title}>{title}</Text>
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-          {meta?.map((line, i) => (
-            <Text key={i} style={styles.meta}>
-              {line}
-            </Text>
-          ))}
-        </View>
+function layoutColumns(columns: SummaryColumn[]): LaidOutColumn[] {
+  const totalFlex = columns.reduce((sum, c) => sum + (c.flex ?? 1), 0);
+  let x = PAGE_MARGIN;
+  return columns.map((c) => {
+    const w = Math.floor((CONTENT_WIDTH * (c.flex ?? 1)) / totalFlex);
+    const laid: LaidOutColumn = { ...c, x, w };
+    x += w;
+    return laid;
+  });
+}
 
-        <View style={styles.tableHeaderRow} fixed>
-          {columns.map((col, i) => (
-            <Text key={i} style={cellStyle(col, "header")}>
-              {col.label}
-            </Text>
-          ))}
-        </View>
+function drawPageTitle(doc: PDFKit.PDFDocument, input: SummaryTableInput): number {
+  let y = PAGE_MARGIN;
 
-        {rows.map((row, ri) => (
-          <View key={ri} style={styles.tableRow} wrap={false}>
-            {columns.map((col, ci) => (
-              <Text key={ci} style={cellStyle(col, "body")}>
-                {row[ci] ?? ""}
-              </Text>
-            ))}
-          </View>
-        ))}
+  doc.font("Helvetica-Bold").fontSize(18).fillColor(C_TEXT);
+  doc.text(input.title, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
+  y = doc.y + 2;
 
-        {footer ? (
-          <View style={styles.footerRow} wrap={false}>
-            {columns.map((col, ci) => (
-              <Text key={ci} style={cellStyle(col, "footer")}>
-                {footer[ci] ?? ""}
-              </Text>
-            ))}
-          </View>
-        ) : null}
+  if (input.subtitle) {
+    doc.font("Helvetica").fontSize(11).fillColor(C_MUTED);
+    doc.text(input.subtitle, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
+    y = doc.y + 2;
+  }
 
-        <Text
-          style={styles.pageNumber}
-          render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
-          fixed
-        />
-      </Page>
-    </Document>
-  );
+  if (input.meta && input.meta.length > 0) {
+    doc.font("Helvetica").fontSize(8).fillColor(C_MUTED);
+    for (const line of input.meta) {
+      doc.text(line, PAGE_MARGIN, y, { width: CONTENT_WIDTH });
+      y = doc.y;
+    }
+  }
+
+  y += 6;
+  doc
+    .moveTo(PAGE_MARGIN, y)
+    .lineTo(PAGE_MARGIN + CONTENT_WIDTH, y)
+    .lineWidth(1)
+    .strokeColor(C_HEADER_RULE)
+    .stroke();
+  return y + 6;
+}
+
+function drawHeaderRow(
+  doc: PDFKit.PDFDocument,
+  columns: LaidOutColumn[],
+  y: number,
+): number {
+  doc.font("Helvetica-Bold").fontSize(7).fillColor(C_MUTED);
+  for (const col of columns) {
+    doc.text(col.label.toUpperCase(), col.x, y, {
+      width: col.w - 4,
+      align: col.align ?? "left",
+      characterSpacing: 0.6,
+    });
+  }
+  const bottom = y + HEADER_ROW_HEIGHT - 3;
+  doc
+    .moveTo(PAGE_MARGIN, bottom)
+    .lineTo(PAGE_MARGIN + CONTENT_WIDTH, bottom)
+    .lineWidth(1)
+    .strokeColor(C_RULE)
+    .stroke();
+  return bottom + 3;
+}
+
+function drawBodyRow(
+  doc: PDFKit.PDFDocument,
+  columns: LaidOutColumn[],
+  values: string[],
+  y: number,
+): number {
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
+    doc
+      .font(col.tabular ? "Courier" : "Helvetica")
+      .fontSize(9)
+      .fillColor(C_TEXT);
+    doc.text(values[i] ?? "", col.x, y, {
+      width: col.w - 4,
+      align: col.align ?? "left",
+      lineBreak: false,
+      ellipsis: true,
+    });
+  }
+  const bottom = y + BODY_ROW_HEIGHT - 3;
+  doc
+    .moveTo(PAGE_MARGIN, bottom)
+    .lineTo(PAGE_MARGIN + CONTENT_WIDTH, bottom)
+    .lineWidth(0.5)
+    .strokeColor(C_ROW_RULE)
+    .stroke();
+  return bottom + 2;
+}
+
+function drawFooterRow(
+  doc: PDFKit.PDFDocument,
+  columns: LaidOutColumn[],
+  values: string[],
+  y: number,
+): number {
+  doc
+    .moveTo(PAGE_MARGIN, y - 2)
+    .lineTo(PAGE_MARGIN + CONTENT_WIDTH, y - 2)
+    .lineWidth(1)
+    .strokeColor(C_RULE)
+    .stroke();
+
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
+    doc
+      .font(col.tabular ? "Courier-Bold" : "Helvetica-Bold")
+      .fontSize(9)
+      .fillColor(C_TEXT);
+    doc.text(values[i] ?? "", col.x, y + 3, {
+      width: col.w - 4,
+      align: col.align ?? "left",
+      lineBreak: false,
+      ellipsis: true,
+    });
+  }
+  return y + FOOTER_ROW_HEIGHT;
+}
+
+function drawPageNumbers(doc: PDFKit.PDFDocument): void {
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    doc.font("Helvetica").fontSize(8).fillColor(C_MUTED);
+    doc.text(
+      `${i - range.start + 1} / ${range.count}`,
+      PAGE_MARGIN,
+      PAGE_HEIGHT - PAGE_MARGIN - 8,
+      { width: CONTENT_WIDTH, align: "right", lineBreak: false },
+    );
+  }
+}
+
+function buildDocument(
+  doc: PDFKit.PDFDocument,
+  input: SummaryTableInput,
+): void {
+  const columns = layoutColumns(input.columns);
+  let y = drawPageTitle(doc, input);
+  y = drawHeaderRow(doc, columns, y);
+
+  for (const row of input.rows) {
+    if (y + BODY_ROW_HEIGHT > BOTTOM_LIMIT) {
+      doc.addPage();
+      y = PAGE_MARGIN;
+      y = drawHeaderRow(doc, columns, y);
+    }
+    y = drawBodyRow(doc, columns, row, y);
+  }
+
+  if (input.footer) {
+    if (y + FOOTER_ROW_HEIGHT > BOTTOM_LIMIT) {
+      doc.addPage();
+      y = PAGE_MARGIN;
+      y = drawHeaderRow(doc, columns, y);
+    }
+    y = drawFooterRow(doc, columns, input.footer, y);
+  }
+
+  drawPageNumbers(doc);
 }
 
 /**
- * Render a summary-table PDF to a Node Buffer suitable for a
- * `new NextResponse(buffer, { headers: { "Content-Type": "application/pdf" } })`.
+ * Render a summary-table PDF to a Node Buffer. Same signature as the previous
+ * @react-pdf/renderer implementation — callers unchanged.
  */
 export async function renderSummaryTablePdf(
   input: SummaryTableInput,
 ): Promise<Buffer> {
-  return renderToBuffer(<SummaryTablePdf {...input} />);
+  const doc = new PDFDocument({
+    size: "A4",
+    layout: "landscape",
+    margin: PAGE_MARGIN,
+    bufferPages: true,
+    info: {
+      Title: input.title,
+      Author: "EasyStaff",
+    },
+  });
+
+  const chunks: Buffer[] = [];
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  buildDocument(doc, input);
+  doc.end();
+  return done;
 }

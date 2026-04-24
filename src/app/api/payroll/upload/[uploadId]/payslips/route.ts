@@ -6,8 +6,9 @@ import { generatePayslipPdf } from "@/lib/payroll/pdf-generator";
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
 import { runPool } from "@/lib/upload/run-pool";
 
-// PDF generation is CPU-bound; 4 matches the bulk payslip worker bound
-// (palette of safe concurrency for @react-pdf/renderer on a single node).
+// PDF generation is CPU-bound; 4 matches the bulk payslip worker bound —
+// pdfkit is imperative so higher concurrency saturates the event loop without
+// OOMing, but 4 keeps memory headroom on the 1 GB serverless Lambdas.
 const PAYSLIP_CONCURRENCY = 4;
 
 export const maxDuration = 60;

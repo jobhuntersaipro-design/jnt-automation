@@ -1,13 +1,19 @@
-import React from "react";
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  Image,
-  StyleSheet,
-  renderToBuffer,
-} from "@react-pdf/renderer";
+/**
+ * Dispatcher payslip PDF — backed by pdfkit.
+ *
+ * Replaces the previous @react-pdf/renderer implementation. Same
+ * `generatePayslipPdf(input) → Buffer` signature and `GeneratePayslipInput`
+ * shape, so the `/api/payroll/upload/[uploadId]/payslips` bulk worker and
+ * any ad-hoc single-payslip callers don't need updating.
+ *
+ * Layout: company header → outer bordered frame containing
+ *   EMPLOYEE'S PARTICULARS title row
+ *   particulars grid (NAME/IC/POSITION | DATE/SOCSO/INCOME TAX)
+ *   ADDITION | DEDUCTION two-column table
+ *   TOTAL (left) | NET PAY + REMARKS (right)
+ * Followed by PREPARED BY + APPROVED BY signature blocks with optional stamp.
+ */
+import PDFDocument from "pdfkit";
 import { countBonusParcelsPerTier, countParcelsPerTier, formatRate } from "./tier-counter";
 import type { TierBreakdown } from "./tier-counter";
 
@@ -18,83 +24,19 @@ function formatRM(amount: number): string {
   });
 }
 
-const B = "#000";
-const s = StyleSheet.create({
-  page: { paddingTop: 50, paddingBottom: 40, paddingHorizontal: 50, fontSize: 9, fontFamily: "Helvetica" },
+const PAGE_WIDTH = 595;
+const PAGE_HEIGHT = 842;
+const MARGIN = 50;
+const CONTENT_LEFT = MARGIN;
+const CONTENT_RIGHT = PAGE_WIDTH - MARGIN;
+const CONTENT_WIDTH = CONTENT_RIGHT - CONTENT_LEFT;
+const MID_X = CONTENT_LEFT + CONTENT_WIDTH / 2;
 
-  // Company header — no green bar, centered bold text
-  center: { textAlign: "center", marginBottom: 24 },
-  companyName: { fontSize: 12, fontFamily: "Helvetica-Bold" },
-  addressLine: { fontSize: 9, fontFamily: "Helvetica-Bold", marginTop: 1 },
+const AMOUNT_COL_W = 80;
+const ROW_PAD_X = 6;
+const ROW_H = 13;
 
-  // Outer frame — wraps everything from EMPLOYEE'S PARTICULARS down to NET PAY/REMARKS
-  outerBox: { borderWidth: 1, borderColor: B },
-
-  // Title row inside the outer box
-  partTitleRow: { borderBottomWidth: 1, borderBottomColor: B, paddingVertical: 4 },
-  partTitle: { textAlign: "center" as const, fontSize: 9.5 },
-
-  // Employee Particulars (bottom-bordered so addition/deduction sits below)
-  partBox: { flexDirection: "row" as const, borderBottomWidth: 1, borderBottomColor: B },
-  partLeft: { flex: 1, paddingVertical: 4, paddingHorizontal: 6 },
-  partRight: { flex: 1, paddingVertical: 4, paddingHorizontal: 6, borderLeftWidth: 1, borderLeftColor: B },
-  partRow: { flexDirection: "row" as const, marginBottom: 1.5 },
-  partLabel: { width: 75, fontSize: 9 },
-  partColon: { width: 10, fontSize: 9 },
-  partVal: { flex: 1, fontSize: 9, fontFamily: "Helvetica-Bold" },
-
-  // Addition/Deduction columns live inside outerBox; no outer border of their own
-  tableOuter: {
-    flexDirection: "row" as const,
-  },
-  // Left half (Addition)
-  halfLeft: { flex: 1, borderRightWidth: 1, borderRightColor: B },
-  // Right half (Deduction)
-  halfRight: { flex: 1 },
-
-  // Header row inside each half
-  hdrRow: {
-    flexDirection: "row" as const,
-    borderBottomWidth: 1,
-    borderBottomColor: B,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-  },
-  hdrLabel: { flex: 1, fontSize: 9, textAlign: "center" as const, textDecoration: "underline" as const },
-  hdrRM: { width: 80, fontSize: 9, textAlign: "center" as const, textDecoration: "underline" as const },
-
-  // Normal data row — NO borders between rows
-  dataRow: { flexDirection: "row" as const, paddingVertical: 2, paddingHorizontal: 6 },
-  cellL: { flex: 1, fontSize: 9 },
-  cellR: { width: 80, fontSize: 9, textAlign: "right" as const },
-
-  // Separator row — has a top border
-  sepRow: {
-    flexDirection: "row" as const,
-    paddingVertical: 3,
-    paddingHorizontal: 6,
-    borderTopWidth: 1,
-    borderTopColor: B,
-  },
-  sepLabelCenterBold: { flex: 1, fontSize: 9, textAlign: "center" as const, fontFamily: "Helvetica-Bold" },
-  sepAmtBold: { width: 80, fontSize: 9, textAlign: "right" as const, fontFamily: "Helvetica-Bold" },
-
-  // Remarks
-  remarksRow: {
-    paddingVertical: 4,
-    paddingHorizontal: 6,
-    borderTopWidth: 1,
-    borderTopColor: B,
-  },
-  remarksBold: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-
-  // Footer
-  footer: { flexDirection: "row" as const, marginTop: 60, justifyContent: "space-between" as const, alignItems: "flex-end" as const },
-  sigBlock: { alignItems: "center" as const, width: 180 },
-  sigDots: { fontSize: 9, marginBottom: 3 },
-  sigLabel: { fontSize: 9, fontFamily: "Helvetica-Bold" },
-  stamp: { width: 70, height: 70, marginBottom: 8, objectFit: "contain" as const },
-});
+const BLACK = "#000";
 
 export interface PayslipData {
   companyName: string;
@@ -114,192 +56,6 @@ export interface PayslipData {
   penalty: number;
   advance: number;
   netSalary: number;
-}
-
-const h = React.createElement;
-
-function PayslipDocument({ data }: { data: PayslipData }) {
-  const addTotal =
-    data.tierBreakdowns.reduce((sum, t) => sum + t.total, 0) +
-    data.bonusTierBreakdowns.reduce((sum, t) => sum + t.total, 0) +
-    data.petrolSubsidy +
-    data.commission;
-
-  // Company header: "ST XIANG TRANSPORTATION SDN BHD (202401013061)"
-  const companyHeader = data.companyRegistrationNo
-    ? `${data.companyName} (${data.companyRegistrationNo})`
-    : data.companyName;
-
-  const addressLines = data.companyAddress ? data.companyAddress.split("\n") : [];
-
-  // Date: last day of the month DD/MM/YYYY
-  const lastDay = new Date(data.year, data.month, 0).getDate();
-  const dateStr = `${String(lastDay).padStart(2, "0")}/${String(data.month).padStart(2, "0")}/${data.year}`;
-
-  // Build addition data rows (no borders)
-  const addRows: React.ReactElement[] = [];
-  for (const t of data.tierBreakdowns) {
-    addRows.push(
-      h(View, { key: `t${t.tier}`, style: s.dataRow },
-        h(Text, { style: s.cellL }, `Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`),
-        h(Text, { style: s.cellR }, formatRM(t.total)),
-      ),
-    );
-  }
-  for (const t of data.bonusTierBreakdowns) {
-    addRows.push(
-      h(View, { key: `bt${t.tier}`, style: s.dataRow },
-        h(Text, { style: s.cellL }, `Bonus Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`),
-        h(Text, { style: s.cellR }, formatRM(t.total)),
-      ),
-    );
-  }
-  if (data.petrolSubsidy > 0) {
-    addRows.push(h(View, { key: "pet", style: s.dataRow },
-      h(Text, { style: s.cellL }, "Petrol Subsidy"),
-      h(Text, { style: s.cellR }, formatRM(data.petrolSubsidy)),
-    ));
-  }
-  if (data.commission > 0) {
-    addRows.push(h(View, { key: "com", style: s.dataRow },
-      h(Text, { style: s.cellL }, "Commission"),
-      h(Text, { style: s.cellR }, formatRM(data.commission)),
-    ));
-  }
-
-  // Build deduction data rows (no borders)
-  const dedRows: React.ReactElement[] = [];
-  if (data.penalty > 0) {
-    dedRows.push(h(View, { key: "pen", style: s.dataRow },
-      h(Text, { style: s.cellL }, "PENALTY"),
-      h(Text, { style: s.cellR }, formatRM(data.penalty)),
-    ));
-  }
-  if (data.advance > 0) {
-    dedRows.push(h(View, { key: "adv", style: s.dataRow },
-      h(Text, { style: s.cellL }, "ADVANCE"),
-      h(Text, { style: s.cellR }, formatRM(data.advance)),
-    ));
-  }
-
-  return h(Document, null,
-    h(Page, { size: "A4", style: s.page },
-
-      // ── Company Header ──
-      h(View, { style: s.center },
-        h(Text, { style: s.companyName }, companyHeader),
-        ...addressLines.map((line, i) => h(Text, { key: i, style: s.addressLine }, line)),
-      ),
-
-      // ── Outer bordered frame: particulars + table ──
-      h(View, { style: s.outerBox },
-
-        // Title bar inside the frame
-        h(View, { style: s.partTitleRow },
-          h(Text, { style: s.partTitle }, "EMPLOYEE'S PARTICULARS"),
-        ),
-
-        // Employee Particulars grid
-        h(View, { style: s.partBox },
-          h(View, { style: s.partLeft },
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "NAME"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, data.dispatcherName),
-            ),
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "I/C NO"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, data.icNo),
-            ),
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "POSITION"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, "DESPATCH"),
-            ),
-          ),
-          h(View, { style: s.partRight },
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "DATE"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, dateStr),
-            ),
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "SOCSO NO"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, ""),
-            ),
-            h(View, { style: s.partRow },
-              h(Text, { style: s.partLabel }, "INCOME TAX NO"),
-              h(Text, { style: s.partColon }, ":"),
-              h(Text, { style: s.partVal }, ""),
-            ),
-          ),
-        ),
-
-        // Addition / Deduction columns
-        h(View, { style: s.tableOuter },
-
-        // LEFT HALF — Addition
-        h(View, { style: s.halfLeft },
-          // Header: ADDITION | RM
-          h(View, { style: s.hdrRow },
-            h(Text, { style: s.hdrLabel }, "ADDITION"),
-            h(Text, { style: s.hdrRM }, "RM"),
-          ),
-          // Data rows (no borders between them)
-          ...addRows,
-          // Spacer to push TOTAL to bottom
-          h(View, { style: { flex: 1 } }),
-          // TOTAL row (top border)
-          h(View, { style: s.sepRow },
-            h(Text, { style: s.sepLabelCenterBold }, "TOTAL :-"),
-            h(Text, { style: s.sepAmtBold }, formatRM(addTotal)),
-          ),
-        ),
-
-        // RIGHT HALF — Deduction
-        h(View, { style: s.halfRight },
-          // Header: DEDUCTION | RM
-          h(View, { style: s.hdrRow },
-            h(Text, { style: s.hdrLabel }, "DEDUCTION"),
-            h(Text, { style: s.hdrRM }, "RM"),
-          ),
-          // Data rows (no borders between them)
-          ...dedRows,
-          // Spacer
-          h(View, { style: { flex: 1 } }),
-          // NET PAY row (top border)
-          h(View, { style: s.sepRow },
-            h(Text, { style: s.sepLabelCenterBold }, "NET PAY :-"),
-            h(Text, { style: s.sepAmtBold }, formatRM(data.netSalary)),
-          ),
-          // REMARKS row (top border)
-          h(View, { style: s.remarksRow },
-            h(Text, { style: s.remarksBold }, "REMARKS :-"),
-          ),
-          // Empty space below remarks
-          h(View, { style: { minHeight: 16 } }),
-        ),
-        ),
-      ),
-
-      // ── Stamp + Signatures ──
-      h(View, { style: s.footer },
-        h(View, { style: s.sigBlock },
-          h(Text, { style: s.sigDots }, "......................."),
-          h(Text, { style: s.sigLabel }, "PREPARED BY"),
-        ),
-        h(View, { style: s.sigBlock },
-          ...(data.stampImageUrl
-            ? [h(Image, { key: "stamp", style: s.stamp, src: data.stampImageUrl })]
-            : []),
-          h(Text, { style: s.sigDots }, "......................."),
-          h(Text, { style: s.sigLabel }, "APPROVED BY"),
-        ),
-      ),
-    ),
-  );
 }
 
 interface LineItemRow {
@@ -335,6 +91,316 @@ export interface GeneratePayslipInput {
   bonusTierSnapshot: TierSnapshotRow[];
 }
 
+type Row = { label: string; amount: number };
+
+// ─── Drawing helpers ─────────────────────────────────────────────────
+function hline(doc: PDFKit.PDFDocument, x1: number, x2: number, y: number): void {
+  doc.moveTo(x1, y).lineTo(x2, y).lineWidth(1).strokeColor(BLACK).stroke();
+}
+function vline(doc: PDFKit.PDFDocument, x: number, y1: number, y2: number): void {
+  doc.moveTo(x, y1).lineTo(x, y2).lineWidth(1).strokeColor(BLACK).stroke();
+}
+function rect(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): void {
+  doc.lineWidth(1).strokeColor(BLACK).rect(x, y, w, h).stroke();
+}
+
+function buildAdditionRows(data: PayslipData): Row[] {
+  const rows: Row[] = [];
+  for (const t of data.tierBreakdowns) {
+    rows.push({ label: `Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`, amount: t.total });
+  }
+  for (const t of data.bonusTierBreakdowns) {
+    rows.push({ label: `Bonus Parcel Delivered (${t.count}*RM ${formatRate(t.rate)})`, amount: t.total });
+  }
+  if (data.petrolSubsidy > 0) rows.push({ label: "Petrol Subsidy", amount: data.petrolSubsidy });
+  if (data.commission > 0) rows.push({ label: "Commission", amount: data.commission });
+  return rows;
+}
+
+function buildDeductionRows(data: PayslipData): Row[] {
+  const rows: Row[] = [];
+  if (data.penalty > 0) rows.push({ label: "PENALTY", amount: data.penalty });
+  if (data.advance > 0) rows.push({ label: "ADVANCE", amount: data.advance });
+  return rows;
+}
+
+function drawCompanyHeader(doc: PDFKit.PDFDocument, data: PayslipData, y: number): number {
+  const header = data.companyRegistrationNo
+    ? `${data.companyName} (${data.companyRegistrationNo})`
+    : data.companyName;
+  doc.font("Helvetica-Bold").fontSize(12).fillColor(BLACK);
+  doc.text(header, CONTENT_LEFT, y, { width: CONTENT_WIDTH, align: "center" });
+  y = doc.y + 1;
+  if (data.companyAddress) {
+    doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+    for (const line of data.companyAddress.split("\n")) {
+      doc.text(line, CONTENT_LEFT, y, { width: CONTENT_WIDTH, align: "center" });
+      y = doc.y + 1;
+    }
+  }
+  return y + 12;
+}
+
+function drawLabelColonValue(
+  doc: PDFKit.PDFDocument,
+  x: number,
+  y: number,
+  width: number,
+  labelW: number,
+  label: string,
+  value: string,
+): void {
+  const colonW = 10;
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  doc.text(label, x, y, { width: labelW, lineBreak: false });
+  doc.text(":", x + labelW, y, { width: colonW, lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text(value, x + labelW + colonW, y, {
+    width: width - labelW - colonW,
+    lineBreak: false,
+    ellipsis: true,
+  });
+}
+
+function drawParticulars(
+  doc: PDFKit.PDFDocument,
+  data: PayslipData,
+  yTop: number,
+): number {
+  const lastDay = new Date(data.year, data.month, 0).getDate();
+  const dateStr = `${String(lastDay).padStart(2, "0")}/${String(data.month).padStart(2, "0")}/${data.year}`;
+
+  const leftParticulars: [string, string][] = [
+    ["NAME", data.dispatcherName],
+    ["I/C NO", data.icNo],
+    ["POSITION", "DESPATCH"],
+  ];
+  const rightParticulars: [string, string][] = [
+    ["DATE", dateStr],
+    ["SOCSO NO", ""],
+    ["INCOME TAX NO", ""],
+  ];
+
+  const boxPadX = ROW_PAD_X;
+  const boxPadY = 4;
+  const lineH = 12;
+  const labelW = 75; // matches original partLabel width
+  let y = yTop + boxPadY;
+  const halfW = CONTENT_WIDTH / 2;
+  for (let i = 0; i < 3; i++) {
+    drawLabelColonValue(
+      doc,
+      CONTENT_LEFT + boxPadX,
+      y,
+      halfW - boxPadX * 2,
+      labelW,
+      leftParticulars[i][0],
+      leftParticulars[i][1],
+    );
+    drawLabelColonValue(
+      doc,
+      MID_X + boxPadX,
+      y,
+      halfW - boxPadX * 2,
+      labelW,
+      rightParticulars[i][0],
+      rightParticulars[i][1],
+    );
+    y += lineH;
+  }
+  return y + boxPadY;
+}
+
+function drawColumnHeaders(doc: PDFKit.PDFDocument, y: number): number {
+  const headerH = 14;
+  const leftAmountX = MID_X - AMOUNT_COL_W;
+  const rightAmountX = CONTENT_RIGHT - AMOUNT_COL_W;
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+
+  const textY = y + 3;
+  doc.text("ADDITION", CONTENT_LEFT + ROW_PAD_X, textY, {
+    width: (MID_X - CONTENT_LEFT) - AMOUNT_COL_W - ROW_PAD_X * 2,
+    align: "center",
+    lineBreak: false,
+  });
+  doc.text("RM", leftAmountX, textY, { width: AMOUNT_COL_W, align: "center", lineBreak: false });
+  doc.text("DEDUCTION", MID_X + ROW_PAD_X, textY, {
+    width: (CONTENT_RIGHT - MID_X) - AMOUNT_COL_W - ROW_PAD_X * 2,
+    align: "center",
+    lineBreak: false,
+  });
+  doc.text("RM", rightAmountX, textY, { width: AMOUNT_COL_W, align: "center", lineBreak: false });
+
+  const underlineY = textY + 10;
+  const rule = (x1: number, x2: number) =>
+    doc.moveTo(x1, underlineY).lineTo(x2, underlineY).lineWidth(0.6).strokeColor(BLACK).stroke();
+  rule(CONTENT_LEFT + ROW_PAD_X, leftAmountX - ROW_PAD_X);
+  rule(leftAmountX, leftAmountX + AMOUNT_COL_W);
+  rule(MID_X + ROW_PAD_X, rightAmountX - ROW_PAD_X);
+  rule(rightAmountX, rightAmountX + AMOUNT_COL_W);
+
+  hline(doc, CONTENT_LEFT, CONTENT_RIGHT, y + headerH);
+  return y + headerH;
+}
+
+function drawHalfDataRows(
+  doc: PDFKit.PDFDocument,
+  rows: Row[],
+  side: "left" | "right",
+  yTop: number,
+): number {
+  const isLeft = side === "left";
+  const labelX = (isLeft ? CONTENT_LEFT : MID_X) + ROW_PAD_X;
+  const labelW =
+    (isLeft ? MID_X - CONTENT_LEFT : CONTENT_RIGHT - MID_X) - AMOUNT_COL_W - ROW_PAD_X * 2;
+  const amountX = (isLeft ? MID_X : CONTENT_RIGHT) - AMOUNT_COL_W;
+
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  let y = yTop + 2;
+  for (const r of rows) {
+    doc.text(r.label, labelX, y, { width: labelW, lineBreak: false, ellipsis: true });
+    doc.text(formatRM(r.amount), amountX, y, {
+      width: AMOUNT_COL_W - ROW_PAD_X,
+      align: "right",
+      lineBreak: false,
+    });
+    y += ROW_H;
+  }
+  return y;
+}
+
+function drawBottomBar(
+  doc: PDFKit.PDFDocument,
+  side: "left" | "right",
+  label: string,
+  amount: number,
+  yTop: number,
+): number {
+  const isLeft = side === "left";
+  const xStart = isLeft ? CONTENT_LEFT : MID_X;
+  const xEnd = isLeft ? MID_X : CONTENT_RIGHT;
+  const labelX = xStart + ROW_PAD_X;
+  const labelW = (xEnd - xStart) - AMOUNT_COL_W - ROW_PAD_X * 2;
+  const amountX = xEnd - AMOUNT_COL_W;
+
+  hline(doc, xStart, xEnd, yTop);
+  const y = yTop + 3;
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text(label, labelX, y, { width: labelW, align: "center", lineBreak: false });
+  doc.text(formatRM(amount), amountX, y, {
+    width: AMOUNT_COL_W - ROW_PAD_X,
+    align: "right",
+    lineBreak: false,
+  });
+  return yTop + 16;
+}
+
+function drawRemarks(doc: PDFKit.PDFDocument, yTop: number): number {
+  hline(doc, MID_X, CONTENT_RIGHT, yTop);
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text("REMARKS :-", MID_X + ROW_PAD_X, yTop + 4, {
+    width: (CONTENT_RIGHT - MID_X) - ROW_PAD_X * 2,
+    lineBreak: false,
+  });
+  return yTop + 28;
+}
+
+function drawFooter(doc: PDFKit.PDFDocument, data: PayslipData, yTop: number): void {
+  const footerY = Math.max(yTop + 40, PAGE_HEIGHT - MARGIN - 100);
+  const blockW = 180;
+  const leftX = CONTENT_LEFT;
+  const rightX = CONTENT_RIGHT - blockW;
+  const dots = ".......................";
+
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  doc.text(dots, leftX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text("PREPARED BY", leftX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+
+  if (data.stampImageUrl) {
+    try {
+      if (/^data:|^\/|^[a-zA-Z]:\\/.test(data.stampImageUrl)) {
+        doc.image(data.stampImageUrl, rightX + (blockW - 70) / 2, footerY, {
+          width: 70,
+          height: 70,
+          fit: [70, 70],
+        });
+      }
+    } catch {
+      // swallow — payslip still renders without stamp
+    }
+  }
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  doc.text(dots, rightX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text("APPROVED BY", rightX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+}
+
+function buildDocument(doc: PDFKit.PDFDocument, data: PayslipData): void {
+  let y = drawCompanyHeader(doc, data, MARGIN);
+
+  const boxTop = y;
+
+  // Title row
+  const titleH = 16;
+  doc.font("Helvetica").fontSize(9.5).fillColor(BLACK);
+  doc.text("EMPLOYEE'S PARTICULARS", CONTENT_LEFT, y + 4, {
+    width: CONTENT_WIDTH,
+    align: "center",
+    lineBreak: false,
+  });
+  y += titleH;
+  hline(doc, CONTENT_LEFT, CONTENT_RIGHT, y);
+
+  const particularsTop = y;
+  y = drawParticulars(doc, data, y);
+  hline(doc, CONTENT_LEFT, CONTENT_RIGHT, y);
+
+  y = drawColumnHeaders(doc, y);
+  const bodyTop = y;
+
+  const additionRows = buildAdditionRows(data);
+  const deductionRows = buildDeductionRows(data);
+  const addTotal =
+    data.tierBreakdowns.reduce((s, t) => s + t.total, 0) +
+    data.bonusTierBreakdowns.reduce((s, t) => s + t.total, 0) +
+    data.petrolSubsidy +
+    data.commission;
+
+  // Draw data rows on each side
+  const leftDataBottom = drawHalfDataRows(doc, additionRows, "left", bodyTop);
+  const rightDataBottom = drawHalfDataRows(doc, deductionRows, "right", bodyTop);
+
+  // Compute where TOTAL (left) and NET PAY (right) go. Pin to the maximum
+  // content height so both columns share a consistent section bottom. Right
+  // side additionally hosts a REMARKS row below NET PAY.
+  const MIN_BODY_H = 140;
+  const leftNeed = leftDataBottom - bodyTop + 16; // + TOTAL row
+  const rightNeed = rightDataBottom - bodyTop + 16 + 28; // + NET PAY + REMARKS
+  const sectionH = Math.max(MIN_BODY_H, leftNeed, rightNeed);
+  const sectionBottom = bodyTop + sectionH;
+
+  // Left: TOTAL pinned at bottom
+  drawBottomBar(doc, "left", "TOTAL :-", addTotal, sectionBottom - 16);
+  // Right: NET PAY pinned above REMARKS (REMARKS = 28 tall)
+  drawBottomBar(doc, "right", "NET PAY :-", data.netSalary, sectionBottom - 16 - 28);
+  drawRemarks(doc, sectionBottom - 28);
+
+  const boxBottom = sectionBottom;
+
+  // Outer frame + vertical separator
+  rect(doc, CONTENT_LEFT, boxTop, CONTENT_WIDTH, boxBottom - boxTop);
+  vline(doc, MID_X, particularsTop, boxBottom);
+
+  drawFooter(doc, data, boxBottom);
+}
+
 export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<Buffer> {
   const tierBreakdowns = countParcelsPerTier(input.lineItems, input.weightTiersSnapshot);
   const bonusTierBreakdowns = countBonusParcelsPerTier(
@@ -360,8 +426,24 @@ export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<B
     netSalary: input.netSalary,
   };
 
-  const doc = h(PayslipDocument, { data });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result = await renderToBuffer(doc as any);
-  return Buffer.from(result);
+  const doc = new PDFDocument({
+    size: "A4",
+    margin: MARGIN,
+    bufferPages: true,
+    info: {
+      Title: `Payslip — ${input.dispatcherName} ${input.month}/${input.year}`,
+      Author: "EasyStaff",
+    },
+  });
+
+  const chunks: Buffer[] = [];
+  doc.on("data", (chunk: Buffer) => chunks.push(chunk));
+  const done = new Promise<Buffer>((resolve, reject) => {
+    doc.on("end", () => resolve(Buffer.concat(chunks)));
+    doc.on("error", reject);
+  });
+
+  buildDocument(doc, data);
+  doc.end();
+  return done;
 }

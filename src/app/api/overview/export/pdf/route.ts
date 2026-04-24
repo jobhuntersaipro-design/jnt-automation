@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
     timeStyle: "short",
   });
 
-  // Serve rendered PDFs from Redis when available — @react-pdf/renderer is
+  // Serve rendered PDFs from Redis when available — pdfkit generation is
   // CPU-bound (100–500 ms). A repeat click on Download within the 5-min
   // overview data TTL reuses the prior render.
   const cacheKey = pdfCacheKey(effective.agentId, type, filters);
