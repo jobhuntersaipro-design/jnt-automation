@@ -46,16 +46,9 @@ export function splitDispatchers(
 }
 
 /**
- * Returns true iff every chunk has reached a terminal state. Used by
- * `/worker/chunk` to decide whether to publish the finalize message.
- */
-export function allChunksTerminal(chunks: ChunkState[]): boolean {
-  return chunks.length > 0 && chunks.every((c) => c.status === "done" || c.status === "failed");
-}
-
-/**
- * Returns `done` chunk count — the Downloads Panel uses this to drive the
- * chunk-level progress bar when a fan-out job has no per-file counter yet.
+ * Returns `done` chunk count — handy for UI display. Not used for the
+ * finalize trigger (that uses an atomic INCR counter in Redis —
+ * `incrementChunksDone` in bulk-job.ts).
  */
 export function countDoneChunks(chunks: ChunkState[]): number {
   return chunks.filter((c) => c.status === "done").length;

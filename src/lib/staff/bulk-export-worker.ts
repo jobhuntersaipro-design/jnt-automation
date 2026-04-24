@@ -2,16 +2,12 @@ import { Client } from "@upstash/qstash";
 import { streamZipToR2 } from "./streaming-zip";
 import { getMonthDetailsBatch } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
-import { getJob, updateJob, patchChunk } from "./bulk-job";
+import { getJob, updateJob, patchChunk, incrementChunksDone } from "./bulk-job";
 import {
   generateMonthDetailFiles,
   listDispatcherIdsForMonth,
 } from "./month-detail-files";
-import {
-  splitDispatchers,
-  allChunksTerminal,
-  partR2Key,
-} from "./bulk-chunks";
+import { splitDispatchers, partR2Key } from "./bulk-chunks";
 
 const qstash = new Client({ token: process.env.QSTASH_TOKEN ?? "" });
 
@@ -243,15 +239,15 @@ export async function runBulkExportChunk(
     const r2Key = partR2Key(job, chunkIndex);
     await streamZipToR2(r2Key, files);
 
-    const after = await patchChunk(jobId, chunkIndex, {
+    await patchChunk(jobId, chunkIndex, {
       status: "done",
       r2Key,
       fileCount: files.length,
     });
 
-    if (after?.chunks && allChunksTerminal(after.chunks)) {
-      // Last chunk — publish finalize. Safe under concurrent delivery:
-      // the finalize handler itself checks idempotency on `status === "done"`.
+    // Atomic — exactly one chunk sees the return value === totalChunks.
+    const done = await incrementChunksDone(jobId);
+    if (done === job.totalChunks) {
       const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/dispatchers/month-detail/bulk/worker/finalize`;
       await qstash.publishJSON({ url, body: { jobId }, retries: 2 });
     }
@@ -262,11 +258,11 @@ export async function runBulkExportChunk(
     );
     const message = err instanceof Error ? err.message : "Chunk worker failed";
     await patchChunk(jobId, chunkIndex, { status: "failed", error: message });
-    const after = await getJob(jobId);
-    if (after?.chunks && allChunksTerminal(after.chunks)) {
-      // Even on failure we still publish finalize so the job resolves;
-      // finalize treats failed chunks as "no files contributed" and
-      // either succeeds with the partial result or fails the whole job.
+    // Failed chunks still count toward "all chunks terminal" — finalize
+    // handles partial success (some chunks done, some failed) by archiving
+    // whatever parts exist.
+    const done = await incrementChunksDone(jobId);
+    if (done === job.totalChunks) {
       try {
         const url = `${process.env.NEXT_PUBLIC_APP_URL}/api/dispatchers/month-detail/bulk/worker/finalize`;
         await qstash.publishJSON({ url, body: { jobId }, retries: 2 });

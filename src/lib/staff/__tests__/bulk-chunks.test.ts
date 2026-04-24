@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   splitDispatchers,
-  allChunksTerminal,
   countDoneChunks,
   partR2Key,
   DEFAULT_CHUNK_SIZE,
@@ -49,34 +48,6 @@ describe("splitDispatchers", () => {
     const ids = Array.from({ length: DEFAULT_CHUNK_SIZE + 1 }, (_, i) => `d${i}`);
     const chunks = splitDispatchers(ids);
     expect(chunks).toHaveLength(2);
-  });
-});
-
-describe("allChunksTerminal", () => {
-  const mk = (status: ChunkState["status"]): ChunkState => ({
-    index: 0,
-    dispatcherIds: ["d"],
-    status,
-  });
-
-  it("empty chunk list is NOT terminal (no work to finalize)", () => {
-    expect(allChunksTerminal([])).toBe(false);
-  });
-
-  it("all done → true", () => {
-    expect(allChunksTerminal([mk("done"), mk("done")])).toBe(true);
-  });
-
-  it("mix of done and failed → true (finalize handles partial success)", () => {
-    expect(allChunksTerminal([mk("done"), mk("failed")])).toBe(true);
-  });
-
-  it("any still running → false", () => {
-    expect(allChunksTerminal([mk("done"), mk("running")])).toBe(false);
-  });
-
-  it("any still pending → false", () => {
-    expect(allChunksTerminal([mk("pending"), mk("done")])).toBe(false);
   });
 });
 

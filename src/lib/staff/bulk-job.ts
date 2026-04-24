@@ -74,6 +74,12 @@ export interface BulkJob {
 const jobKey = (jobId: string) => `bulk-job:${jobId}`;
 const activeSetKey = (agentId: string) => `bulk-job:active:${agentId}`;
 const recentListKey = (agentId: string) => `bulk-job:recent:${agentId}`;
+/**
+ * Atomic counter used by the QStash fan-out to decide which chunk worker
+ * should publish the finalize message. INCR is atomic on Redis — exactly
+ * one chunk will see the return value equal to totalChunks.
+ */
+const chunksDoneCounterKey = (jobId: string) => `bulk-job:${jobId}:chunks-done`;
 // 30 days — paired with an R2 lifecycle rule on the `bulk-exports/` prefix so
 // Redis pointer and R2 object expire together (see docs/perf/r2-lifecycle.md).
 // Previously 2h, which produced "pointer gone, blob orphaned" errors whenever
@@ -137,55 +143,56 @@ export async function updateJob(
 }
 
 /**
- * Atomically patch a single chunk's state. Multiple fan-out workers write
- * to the same job record concurrently; a naive read-modify-write in
- * `updateJob` would clobber sibling writes. This helper reloads inside a
- * short retry loop and CAS-compares `updatedAt` to detect races. Upstash
- * doesn't expose MULTI/EXEC, so retry-on-conflict is the pragmatic path.
+ * Patch a single chunk's state. Writes are best-effort — under rare
+ * concurrent-finish races the `chunks[]` array may lose a sibling's
+ * status update. The *finalize-trigger decision* does NOT depend on
+ * `chunks[]` agreeing across writers — use `incrementChunksDone` for
+ * that, which is atomic.
  *
- * Returns the full post-update job (useful for the caller to check
- * `allChunksTerminal` and decide whether to publish finalize).
+ * Returns the post-write job snapshot (for progress UI).
  */
 export async function patchChunk(
   jobId: string,
   chunkIndex: number,
   patch: Partial<ChunkState>,
 ): Promise<BulkJob | null> {
-  const MAX_ATTEMPTS = 5;
-  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const existing = await getJob(jobId);
-    if (!existing || !existing.chunks) return null;
-    const prior = existing.chunks[chunkIndex];
-    if (!prior) return null;
+  const existing = await getJob(jobId);
+  if (!existing || !existing.chunks) return null;
+  const prior = existing.chunks[chunkIndex];
+  if (!prior) return null;
 
-    const nextChunks = [...existing.chunks];
-    nextChunks[chunkIndex] = { ...prior, ...patch };
-    const completedChunks = nextChunks.filter(
-      (c) => c.status === "done" || c.status === "failed",
-    ).length;
+  const nextChunks = [...existing.chunks];
+  nextChunks[chunkIndex] = { ...prior, ...patch };
+  const completedChunks = nextChunks.filter(
+    (c) => c.status === "done" || c.status === "failed",
+  ).length;
 
-    const priorUpdatedAt = existing.updatedAt;
-    const next: BulkJob = {
-      ...existing,
-      chunks: nextChunks,
-      completedChunks,
-      updatedAt: Date.now(),
-    };
+  const next: BulkJob = {
+    ...existing,
+    chunks: nextChunks,
+    completedChunks,
+    updatedAt: Date.now(),
+  };
+  await redis.set(jobKey(jobId), next, { ex: TTL_SECONDS });
+  return next;
+}
 
-    // Short-window CAS: re-read, bail out + retry if another writer bumped
-    // updatedAt between our read and write.
-    const latest = await getJob(jobId);
-    if (!latest || latest.updatedAt !== priorUpdatedAt) {
-      // concurrent writer raced us — retry
-      continue;
-    }
-
-    await redis.set(jobKey(jobId), next, { ex: TTL_SECONDS });
-    return next;
+/**
+ * Atomically increment and return the "chunks-done" counter for this job.
+ * Exactly one caller observes the return value equal to `totalChunks` —
+ * that caller is responsible for publishing the finalize message.
+ * Upstash INCR is atomic, unlike read-modify-write on the job record.
+ */
+export async function incrementChunksDone(jobId: string): Promise<number> {
+  const key = chunksDoneCounterKey(jobId);
+  const value = await redis.incr(key);
+  // Only set expiry on first increment; avoids bumping the TTL on every
+  // chunk finish. Upstash doesn't expose SET + NX in the same call as
+  // INCR, so this is the cheapest pattern.
+  if (value === 1) {
+    await redis.expire(key, TTL_SECONDS);
   }
-  // All attempts contended. The caller will see the latest state on next
-  // read — the terminal transition still happens, just via another writer.
-  return getJob(jobId);
+  return value;
 }
 
 /**
