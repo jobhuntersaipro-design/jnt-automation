@@ -47,7 +47,7 @@ export async function GET(
 
   // Cache hit — redirect the browser straight to R2 via a presigned URL so
   // the bytes never flow through this function. This is the hot path after
-  // the prewarm pipeline runs.
+  // the first download warms the cache via write-through.
   const hit = await hasCached(cacheKey).catch((err) => {
     console.error("[pdf-cache] head failed:", err);
     return false;

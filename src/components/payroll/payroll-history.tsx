@@ -24,10 +24,8 @@ import {
   Package,
 } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
-import { usePrewarmStatus } from "@/lib/hooks/use-prewarm-status";
 import { announceBulkExportStarted } from "@/components/dashboard/bulk-jobs-indicator";
 import { BranchChip } from "@/components/ui/branch-chip";
-import { Loader2 } from "lucide-react";
 
 /**
  * Renders dropdown content into document.body via portal, anchored to a
@@ -199,38 +197,6 @@ function RowActions({
   const [linesOpen, setLinesOpen] = useState(false);
   const [exportingLines, setExportingLines] = useState<"csv" | "pdf" | null>(null);
 
-  // Block "Line items" downloads while the per-month cache is still being
-  // prewarmed. Without this, users clicking during warm-up pay full inline
-  // generation cost — the exact 10-minute wait that prompted this feature.
-  const prewarm = usePrewarmStatus(year, month);
-  const isWarming =
-    prewarm.status === "queued" || prewarm.status === "running";
-
-  // Stage-aware progress split:
-  //   generating → 0–90 %   (based on per-record files done / total)
-  //   finalizing → 90–99 %  (bulk ZIP merge, short-lived)
-  //   done       → hidden
-  // This prevents the indicator from stalling at 100 % while finalize runs
-  // (visible in the Feb-2026 rows before this change).
-  const genRatio =
-    prewarm.total && prewarm.total > 0
-      ? Math.min(1, (prewarm.done ?? 0) / prewarm.total)
-      : 0;
-  const warmPct =
-    prewarm.stage === "finalizing"
-      ? 95
-      : prewarm.stage === "done"
-        ? 100
-        : Math.round(genRatio * 90);
-  const warmLabel =
-    prewarm.stage === "queued"
-      ? "Queued"
-      : prewarm.stage === "finalizing"
-        ? "Bundling"
-        : prewarm.stage === "done"
-          ? "Ready"
-          : `Generating ${prewarm.done ?? 0}/${prewarm.total ?? 0}`;
-
   const handleSummaryCsv = () => {
     setSummaryOpen(false);
     window.open(`/api/payroll/upload/${uploadId}/export/csv`, "_blank");
@@ -323,50 +289,21 @@ function RowActions({
       </PortalDropdown>
 
       {/* Line items (per-dispatcher parcel detail for the whole month) */}
-      {isWarming ? (
-        <div
-          className="inline-flex flex-col items-stretch min-w-[9.5rem] px-2 py-1 rounded"
-          data-testid="prewarm-indicator"
-          role="status"
-          aria-live="polite"
-          aria-label={`${warmLabel} — ${warmPct}% prepared`}
-          title={
-            prewarm.stage === "finalizing"
-              ? "Bundling ZIP… almost ready"
-              : `Generating per-dispatcher PDFs — ${prewarm.done ?? 0}/${prewarm.total ?? 0}`
-          }
-        >
-          <div className="inline-flex items-center gap-1.5 text-[0.72rem] font-medium text-on-surface-variant whitespace-nowrap">
-            <Loader2 className="w-3 h-3 animate-spin text-brand" aria-hidden />
-            <span>{warmLabel}</span>
-            <span className="ml-auto tabular-nums">{warmPct}%</span>
-          </div>
-          <div className="mt-1 h-1 rounded-full bg-surface-container-high overflow-hidden">
-            <div
-              className="h-full bg-brand transition-[width] duration-300"
-              style={{ width: `${warmPct}%` }}
-            />
-          </div>
-        </div>
-      ) : (
-        <>
-          <button
-            ref={linesBtnRef}
-            type="button"
-            onClick={() => {
-              setLinesOpen((v) => !v);
-              setSummaryOpen(false);
-            }}
-            disabled={exportingLines !== null}
-            aria-label="Download per-dispatcher line items"
-            className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <Package className="w-3.5 h-3.5" aria-hidden />
-            {exportingLines ? "Queuing…" : "Line items"}
-            <ChevronDown className="w-2.5 h-2.5" aria-hidden />
-          </button>
-        </>
-      )}
+      <button
+        ref={linesBtnRef}
+        type="button"
+        onClick={() => {
+          setLinesOpen((v) => !v);
+          setSummaryOpen(false);
+        }}
+        disabled={exportingLines !== null}
+        aria-label="Download per-dispatcher line items"
+        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+      >
+        <Package className="w-3.5 h-3.5" aria-hidden />
+        {exportingLines ? "Queuing…" : "Line items"}
+        <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+      </button>
       <PortalDropdown
         open={linesOpen}
         anchorRef={linesBtnRef}

@@ -12,7 +12,6 @@ import {
 } from "@/lib/payroll/re-price-helpers";
 import { runPool } from "@/lib/upload/run-pool";
 import { cacheKeysForRecords, deleteCachedBlobs } from "@/lib/staff/pdf-cache";
-import { enqueuePrewarm } from "@/lib/staff/prewarm";
 
 export const maxDuration = 120;
 
@@ -245,18 +244,6 @@ export async function POST(
         affectedRecordIds,
       ),
     ).catch((err) => console.error("[pdf-cache] invalidate failed:", err));
-
-    // Async prewarm — populates the canonical cache for next click. Uses
-    // the dispatcherIds filter so only the affected dispatchers are
-    // regenerated in the per-record pass; the bulk ZIPs are always
-    // rebuilt from the full month.
-    enqueuePrewarm({
-      agentId: effective.agentId,
-      year: upload.year,
-      month: upload.month,
-      reason: "recalculate",
-      dispatcherIds: updates.map((u) => u.dispatcherId),
-    }).catch((err) => console.error("[prewarm] enqueue failed:", err));
 
     revalidatePath("/dispatchers");
     revalidatePath("/dashboard");
