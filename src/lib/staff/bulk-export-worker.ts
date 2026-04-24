@@ -1,6 +1,4 @@
-import JSZip from "jszip";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKET } from "@/lib/r2";
+import { streamZipToR2 } from "./streaming-zip";
 import { getMonthDetailsBatch, type MonthDetail } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
 import {
@@ -124,26 +122,15 @@ export async function runBulkExport(jobId: string): Promise<void> {
 
     const files = raw.filter((f): f is GeneratedFile => f !== null);
 
-    // 3. Build the zip in memory (still the cheapest option for 60-ish files)
+    // 3+4. Stream ZIP straight into R2. archiver → PassThrough → lib-storage
+    // Upload — peak RAM is a handful of MB instead of the full archive size.
+    // Zipping and uploading happen in a single phase, so we emit one stage
+    // transition and pass the whole pipeline.
     await updateJob(jobId, { stage: "zipping" });
-    const zip = new JSZip();
-    for (const f of files) {
-      zip.file(f.fileName, f.data);
-    }
-    const zipBuffer = await zip.generateAsync({ type: "uint8array" });
-
-    // 4. Upload to R2
-    await updateJob(jobId, { stage: "uploading" });
     const mm = String(job.month).padStart(2, "0");
     const r2Key = `bulk-exports/${job.agentId}/${job.jobId}/${job.year}_${mm}_details.zip`;
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: r2Key,
-        Body: zipBuffer,
-        ContentType: "application/zip",
-      }),
-    );
+    await updateJob(jobId, { stage: "uploading" });
+    await streamZipToR2(r2Key, files);
 
     // 5. Resolve branch name for the notification detail. We pick the most
     //    common branch across the records so agents with multiple branches

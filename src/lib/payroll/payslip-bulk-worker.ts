@@ -1,9 +1,7 @@
-import JSZip from "jszip";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKET } from "@/lib/r2";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
 import { getJob, updateJob } from "@/lib/staff/bulk-job";
+import { streamZipToR2 } from "@/lib/staff/streaming-zip";
 import { generatePayslipPdf } from "./pdf-generator";
 import { runPool } from "@/lib/upload/run-pool";
 
@@ -156,23 +154,10 @@ export async function runPayslipBulkExport(jobId: string): Promise<void> {
     const files = raw.filter((f): f is Generated => f !== null);
 
     await updateJob(jobId, { stage: "zipping" });
-    const zip = new JSZip();
-    for (const f of files) {
-      zip.file(f.fileName, f.data);
-    }
-    const zipBuffer = await zip.generateAsync({ type: "uint8array" });
-
-    await updateJob(jobId, { stage: "uploading" });
     const mm = String(upload.month).padStart(2, "0");
     const r2Key = `bulk-exports/${job.agentId}/${job.jobId}/payslips_${upload.branch.code}_${mm}_${upload.year}.zip`;
-    await r2.send(
-      new PutObjectCommand({
-        Bucket: R2_BUCKET,
-        Key: r2Key,
-        Body: zipBuffer,
-        ContentType: "application/zip",
-      }),
-    );
+    await updateJob(jobId, { stage: "uploading" });
+    await streamZipToR2(r2Key, files);
 
     const monthName = new Date(upload.year, upload.month - 1).toLocaleString("en", {
       month: "long",
