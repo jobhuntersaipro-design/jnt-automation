@@ -31,20 +31,12 @@ const nextConfig: NextConfig = {
   // exact file path is the pattern that reliably works in 2026. Context:
   // https://github.com/foliojs/pdfkit/issues/1549
   outputFileTracingIncludes: {
-    // Bulk month-detail PDF fan-out worker — the route hitting this bug
+    // Bulk month-detail PDF fan-out worker
     "/api/dispatchers/month-detail/bulk/worker/chunk": [
       "./node_modules/pdfkit/js/data/**",
     ],
     // Per-record PDF download (cache-miss inline generation)
     "/api/staff/[id]/history/[salaryRecordId]/export/pdf": [
-      "./node_modules/pdfkit/js/data/**",
-    ],
-    // Cache prewarm (legacy inline path + fan-out chunk worker + finalize)
-    "/api/payroll-cache/prewarm": ["./node_modules/pdfkit/js/data/**"],
-    "/api/payroll-cache/prewarm/worker/chunk": [
-      "./node_modules/pdfkit/js/data/**",
-    ],
-    "/api/payroll-cache/prewarm/worker/finalize": [
       "./node_modules/pdfkit/js/data/**",
     ],
     // Dev-only inline fallback path lives on /bulk/start when QStash envs
