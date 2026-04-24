@@ -4,6 +4,13 @@ import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { generatePayslipPdf } from "@/lib/payroll/pdf-generator";
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
+import { runPool } from "@/lib/upload/run-pool";
+
+// PDF generation is CPU-bound; 4 matches the bulk payslip worker bound
+// (palette of safe concurrency for @react-pdf/renderer on a single node).
+const PAYSLIP_CONCURRENCY = 4;
+
+export const maxDuration = 60;
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -94,45 +101,48 @@ export async function POST(
       },
     });
 
-    // Generate PDFs
-    const payslipFiles: { fileName: string; buffer: Buffer }[] = [];
+    // Generate PDFs in a bounded parallel pool. PDF rendering is CPU-bound,
+    // so concurrency 4 gives ~4x speedup without saturating the event loop.
+    const payslipFiles = await runPool(
+      salaryRecords,
+      PAYSLIP_CONCURRENCY,
+      async (record) => {
+        const weightTiersSnapshot = (record.weightTiersSnapshot ?? []) as Array<{
+          tier: number;
+          minWeight: number;
+          maxWeight: number | null;
+          commission: number;
+        }>;
+        const bonusSnapshot = record.bonusTierSnapshot as
+          | { orderThreshold: number; tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }> }
+          | null;
+        const bonusTierSnapshot = bonusSnapshot?.tiers ?? [];
 
-    for (const record of salaryRecords) {
-      const weightTiersSnapshot = (record.weightTiersSnapshot ?? []) as Array<{
-        tier: number;
-        minWeight: number;
-        maxWeight: number | null;
-        commission: number;
-      }>;
-      const bonusSnapshot = record.bonusTierSnapshot as
-        | { orderThreshold: number; tiers: Array<{ tier: number; minWeight: number; maxWeight: number | null; commission: number }> }
-        | null;
-      const bonusTierSnapshot = bonusSnapshot?.tiers ?? [];
+        const buffer = await generatePayslipPdf({
+          companyName: agent.name,
+          companyRegistrationNo: agent.companyRegistrationNo,
+          companyAddress: agent.companyAddress,
+          stampImageUrl: agent.stampImageUrl,
+          dispatcherName: record.dispatcher.name,
+          icNo: record.dispatcher.icNo ?? "",
+          month: fullUpload.month,
+          year: fullUpload.year,
+          petrolSubsidy: record.petrolSubsidy,
+          commission: record.commission,
+          penalty: record.penalty,
+          advance: record.advance,
+          netSalary: record.netSalary,
+          lineItems: record.lineItems,
+          weightTiersSnapshot,
+          bonusTierSnapshot,
+        });
 
-      const buffer = await generatePayslipPdf({
-        companyName: agent.name,
-        companyRegistrationNo: agent.companyRegistrationNo,
-        companyAddress: agent.companyAddress,
-        stampImageUrl: agent.stampImageUrl,
-        dispatcherName: record.dispatcher.name,
-        icNo: record.dispatcher.icNo ?? "",
-        month: fullUpload.month,
-        year: fullUpload.year,
-        petrolSubsidy: record.petrolSubsidy,
-        commission: record.commission,
-        penalty: record.penalty,
-        advance: record.advance,
-        netSalary: record.netSalary,
-        lineItems: record.lineItems,
-        weightTiersSnapshot,
-        bonusTierSnapshot,
-      });
-
-      const safeName = record.dispatcher.name.replace(/[^a-zA-Z0-9]/g, "_");
-      const monthStr = String(fullUpload.month).padStart(2, "0");
-      const fileName = `${fullUpload.branch.code}_${safeName}_${monthStr}_${fullUpload.year}.pdf`;
-      payslipFiles.push({ fileName, buffer });
-    }
+        const safeName = record.dispatcher.name.replace(/[^a-zA-Z0-9]/g, "_");
+        const monthStr = String(fullUpload.month).padStart(2, "0");
+        const fileName = `${fullUpload.branch.code}_${safeName}_${monthStr}_${fullUpload.year}.pdf`;
+        return { fileName, buffer };
+      },
+    );
 
     // If single payslip, return PDF directly
     if (payslipFiles.length === 1) {

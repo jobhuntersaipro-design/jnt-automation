@@ -8,6 +8,12 @@ import {
 } from "@/lib/staff/payslip-generator";
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
 import type { EmployeePayslipInput } from "@/lib/staff/payslip-generator";
+import { runPool } from "@/lib/upload/run-pool";
+
+// CPU-bound PDF render; matches the dispatcher-payslip and bulk-worker pools.
+const PAYSLIP_CONCURRENCY = 4;
+
+export const maxDuration = 60;
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -78,11 +84,14 @@ export async function POST(
     dispatcherMap.set(`${ds.dispatcher.name.toLowerCase()}::${ds.dispatcher.branchId}`, ds);
   }
 
-  const payslips: { fileName: string; buffer: Buffer }[] = [];
-
-  for (const emp of employees) {
+  // Generate PDFs in a bounded pool. Nulls for rows missing salary data or
+  // IC are filtered out after — preserving the prior `continue` semantics.
+  const raw = await runPool<
+    typeof employees[number],
+    { fileName: string; buffer: Buffer } | null
+  >(employees, PAYSLIP_CONCURRENCY, async (emp) => {
     const salaryRecord = emp.salaryRecords[0];
-    if (!salaryRecord || !emp.icNo) continue;
+    if (!salaryRecord || !emp.icNo) return null;
 
     let dispatcherData: {
       tierBreakdowns: { tier: number; count: number; rate: number; total: number }[];
@@ -160,11 +169,13 @@ export async function POST(
     const buffer = await generateEmployeePayslipPdf(input);
     const posLabel = emp.type.toLowerCase().replace("_", "-");
     const safeName = emp.name.replace(/[^a-zA-Z0-9 ]/g, "").replace(/\s+/g, "_");
-    payslips.push({
+    return {
       fileName: `${posLabel}_${safeName}_${MONTH_NAMES[month - 1]}_${year}.pdf`,
       buffer,
-    });
-  }
+    };
+  });
+
+  const payslips = raw.filter((p): p is { fileName: string; buffer: Buffer } => p !== null);
 
   if (payslips.length === 0) {
     return NextResponse.json({ error: "No payslips could be generated (missing IC or salary data)" }, { status: 400 });

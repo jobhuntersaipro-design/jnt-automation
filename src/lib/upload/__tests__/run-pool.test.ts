@@ -1,28 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-/**
- * Local copy of runPool for unit testing. Kept in sync with the version
- * in src/app/api/upload/[uploadId]/confirm/route.ts — if the route version
- * ever gets extracted to a shared module, delete this copy and import.
- */
-async function runPool<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function next(): Promise<void> {
-    while (true) {
-      const i = cursor++;
-      if (i >= items.length) return;
-      results[i] = await worker(items[i], i);
-    }
-  }
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, () => next());
-  await Promise.all(runners);
-  return results;
-}
+import { runPool } from "../run-pool";
 
 describe("runPool", () => {
   it("returns results in input order, regardless of completion order", async () => {

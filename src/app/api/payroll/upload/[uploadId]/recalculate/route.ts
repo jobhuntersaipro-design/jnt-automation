@@ -10,6 +10,7 @@ import {
   bucketLineItemChanges,
   rulesMatchSnapshot,
 } from "@/lib/payroll/re-price-helpers";
+import { runPool } from "@/lib/upload/run-pool";
 
 export const maxDuration = 120;
 
@@ -27,26 +28,6 @@ const UpdateEntrySchema = z.object({
 const BodySchema = z.object({
   updates: z.array(UpdateEntrySchema).min(1).max(500),
 });
-
-// Parallel pool — matches the pattern in upload/confirm and bulk-export-worker.
-async function runPool<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T, index: number) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function next(): Promise<void> {
-    while (true) {
-      const i = cursor++;
-      if (i >= items.length) return;
-      results[i] = await worker(items[i], i);
-    }
-  }
-  const runners = Array.from({ length: Math.min(concurrency, items.length) }, () => next());
-  await Promise.all(runners);
-  return results;
-}
 
 const POOL_CONCURRENCY = 4;
 const PER_DISPATCHER_TX_TIMEOUT_MS = 20_000;

@@ -5,28 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/db/notifications";
 import { getJob, updateJob } from "@/lib/staff/bulk-job";
 import { generatePayslipPdf } from "./pdf-generator";
+import { runPool } from "@/lib/upload/run-pool";
 
 const PAYSLIP_CONCURRENCY = 4;
-
-async function runPool<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function next(): Promise<void> {
-    while (true) {
-      const i = cursor++;
-      if (i >= items.length) return;
-      results[i] = await worker(items[i]);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => next()),
-  );
-  return results;
-}
 
 /**
  * Background worker for bulk dispatcher-payslip generation. Mirrors the

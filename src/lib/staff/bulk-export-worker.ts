@@ -13,29 +13,7 @@ import { generateMonthDetailPdf } from "./month-detail-pdf";
 import { monthDetailFilename } from "./month-detail-filename";
 import { getJob, updateJob } from "./bulk-job";
 import { readBonusTierSnapshot } from "./bonus-tier-snapshot";
-
-/**
- * Bounded concurrent pool runner (kept local — small and self-contained).
- */
-async function runPool<T, R>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let cursor = 0;
-  async function next(): Promise<void> {
-    while (true) {
-      const i = cursor++;
-      if (i >= items.length) return;
-      results[i] = await worker(items[i]);
-    }
-  }
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, () => next()),
-  );
-  return results;
-}
+import { runPool } from "@/lib/upload/run-pool";
 
 /**
  * Run a bulk month-detail export in the background.
