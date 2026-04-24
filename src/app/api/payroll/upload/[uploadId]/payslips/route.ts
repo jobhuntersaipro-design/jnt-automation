@@ -12,11 +12,6 @@ const PAYSLIP_CONCURRENCY = 4;
 
 export const maxDuration = 60;
 
-const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
-
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ uploadId: string }> },

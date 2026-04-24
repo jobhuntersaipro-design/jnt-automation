@@ -171,9 +171,6 @@ async function seed(): Promise<{ agentId: string; branchId: string }> {
         advance: 0,
         netSalary: totalCommission,
         weightTiersSnapshot: DEFAULT_WEIGHT_TIERS,
-        petrolSubsidySnapshot: null,
-        bonusTierSnapshot: null,
-        grossSalary: totalCommission,
         lineItems: { createMany: { data: lineItems } },
       },
     });
