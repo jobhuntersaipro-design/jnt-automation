@@ -3,17 +3,6 @@
 import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
 
-// Diagnostic: surface which Prisma-relevant env vars are actually visible to
-// `prisma generate` / `prisma migrate deploy` in the current build shell.
-// Only logs names, never values, so it's safe in Vercel build logs.
-if (!process.env.DIRECT_URL) {
-  const present = ["DATABASE_URL", "DIRECT_URL", "VERCEL", "VERCEL_ENV", "NODE_ENV"]
-    .filter((k) => process.env[k] !== undefined);
-  console.error(
-    `[prisma.config] DIRECT_URL is missing. Visible env: ${present.join(", ") || "(none of interest)"}.`,
-  );
-}
-
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
