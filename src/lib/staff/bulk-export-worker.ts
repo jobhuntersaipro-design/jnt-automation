@@ -25,11 +25,16 @@ const qstash = new Client({ token: process.env.QSTASH_TOKEN ?? "" });
  * to done. Safe to call fire-and-forget — errors captured onto the job.
  */
 export async function runBulkExport(jobId: string): Promise<void> {
+  const t0 = Date.now();
+  const log = (msg: string) =>
+    console.log(`[bulk-export:${jobId.slice(0, 8)}] +${((Date.now() - t0) / 1000).toFixed(1)}s ${msg}`);
+
   const job = await getJob(jobId);
   if (!job) {
     console.error(`[bulk-export] job ${jobId} not found`);
     return;
   }
+  log(`started (agent=${job.agentId.slice(0, 8)} ${job.year}-${job.month} ${job.format})`);
 
   try {
     await updateJob(jobId, {
@@ -37,26 +42,27 @@ export async function runBulkExport(jobId: string): Promise<void> {
       stage: "fetching",
       startedAt: Date.now(),
     });
+    log("stage=fetching");
 
-    // One DB round-trip for the initial size reveal — the full detail
-    // fetch happens again inside generateMonthDetailFiles. Cheap because
-    // the month-level query is well-indexed.
     const totalForStage = await listDispatcherIdsForMonth(
       job.agentId,
       job.year,
       job.month,
     );
+    log(`fetched ${totalForStage.length} dispatcher ids`);
     if (totalForStage.length === 0) {
       await updateJob(jobId, {
         status: "failed",
         error: "No salary records for this month",
       });
+      log("failed — no salary records");
       return;
     }
     await updateJob(jobId, {
       total: totalForStage.length,
       stage: "generating",
     });
+    log("stage=generating");
 
     const files = await generateMonthDetailFiles({
       agentId: job.agentId,
@@ -64,26 +70,21 @@ export async function runBulkExport(jobId: string): Promise<void> {
       month: job.month,
       format: job.format,
       onFile: async ({ dispatcherName, doneInBatch }) => {
-        // Per-file progress write: carries `done` + `currentLabel` so the
-        // Downloads Panel shows "Generating <name> · k / N". ~1 write/s
-        // is fine at 60-person scale.
         await updateJob(jobId, {
           done: doneInBatch,
           currentLabel: dispatcherName,
         });
       },
     });
+    log(`generated ${files.length} files`);
 
-    // 3+4. Stream ZIP straight into R2 (Phase 3a) — peak RAM is a handful
-    // of MB instead of the full archive size.
-    //
-    // Canonical cache key: shared across jobs for the same (agentId, year,
-    // month, format). Subsequent `/bulk/start` calls short-circuit on this
-    // blob instead of regenerating.
     await updateJob(jobId, { stage: "zipping" });
+    log("stage=zipping");
     const r2Key = zipKey(job.agentId, job.year, job.month, job.format);
     await updateJob(jobId, { stage: "uploading" });
+    log(`stage=uploading → r2://${r2Key}`);
     await streamZipToR2(r2Key, files);
+    log("zip uploaded");
 
     // Resolve a representative branch for the notification detail.
     const details = await getMonthDetailsBatch(job.agentId, job.year, job.month);
@@ -116,8 +117,9 @@ export async function runBulkExport(jobId: string): Promise<void> {
       total: totalForStage.length,
       r2Key,
     });
+    log(`DONE ${files.length} files in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
   } catch (err) {
-    console.error(`[bulk-export] job ${jobId} failed:`, err);
+    console.error(`[bulk-export:${jobId.slice(0, 8)}] FAILED after ${((Date.now() - t0) / 1000).toFixed(1)}s:`, err);
     const message = err instanceof Error ? err.message : "Bulk export failed";
     await updateJob(jobId, { status: "failed", error: message });
   }

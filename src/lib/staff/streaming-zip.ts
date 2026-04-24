@@ -3,6 +3,8 @@ import { Upload } from "@aws-sdk/lib-storage";
 import { PassThrough } from "node:stream";
 import { r2, R2_BUCKET } from "@/lib/r2";
 
+const UPLOAD_TIMEOUT_MS = 120_000; // 2 min — anything longer is a config bug
+
 export interface ZipEntry {
   fileName: string;
   /** File contents: a Buffer, Uint8Array, or a string (UTF-8). */
@@ -39,6 +41,20 @@ export async function streamZipToR2(
     );
   }
 
+  // Fail fast if R2 env isn't configured — otherwise the SDK quietly retries
+  // on every request and the caller hangs for minutes before any error
+  // surfaces. In prod Vercel these are always set; this guard is for dev.
+  const missing: string[] = [];
+  if (!process.env.R2_ACCOUNT_ID) missing.push("R2_ACCOUNT_ID");
+  if (!process.env.R2_ACCESS_KEY_ID) missing.push("R2_ACCESS_KEY_ID");
+  if (!process.env.R2_SECRET_ACCESS_KEY) missing.push("R2_SECRET_ACCESS_KEY");
+  if (!R2_BUCKET) missing.push("R2_BUCKET_NAME");
+  if (missing.length > 0) {
+    throw new Error(
+      `streamZipToR2: missing R2 env var(s): ${missing.join(", ")}`,
+    );
+  }
+
   const archive = archiver("zip", { zlib: { level: 1 } });
   const passthrough = new PassThrough();
   archive.pipe(passthrough);
@@ -52,12 +68,20 @@ export async function streamZipToR2(
       ContentType: "application/zip",
     },
     queueSize: 2,
-    // Cloudflare R2 minimum part size is 5 MiB; default (10MB) is slightly
-    // oversized for small exports but fine for large ones.
   });
 
-  // Archiver errors bubble up through the stream; capture them so we can
-  // abort the upload cleanly.
+  // Observability — log each multipart part as it uploads so a stalled
+  // upload (network, creds, bucket) surfaces before the 2-min timeout.
+  let uploadedBytes = 0;
+  upload.on("httpUploadProgress", (p) => {
+    if (typeof p.loaded === "number") {
+      uploadedBytes = p.loaded;
+      console.log(
+        `[streaming-zip] ${key} part=${p.part ?? "?"} loaded=${p.loaded} total=${p.total ?? "?"}`,
+      );
+    }
+  });
+
   archive.on("error", (err) => passthrough.destroy(err));
 
   for (const f of files) {
@@ -71,5 +95,19 @@ export async function streamZipToR2(
   }
   await archive.finalize();
 
-  await upload.done();
+  // Race the upload against a hard timeout so config issues fail loud.
+  await Promise.race([
+    upload.done(),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `streamZipToR2: upload to ${key} timed out after ${UPLOAD_TIMEOUT_MS / 1000}s (${uploadedBytes} bytes sent). Check R2 endpoint/credentials/bucket.`,
+            ),
+          ),
+        UPLOAD_TIMEOUT_MS,
+      ),
+    ),
+  ]);
 }
