@@ -44,9 +44,16 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
       .sort();
 
     if (partKeys.length === 0) {
+      // Surface the first failed chunk's actual error so the Downloads Panel
+      // shows the root cause, not a generic wrapper. Without this the user
+      // only sees "All chunks failed — nothing to archive" and has to scrape
+      // server logs / Redis to find out why.
+      const firstFailure = job.chunks.find((c) => c.status === "failed")?.error;
       await updateJob(jobId, {
         status: "failed",
-        error: "All chunks failed — nothing to archive",
+        error: firstFailure
+          ? `All chunks failed. First error: ${firstFailure}`
+          : "All chunks failed — nothing to archive",
       });
       return;
     }
