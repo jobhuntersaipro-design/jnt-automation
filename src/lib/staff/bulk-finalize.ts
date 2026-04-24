@@ -55,6 +55,28 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
     // Subsequent `/bulk/start` short-circuits on this blob.
     const finalKey = zipKey(job.agentId, job.year, job.month, job.format);
 
+    // Collect entries from every part BEFORE touching the output stream, so
+    // we can bail without writing anything if the merge would be empty. A
+    // zero-entry archive at the canonical cache key would serve the
+    // "file empty or non-readable" error to every subsequent download until
+    // manually invalidated (see pdf-cache.ts — no R2 lifecycle on
+    // payroll-cache/). Parts are small (<=CHUNK_SIZE × ~500KB) so holding
+    // them in memory is fine.
+    const partEntries: Array<{ fileName: string; buffer: Buffer }[]> = [];
+    let totalFiles = 0;
+    for (const partKey of partKeys) {
+      const entries = await extractEntriesFromR2(partKey);
+      partEntries.push(entries);
+      totalFiles += entries.length;
+    }
+    if (totalFiles === 0) {
+      await updateJob(jobId, {
+        status: "failed",
+        error: "All part ZIPs were empty — no files to archive",
+      });
+      return;
+    }
+
     // Open the output archive: archiver → PassThrough → lib-storage Upload.
     // Level 1 zlib — entries are already compressed (PDFs), so minimal
     // compression keeps CPU low and output size only slightly larger.
@@ -76,14 +98,10 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
 
     await updateJob(jobId, { stage: "uploading" });
 
-    // For each part, stream all its entries into the final archive. Runs
-    // sequentially — archiver doesn't support concurrent writes.
-    let totalFiles = 0;
-    for (const partKey of partKeys) {
-      const entries = await extractEntriesFromR2(partKey);
+    // Runs sequentially — archiver doesn't support concurrent writes.
+    for (const entries of partEntries) {
       for (const entry of entries) {
         archive.append(entry.buffer, { name: entry.fileName });
-        totalFiles++;
       }
     }
 

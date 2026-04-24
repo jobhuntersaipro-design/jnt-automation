@@ -27,6 +27,18 @@ export async function streamZipToR2(
   key: string,
   files: ZipEntry[],
 ): Promise<void> {
+  // Refuse to write a zero-entry archive. Archiver would happily emit a
+  // 22-byte EOCD-only zip that macOS / 7-zip report as "empty or non-readable",
+  // and because cache keys under `payroll-cache/` have no R2 lifecycle rule,
+  // the bad blob would persist until manually invalidated. Failing here
+  // surfaces the upstream bug (usually: all per-dispatcher file generations
+  // threw) as a visible job failure instead.
+  if (files.length === 0) {
+    throw new Error(
+      `streamZipToR2: refusing to create an empty archive at ${key}`,
+    );
+  }
+
   const archive = archiver("zip", { zlib: { level: 1 } });
   const passthrough = new PassThrough();
   archive.pipe(passthrough);

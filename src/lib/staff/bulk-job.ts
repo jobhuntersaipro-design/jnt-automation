@@ -324,6 +324,9 @@ export async function listRecent(agentId: string): Promise<BulkJob[]> {
     orderedIds.push(id);
   }
 
+  const activeSet = new Set(activeIds);
+  const recentSet = new Set(recentIds as string[]);
+
   const jobs: BulkJob[] = [];
   for (const id of orderedIds) {
     const job = await getJob(id);
@@ -333,6 +336,22 @@ export async function listRecent(agentId: string): Promise<BulkJob[]> {
       await redis.lrem(recentListKey(agentId), 0, id);
       continue;
     }
+    // Terminal jobs should never stay in the active set — they do when a
+    // transition-time SREM was lost (transient Redis error, worker killed
+    // mid-updateJob, or a direct `redis.set` path that bypassed updateJob).
+    // Sweep them into the recent list so `clearRecent` can actually evict
+    // them; otherwise Clear all has no visible effect on those rows.
+    if (
+      (job.status === "done" || job.status === "failed") &&
+      activeSet.has(id)
+    ) {
+      await redis.srem(activeSetKey(agentId), id);
+      if (!recentSet.has(id)) {
+        await redis.lpush(recentListKey(agentId), id);
+        await redis.ltrim(recentListKey(agentId), 0, RECENT_CAP - 1);
+        await redis.expire(recentListKey(agentId), TTL_SECONDS);
+      }
+    }
     jobs.push(job);
   }
 
@@ -341,9 +360,25 @@ export async function listRecent(agentId: string): Promise<BulkJob[]> {
 }
 
 /**
- * Hard-clear the recent list for an agent (does not touch in-flight jobs).
+ * Hard-clear the recent list for an agent. Also sweeps any terminal job
+ * that leaked into the active set — otherwise those rows re-appear on the
+ * next poll and the UI looks like Clear all did nothing. Genuinely running
+ * jobs stay, so in-flight work is untouched.
+ *
  * Backs the DELETE /api/dispatchers/month-detail/bulk/recent endpoint.
  */
 export async function clearRecent(agentId: string): Promise<void> {
+  const activeIds = await redis.smembers(activeSetKey(agentId));
+  const toRemove: string[] = [];
+  for (const id of activeIds) {
+    const job = await redis.get<BulkJob>(jobKey(id));
+    // Missing record (TTL) or terminal → safe to drop from the active set.
+    if (!job || job.status === "done" || job.status === "failed") {
+      toRemove.push(id);
+    }
+  }
+  if (toRemove.length > 0) {
+    await redis.srem(activeSetKey(agentId), ...toRemove);
+  }
   await redis.del(recentListKey(agentId));
 }
