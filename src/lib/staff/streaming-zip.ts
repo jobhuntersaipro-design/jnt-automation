@@ -84,6 +84,8 @@ export async function streamZipToR2(
 
   archive.on("error", (err) => passthrough.destroy(err));
 
+  console.log(`[streaming-zip] ${key} begin — ${files.length} files`);
+
   for (const f of files) {
     const content =
       typeof f.data === "string"
@@ -93,21 +95,40 @@ export async function streamZipToR2(
           : Buffer.from(f.data);
     archive.append(content, { name: f.fileName });
   }
-  await archive.finalize();
 
-  // Race the upload against a hard timeout so config issues fail loud.
-  await Promise.race([
-    upload.done(),
-    new Promise<never>((_, reject) =>
-      setTimeout(
-        () =>
-          reject(
-            new Error(
-              `streamZipToR2: upload to ${key} timed out after ${UPLOAD_TIMEOUT_MS / 1000}s (${uploadedBytes} bytes sent). Check R2 endpoint/credentials/bucket.`,
-            ),
+  // CRITICAL: do NOT await `archive.finalize()` before `upload.done()`.
+  // Archiver pushes data into the PassThrough, which has a 16 KB default
+  // buffer. Once it fills, archiver's writes block waiting for a reader.
+  // The @aws-sdk/lib-storage Upload only begins consuming Body when
+  // `done()` is awaited — so awaiting finalize first deadlocks on any
+  // archive bigger than ~16 KB. Instead, kick finalize off (it returns a
+  // promise we observe for errors), then immediately await upload.done().
+  // The Upload reads from the stream; archiver's finalize resolves when
+  // the last chunk drains through. Race both against a hard timeout.
+  const finalizePromise = archive.finalize();
+  const uploadPromise = upload.done();
+
+  // Surface archive errors that otherwise silently reject finalizePromise
+  finalizePromise.catch((err) => {
+    console.error(`[streaming-zip] ${key} archive.finalize error:`, err);
+    passthrough.destroy(err instanceof Error ? err : new Error(String(err)));
+  });
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            `streamZipToR2: upload to ${key} timed out after ${UPLOAD_TIMEOUT_MS / 1000}s (${uploadedBytes} bytes sent). Check R2 endpoint/credentials/bucket.`,
           ),
-        UPLOAD_TIMEOUT_MS,
-      ),
+        ),
+      UPLOAD_TIMEOUT_MS,
     ),
+  );
+
+  await Promise.race([
+    Promise.all([uploadPromise, finalizePromise]),
+    timeoutPromise,
   ]);
+  console.log(`[streaming-zip] ${key} done — ${uploadedBytes} bytes`);
 }
