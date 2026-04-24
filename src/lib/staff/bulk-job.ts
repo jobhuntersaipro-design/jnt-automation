@@ -58,8 +58,12 @@ export interface BulkJob {
 const jobKey = (jobId: string) => `bulk-job:${jobId}`;
 const activeSetKey = (agentId: string) => `bulk-job:active:${agentId}`;
 const recentListKey = (agentId: string) => `bulk-job:recent:${agentId}`;
-const TTL_SECONDS = 7200; // 2h for job records
-export const RECENT_CAP = 20;
+// 30 days — paired with an R2 lifecycle rule on the `bulk-exports/` prefix so
+// Redis pointer and R2 object expire together (see docs/perf/r2-lifecycle.md).
+// Previously 2h, which produced "pointer gone, blob orphaned" errors whenever
+// a user tried to re-download an export from the Downloads Center the next day.
+const TTL_SECONDS = 60 * 60 * 24 * 30;
+export const RECENT_CAP = 50;
 export const RECENT_RETURN_LIMIT = 10;
 
 export async function createJob(
