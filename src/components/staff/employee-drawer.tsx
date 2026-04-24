@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, ChevronDown, Check, Plus, BarChart3, Settings, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { DispatcherAvatar } from "./dispatcher-avatar";
@@ -229,8 +230,14 @@ export function EmployeeDrawer({
       ? `/api/employees/${employee!.id}/avatar`
       : undefined; // disabled for new employees (no id yet)
 
-  return (
-    <div className="fixed inset-0 z-50" data-testid="employee-drawer">
+  // Portal the drawer to <body> so no ancestor's `transform`, `filter`, or
+  // `contain` CSS creates a new containing block that would break
+  // `position: fixed` (the "narrow clipped drawer on the branch page"
+  // symptom). Also guarantees the drawer sits above any sticky headers
+  // regardless of the z-index soup in the parent tree.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[100]" data-testid="employee-drawer">
       <div className="absolute inset-0 bg-on-surface/30" onClick={onClose} />
       <div
         className="absolute right-0 top-0 bottom-0 w-120 max-w-full bg-white shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] flex flex-col animate-slide-in-right"
@@ -494,7 +501,8 @@ export function EmployeeDrawer({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

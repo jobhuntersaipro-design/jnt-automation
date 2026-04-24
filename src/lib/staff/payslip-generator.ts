@@ -377,6 +377,7 @@ function drawEmployerAndNetPay(
   doc: PDFKit.PDFDocument,
   data: EmployeePayslipInput,
   yTop: number,
+  displayedNet: number,
 ): number {
   hline(doc, CONTENT_LEFT, CONTENT_RIGHT, yTop);
   const innerPadX = ROW_PAD_X;
@@ -430,7 +431,7 @@ function drawEmployerAndNetPay(
     align: "center",
     lineBreak: false,
   });
-  doc.text(formatRM(data.netSalary), rightAmountX, yRight, {
+  doc.text(formatRM(displayedNet), rightAmountX, yRight, {
     width: AMOUNT_COL_W - ROW_PAD_X,
     align: "right",
     lineBreak: false,
@@ -515,12 +516,23 @@ function buildDocument(doc: PDFKit.PDFDocument, data: EmployeePayslipInput): voi
   y = drawTableBody(doc, additions, deductions, bodyTop);
   const bodyBottom = y;
 
+  // Internal-consistency invariant: TOTAL == sum(addition rows), NET ==
+  // TOTAL - sum(deduction rows). Using `data.grossSalary` directly breaks
+  // when the saved EmployeeSalaryRecord is stale — e.g. the combined
+  // Admin+dispatcher case where a name-based dispatcher match added rows
+  // to the displayed additions after the record had been saved with just
+  // the employee's own gross. Compute from the row totals so the payslip
+  // is always self-consistent regardless of stored field drift.
+  const displayedGross = additions.reduce((s, r) => s + r.amount, 0);
+  const displayedDeductions = deductions.reduce((s, r) => s + r.amount, 0);
+  const displayedNet = displayedGross - displayedDeductions;
+
   // TOTAL row
-  y = drawTotalRow(doc, data.grossSalary, bodyBottom);
+  y = drawTotalRow(doc, displayedGross, bodyBottom);
   const totalBottom = y;
 
-  // Employer contribution + Net Pay
-  y = drawEmployerAndNetPay(doc, data, totalBottom);
+  // Employer contribution + Net Pay (uses displayedNet — consistent with TOTAL)
+  y = drawEmployerAndNetPay(doc, data, totalBottom, displayedNet);
   const boxBottom = y;
 
   // ── Outer frame: draw border rectangle enclosing everything ──────

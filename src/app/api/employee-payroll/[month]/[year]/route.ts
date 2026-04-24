@@ -222,13 +222,72 @@ export async function POST(
       return NextResponse.json({ error: "One or more employees not found" }, { status: 404 })
     }
 
+    // Name+branch fallback match — mirrors the single-payslip PDF route logic
+    // so the saved gross/statutory reflect dispatcher earnings even when the
+    // employee has no explicit `dispatcherId` FK. Without this, an Admin who
+    // moonlights as a dispatcher (same name + branch) gets gross = basic pay
+    // only at save time, then the payslip PDF renders dispatcher tier rows
+    // that don't roll up into TOTAL or NET.
+    const needsNameMatch = employees.filter(
+      (e) => !e.dispatcher && e.branchId && e.name,
+    )
+    type NameMatchKey = `${string}::${string}`
+    const nameMatchDispatcherSalaries = new Map<
+      NameMatchKey,
+      {
+        baseSalary: number
+        bonusTierEarnings: number
+        petrolSubsidy: number
+        penalty: number
+        advance: number
+      }
+    >()
+    if (needsNameMatch.length > 0) {
+      const matches = await prisma.dispatcher.findMany({
+        where: {
+          OR: needsNameMatch.map((e) => ({
+            name: { equals: e.name, mode: "insensitive" as const },
+            branchId: e.branchId!,
+          })),
+        },
+        select: {
+          name: true,
+          branchId: true,
+          salaryRecords: {
+            where: { month, year },
+            select: {
+              baseSalary: true,
+              bonusTierEarnings: true,
+              petrolSubsidy: true,
+              penalty: true,
+              advance: true,
+            },
+            take: 1,
+          },
+        },
+      })
+      for (const m of matches) {
+        const sr = m.salaryRecords[0]
+        if (!sr) continue
+        const key: NameMatchKey = `${m.name.toLowerCase()}::${m.branchId}`
+        nameMatchDispatcherSalaries.set(key, sr)
+      }
+    }
+
     const employeeMap = new Map(employees.map((e) => [e.id, e]))
 
     // Calculate and upsert all records in a transaction
     const records = await prisma.$transaction(
       entries.map((entry) => {
         const emp = employeeMap.get(entry.employeeId)!
-        const dispatcherRecord = emp.dispatcher?.salaryRecords?.[0]
+        const linkedDispatcherRecord = emp.dispatcher?.salaryRecords?.[0]
+        const nameMatchKey: NameMatchKey | null =
+          !linkedDispatcherRecord && emp.branchId
+            ? (`${emp.name.toLowerCase()}::${emp.branchId}` as NameMatchKey)
+            : null
+        const dispatcherRecord =
+          linkedDispatcherRecord ??
+          (nameMatchKey ? nameMatchDispatcherSalaries.get(nameMatchKey) : undefined)
 
         const dispatcherGross = dispatcherRecord
           ? dispatcherRecord.baseSalary +
@@ -236,7 +295,6 @@ export async function POST(
             dispatcherRecord.petrolSubsidy
           : 0
 
-        // Supervisor/Admin: basic pay + allowances only (hours not applicable).
         const employeeGross =
           emp.type === "STORE_KEEPER"
             ? calculateStoreKeeperGross(
@@ -250,7 +308,9 @@ export async function POST(
                 entry.basicPay,
                 entry.petrolAllowance,
                 entry.kpiAllowance,
-                entry.otherAllowance
+                entry.otherAllowance,
+                entry.workingHours,
+                entry.hourlyWage
               )
 
         const totalGross = employeeGross + dispatcherGross

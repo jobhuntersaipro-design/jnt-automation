@@ -54,7 +54,12 @@ function PortalDropdown({
       const el = anchorRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+      // Right-align to anchor, but clamp so the dropdown never overflows the
+      // viewport edges. `rightFromLeft` keeps a 6 px gutter from the right
+      // edge when the anchor is close to the screen edge (prevents the
+      // "Line items" dropdown slipping off-screen on narrow viewports).
+      const rightFromLeft = Math.max(6, window.innerWidth - rect.right);
+      setPos({ top: rect.bottom + 4, right: rightFromLeft });
     };
     measure();
     window.addEventListener("scroll", measure, true);
@@ -82,7 +87,12 @@ function PortalDropdown({
   return createPortal(
     <div
       ref={panelRef}
-      style={{ position: "fixed", top: pos.top, right: pos.right }}
+      style={{
+        position: "fixed",
+        top: pos.top,
+        right: pos.right,
+        maxWidth: "calc(100vw - 12px)",
+      }}
       className={`z-50 bg-surface-card border border-outline-variant/20 rounded-md shadow-lg py-1 ${className}`}
     >
       {children}
