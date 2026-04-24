@@ -2,12 +2,20 @@ import { Client } from "@upstash/qstash";
 import { streamZipToR2 } from "./streaming-zip";
 import { getMonthDetailsBatch } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
-import { getJob, updateJob, patchChunk, incrementChunksDone } from "./bulk-job";
+import {
+  getJob,
+  updateJob,
+  patchChunk,
+  incrementChunksDone,
+  incrementDoneCounter,
+  seedChunksHash,
+} from "./bulk-job";
 import {
   generateMonthDetailFiles,
   listDispatcherIdsForMonth,
 } from "./month-detail-files";
 import { splitDispatchers, partR2Key } from "./bulk-chunks";
+import { zipKey } from "./pdf-cache";
 
 const qstash = new Client({ token: process.env.QSTASH_TOKEN ?? "" });
 
@@ -68,9 +76,12 @@ export async function runBulkExport(jobId: string): Promise<void> {
 
     // 3+4. Stream ZIP straight into R2 (Phase 3a) — peak RAM is a handful
     // of MB instead of the full archive size.
+    //
+    // Canonical cache key: shared across jobs for the same (agentId, year,
+    // month, format). Subsequent `/bulk/start` calls short-circuit on this
+    // blob instead of regenerating.
     await updateJob(jobId, { stage: "zipping" });
-    const mm = String(job.month).padStart(2, "0");
-    const r2Key = `bulk-exports/${job.agentId}/${job.jobId}/${job.year}_${mm}_details.zip`;
+    const r2Key = zipKey(job.agentId, job.year, job.month, job.format);
     await updateJob(jobId, { stage: "uploading" });
     await streamZipToR2(r2Key, files);
 
@@ -143,6 +154,7 @@ export async function startBulkExportFanout(jobId: string): Promise<void> {
     }
 
     const chunks = splitDispatchers(ids);
+    await seedChunksHash(jobId, chunks);
     await updateJob(jobId, {
       total: ids.length,
       totalChunks: chunks.length,
@@ -225,14 +237,11 @@ export async function runBulkExportChunk(
       format: job.format,
       dispatcherIds: chunk.dispatcherIds,
       onFile: async ({ dispatcherName }) => {
-        // Increment the job-wide `done` counter + update label. Races are
-        // acceptable here — the final total is re-synced at finalize time.
-        const latest = await getJob(jobId);
-        if (!latest) return;
-        await updateJob(jobId, {
-          done: (latest.done ?? 0) + 1,
-          currentLabel: dispatcherName,
-        });
+        // Atomic INCR via dedicated counter key (audit B1). `getJob`
+        // merges the counter into `BulkJob.done` on read. `currentLabel`
+        // writes are cosmetic and non-monotonic; last-writer-wins is fine.
+        await incrementDoneCounter(jobId);
+        await updateJob(jobId, { currentLabel: dispatcherName });
       },
     });
 

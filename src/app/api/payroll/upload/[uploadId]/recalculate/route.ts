@@ -11,6 +11,8 @@ import {
   rulesMatchSnapshot,
 } from "@/lib/payroll/re-price-helpers";
 import { runPool } from "@/lib/upload/run-pool";
+import { cacheKeysForRecords, deleteCachedBlobs } from "@/lib/staff/pdf-cache";
+import { enqueuePrewarm } from "@/lib/staff/prewarm";
 
 export const maxDuration = 120;
 
@@ -227,6 +229,34 @@ export async function POST(
         { timeout: PER_DISPATCHER_TX_TIMEOUT_MS },
       );
     });
+
+    // Synchronous cache invalidation — recalculate changes tier-breakdown
+    // and isBonusTier flags that live inside the cached PDF/CSV. Delete the
+    // affected per-record blobs + both bulk ZIPs BEFORE returning so no user
+    // can download a stale blob after seeing the "Saved" toast.
+    const affectedRecordIds = updates
+      .map((u) => recordByDispatcher.get(u.dispatcherId)?.id)
+      .filter((id): id is string => Boolean(id));
+    await deleteCachedBlobs(
+      cacheKeysForRecords(
+        effective.agentId,
+        upload.year,
+        upload.month,
+        affectedRecordIds,
+      ),
+    ).catch((err) => console.error("[pdf-cache] invalidate failed:", err));
+
+    // Async prewarm — populates the canonical cache for next click. Uses
+    // the dispatcherIds filter so only the affected dispatchers are
+    // regenerated in the per-record pass; the bulk ZIPs are always
+    // rebuilt from the full month.
+    enqueuePrewarm({
+      agentId: effective.agentId,
+      year: upload.year,
+      month: upload.month,
+      reason: "recalculate",
+      dispatcherIds: updates.map((u) => u.dispatcherId),
+    }).catch((err) => console.error("[prewarm] enqueue failed:", err));
 
     revalidatePath("/dispatchers");
     revalidatePath("/dashboard");

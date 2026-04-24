@@ -262,6 +262,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing existingUploadId" }, { status: 400 });
   }
 
+  // Evict PDF cache blobs for the old salary records BEFORE the cascade
+  // delete wipes them — same rationale as the init route.
+  const { invalidateCacheForUpload } = await import("@/lib/staff/pdf-cache");
+  await invalidateCacheForUpload(agentId, existingUploadId).catch((err) =>
+    console.error("[pdf-cache] invalidate failed:", err),
+  );
+
   const uploadId = await replaceUpload({
     existingUploadId,
     agentId,
