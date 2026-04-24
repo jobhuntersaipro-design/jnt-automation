@@ -1,20 +1,50 @@
-# Current Feature
+# Current Feature: PDF Generation Refactor — Kill Prewarm, Standardise on pdfkit
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+Not Started
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Delete the eager prewarm fan-out pipeline end-to-end (triggered on every recalculate + confirm; burns Lambda/QStash minutes whether or not anyone downloads). Keep `pdf-cache.ts` + `deleteCachedBlobs` cache-bust behaviour — only the eager regeneration goes.
+- Port `@react-pdf/renderer` call sites ([src/lib/pdf/summary-table.tsx](src/lib/pdf/summary-table.tsx) + [src/lib/staff/payslip-generator.ts](src/lib/staff/payslip-generator.ts)) to pdfkit so the codebase has one PDF library. Remove `@react-pdf/renderer` from `package.json` after port.
+- Revert month-detail PDF button ([month-detail-client.tsx:159](src/components/staff/month-detail-client.tsx#L159)) + payroll-history row UI back to always-enabled — cache hit → 302 → R2; cache miss → synchronous pdfkit write-through (Pro plan's 60 s ceiling covers worst-case ~30 s).
+- Drop `computeDownloadButtonState`, `<PrewarmIndicator>`, `usePrewarmStatus`, and all associated tests — dead code after removal.
+- Leave bulk ZIP pipeline, per-record `pdfkit` month-detail generator, and `pdf-cache.ts` untouched.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- **Spec:** [context/features/pdf-job-refactor-spec.md](context/features/pdf-job-refactor-spec.md) (loaded 2026-04-24).
+- **Supersedes:** `pdf-download-prewarm-ux-spec.md` — the Prewarm UX feature currently on branch `feature/line-item-pdf-prewarm-ux` (committed + pushed, not merged). **Open decision: abandon that branch vs. merge-then-revert.** Abandoning is cleaner — the new feature tears out both the UX and the backend it leans on. Merge-then-revert doubles the churn for zero value.
+- **Answers locked in (from 2026-04-24 clarifying thread):**
+  - Q1 = **A** — kill prewarm entirely, no opt-in variant.
+  - Q2 = **Pro plan** — leave per-record month-detail synchronous on cache miss; pdfkit's observed worst-case (~30 s at 2 500 parcels) fits comfortably under 60 s `maxDuration`.
+  - Q3 = **Port now** — `@react-pdf/renderer` goes in this feature, not a follow-up.
+  - Q4 = **No new surface** — bulk ZIP already async-job-based, stays as-is.
+  - Q5 = **Collapse onto `BulkJob` progress** for the bulk ZIP indicator on payroll-history; per-record button shows nothing special (browser download spinner during rare cache-miss path).
+- **Implementation order (removal-first, port-second):**
+  1. RED tests: `Buffer` shape + content substring checks on the two ported modules.
+  2. Delete `enqueuePrewarm` + `seedPrewarmQueued` calls from [confirm/route.ts](src/app/api/upload/[uploadId]/confirm/route.ts) + [recalculate/route.ts](src/app/api/payroll/upload/[uploadId]/recalculate/route.ts). Keep `deleteCachedBlobs`.
+  3. Revert UI: drop `usePrewarmStatus` + `<PrewarmIndicator>` from `month-detail-client.tsx` and `payroll-history.tsx`. Delete `download-button-state.ts` + `.test.ts` + the indicator component.
+  4. Delete prewarm backend: `prewarm.ts`, `prewarm-job.ts`, `/api/payroll-cache/prewarm/route.ts`, `/api/payroll-cache/status/route.ts`, `use-prewarm-status.ts` + all associated tests.
+  5. Port `summary-table.tsx` → `src/lib/pdf/summary-table-pdfkit.ts` with same `renderSummaryTablePdf({ title, columns, rows, totalsRow })` contract. Swap 3 import sites.
+  6. Port `payslip-generator.ts` → `src/lib/staff/payslip-generator-pdfkit.ts` with identical `EmployeePayslipInput` contract + 3 templates (Supervisor/Admin, Store Keeper, Combined). Swap 4 import sites.
+  7. `npm uninstall @react-pdf/renderer`. `grep -ri "@react-pdf/renderer" .` should be empty.
+  8. Manual smoke: 8 scenarios listed in spec §5.8.
+- **Rollout:** single PR, no schema migration, no env changes. Prewarm's Redis keys (`prewarm:state:*`) expire naturally within 30 days.
+- **Acceptance:**
+  - `grep -ri 'prewarm\|PrewarmState\|PrewarmIndicator' src/` returns zero results.
+  - `grep -ri "@react-pdf/renderer" .` returns zero results outside `node_modules`.
+  - `package.json` no longer lists `@react-pdf/renderer`.
+  - `npm run build` + `npm run test` clean.
+  - QStash dashboard shows zero prewarm-related messages over 24 h post-deploy.
+  - Visual diff ≤ 5 px on all 3 payslip templates vs. current React-PDF output (side-by-side in PR description).
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-24: **Line-Item PDF Download — Prewarm UX** — **Abandoned (unmerged).** Spec: `context/features/pdf-download-prewarm-ux-spec.md`. Branch `feature/line-item-pdf-prewarm-ux` was committed + pushed but never merged — superseded by the **PDF Generation Refactor** feature which deletes the entire prewarm pipeline (UX + backend) the day after it was built. Commits on the abandoned branch (`c058231` configurable concurrency, `5f0dc8d` prewarm UX on month-detail button) are preserved in Git history on the deleted remote branch only. Rationale for abandonment: user reported prewarm "takes too long and too much resources" — the async-job pattern already used by the bulk ZIP export makes eager prewarm architecturally unnecessary. Merging this branch just to revert it in the next PR would have doubled the churn for zero value.
 
 - 2026-04-24: **PDF/CSV/ZIP Cache Layer for Payroll Downloads** — Completed. Spec: `context/features/pdf-cache-spec.md`. Audit: `docs/audit-results/PDF_LINE_ITEMS_DOWNLOAD_AUDIT.md`. New `src/lib/staff/pdf-cache.ts` builds canonical keys under `payroll-cache/{agentId}/{year}-{mm}/` for per-dispatcher PDF+CSV (keyed by salaryRecordId) and both bulk ZIPs (keyed by format). Blobs are shared across users within an agent and persist until mutation-driven invalidation — no TTL, deliberately separate from the `bulk-exports/` prefix that has the 30-day R2 lifecycle rule. Per-record PDF + CSV routes (`/api/staff/[id]/history/[salaryRecordId]/export/{pdf,csv}`) become read-through: hit streams from R2 via `Readable.toWeb`; miss generates + fire-and-forget `PutObjectCommand` on the canonical key. Responses carry `x-payroll-cache: hit|miss` for observability. `/api/dispatchers/month-detail/bulk/start` HEAD-checks the canonical ZIP via `hasCached()` and, on hit, creates a job record and immediately flips it to `done` with `r2Key` pointing at the cache blob — the existing download route reads `job.r2Key`, so no route changes. Misses fall through to the normal fan-out path. `bulk-export-worker.ts` + `bulk-finalize.ts` write the final ZIP under `zipKey(agentId, year, month, format)` instead of the jobId-scoped path so a second bulk from any user in the same agent-month hits cache on start. Prewarm pipeline: new `src/lib/staff/prewarm.ts` + QStash-signed worker route at `POST /api/payroll-cache/prewarm` (`maxDuration = 600`). `runPrewarm()` regenerates every per-record PDF+CSV + both bulk ZIPs for a month; `enqueuePrewarm()` fires after upload confirm (full-month) and after recalculate (narrowed to affected `dispatcherIds`, but bulk ZIPs always full-month to keep the canonical ZIP consistent with per-record cache). Dev runs inline on the event loop; prod goes through QStash with `retries=2`. Synchronous invalidation: (a) recalculate calls `deleteCachedBlobs(cacheKeysForRecords(...))` covering affected record blobs + both ZIPs BEFORE returning, then `enqueuePrewarm`; (b) upload replace flow (both `/api/upload/init` and `/api/upload/detect`) calls `invalidateCacheForUpload()` BEFORE `replaceUpload()` cascades the `SalaryRecord` rows — once records are gone, the record-id → cache-key mapping is lost and blobs would orphan (no lifecycle rule on `payroll-cache/`). `verifyUploadOwnership` now selects `year`/`month` so invalidation doesn't need an extra fetch. **Fanout correctness (audit B1 + B4)**: (B1) new `doneCounterKey` with atomic `INCR` via `incrementDoneCounter(jobId)` replaces the read-modify-write on `BulkJob.done` in the chunk worker's `onFile` callback that silently lost increments under concurrent chunk finishers — `getJob` merges the counter into `BulkJob.done` on read; (B4) new `chunksHashKey` with per-field `HSET` replaces the whole-array rewrite in `patchChunk()` — `seedChunksHash()` mirrors the initial chunks array on `startBulkExportFanout`, and `getJob` merges the hash back onto `BulkJob.chunks` on read. Concurrent chunks no longer overwrite each other's `status`/`r2Key`. Inline jobs (no `totalChunks`) skip the extra Redis reads. **Decisions on spec §9 open questions**: CSV gets short-circuit too (not just PDF); prewarm fires after response flush via fire-and-forget; no manual "rebuild cache" UI button (invalidation is automatic on every mutation that changes content). B2/B3/B5/B6/B7/B8/B9 from the audit deferred — tracked in audit §5. **New files**: `src/lib/staff/{pdf-cache,prewarm}.ts`, `src/app/api/payroll-cache/prewarm/route.ts`, `src/lib/staff/__tests__/{pdf-cache,bulk-job-fanout}.test.ts` (+23 tests: 13 for pdf-cache key builders + R2 helpers with mocked S3 client, 10 for B1/B4 read-merge semantics with mocked Redis). **Tests**: 243/243 vitest (up from 220, +23). Build + typecheck clean. **Manual prod follow-ups**: (a) end-to-end QStash prewarm smoke test — dev only exercises inline path; (b) monitor `x-payroll-cache` response header to confirm hit-rate ramps up after confirm/recalc events; (c) R2 lifecycle stays on `bulk-exports/` prefix — `payroll-cache/` intentionally has none so cached blobs survive until explicit invalidation.
 
