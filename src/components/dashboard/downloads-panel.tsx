@@ -17,6 +17,7 @@ import {
   type BulkJobKind,
   type BulkJobStage,
 } from "./bulk-jobs-indicator";
+import { computeProgressPercent } from "@/lib/staff/bulk-progress";
 
 export interface RecentJob {
   jobId: string;
@@ -29,6 +30,7 @@ export interface RecentJob {
   format: "csv" | "pdf";
   kind?: BulkJobKind;
   branchCode?: string;
+  currentLabel?: string;
   error?: string;
   startedAt: number | null;
   createdAt: number;
@@ -36,14 +38,21 @@ export interface RecentJob {
 }
 
 /** Human-readable label for each stage of a running job. */
-function stageLabel(stage: BulkJobStage, done: number, total: number): string {
+function stageLabel(
+  stage: BulkJobStage,
+  done: number,
+  total: number,
+  currentLabel?: string,
+): string {
   switch (stage) {
     case "queued":
       return "Queued…";
     case "fetching":
       return "Fetching records…";
     case "generating":
-      return total > 0 ? `Generating ${done} / ${total}` : "Generating…";
+      if (total <= 0) return "Generating…";
+      if (currentLabel) return `Generating ${currentLabel} · ${done} / ${total}`;
+      return `Generating ${done} / ${total}`;
     case "zipping":
       return "Bundling zip…";
     case "uploading":
@@ -291,12 +300,14 @@ function DownloadRow({
     job.kind === "payslip" ? "Payslips" : `${job.format.toUpperCase()} export`;
 
   if (job.status === "queued" || job.status === "running") {
-    const pct =
-      job.total > 0
-        ? Math.min(100, Math.round((job.done / job.total) * 100))
-        : 0;
     const stage = job.stage ?? (job.status === "queued" ? "queued" : "generating");
-    const label_ = stageLabel(stage, job.done, job.total);
+    const pct = computeProgressPercent({
+      stage,
+      status: job.status,
+      done: job.done,
+      total: job.total,
+    });
+    const label_ = stageLabel(stage, job.done, job.total, job.currentLabel);
     const eta = formatEta(stage, job.done, job.total, job.startedAt);
     return (
       <li

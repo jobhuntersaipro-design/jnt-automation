@@ -27,6 +27,7 @@ export async function GET() {
       format: j.format,
       kind: j.kind ?? "month-detail",
       branchCode: j.branchCode,
+      currentLabel: j.currentLabel,
       error: j.error,
       startedAt: j.startedAt ?? null,
       createdAt: j.createdAt,

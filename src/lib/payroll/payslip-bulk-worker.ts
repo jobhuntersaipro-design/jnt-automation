@@ -139,9 +139,11 @@ export async function runPayslipBulkExport(jobId: string): Promise<void> {
           const fileName = `${upload.branch.code}_${safeName}_${monthStr}_${upload.year}.pdf`;
 
           completed++;
-          if (completed % 2 === 0 || completed === salaryRecords.length) {
-            await updateJob(jobId, { done: completed });
-          }
+          // Per-file progress + label for the Downloads Panel.
+          await updateJob(jobId, {
+            done: completed,
+            currentLabel: record.dispatcher.name,
+          });
           return { fileName, data: new Uint8Array(buffer) };
         } catch (err) {
           console.error(`[payslip-bulk] skipping ${record.dispatcher.extId}:`, err);

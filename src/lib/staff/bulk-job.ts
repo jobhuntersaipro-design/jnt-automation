@@ -45,6 +45,13 @@ export interface BulkJob {
   done: number;
   /** Total files to generate (set after the initial DB query) */
   total: number;
+  /**
+   * Display label for the file currently being generated (e.g. dispatcher
+   * or employee name). Updated per-file during the `generating` stage so
+   * the Downloads Panel can show `Generating Ahmad Bin Hamid · 15 / 47`
+   * instead of just a raw counter.
+   */
+  currentLabel?: string;
   /** Wall-clock start of actual work (fetching onwards). Null while queued. */
   startedAt: number | null;
   /** R2 object key once the zip has been uploaded */

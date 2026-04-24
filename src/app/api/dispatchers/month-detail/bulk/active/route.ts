@@ -26,6 +26,7 @@ export async function GET() {
       month: j.month,
       format: j.format,
       kind: j.kind ?? "month-detail",
+      currentLabel: j.currentLabel,
       startedAt: j.startedAt ?? null,
     })),
   });

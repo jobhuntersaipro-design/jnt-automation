@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
+import { computeProgressFraction } from "@/lib/staff/bulk-progress";
 
 export type BulkJobStage =
   | "queued"
@@ -23,6 +24,7 @@ export interface ActiveJob {
   month: number;
   format: "csv" | "pdf";
   kind?: BulkJobKind;
+  currentLabel?: string;
   startedAt: number | null;
 }
 
@@ -358,7 +360,14 @@ export function BulkJobsIndicator() {
 
   const totalFiles = jobs.reduce((s, j) => s + (j.total || 0), 0);
   const totalDone = jobs.reduce((s, j) => s + (j.done || 0), 0);
-  const fraction = totalFiles > 0 ? totalDone / totalFiles : 0;
+  // Weighted average across jobs — fraction includes the
+  // fetching/zipping/uploading overhead so the ring doesn't freeze at 100%
+  // while the last stages run. Falls back to file-count ratio when no job
+  // has a total yet.
+  const fraction =
+    jobs.length > 0
+      ? jobs.reduce((s, j) => s + computeProgressFraction(j), 0) / jobs.length
+      : 0;
   const percent = Math.round(fraction * 100);
 
   const r = 13;

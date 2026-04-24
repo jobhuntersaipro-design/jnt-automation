@@ -102,10 +102,14 @@ export async function runBulkExport(jobId: string): Promise<void> {
           }
 
           completed++;
-          // Throttled progress update — write every file OR every 2 for large jobs
-          if (completed % 2 === 0 || completed === details.length) {
-            await updateJob(jobId, { done: completed });
-          }
+          // Per-file progress write: carries `done` + `currentLabel` so the
+          // Downloads Panel can show "Generating <name> · k / N". Upstash
+          // handles ~1 write/s comfortably; a 60-person bulk export costs
+          // 60 writes which is fine.
+          await updateJob(jobId, {
+            done: completed,
+            currentLabel: detail.dispatcher.name,
+          });
           return { fileName, data };
         } catch (err) {
           console.error(
