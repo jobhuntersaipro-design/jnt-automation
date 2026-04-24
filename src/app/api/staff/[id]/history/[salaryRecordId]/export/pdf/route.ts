@@ -9,7 +9,8 @@ import {
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailPdf } from "@/lib/staff/month-detail-pdf";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
-import { getCachedStream, pdfKey, putCached } from "@/lib/staff/pdf-cache";
+import { hasCached, pdfKey, putCached } from "@/lib/staff/pdf-cache";
+import { getPresignedDownloadUrl } from "@/lib/r2";
 
 export async function GET(
   req: NextRequest,
@@ -44,19 +45,22 @@ export async function GET(
     salaryRecordId,
   );
 
-  // Cache hit — stream directly from R2, zero generation cost.
-  const cached = await getCachedStream(cacheKey).catch((err) => {
-    console.error("[pdf-cache] read failed:", err);
-    return null;
+  // Cache hit — redirect the browser straight to R2 via a presigned URL so
+  // the bytes never flow through this function. This is the hot path after
+  // the prewarm pipeline runs.
+  const hit = await hasCached(cacheKey).catch((err) => {
+    console.error("[pdf-cache] head failed:", err);
+    return false;
   });
-  if (cached) {
-    return new NextResponse(cached, {
-      status: 200,
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
-        "x-payroll-cache": "hit",
-      },
+  if (hit) {
+    const url = await getPresignedDownloadUrl(cacheKey, {
+      filename,
+      disposition: download ? "attachment" : "inline",
+      contentType: "application/pdf",
+    });
+    return NextResponse.redirect(url, {
+      status: 302,
+      headers: { "x-payroll-cache": "hit" },
     });
   }
 

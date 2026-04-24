@@ -9,7 +9,8 @@ import {
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailCsv } from "@/lib/staff/month-detail-csv";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
-import { csvKey, getCachedStream, putCached } from "@/lib/staff/pdf-cache";
+import { csvKey, hasCached, putCached } from "@/lib/staff/pdf-cache";
+import { getPresignedDownloadUrl } from "@/lib/r2";
 
 export async function GET(
   _req: NextRequest,
@@ -43,18 +44,19 @@ export async function GET(
     salaryRecordId,
   );
 
-  const cached = await getCachedStream(cacheKey).catch((err) => {
-    console.error("[pdf-cache] read failed:", err);
-    return null;
+  const hit = await hasCached(cacheKey).catch((err) => {
+    console.error("[pdf-cache] head failed:", err);
+    return false;
   });
-  if (cached) {
-    return new NextResponse(cached, {
-      status: 200,
-      headers: {
-        "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-        "x-payroll-cache": "hit",
-      },
+  if (hit) {
+    const url = await getPresignedDownloadUrl(cacheKey, {
+      filename,
+      disposition: "attachment",
+      contentType: "text/csv; charset=utf-8",
+    });
+    return NextResponse.redirect(url, {
+      status: 302,
+      headers: { "x-payroll-cache": "hit" },
     });
   }
 
