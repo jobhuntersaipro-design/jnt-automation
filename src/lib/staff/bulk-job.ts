@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import type { ChunkState } from "./bulk-chunks";
 
 const redis = Redis.fromEnv();
 
@@ -56,6 +57,14 @@ export interface BulkJob {
   startedAt: number | null;
   /** R2 object key once the zip has been uploaded */
   r2Key?: string;
+  /**
+   * QStash fan-out state (Phase 3b). Populated only when the month-detail
+   * job was dispatched in prod; dev path keeps the inline single-worker flow
+   * and leaves these undefined.
+   */
+  totalChunks?: number;
+  completedChunks?: number;
+  chunks?: ChunkState[];
   /** Human-readable error when status === "failed" */
   error?: string;
   createdAt: number;
@@ -125,6 +134,58 @@ export async function updateJob(
       await redis.expire(recentListKey(next.agentId), TTL_SECONDS);
     }
   }
+}
+
+/**
+ * Atomically patch a single chunk's state. Multiple fan-out workers write
+ * to the same job record concurrently; a naive read-modify-write in
+ * `updateJob` would clobber sibling writes. This helper reloads inside a
+ * short retry loop and CAS-compares `updatedAt` to detect races. Upstash
+ * doesn't expose MULTI/EXEC, so retry-on-conflict is the pragmatic path.
+ *
+ * Returns the full post-update job (useful for the caller to check
+ * `allChunksTerminal` and decide whether to publish finalize).
+ */
+export async function patchChunk(
+  jobId: string,
+  chunkIndex: number,
+  patch: Partial<ChunkState>,
+): Promise<BulkJob | null> {
+  const MAX_ATTEMPTS = 5;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const existing = await getJob(jobId);
+    if (!existing || !existing.chunks) return null;
+    const prior = existing.chunks[chunkIndex];
+    if (!prior) return null;
+
+    const nextChunks = [...existing.chunks];
+    nextChunks[chunkIndex] = { ...prior, ...patch };
+    const completedChunks = nextChunks.filter(
+      (c) => c.status === "done" || c.status === "failed",
+    ).length;
+
+    const priorUpdatedAt = existing.updatedAt;
+    const next: BulkJob = {
+      ...existing,
+      chunks: nextChunks,
+      completedChunks,
+      updatedAt: Date.now(),
+    };
+
+    // Short-window CAS: re-read, bail out + retry if another writer bumped
+    // updatedAt between our read and write.
+    const latest = await getJob(jobId);
+    if (!latest || latest.updatedAt !== priorUpdatedAt) {
+      // concurrent writer raced us — retry
+      continue;
+    }
+
+    await redis.set(jobKey(jobId), next, { ex: TTL_SECONDS });
+    return next;
+  }
+  // All attempts contended. The caller will see the latest state on next
+  // read — the terminal transition still happens, just via another writer.
+  return getJob(jobId);
 }
 
 /**

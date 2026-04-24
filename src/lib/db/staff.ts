@@ -371,11 +371,16 @@ async function withNeonRetry<T>(
  * Batch-fetch every dispatcher's parcel-level detail for a given month in
  * a single DB round-trip (2 queries thanks to Prisma's include). Much
  * faster than calling getMonthDetail N times.
+ *
+ * Optional `dispatcherIds` narrows the result to a specific subset — used
+ * by the QStash fan-out worker (Phase 3b) where each chunk processes a
+ * slice of the month's dispatchers.
  */
 export async function getMonthDetailsBatch(
   agentId: string,
   year: number,
   month: number,
+  dispatcherIds?: string[],
 ) {
   const records = await withNeonRetry(() =>
     prisma.salaryRecord.findMany({
@@ -383,6 +388,9 @@ export async function getMonthDetailsBatch(
         year,
         month,
         dispatcher: { branch: { agentId } },
+        ...(dispatcherIds && dispatcherIds.length > 0
+          ? { dispatcherId: { in: dispatcherIds } }
+          : {}),
       },
       include: {
         dispatcher: {
