@@ -51,26 +51,48 @@ function zipName(
   return `${year}_${mm}_details.zip`;
 }
 
-/** Client-side download helper used by both the toast action and the panel. */
+/**
+ * Client-side download helper used by both the toast action and the panel.
+ *
+ * The endpoint returns a 302 redirect to a presigned R2 URL, so we want the
+ * browser — not JS — to follow the redirect. That lets the ZIP stream
+ * straight to disk with no intermediate blob in browser memory (a full
+ * month of payslips can be 100+ MB).
+ *
+ * Before navigating we probe with `redirect: "manual"` so we can surface a
+ * proper toast if the job has expired / failed rather than dumping raw
+ * JSON onto a new page.
+ */
 export async function downloadZip(jobId: string, filename: string): Promise<void> {
+  const endpoint = `/api/dispatchers/month-detail/bulk/${jobId}/download`;
   try {
-    const res = await fetch(`/api/dispatchers/month-detail/bulk/${jobId}/download`);
-    if (!res.ok) {
+    const probe = await fetch(endpoint, { redirect: "manual" });
+    // "opaqueredirect" is what browsers return for a 3xx when redirect is
+    // manual. Anything else is either success (unlikely, but handle it) or
+    // an error response we should show.
+    if (probe.type !== "opaqueredirect" && !probe.ok) {
       toast.error("Download expired — export again from the Bulk Detail button.");
       return;
     }
-    const blob = await res.blob();
-    const href = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = href;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(href);
+    triggerBrowserDownload(endpoint, filename);
   } catch {
     toast.error("Download failed");
   }
+}
+
+/**
+ * Fire a real <a> click at the download endpoint. The browser follows the
+ * 302 to R2, sees `Content-Disposition: attachment`, and saves the file
+ * without navigating away from the current page.
+ */
+function triggerBrowserDownload(href: string, filename: string): void {
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 const BULK_EXPORT_STARTED_EVENT = "bulk-export:started";

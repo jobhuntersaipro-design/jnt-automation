@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetObjectCommand } from "@aws-sdk/client-s3";
-import { r2, R2_BUCKET } from "@/lib/r2";
+import { getPresignedDownloadUrl, hasR2Object } from "@/lib/r2";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getJob } from "@/lib/staff/bulk-job";
-import { Readable } from "node:stream";
 
 export async function GET(
   _req: NextRequest,
@@ -26,10 +24,7 @@ export async function GET(
     );
   }
 
-  const obj = await r2.send(
-    new GetObjectCommand({ Bucket: R2_BUCKET, Key: job.r2Key }),
-  );
-  if (!obj.Body) {
+  if (!(await hasR2Object(job.r2Key))) {
     return NextResponse.json(
       { error: "Export file missing from storage" },
       { status: 410 },
@@ -42,18 +37,15 @@ export async function GET(
       ? `payslips_${job.branchCode ?? "export"}_${mm}_${job.year}.zip`
       : `${job.year}_${mm}_details.zip`;
 
-  // Stream R2 body straight to the client — no intermediate buffer. TTFB
-  // drops from (full-zip-download-from-R2 time) to ~network RTT.
-  // Readable.toWeb handles backpressure correctly (Node 18+).
-  const webStream = Readable.toWeb(obj.Body as Readable) as ReadableStream<Uint8Array>;
+  // Redirect the browser straight to R2 with a short-lived presigned URL.
+  // The response payload no longer flows through this function — saves
+  // function duration on Vercel and lets the browser stream to disk
+  // without any proxying layer.
+  const presignedUrl = await getPresignedDownloadUrl(job.r2Key, {
+    filename,
+    disposition: "attachment",
+    contentType: "application/zip",
+  });
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/zip",
-    "Content-Disposition": `attachment; filename="${filename}"`,
-  };
-  if (typeof obj.ContentLength === "number") {
-    headers["Content-Length"] = String(obj.ContentLength);
-  }
-
-  return new NextResponse(webStream, { status: 200, headers });
+  return NextResponse.redirect(presignedUrl, { status: 302 });
 }

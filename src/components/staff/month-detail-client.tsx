@@ -158,24 +158,26 @@ export function MonthDetailClient({
 
   const handlePdf = async () => {
     setExportingPdf(true);
+    const endpoint = `/api/staff/${dispatcher.id}/history/${salaryRecordId}/export/pdf?download=1`;
+    const filename = monthDetailFilename(year, month, dispatcher.name, "pdf");
     try {
-      const res = await fetch(
-        `/api/staff/${dispatcher.id}/history/${salaryRecordId}/export/pdf?download=1`,
-      );
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({ error: "Export failed" }));
+      // On cache hit this endpoint 302-redirects to a presigned R2 URL, so
+      // we want the browser to follow the redirect itself — that skips the
+      // blob-in-memory step (important for large monthly PDFs) and cuts
+      // TTFB to a single round-trip.
+      const probe = await fetch(endpoint, { redirect: "manual" });
+      if (probe.type !== "opaqueredirect" && !probe.ok) {
+        const data = await probe.json().catch(() => ({ error: "Export failed" }));
         toast.error(data.error || "Failed to download PDF");
         return;
       }
-      const blob = await res.blob();
-      const href = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = href;
-      a.download = monthDetailFilename(year, month, dispatcher.name, "pdf");
+      a.href = endpoint;
+      a.download = filename;
+      a.rel = "noopener";
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(href);
     } catch {
       toast.error("Failed to download PDF");
     } finally {

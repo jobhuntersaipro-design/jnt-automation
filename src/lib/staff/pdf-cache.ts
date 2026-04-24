@@ -1,10 +1,8 @@
 import {
   DeleteObjectsCommand,
-  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
-import { Readable } from "node:stream";
 import { r2, R2_BUCKET } from "@/lib/r2";
 
 /**
@@ -50,28 +48,10 @@ export function zipKey(
 }
 
 /**
- * Returns the R2 object body as a web ReadableStream when present, null
- * when the key does not exist. Any other error propagates.
- */
-export async function getCachedStream(
-  key: string,
-): Promise<ReadableStream<Uint8Array> | null> {
-  try {
-    const obj = await r2.send(new GetObjectCommand({ Bucket: R2_BUCKET, Key: key }));
-    if (!obj.Body) return null;
-    // @aws-sdk/client-s3 returns a Node Readable in Node runtimes; convert
-    // to a web ReadableStream so it can be handed directly to NextResponse.
-    return Readable.toWeb(obj.Body as Readable) as ReadableStream<Uint8Array>;
-  } catch (err: unknown) {
-    if (isNotFoundError(err)) return null;
-    throw err;
-  }
-}
-
-/**
- * HEAD check — cheaper than GET when all we need is existence (e.g. the
- * `/bulk/start` short-circuit). Returns false on 404, propagates other
- * errors so observability stays intact.
+ * HEAD check — cheaper than GET when all we need is existence. Used by the
+ * `/bulk/start` short-circuit and by the per-record download routes to
+ * decide between "redirect to presigned URL" and "generate inline". Returns
+ * false on 404, propagates other errors so observability stays intact.
  */
 export async function hasCached(key: string): Promise<boolean> {
   try {
