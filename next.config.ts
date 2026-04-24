@@ -39,8 +39,14 @@ const nextConfig: NextConfig = {
     "/api/staff/[id]/history/[salaryRecordId]/export/pdf": [
       "./node_modules/pdfkit/js/data/**",
     ],
-    // Cache prewarm after upload-confirm / recalculate
+    // Cache prewarm (legacy inline path + fan-out chunk worker + finalize)
     "/api/payroll-cache/prewarm": ["./node_modules/pdfkit/js/data/**"],
+    "/api/payroll-cache/prewarm/worker/chunk": [
+      "./node_modules/pdfkit/js/data/**",
+    ],
+    "/api/payroll-cache/prewarm/worker/finalize": [
+      "./node_modules/pdfkit/js/data/**",
+    ],
     // Dev-only inline fallback path lives on /bulk/start when QStash envs
     // aren't set; keep it covered in case prod ever takes that branch
     "/api/dispatchers/month-detail/bulk/start": [

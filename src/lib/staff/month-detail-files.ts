@@ -50,8 +50,12 @@ export async function generateMonthDetailFiles(
   );
   if (details.length === 0) return [];
 
-  // CPU-bound PDF; string-join CSV. Matches the prior worker tuning.
-  const concurrency = args.format === "pdf" ? 4 : 8;
+  // CPU-bound PDF; string-join CSV. Vercel Lambdas have 2 vCPUs on Hobby,
+  // 4 on Pro — so `concurrency=8` for PDF is still limited by physical
+  // parallelism, but the higher queue depth keeps the event loop saturated
+  // so nothing blocks on Prisma I/O between renders. Fan-out across
+  // chunk workers (bulk-export + prewarm) is what delivers real speedup.
+  const concurrency = args.format === "pdf" ? 8 : 8;
   let completed = 0;
   const failures: Array<{ extId: string; name: string; error: Error }> = [];
 

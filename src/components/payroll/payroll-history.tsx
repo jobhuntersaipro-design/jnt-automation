@@ -24,8 +24,10 @@ import {
   Package,
 } from "lucide-react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { usePrewarmStatus } from "@/lib/hooks/use-prewarm-status";
 import { announceBulkExportStarted } from "@/components/dashboard/bulk-jobs-indicator";
 import { BranchChip } from "@/components/ui/branch-chip";
+import { Loader2 } from "lucide-react";
 
 /**
  * Renders dropdown content into document.body via portal, anchored to a
@@ -197,6 +199,21 @@ function RowActions({
   const [linesOpen, setLinesOpen] = useState(false);
   const [exportingLines, setExportingLines] = useState<"csv" | "pdf" | null>(null);
 
+  // Block "Line items" + "Summary" downloads while the per-month cache is
+  // still being prewarmed. Without this, users clicking during warm-up pay
+  // full inline generation cost — the exact 10-minute wait that prompted
+  // this feature. Summary PDF reads from the upload table so it's not
+  // cache-dependent, but the per-record cache lives on the same prewarm
+  // run that produces the line-items ZIPs; gating both keeps the UX
+  // consistent.
+  const prewarm = usePrewarmStatus(year, month);
+  const isWarming =
+    prewarm.status === "queued" || prewarm.status === "running";
+  const warmPct =
+    prewarm.total && prewarm.total > 0
+      ? Math.min(100, Math.round(((prewarm.done ?? 0) / prewarm.total) * 100))
+      : 0;
+
   const handleSummaryCsv = () => {
     setSummaryOpen(false);
     window.open(`/api/payroll/upload/${uploadId}/export/csv`, "_blank");
@@ -296,12 +313,29 @@ function RowActions({
           setLinesOpen((v) => !v);
           setSummaryOpen(false);
         }}
-        disabled={exportingLines !== null}
-        aria-label="Download per-dispatcher line items"
-        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+        disabled={exportingLines !== null || isWarming}
+        aria-label={
+          isWarming
+            ? `Preparing downloads, ${warmPct}%`
+            : "Download per-dispatcher line items"
+        }
+        title={
+          isWarming
+            ? `Preparing downloads — ${prewarm.done ?? 0}/${prewarm.total ?? 0}. Available shortly.`
+            : undefined
+        }
+        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
       >
-        <Package className="w-3.5 h-3.5" aria-hidden />
-        {exportingLines ? "Queuing…" : "Line items"}
+        {isWarming ? (
+          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
+        ) : (
+          <Package className="w-3.5 h-3.5" aria-hidden />
+        )}
+        {isWarming
+          ? `Preparing ${warmPct}%`
+          : exportingLines
+            ? "Queuing…"
+            : "Line items"}
         <ChevronDown className="w-2.5 h-2.5" aria-hidden />
       </button>
       <PortalDropdown
