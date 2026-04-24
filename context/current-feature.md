@@ -2,15 +2,25 @@
 
 ## Status
 
-Not Started
+In Progress — branch `feature/pdf-cache-layer`
 
 ## Goals
 
-<!-- Populate via /feature load -->
+PDF line-items download optimization. Pre-store per-dispatcher PDF + CSV + bulk ZIP in R2 under canonical, shared-per-agent-month keys so subsequent downloads stream from R2 instead of regenerating from scratch.
+
+- Sub-second second-click for any previously-generated PDF / CSV / ZIP
+- Eager prewarm via QStash after upload confirm AND after recalculate
+- Lazy fallback on first miss — generate + write to cache in one round-trip
+- Synchronous invalidation on recalculate / upload replace / upload delete
+
+Pre-req hardening from the audit (§2): fix B1 (atomic `done` counter in QStash chunk worker) and B4 (chunk state hash-per-field) so finalize doesn't write a ZIP with missing chunks.
 
 ## Notes
 
-<!-- Populate via /feature load -->
+- Audit: `docs/audit-results/PDF_LINE_ITEMS_DOWNLOAD_AUDIT.md`
+- Spec: `context/features/pdf-cache-spec.md`
+- Decisions on §9 open questions: CSV gets short-circuit too; prewarm fires after response flush; no manual rebuild button.
+- B2/B3/B5/B6/B7/B8/B9 deferred — tracked in audit §5.
 
 ## History
 

@@ -9,6 +9,7 @@ import {
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailPdf } from "@/lib/staff/month-detail-pdf";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
+import { getCachedStream, pdfKey, putCached } from "@/lib/staff/pdf-cache";
 
 export async function GET(
   req: NextRequest,
@@ -29,6 +30,37 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
+  const download = req.nextUrl.searchParams.get("download") === "1";
+  const filename = monthDetailFilename(
+    detail.year,
+    detail.month,
+    detail.dispatcher.name,
+    "pdf",
+  );
+  const cacheKey = pdfKey(
+    effective.agentId,
+    detail.year,
+    detail.month,
+    salaryRecordId,
+  );
+
+  // Cache hit — stream directly from R2, zero generation cost.
+  const cached = await getCachedStream(cacheKey).catch((err) => {
+    console.error("[pdf-cache] read failed:", err);
+    return null;
+  });
+  if (cached) {
+    return new NextResponse(cached, {
+      status: 200,
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
+        "x-payroll-cache": "hit",
+      },
+    });
+  }
+
+  // Miss — generate, stream to client, write-through to cache async.
   const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
   const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
   const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
@@ -62,12 +94,12 @@ export async function GET(
     );
   }
 
-  const download = req.nextUrl.searchParams.get("download") === "1";
-  const filename = monthDetailFilename(
-    detail.year,
-    detail.month,
-    detail.dispatcher.name,
-    "pdf",
+  // Fire-and-forget write-through. The response doesn't wait on this, but
+  // Node keeps the Lambda alive until the in-flight Promise resolves (the
+  // R2 PUT is ~300-800 ms for a 500 KB PDF). Failures are logged, never
+  // surfaced to the user — worst case the next click regenerates.
+  putCached(cacheKey, pdf, "application/pdf").catch((err) =>
+    console.error("[pdf-cache] write failed:", err),
   );
 
   return new NextResponse(new Uint8Array(pdf), {
@@ -75,6 +107,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `${download ? "attachment" : "inline"}; filename="${filename}"`,
+      "x-payroll-cache": "miss",
     },
   });
 }

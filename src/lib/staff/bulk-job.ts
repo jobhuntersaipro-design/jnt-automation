@@ -80,6 +80,20 @@ const recentListKey = (agentId: string) => `bulk-job:recent:${agentId}`;
  * one chunk will see the return value equal to totalChunks.
  */
 const chunksDoneCounterKey = (jobId: string) => `bulk-job:${jobId}:chunks-done`;
+/**
+ * Atomic counter for files completed across all chunk workers. Read by
+ * `getJob` and merged into `BulkJob.done`. Replaces a read-modify-write
+ * pattern on the job record which silently lost increments under the
+ * fan-out path (audit B1).
+ */
+const doneCounterKey = (jobId: string) => `bulk-job:${jobId}:done`;
+/**
+ * Per-chunk hash. Each chunk writes to its own field via `HSET` so
+ * concurrent chunk finishers never overwrite each other's status / r2Key
+ * (audit B4). The initial chunks array is mirrored here in
+ * `startBulkExportFanout`; updates go here exclusively.
+ */
+const chunksHashKey = (jobId: string) => `bulk-job:${jobId}:chunks`;
 // 30 days — paired with an R2 lifecycle rule on the `bulk-exports/` prefix so
 // Redis pointer and R2 object expire together (see docs/perf/r2-lifecycle.md).
 // Previously 2h, which produced "pointer gone, blob orphaned" errors whenever
@@ -113,7 +127,31 @@ export async function createJob(
 }
 
 export async function getJob(jobId: string): Promise<BulkJob | null> {
-  return redis.get<BulkJob>(jobKey(jobId));
+  const job = await redis.get<BulkJob>(jobKey(jobId));
+  if (!job) return null;
+
+  // Fan-out jobs have `totalChunks` set and use the atomic done counter
+  // (audit B1) + per-chunk hash (audit B4). Inline jobs write `done`
+  // directly on the record and don't pay the extra Redis reads.
+  if (!job.totalChunks) return job;
+
+  const [counter, chunksHash] = await Promise.all([
+    redis.get<number>(doneCounterKey(jobId)),
+    redis.hgetall<Record<string, ChunkState>>(chunksHashKey(jobId)),
+  ]);
+
+  let merged = job;
+  if (typeof counter === "number") {
+    merged = { ...merged, done: Math.max(merged.done, counter) };
+  }
+  if (chunksHash && job.chunks) {
+    const nextChunks = job.chunks.map((c, i) => chunksHash[String(i)] ?? c);
+    const completedChunks = nextChunks.filter(
+      (c) => c.status === "done" || c.status === "failed",
+    ).length;
+    merged = { ...merged, chunks: nextChunks, completedChunks };
+  }
+  return merged;
 }
 
 export async function updateJob(
@@ -143,11 +181,11 @@ export async function updateJob(
 }
 
 /**
- * Patch a single chunk's state. Writes are best-effort — under rare
- * concurrent-finish races the `chunks[]` array may lose a sibling's
- * status update. The *finalize-trigger decision* does NOT depend on
- * `chunks[]` agreeing across writers — use `incrementChunksDone` for
- * that, which is atomic.
+ * Patch a single chunk's state.
+ *
+ * Writes land on a dedicated hash field (`HSET chunks:{jobId} {i} …`) so
+ * concurrent chunk finishers never overwrite each other's rows (audit B4).
+ * `getJob` merges the hash back into `BulkJob.chunks` on read.
  *
  * Returns the post-write job snapshot (for progress UI).
  */
@@ -156,25 +194,66 @@ export async function patchChunk(
   chunkIndex: number,
   patch: Partial<ChunkState>,
 ): Promise<BulkJob | null> {
-  const existing = await getJob(jobId);
-  if (!existing || !existing.chunks) return null;
-  const prior = existing.chunks[chunkIndex];
+  const hashKey = chunksHashKey(jobId);
+  // Prior state comes from the hash first (latest write), then falls back
+  // to the initial array written by startBulkExportFanout.
+  const priorFromHash = await redis.hget<ChunkState>(hashKey, String(chunkIndex));
+  let prior = priorFromHash;
+  if (!prior) {
+    const job = await redis.get<BulkJob>(jobKey(jobId));
+    prior = job?.chunks?.[chunkIndex] ?? null;
+  }
   if (!prior) return null;
 
-  const nextChunks = [...existing.chunks];
-  nextChunks[chunkIndex] = { ...prior, ...patch };
-  const completedChunks = nextChunks.filter(
-    (c) => c.status === "done" || c.status === "failed",
-  ).length;
+  const next = { ...prior, ...patch };
+  await redis.hset(hashKey, { [String(chunkIndex)]: next });
+  await redis.expire(hashKey, TTL_SECONDS);
 
-  const next: BulkJob = {
-    ...existing,
-    chunks: nextChunks,
-    completedChunks,
-    updatedAt: Date.now(),
-  };
-  await redis.set(jobKey(jobId), next, { ex: TTL_SECONDS });
-  return next;
+  // Bump updatedAt on the job record so the progress UI ticks. No other
+  // field is touched here — chunk state lives in the hash.
+  const jobRecord = await redis.get<BulkJob>(jobKey(jobId));
+  if (jobRecord) {
+    await redis.set(
+      jobKey(jobId),
+      { ...jobRecord, updatedAt: Date.now() },
+      { ex: TTL_SECONDS },
+    );
+  }
+
+  return getJob(jobId);
+}
+
+/**
+ * Seed the per-chunk hash with the initial array. Called once by
+ * `startBulkExportFanout` after splitting. Keeps the chunks array on the
+ * job record for historical compatibility and as the fallback for
+ * `patchChunk` when a chunk finishes before the hash is populated.
+ */
+export async function seedChunksHash(
+  jobId: string,
+  chunks: ChunkState[],
+): Promise<void> {
+  if (chunks.length === 0) return;
+  const payload: Record<string, ChunkState> = {};
+  for (const c of chunks) payload[String(c.index)] = c;
+  const hashKey = chunksHashKey(jobId);
+  await redis.hset(hashKey, payload);
+  await redis.expire(hashKey, TTL_SECONDS);
+}
+
+/**
+ * Atomically increment and return the per-job "files done" counter for the
+ * fan-out path. Replaces a read-modify-write on `BulkJob.done` which lost
+ * increments under concurrent chunk workers (audit B1).
+ *
+ * `getJob` merges this counter into `BulkJob.done` so callers never have
+ * to read it directly.
+ */
+export async function incrementDoneCounter(jobId: string): Promise<number> {
+  const key = doneCounterKey(jobId);
+  const value = await redis.incr(key);
+  if (value === 1) await redis.expire(key, TTL_SECONDS);
+  return value;
 }
 
 /**

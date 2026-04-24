@@ -9,6 +9,7 @@ import {
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { generateMonthDetailCsv } from "@/lib/staff/month-detail-csv";
 import { monthDetailFilename } from "@/lib/staff/month-detail-filename";
+import { csvKey, getCachedStream, putCached } from "@/lib/staff/pdf-cache";
 
 export async function GET(
   _req: NextRequest,
@@ -29,16 +30,42 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
-  const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
-  const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
-  const tierBreakdown = buildTierBreakdown(detail.lineItems, weightTiers, bonusTiers);
-  const csv = generateMonthDetailCsv(detail, tierBreakdown);
   const filename = monthDetailFilename(
     detail.year,
     detail.month,
     detail.dispatcher.name,
     "csv",
+  );
+  const cacheKey = csvKey(
+    effective.agentId,
+    detail.year,
+    detail.month,
+    salaryRecordId,
+  );
+
+  const cached = await getCachedStream(cacheKey).catch((err) => {
+    console.error("[pdf-cache] read failed:", err);
+    return null;
+  });
+  if (cached) {
+    return new NextResponse(cached, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+        "x-payroll-cache": "hit",
+      },
+    });
+  }
+
+  const weightTiers = ((detail.weightTiersSnapshot ?? []) as unknown) as WeightTierSnapshot[];
+  const bonusTierSnapshot = readBonusTierSnapshot(detail.bonusTierSnapshot);
+  const bonusTiers = (bonusTierSnapshot?.tiers ?? undefined) as BonusTierSnapshotRow[] | undefined;
+  const tierBreakdown = buildTierBreakdown(detail.lineItems, weightTiers, bonusTiers);
+  const csv = generateMonthDetailCsv(detail, tierBreakdown);
+
+  putCached(cacheKey, csv, "text/csv; charset=utf-8").catch((err) =>
+    console.error("[pdf-cache] write failed:", err),
   );
 
   return new NextResponse(csv, {
@@ -46,6 +73,7 @@ export async function GET(
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${filename}"`,
+      "x-payroll-cache": "miss",
     },
   });
 }

@@ -162,7 +162,14 @@ export async function verifyUploadOwnership(uploadId: string, agentId: string) {
       id: uploadId,
       branch: { agentId },
     },
-    select: { id: true, status: true, r2Key: true, branchId: true },
+    select: {
+      id: true,
+      status: true,
+      r2Key: true,
+      branchId: true,
+      year: true,
+      month: true,
+    },
   });
 
   return upload;

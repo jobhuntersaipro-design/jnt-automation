@@ -18,6 +18,7 @@ import {
   throttledProgressWriter,
 } from "@/lib/upload/progress";
 import { runPool } from "@/lib/upload/run-pool";
+import { enqueuePrewarm } from "@/lib/staff/prewarm";
 
 export async function POST(
   _req: NextRequest,
@@ -209,6 +210,17 @@ export async function POST(
 
     // Bust dashboard cache so new data shows immediately
     revalidatePath("/dashboard");
+
+    // Pre-warm the PDF / CSV / ZIP cache for this month in the background
+    // so the first user click streams from R2 instead of paying the 3–15 s
+    // generation cost. Fire-and-forget — failures are logged and the lazy
+    // read-through on the single routes covers any miss.
+    enqueuePrewarm({
+      agentId: session.user.id,
+      year: fullUpload.year,
+      month: fullUpload.month,
+      reason: "upload-confirmed",
+    }).catch((err) => console.error("[prewarm] enqueue failed:", err));
 
     // Notification (non-fatal)
     const monthName = new Date(fullUpload.year, fullUpload.month - 1).toLocaleString("en", { month: "long" });

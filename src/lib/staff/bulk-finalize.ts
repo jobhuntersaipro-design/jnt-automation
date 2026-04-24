@@ -7,6 +7,7 @@ import { r2, R2_BUCKET } from "@/lib/r2";
 import { getJob, updateJob } from "./bulk-job";
 import { getMonthDetailsBatch } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
+import { zipKey } from "./pdf-cache";
 
 /**
  * Finalize worker — merges all per-chunk part ZIPs into one final archive
@@ -50,8 +51,9 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
       return;
     }
 
-    const mm = String(job.month).padStart(2, "0");
-    const finalKey = `bulk-exports/${job.agentId}/${job.jobId}/${job.year}_${mm}_details.zip`;
+    // Canonical cache key — shared across jobs for the same agent-month.
+    // Subsequent `/bulk/start` short-circuits on this blob.
+    const finalKey = zipKey(job.agentId, job.year, job.month, job.format);
 
     // Open the output archive: archiver → PassThrough → lib-storage Upload.
     // Level 1 zlib — entries are already compressed (PDFs), so minimal
