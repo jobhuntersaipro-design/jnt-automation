@@ -18,11 +18,29 @@ const redis = Redis.fromEnv();
  */
 export type PrewarmStatus = "queued" | "running" | "done" | "failed";
 
+/**
+ * Fine-grained progress stage, drives the "Preparing …" indicator copy:
+ *   queued      → "Queued…"
+ *   generating  → "Generating N/M"
+ *   finalizing  → "Bundling ZIP…"      (merging per-record blobs → bulk ZIP)
+ *   done        → indicator hidden
+ *
+ * Without this, a stuck finalize leaves the UI showing "Preparing 100%"
+ * indefinitely — exactly the bug captured in the Feb-2026 rows where
+ * every per-record blob was written but the bulk ZIP never materialised.
+ */
+export type PrewarmStage =
+  | "queued"
+  | "generating"
+  | "finalizing"
+  | "done";
+
 export interface PrewarmState {
   agentId: string;
   year: number;
   month: number;
   status: PrewarmStatus;
+  stage: PrewarmStage;
   total: number;
   done: number;
   totalChunks: number;
@@ -64,6 +82,7 @@ export async function createPrewarmJob(
   const state: PrewarmState = {
     ...args,
     status: "queued",
+    stage: "queued",
     done: 0,
     doneChunks: 0,
     startedAt: now,
@@ -96,6 +115,15 @@ export async function getPrewarmJob(
 
   return {
     ...base,
+    // Back-compat: older state records written before the `stage` field
+    // existed default to "generating" while running / "done" when done.
+    stage:
+      base.stage ??
+      (base.status === "done"
+        ? "done"
+        : base.status === "queued"
+          ? "queued"
+          : "generating"),
     done: Math.max(base.done, done ?? 0),
     doneChunks: Math.max(base.doneChunks, doneChunks ?? 0),
   };

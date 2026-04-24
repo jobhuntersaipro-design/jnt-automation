@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     status: state.status,
+    stage: state.stage,
     total: state.total,
     done: state.done,
     totalChunks: state.totalChunks,

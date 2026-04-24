@@ -199,20 +199,37 @@ function RowActions({
   const [linesOpen, setLinesOpen] = useState(false);
   const [exportingLines, setExportingLines] = useState<"csv" | "pdf" | null>(null);
 
-  // Block "Line items" + "Summary" downloads while the per-month cache is
-  // still being prewarmed. Without this, users clicking during warm-up pay
-  // full inline generation cost — the exact 10-minute wait that prompted
-  // this feature. Summary PDF reads from the upload table so it's not
-  // cache-dependent, but the per-record cache lives on the same prewarm
-  // run that produces the line-items ZIPs; gating both keeps the UX
-  // consistent.
+  // Block "Line items" downloads while the per-month cache is still being
+  // prewarmed. Without this, users clicking during warm-up pay full inline
+  // generation cost — the exact 10-minute wait that prompted this feature.
   const prewarm = usePrewarmStatus(year, month);
   const isWarming =
     prewarm.status === "queued" || prewarm.status === "running";
-  const warmPct =
+
+  // Stage-aware progress split:
+  //   generating → 0–90 %   (based on per-record files done / total)
+  //   finalizing → 90–99 %  (bulk ZIP merge, short-lived)
+  //   done       → hidden
+  // This prevents the indicator from stalling at 100 % while finalize runs
+  // (visible in the Feb-2026 rows before this change).
+  const genRatio =
     prewarm.total && prewarm.total > 0
-      ? Math.min(100, Math.round(((prewarm.done ?? 0) / prewarm.total) * 100))
+      ? Math.min(1, (prewarm.done ?? 0) / prewarm.total)
       : 0;
+  const warmPct =
+    prewarm.stage === "finalizing"
+      ? 95
+      : prewarm.stage === "done"
+        ? 100
+        : Math.round(genRatio * 90);
+  const warmLabel =
+    prewarm.stage === "queued"
+      ? "Queued"
+      : prewarm.stage === "finalizing"
+        ? "Bundling"
+        : prewarm.stage === "done"
+          ? "Ready"
+          : `Generating ${prewarm.done ?? 0}/${prewarm.total ?? 0}`;
 
   const handleSummaryCsv = () => {
     setSummaryOpen(false);
@@ -306,38 +323,50 @@ function RowActions({
       </PortalDropdown>
 
       {/* Line items (per-dispatcher parcel detail for the whole month) */}
-      <button
-        ref={linesBtnRef}
-        type="button"
-        onClick={() => {
-          setLinesOpen((v) => !v);
-          setSummaryOpen(false);
-        }}
-        disabled={exportingLines !== null || isWarming}
-        aria-label={
-          isWarming
-            ? `Preparing downloads, ${warmPct}%`
-            : "Download per-dispatcher line items"
-        }
-        title={
-          isWarming
-            ? `Preparing downloads — ${prewarm.done ?? 0}/${prewarm.total ?? 0}. Available shortly.`
-            : undefined
-        }
-        className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-      >
-        {isWarming ? (
-          <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden />
-        ) : (
-          <Package className="w-3.5 h-3.5" aria-hidden />
-        )}
-        {isWarming
-          ? `Preparing ${warmPct}%`
-          : exportingLines
-            ? "Queuing…"
-            : "Line items"}
-        <ChevronDown className="w-2.5 h-2.5" aria-hidden />
-      </button>
+      {isWarming ? (
+        <div
+          className="inline-flex flex-col items-stretch min-w-[9.5rem] px-2 py-1 rounded"
+          data-testid="prewarm-indicator"
+          role="status"
+          aria-live="polite"
+          aria-label={`${warmLabel} — ${warmPct}% prepared`}
+          title={
+            prewarm.stage === "finalizing"
+              ? "Bundling ZIP… almost ready"
+              : `Generating per-dispatcher PDFs — ${prewarm.done ?? 0}/${prewarm.total ?? 0}`
+          }
+        >
+          <div className="inline-flex items-center gap-1.5 text-[0.72rem] font-medium text-on-surface-variant whitespace-nowrap">
+            <Loader2 className="w-3 h-3 animate-spin text-brand" aria-hidden />
+            <span>{warmLabel}</span>
+            <span className="ml-auto tabular-nums">{warmPct}%</span>
+          </div>
+          <div className="mt-1 h-1 rounded-full bg-surface-container-high overflow-hidden">
+            <div
+              className="h-full bg-brand transition-[width] duration-300"
+              style={{ width: `${warmPct}%` }}
+            />
+          </div>
+        </div>
+      ) : (
+        <>
+          <button
+            ref={linesBtnRef}
+            type="button"
+            onClick={() => {
+              setLinesOpen((v) => !v);
+              setSummaryOpen(false);
+            }}
+            disabled={exportingLines !== null}
+            aria-label="Download per-dispatcher line items"
+            className="inline-flex items-center gap-1 px-2 py-1 text-[0.75rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <Package className="w-3.5 h-3.5" aria-hidden />
+            {exportingLines ? "Queuing…" : "Line items"}
+            <ChevronDown className="w-2.5 h-2.5" aria-hidden />
+          </button>
+        </>
+      )}
       <PortalDropdown
         open={linesOpen}
         anchorRef={linesBtnRef}

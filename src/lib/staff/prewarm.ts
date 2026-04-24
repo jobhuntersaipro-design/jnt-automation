@@ -93,7 +93,10 @@ export async function startPrewarmFanout(
     totalChunks: chunks.length,
     reason,
   });
-  await updatePrewarmJob(agentId, year, month, { status: "running" });
+  await updatePrewarmJob(agentId, year, month, {
+    status: "running",
+    stage: "generating",
+  });
 
   const workerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/payroll-cache/prewarm/worker/chunk`;
   await Promise.all(
@@ -243,6 +246,11 @@ export async function runPrewarmFinalize(args: {
 }): Promise<void> {
   const { agentId, year, month } = args;
   try {
+    // Transition to "finalizing" immediately so the UI stops showing
+    // "Generating 100%" and starts showing "Bundling ZIP…". Without this
+    // the indicator stalls visibly while the two R2 fetches + merge run.
+    await updatePrewarmJob(agentId, year, month, { stage: "finalizing" });
+
     const { prisma } = await import("@/lib/prisma");
     const records = await prisma.salaryRecord.findMany({
       where: {
@@ -257,6 +265,7 @@ export async function runPrewarmFinalize(args: {
     if (records.length === 0) {
       await updatePrewarmJob(agentId, year, month, {
         status: "done",
+        stage: "done",
       });
       return;
     }
@@ -333,6 +342,7 @@ export async function runPrewarmFinalize(args: {
 
     await updatePrewarmJob(agentId, year, month, {
       status: "done",
+      stage: "done",
     });
   } catch (err) {
     console.error(`[prewarm-finalize] ${args.agentId} ${args.year}-${args.month}:`, err);
@@ -372,7 +382,10 @@ export async function runPrewarmInline(
     totalChunks: 1,
     reason,
   });
-  await updatePrewarmJob(agentId, year, month, { status: "running" });
+  await updatePrewarmJob(agentId, year, month, {
+    status: "running",
+    stage: "generating",
+  });
 
   try {
     const [pdfFiles, csvFiles] = await Promise.all([
@@ -435,6 +448,11 @@ export async function runPrewarmInline(
 
     await incrementPrewarmDone(agentId, year, month, records.length);
 
+    // Flip to "finalizing" so the UI shows "Bundling ZIP…" during the
+    // two R2 uploads — otherwise it stalls visibly at 100% for the
+    // duration of the zip stream.
+    await updatePrewarmJob(agentId, year, month, { stage: "finalizing" });
+
     // Bulk ZIPs — always regenerated from the full month.
     if (dispatcherIds) {
       const allPdf = await generateMonthDetailFiles({ agentId, year, month, format: "pdf" });
@@ -446,7 +464,10 @@ export async function runPrewarmInline(
       await streamZipToR2(zipKey(agentId, year, month, "csv"), csvFiles);
     }
 
-    await updatePrewarmJob(agentId, year, month, { status: "done" });
+    await updatePrewarmJob(agentId, year, month, {
+      status: "done",
+      stage: "done",
+    });
 
     const ms = Date.now() - start;
     console.log(

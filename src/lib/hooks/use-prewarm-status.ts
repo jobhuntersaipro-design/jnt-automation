@@ -2,8 +2,16 @@ import { useEffect, useRef, useState } from "react";
 
 export type PrewarmStatus = "idle" | "queued" | "running" | "done" | "failed";
 
+export type PrewarmStage = "queued" | "generating" | "finalizing" | "done";
+
 export interface PrewarmStatusResponse {
   status: PrewarmStatus;
+  /**
+   * Fine-grained stage during `status === "running"`. Lets the UI
+   * distinguish "Generating 47/100" from "Bundling ZIP…" — otherwise
+   * the counter plateaus at 100 % while finalize runs and it looks stuck.
+   */
+  stage?: PrewarmStage;
   total?: number;
   done?: number;
   totalChunks?: number;
