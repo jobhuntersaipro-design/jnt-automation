@@ -198,8 +198,8 @@ describe("listRecent — sweep terminal jobs leaked into active set (P2-T4)", ()
   });
 });
 
-describe("clearRecent — evicts leaked terminal jobs from active set", () => {
-  it("SREMs done/failed jobs from active + DELs recent list", async () => {
+describe("clearRecent — cancels running jobs + evicts leaked terminal jobs", () => {
+  it("marks running jobs failed, sweeps all from active set, DELs recent list", async () => {
     mockRedis.smembers.mockResolvedValue([
       "running-1",
       "leaked-done",
@@ -216,16 +216,25 @@ describe("clearRecent — evicts leaked terminal jobs from active set", () => {
 
     await clearRecent("agent-1");
 
-    // Terminal jobs swept (varargs srem)
+    // Running job marked failed (so UI stops showing progress) — set was
+    // called with the transitioned record at the job key.
+    const runningSetCall = mockRedis.set.mock.calls.find(
+      ([key]) => key === "bulk-job:running-1",
+    );
+    expect(runningSetCall).toBeDefined();
+    expect(runningSetCall?.[1]).toMatchObject({
+      jobId: "running-1",
+      status: "failed",
+      error: "Cancelled via Clear all",
+    });
+
+    // All three IDs (running-1, leaked-done, leaked-failed) swept from
+    // active set in a single varargs srem.
     expect(mockRedis.srem).toHaveBeenCalledWith(
       "bulk-job:active:agent-1",
+      "running-1",
       "leaked-done",
       "leaked-failed",
-    );
-    // Running jobs untouched
-    expect(mockRedis.srem).not.toHaveBeenCalledWith(
-      "bulk-job:active:agent-1",
-      "running-1",
     );
     // Recent list fully cleared
     expect(mockRedis.del).toHaveBeenCalledWith("bulk-job:recent:agent-1");

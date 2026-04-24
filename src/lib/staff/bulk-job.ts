@@ -360,10 +360,16 @@ export async function listRecent(agentId: string): Promise<BulkJob[]> {
 }
 
 /**
- * Hard-clear the recent list for an agent. Also sweeps any terminal job
- * that leaked into the active set — otherwise those rows re-appear on the
- * next poll and the UI looks like Clear all did nothing. Genuinely running
- * jobs stay, so in-flight work is untouched.
+ * Hard-clear the recent list for an agent. Sweeps terminal jobs out of the
+ * active set AND marks any still-running jobs as failed so they also
+ * disappear from the Downloads panel. In dev, "running" jobs often mean a
+ * worker that silently stalled (hung R2 upload, network issue) — the user
+ * wants Clear all to actually clear.
+ *
+ * Inline workers that do later complete will no-op on their `updateJob`
+ * writes because the record's status is already terminal. QStash chunk
+ * workers can't be truly stopped mid-flight but will also be unable to
+ * flip the job back to running.
  *
  * Backs the DELETE /api/dispatchers/month-detail/bulk/recent endpoint.
  */
@@ -372,13 +378,64 @@ export async function clearRecent(agentId: string): Promise<void> {
   const toRemove: string[] = [];
   for (const id of activeIds) {
     const job = await redis.get<BulkJob>(jobKey(id));
-    // Missing record (TTL) or terminal → safe to drop from the active set.
-    if (!job || job.status === "done" || job.status === "failed") {
+    if (!job) {
       toRemove.push(id);
+      continue;
     }
+    if (job.status === "done" || job.status === "failed") {
+      toRemove.push(id);
+      continue;
+    }
+    // Still queued/running — mark failed so the UI shows the user what they
+    // asked for (cleared).
+    await redis.set(
+      jobKey(id),
+      {
+        ...job,
+        status: "failed" as const,
+        stage: job.stage,
+        error: "Cancelled via Clear all",
+        updatedAt: Date.now(),
+      },
+      { ex: TTL_SECONDS },
+    );
+    toRemove.push(id);
   }
   if (toRemove.length > 0) {
     await redis.srem(activeSetKey(agentId), ...toRemove);
   }
   await redis.del(recentListKey(agentId));
+}
+
+/**
+ * Cancel a single in-flight job (dev rescue for stalled uploads + the
+ * per-row Cancel button in the Downloads panel). Marks as failed, drops
+ * from the active set, keeps it in the recent list with an "error" so
+ * the user can see what happened. Agent-scoped — pass the caller's
+ * agentId and we no-op on mismatch to avoid cross-tenant cancellation.
+ */
+export async function cancelJob(
+  jobId: string,
+  agentId: string,
+): Promise<boolean> {
+  const job = await redis.get<BulkJob>(jobKey(jobId));
+  if (!job || job.agentId !== agentId) return false;
+  if (job.status === "done" || job.status === "failed") {
+    // Already terminal — just make sure the active set is clean.
+    await redis.srem(activeSetKey(agentId), jobId);
+    return true;
+  }
+  await redis.set(
+    jobKey(jobId),
+    {
+      ...job,
+      status: "failed" as const,
+      error: "Cancelled by user",
+      updatedAt: Date.now(),
+    },
+    { ex: TTL_SECONDS },
+  );
+  await redis.srem(activeSetKey(agentId), jobId);
+  // Keep on the recent list so the Cancelled row stays visible.
+  return true;
 }

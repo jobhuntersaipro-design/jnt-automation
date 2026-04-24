@@ -6,6 +6,7 @@ import {
   Download,
   Loader2,
   RefreshCw,
+  X,
   XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -125,6 +126,7 @@ export function DownloadsPanel() {
   const [recent, setRecent] = useState<RecentJob[]>([]);
   const [retrying, setRetrying] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
+  const [cancelling, setCancelling] = useState<string | null>(null);
   const active = useActiveJobs();
 
   const fetchRecent = useCallback(async () => {
@@ -233,13 +235,40 @@ export function DownloadsPanel() {
         toast.error("Clear failed");
         return;
       }
+      // Optimistic — /recent endpoint now also cancels in-flight jobs, so
+      // both the recent list and the active rows should disappear. Refetch
+      // once to pick up whatever Redis state landed.
       setRecent([]);
+      await fetchRecent();
     } catch {
       toast.error("Clear failed");
     } finally {
       setClearing(false);
     }
-  }, []);
+  }, [fetchRecent]);
+
+  const handleCancel = useCallback(
+    async (job: RecentJob) => {
+      setCancelling(job.jobId);
+      try {
+        const res = await fetch(
+          `/api/dispatchers/month-detail/bulk/${job.jobId}/cancel`,
+          { method: "POST" },
+        );
+        if (!res.ok) {
+          toast.error("Cancel failed");
+          return;
+        }
+        toast.success("Export cancelled");
+        await fetchRecent();
+      } catch {
+        toast.error("Cancel failed");
+      } finally {
+        setCancelling(null);
+      }
+    },
+    [fetchRecent],
+  );
 
   if (rows.length === 0) {
     return (
@@ -275,8 +304,10 @@ export function DownloadsPanel() {
             key={job.jobId}
             job={job}
             retrying={retrying === job.jobId}
+            cancelling={cancelling === job.jobId}
             onDownload={() => handleDownload(job)}
             onRetry={() => handleRetry(job)}
+            onCancel={() => handleCancel(job)}
           />
         ))}
       </ul>
@@ -287,13 +318,17 @@ export function DownloadsPanel() {
 function DownloadRow({
   job,
   retrying,
+  cancelling,
   onDownload,
   onRetry,
+  onCancel,
 }: {
   job: RecentJob;
   retrying: boolean;
+  cancelling: boolean;
   onDownload: () => void;
   onRetry: () => void;
+  onCancel: () => void;
 }) {
   const label = formatLabel(job.year, job.month);
   const formatLabel_ =
@@ -322,11 +357,23 @@ function DownloadRow({
           <span className="text-[0.78rem] font-medium text-on-surface">
             {formatLabel_} · {label}
           </span>
-          {stage !== "generating" || job.total === 0 ? null : (
+          {stage !== "generating" || job.total === 0 ? (
+            <span className="ml-auto" />
+          ) : (
             <span className="ml-auto text-[0.72rem] text-on-surface-variant tabular-nums">
               {pct}%
             </span>
           )}
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={cancelling}
+            aria-label="Cancel export"
+            title="Cancel this export"
+            className="p-1 rounded text-on-surface-variant hover:text-critical hover:bg-critical/10 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" aria-hidden />
+          </button>
         </div>
         <div className="mt-2 h-1 rounded-full bg-surface-container-high overflow-hidden">
           <div
