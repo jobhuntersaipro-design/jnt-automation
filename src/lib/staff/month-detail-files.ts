@@ -53,6 +53,7 @@ export async function generateMonthDetailFiles(
   // CPU-bound PDF; string-join CSV. Matches the prior worker tuning.
   const concurrency = args.format === "pdf" ? 4 : 8;
   let completed = 0;
+  const failures: Array<{ extId: string; name: string; error: Error }> = [];
 
   const raw = await runPool<MonthDetail, GeneratedMonthFile | null>(
     details,
@@ -105,17 +106,38 @@ export async function generateMonthDetailFiles(
         }
         return { fileName, data };
       } catch (err) {
+        const wrapped = err instanceof Error ? err : new Error(String(err));
         console.error(
-          `[month-detail-files] skipping ${detail.dispatcher.extId}:`,
-          err,
+          `[month-detail-files] ${args.format} generation failed for ${detail.dispatcher.extId} (${detail.dispatcher.name}):`,
+          wrapped,
         );
+        failures.push({
+          extId: detail.dispatcher.extId,
+          name: detail.dispatcher.name,
+          error: wrapped,
+        });
         completed++;
         return null;
       }
     },
   );
 
-  return raw.filter((f): f is GeneratedMonthFile => f !== null);
+  const successes = raw.filter((f): f is GeneratedMonthFile => f !== null);
+
+  // If every dispatcher failed, fail loudly. Returning [] here would let
+  // callers write a 22-byte empty zip to the canonical cache key and keep
+  // serving it on every subsequent click until someone invalidates by hand.
+  // See docs/audit-results/PDF_LINE_ITEMS_DOWNLOAD_AUDIT.md / the prior
+  // 2026-03 incident for the exact failure mode.
+  if (successes.length === 0 && failures.length > 0) {
+    const first = failures[0];
+    throw new Error(
+      `All ${failures.length} dispatcher ${args.format.toUpperCase()} file(s) failed to generate. ` +
+        `First failure — ${first.name} (${first.extId}): ${first.error.message}`,
+    );
+  }
+
+  return successes;
 }
 
 /**

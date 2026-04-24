@@ -45,6 +45,7 @@ vi.mock("@upstash/redis", () => ({
 import {
   RECENT_CAP,
   RECENT_RETURN_LIMIT,
+  clearRecent,
   listRecent,
   updateJob,
   type BulkJob,
@@ -153,6 +154,90 @@ describe("listRecent — drop expired entries (P2-T2)", () => {
 
     expect(result.map((j) => j.jobId)).toEqual(["done-1", "done-2"]);
     expect(result.length).toBe(2);
+  });
+});
+
+describe("listRecent — sweep terminal jobs leaked into active set (P2-T4)", () => {
+  it("SREMs terminal jobs from active set + LPUSHes to recent when they weren't already there", async () => {
+    // A job that completed but whose transition SREM was lost — still in
+    // active, not in recent. Downloads Panel's Clear all has to be able to
+    // evict it.
+    mockRedis.smembers.mockResolvedValue(["leaked-done"]);
+    mockRedis.lrange.mockResolvedValue([]);
+    mockRedis.get.mockResolvedValue(
+      baseJob({ jobId: "leaked-done", status: "done" }),
+    );
+
+    const result = await listRecent("agent-1");
+
+    expect(result.map((j) => j.jobId)).toEqual(["leaked-done"]);
+    expect(mockRedis.srem).toHaveBeenCalledWith(
+      "bulk-job:active:agent-1",
+      "leaked-done",
+    );
+    expect(mockRedis.lpush).toHaveBeenCalledWith(
+      "bulk-job:recent:agent-1",
+      "leaked-done",
+    );
+  });
+
+  it("leaves genuinely running jobs in active, no LPUSH", async () => {
+    mockRedis.smembers.mockResolvedValue(["still-running"]);
+    mockRedis.lrange.mockResolvedValue([]);
+    mockRedis.get.mockResolvedValue(
+      baseJob({ jobId: "still-running", status: "running" }),
+    );
+
+    await listRecent("agent-1");
+
+    expect(mockRedis.srem).not.toHaveBeenCalledWith(
+      "bulk-job:active:agent-1",
+      "still-running",
+    );
+    expect(mockRedis.lpush).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearRecent — evicts leaked terminal jobs from active set", () => {
+  it("SREMs done/failed jobs from active + DELs recent list", async () => {
+    mockRedis.smembers.mockResolvedValue([
+      "running-1",
+      "leaked-done",
+      "leaked-failed",
+    ]);
+    mockRedis.get.mockImplementation(async (key: string) => {
+      const id = key.replace("bulk-job:", "");
+      if (id === "running-1") return baseJob({ jobId: id, status: "running" });
+      if (id === "leaked-done") return baseJob({ jobId: id, status: "done" });
+      if (id === "leaked-failed")
+        return baseJob({ jobId: id, status: "failed", error: "x" });
+      return null;
+    });
+
+    await clearRecent("agent-1");
+
+    // Terminal jobs swept (varargs srem)
+    expect(mockRedis.srem).toHaveBeenCalledWith(
+      "bulk-job:active:agent-1",
+      "leaked-done",
+      "leaked-failed",
+    );
+    // Running jobs untouched
+    expect(mockRedis.srem).not.toHaveBeenCalledWith(
+      "bulk-job:active:agent-1",
+      "running-1",
+    );
+    // Recent list fully cleared
+    expect(mockRedis.del).toHaveBeenCalledWith("bulk-job:recent:agent-1");
+  });
+
+  it("DELs recent even when active set is empty", async () => {
+    mockRedis.smembers.mockResolvedValue([]);
+
+    await clearRecent("agent-1");
+
+    expect(mockRedis.srem).not.toHaveBeenCalled();
+    expect(mockRedis.del).toHaveBeenCalledWith("bulk-job:recent:agent-1");
   });
 });
 
