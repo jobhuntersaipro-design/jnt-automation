@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   generateEmployeePayslipPdf,
+  buildAdditionRows,
+  buildDeductionRows,
   type EmployeePayslipInput,
 } from "../payslip-generator";
 
@@ -79,6 +81,75 @@ describe("generateEmployeePayslipPdf", () => {
     );
     expect(buf.subarray(0, 4).toString("ascii")).toBe("%PDF");
     expect(buf.length).toBeGreaterThan(1024);
+  });
+
+  it("combined template — deduction rows sum equals data.penalty + data.advance (no double-count)", () => {
+    // Regression test for Bug 4: when an employee is ALSO a dispatcher,
+    // EmployeeSalaryRecord stores combined penalty/advance; the old render
+    // showed both "Penalty: combined" + "Penalty (Dispatcher): portion",
+    // inflating the deduction column by the dispatcher portion.
+    const input = baseInput({
+      penalty: 50, // combined = employee 20 + dispatcher 30
+      advance: 150, // combined = employee 100 + dispatcher 50
+      dispatcherTierBreakdowns: [{ tier: 1, count: 10, rate: 1, total: 10 }],
+      dispatcherPenalty: 30,
+      dispatcherAdvance: 50,
+    });
+    const rows = buildDeductionRows(input);
+    const totalDeductions =
+      rows
+        .filter((r) => r.label === "Penalty" || r.label === "Penalty (Dispatcher)")
+        .reduce((s, r) => s + r.amount, 0);
+    const totalAdvances =
+      rows
+        .filter((r) => r.label === "Advance" || r.label === "Advance (Dispatcher)")
+        .reduce((s, r) => s + r.amount, 0);
+    expect(totalDeductions).toBe(50);
+    expect(totalAdvances).toBe(150);
+  });
+
+  it("combined template — splits Penalty into employee-only + dispatcher rows", () => {
+    const input = baseInput({
+      penalty: 50,
+      advance: 0,
+      dispatcherTierBreakdowns: [{ tier: 1, count: 10, rate: 1, total: 10 }],
+      dispatcherPenalty: 30,
+    });
+    const rows = buildDeductionRows(input);
+    expect(rows.find((r) => r.label === "Penalty")?.amount).toBe(20);
+    expect(rows.find((r) => r.label === "Penalty (Dispatcher)")?.amount).toBe(30);
+  });
+
+  it("non-combined template — Penalty row carries full value", () => {
+    const input = baseInput({ penalty: 50 });
+    const rows = buildDeductionRows(input);
+    expect(rows.find((r) => r.label === "Penalty")?.amount).toBe(50);
+    expect(rows.find((r) => r.label === "Penalty (Dispatcher)")).toBeUndefined();
+  });
+
+  it("combined template — if employee portion is zero, only dispatcher row shows", () => {
+    const input = baseInput({
+      penalty: 30, // all dispatcher
+      dispatcherTierBreakdowns: [{ tier: 1, count: 10, rate: 1, total: 10 }],
+      dispatcherPenalty: 30,
+    });
+    const rows = buildDeductionRows(input);
+    expect(rows.find((r) => r.label === "Penalty")).toBeUndefined();
+    expect(rows.find((r) => r.label === "Penalty (Dispatcher)")?.amount).toBe(30);
+  });
+
+  it("addition rows — combined template includes tier rows before BASIC PAY", () => {
+    const input = baseInput({
+      dispatcherTierBreakdowns: [
+        { tier: 1, count: 100, rate: 1, total: 100 },
+        { tier: 2, count: 20, rate: 1.4, total: 28 },
+      ],
+    });
+    const rows = buildAdditionRows(input);
+    const tierIdx = rows.findIndex((r) => r.label.startsWith("Parcel Delivered"));
+    const basicIdx = rows.findIndex((r) => r.label === "BASIC PAY");
+    expect(tierIdx).toBeGreaterThanOrEqual(0);
+    expect(basicIdx).toBeGreaterThan(tierIdx);
   });
 
   it("handles zero-amount fields without drawing empty rows", async () => {

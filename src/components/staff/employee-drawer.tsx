@@ -180,6 +180,11 @@ export function EmployeeDrawer({
       }
 
       if (isEdit) {
+        // Propagate the CURRENT form values (including cleared tax numbers) so
+        // the parent row reflects what was saved. Spreading `...employee` alone
+        // leaves stale epfNo/socsoNo/incomeTaxNo in the UI after the user
+        // clears them — the PATCH succeeds but the drawer still shows the old
+        // value on reopen. Fixes the "cannot remove tax" report.
         const updated: StaffEmployee = {
           ...employee,
           name: name.trim(),
@@ -189,6 +194,9 @@ export function EmployeeDrawer({
           branchCode: branchCode || null,
           isComplete: !!icNo.trim(),
           gender: employee.gender,
+          epfNo: epfNo.trim() || null,
+          socsoNo: socsoNo.trim() || null,
+          incomeTaxNo: incomeTaxNo.trim() || null,
         };
         onSaved(updated);
         toast.success("Employee updated");

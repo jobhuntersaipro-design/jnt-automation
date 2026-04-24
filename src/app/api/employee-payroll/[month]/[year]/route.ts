@@ -236,6 +236,7 @@ export async function POST(
             dispatcherRecord.petrolSubsidy
           : 0
 
+        // Supervisor/Admin: basic pay + allowances only (hours not applicable).
         const employeeGross =
           emp.type === "STORE_KEEPER"
             ? calculateStoreKeeperGross(
@@ -249,9 +250,7 @@ export async function POST(
                 entry.basicPay,
                 entry.petrolAllowance,
                 entry.kpiAllowance,
-                entry.otherAllowance,
-                entry.workingHours,
-                entry.hourlyWage
+                entry.otherAllowance
               )
 
         const totalGross = employeeGross + dispatcherGross

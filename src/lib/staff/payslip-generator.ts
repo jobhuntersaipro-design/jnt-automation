@@ -119,7 +119,10 @@ function rect(
   doc.lineWidth(1).strokeColor(BLACK).rect(x, y, w, h).stroke();
 }
 
-function buildAdditionRows(data: EmployeePayslipInput): Row[] {
+/**
+ * Exported for unit tests. Pure data — no PDF rendering.
+ */
+export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   const isCombined = !!data.dispatcherTierBreakdowns;
   const isStoreKeeper = data.employeeType === "STORE_KEEPER";
   const rows: Row[] = [];
@@ -162,21 +165,33 @@ function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   return rows;
 }
 
-function buildDeductionRows(data: EmployeePayslipInput): Row[] {
+/**
+ * Exported for unit tests. Pure data — no PDF rendering.
+ *
+ * In combined mode (`dispatcherTierBreakdowns` present), `data.penalty` and
+ * `data.advance` are the *combined* values stored on EmployeeSalaryRecord
+ * (employee manual entry + dispatcher-originated), and `dispatcherPenalty` /
+ * `dispatcherAdvance` are the dispatcher portion. To avoid double-counting
+ * in the deduction column, we split "Penalty" → employee-only and show
+ * "Penalty (Dispatcher)" separately. Sum stays equal to `data.penalty`.
+ */
+export function buildDeductionRows(data: EmployeePayslipInput): Row[] {
   const isCombined = !!data.dispatcherTierBreakdowns;
   const rows: Row[] = [];
   if (data.epfEmployee > 0) rows.push({ label: "EMPLOYEE EPF (KWSP)", amount: data.epfEmployee });
   if (data.socsoEmployee > 0) rows.push({ label: "EMPLOYEE SOCSO(PERKESO)", amount: data.socsoEmployee });
   if (data.eisEmployee > 0) rows.push({ label: "EMPLOYMENT INSURANCE SCHEME (EIS)", amount: data.eisEmployee });
   if (data.pcb > 0) rows.push({ label: "PCB", amount: data.pcb });
-  if (data.penalty > 0) rows.push({ label: "Penalty", amount: data.penalty });
-  if (data.advance > 0) rows.push({ label: "Advance", amount: data.advance });
-  if (isCombined && data.dispatcherPenalty && data.dispatcherPenalty > 0) {
-    rows.push({ label: "Penalty (Dispatcher)", amount: data.dispatcherPenalty });
-  }
-  if (isCombined && data.dispatcherAdvance && data.dispatcherAdvance > 0) {
-    rows.push({ label: "Advance (Dispatcher)", amount: data.dispatcherAdvance });
-  }
+
+  const dispatcherPenalty = isCombined ? (data.dispatcherPenalty ?? 0) : 0;
+  const dispatcherAdvance = isCombined ? (data.dispatcherAdvance ?? 0) : 0;
+  const employeePenalty = Math.max(0, data.penalty - dispatcherPenalty);
+  const employeeAdvance = Math.max(0, data.advance - dispatcherAdvance);
+
+  if (employeePenalty > 0) rows.push({ label: "Penalty", amount: employeePenalty });
+  if (employeeAdvance > 0) rows.push({ label: "Advance", amount: employeeAdvance });
+  if (dispatcherPenalty > 0) rows.push({ label: "Penalty (Dispatcher)", amount: dispatcherPenalty });
+  if (dispatcherAdvance > 0) rows.push({ label: "Advance (Dispatcher)", amount: dispatcherAdvance });
   return rows;
 }
 

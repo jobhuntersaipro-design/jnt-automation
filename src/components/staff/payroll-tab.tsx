@@ -57,6 +57,10 @@ interface PayrollEntry {
 const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolAllowance", "kpiAllowance", "otherAllowance"])
 
 function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
+  // Supervisor/Admin: basic pay + allowances only. Store Keeper:
+  // hours × hourly wage + allowances. Hours/hourlyWage are ignored for
+  // Supervisor/Admin even if legacy values exist — the UI no longer exposes
+  // those fields, so this keeps gross consistent with what users see.
   const employeeGross =
     entry.type === "STORE_KEEPER"
       ? calculateStoreKeeperGross(
@@ -70,9 +74,7 @@ function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
           entry.basicPay,
           entry.petrolAllowance,
           entry.kpiAllowance,
-          entry.otherAllowance,
-          entry.workingHours,
-          entry.hourlyWage
+          entry.otherAllowance
         )
 
   const totalGross = employeeGross + entry.dispatcherGross
@@ -670,29 +672,22 @@ export function PayrollTab() {
                       </div>
                     </td>
 
-                    {/* Working Hours — editable for all types. For Supervisor/Admin
-                        it adds `hours * hourlyWage` on top of basicPay; for Store
-                        Keeper it drives the whole wage. When neither hourlyWage nor
-                        hours is set for a supervisor, it's informational only. */}
+                    {/* Working Hours — Store Keeper only. Supervisor/Admin use
+                        basic pay + allowances; hours don't apply. */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                        <HoursInput
-                          value={entry.workingHours}
-                          onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
-                        />
-                      </div>
-                      {!isStoreKeeper && entry.workingHours > 0 && (
-                        <div className="mt-1">
-                          <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                            <CalcCurrencyInput
-                              value={entry.hourlyWage}
-                              onChange={(v) => updateEntry(entry.employeeId, "hourlyWage", v)}
-                              light
-                            />
-                          </div>
-                          <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
-                            RM / hr
-                          </div>
+                      {isStoreKeeper ? (
+                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                          <HoursInput
+                            value={entry.workingHours}
+                            onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          className="text-center text-[0.8rem] tabular-nums text-on-surface-variant/40 select-none"
+                          title="Hours not applicable — Supervisor/Admin use Basic Pay"
+                        >
+                          —
                         </div>
                       )}
                     </td>

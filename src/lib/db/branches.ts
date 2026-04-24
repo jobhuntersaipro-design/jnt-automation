@@ -117,10 +117,21 @@ export type BranchDispatcherRow = {
   lastActive: string | null;
 };
 
+export type BranchEmployeeRow = {
+  employeeId: string;
+  name: string;
+  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+  extId: string | null;
+  /** Masked IC ("••••••••1234") for display; empty string if no IC set. */
+  icNo: string;
+  isComplete: boolean;
+};
+
 export type BranchDetail = {
   summary: BranchSummary;
   trend: BranchTrendPoint[];
   dispatchers: BranchDispatcherRow[];
+  employees: BranchEmployeeRow[];
 };
 
 const MONTH_ABBR = [
@@ -142,7 +153,7 @@ export async function getBranchDetail(
   });
   if (!branch) return null;
 
-  const [assignments, salaryRecords] = await Promise.all([
+  const [assignments, salaryRecords, employees] = await Promise.all([
     prisma.dispatcherAssignment.findMany({
       where: { branchId: branch.id },
       select: {
@@ -168,6 +179,17 @@ export async function getBranchDetail(
         advance: true,
         totalOrders: true,
       },
+    }),
+    prisma.employee.findMany({
+      where: { branchId: branch.id, agentId },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        extId: true,
+        icNo: true,
+      },
+      orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
   ]);
 
@@ -267,6 +289,15 @@ export async function getBranchDetail(
     },
   );
 
+  const employeeRows: BranchEmployeeRow[] = employees.map((e) => ({
+    employeeId: e.id,
+    name: e.name,
+    type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER",
+    extId: e.extId,
+    icNo: e.icNo ? "•".repeat(8) + e.icNo.slice(-4) : "",
+    isComplete: !!e.icNo,
+  }));
+
   return {
     summary: {
       branchCode: branch.code,
@@ -276,5 +307,6 @@ export async function getBranchDetail(
     },
     trend,
     dispatchers,
+    employees: employeeRows,
   };
 }
