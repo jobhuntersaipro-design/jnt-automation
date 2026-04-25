@@ -492,7 +492,7 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
               onClick={() => handleSort("branch")}
             />
             <SortHeader
-              label="Staff"
+              label="Dispatcher"
               align="center"
               active={sortKey === "staff"}
               dir={sortDir}
