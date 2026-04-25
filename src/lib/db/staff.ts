@@ -129,7 +129,7 @@ export async function getDispatchers(
       id: d.id,
       extId: primaryExtId,
       name: d.name,
-      icNo: maskIc(d.icNo),
+      icNo: d.icNo ?? "",
       gender: d.gender,
       avatarUrl: d.avatarUrl,
       isPinned: d.isPinned,

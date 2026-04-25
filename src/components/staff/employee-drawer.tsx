@@ -190,7 +190,7 @@ export function EmployeeDrawer({
           ...employee,
           name: name.trim(),
           rawIcNo: icNo.trim(),
-          icNo: icNo.trim() ? "•".repeat(8) + icNo.trim().slice(-4) : "",
+          icNo: icNo.trim(),
           type,
           branchCode: branchCode || null,
           isComplete: !!icNo.trim(),

@@ -1,7 +1,7 @@
 import { unstable_cache } from "next/cache";
 import {
   getSummaryStats,
-  getMonthlyPayoutTrend,
+  getMonthlyDispatcherStaffBreakdown,
   getBranchDistribution,
   getSalaryBreakdown,
   getBonusTierHitRate,
@@ -21,13 +21,18 @@ function baseKey(agentId: string, filters: Filters): string {
  * rather than blocking on all 6 queries at once.
  */
 export function fetchSummary(agentId: string, filters: Filters) {
-  const key = `overview:summary:${baseKey(agentId, filters)}`;
+  // v2 — schema changed to include netPayoutByRole + avgMonthlySalary split.
+  const key = `overview:summary:v2:${baseKey(agentId, filters)}`;
   return unstable_cache(() => getSummaryStats(agentId, filters), [key], { revalidate: TTL })();
 }
 
 export function fetchTrend(agentId: string, filters: Filters) {
-  const key = `overview:trend:${baseKey(agentId, filters)}`;
-  return unstable_cache(() => getMonthlyPayoutTrend(agentId, filters), [key], { revalidate: TTL })();
+  const key = `overview:role-breakdown:${baseKey(agentId, filters)}`;
+  return unstable_cache(
+    () => getMonthlyDispatcherStaffBreakdown(agentId, filters),
+    [key],
+    { revalidate: TTL },
+  )();
 }
 
 export function fetchBranchDist(agentId: string, filters: Filters) {

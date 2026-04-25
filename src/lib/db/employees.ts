@@ -59,7 +59,7 @@ export async function getEmployees(
     id: e.id,
     extId: e.extId ?? "",
     name: e.name,
-    icNo: e.icNo ? maskIc(e.icNo) : "",
+    icNo: e.icNo ?? "",
     rawIcNo: e.icNo ?? "",
     gender: e.gender,
     avatarUrl: e.avatarUrl,

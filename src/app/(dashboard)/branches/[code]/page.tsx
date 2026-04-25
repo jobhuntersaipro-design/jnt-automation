@@ -90,8 +90,14 @@ export default async function BranchDetailPage({
     },
   ];
 
-  const summaryCards = [
-    { label: "Net payout", value: formatRMShort(summary.totals.netSalary), accent: "text-brand" },
+  const netByRole = summary.totals.netSalaryByRole;
+  const summaryCards: SummaryCard[] = [
+    {
+      label: "Net payout",
+      value: formatRMShort(summary.totals.netSalary),
+      accent: "text-brand",
+      subline: `Dispatchers ${formatRMShort(netByRole.dispatcher)} · Staff ${formatRMShort(netByRole.staff)}`,
+    },
     { label: "Base salary", value: formatRMShort(summary.totals.baseSalary), accent: "text-on-surface" },
     { label: "Bonus tier", value: formatRMShort(summary.totals.bonusTier), accent: "text-emerald-700" },
     { label: "Petrol subsidy", value: formatRMShort(summary.totals.petrolSubsidy), accent: "text-amber-700" },
@@ -155,6 +161,11 @@ export default async function BranchDetailPage({
               <p className={`mt-1.5 text-[1.05rem] font-semibold tabular-nums ${c.accent}`}>
                 {c.value}
               </p>
+              {c.subline && (
+                <p className="mt-0.5 text-[0.62rem] text-on-surface-variant/70 tabular-nums">
+                  {c.subline}
+                </p>
+              )}
             </div>
           ))}
         </section>
@@ -343,6 +354,13 @@ export default async function BranchDetailPage({
     </div>
   );
 }
+
+type SummaryCard = {
+  label: string;
+  value: string;
+  accent: string;
+  subline?: string;
+};
 
 type PeopleCard = {
   label: string;

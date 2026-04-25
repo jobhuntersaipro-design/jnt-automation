@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
-import { MonthlyNetPayoutTrend } from "@/components/dashboard/monthly-net-payout-trend";
+import { DispatcherStaffBreakdown } from "@/components/dashboard/dispatcher-staff-breakdown";
 import { BranchDistribution } from "@/components/dashboard/branch-distribution";
 import { SalaryBreakdown } from "@/components/dashboard/salary-breakdown";
 import { BonusTierHitRate } from "@/components/dashboard/bonus-tier-hit-rate";
@@ -49,7 +49,7 @@ async function SummaryCardsAsync({
 
 async function TrendChart({ agentId, filters }: { agentId: string; filters: Filters }) {
   const data = await fetchTrend(agentId, filters);
-  return <MonthlyNetPayoutTrend data={data} />;
+  return <DispatcherStaffBreakdown data={data} />;
 }
 
 async function BranchDistChart({ agentId, filters }: { agentId: string; filters: Filters }) {
