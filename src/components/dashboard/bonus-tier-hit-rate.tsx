@@ -58,7 +58,7 @@ export function BonusTierHitRate({ data }: { data: HitRatePoint[] }) {
 
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
-      <div className="flex items-start justify-between gap-4 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 shrink-0">
         <div>
           <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
             Bonus Tier Hit Rate
@@ -67,7 +67,7 @@ export function BonusTierHitRate({ data }: { data: HitRatePoint[] }) {
             % of dispatchers reaching ≥2,000 monthly orders
           </p>
         </div>
-        <div className="text-right shrink-0">
+        <div className="text-left sm:text-right sm:shrink-0">
           <p
             className="font-heading font-bold text-brand tabular-nums leading-none"
             style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}

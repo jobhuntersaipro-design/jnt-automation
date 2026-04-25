@@ -111,7 +111,7 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       <div className="shrink-0">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
             <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
               Net Payout vs Base Salary
@@ -120,7 +120,7 @@ export function MonthlyNetPayoutTrend({ data }: { data: TrendPoint[] }) {
               Monthly comparison across the operation
             </p>
           </div>
-          <div className="flex items-center gap-4 shrink-0 pt-1">
+          <div className="flex flex-wrap items-center gap-4 sm:shrink-0 sm:pt-1">
             <button
               onClick={() => toggleLine("actual")}
               className="flex items-center gap-1.5 transition-opacity"

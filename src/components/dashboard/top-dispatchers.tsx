@@ -124,14 +124,14 @@ function DispatcherTable({
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface leading-tight">
             {title}
           </h2>
           <p className="text-[0.9rem] text-on-surface-variant mt-0.5">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
           {action}
           <div className="relative">
           <Search
