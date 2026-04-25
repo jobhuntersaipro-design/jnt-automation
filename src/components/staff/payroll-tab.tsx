@@ -6,7 +6,8 @@ import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
 import { BranchChip } from "@/components/ui/branch-chip"
-import { EmployeeAvatarView } from "./employee-avatar-view"
+import { DispatcherAvatar } from "./dispatcher-avatar"
+import { selectAvatarTarget } from "@/lib/staff/avatar-target"
 import type { Gender } from "@/generated/prisma/client"
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard"
 import {
@@ -29,6 +30,7 @@ interface PayrollEntry {
   icNo: string | null
   gender: Gender
   avatarUrl: string | null
+  dispatcherId: string | null
   dispatcherAvatarUrl: string | null
   hasDispatcherMatch: boolean
   dispatcherGross: number
@@ -660,12 +662,51 @@ export function PayrollTab() {
                     {/* Employee */}
                     <td className="py-2.5 pl-3">
                       <div className="flex items-center gap-2.5">
-                        <EmployeeAvatarView
-                          name={entry.name}
-                          gender={entry.gender}
-                          avatarUrl={entry.avatarUrl}
-                          dispatcherAvatarUrl={entry.dispatcherAvatarUrl}
-                        />
+                        {(() => {
+                          const target = selectAvatarTarget({
+                            employeeId: entry.employeeId,
+                            dispatcherId: entry.dispatcherId,
+                          })
+                          // When linked to a dispatcher (FK), edit goes to the dispatcher's
+                          // photo so what the user sees is what they edit. Display priority
+                          // already prefers dispatcherAvatarUrl over the employee's own.
+                          const displayUrl = entry.dispatcherAvatarUrl ?? entry.avatarUrl
+                          const ringColor =
+                            entry.gender === "MALE"
+                              ? "var(--color-brand)"
+                              : entry.gender === "FEMALE"
+                                ? "var(--color-female-ring)"
+                                : "var(--color-outline-variant)"
+                          return (
+                            <DispatcherAvatar
+                              dispatcherId={target.subjectId}
+                              name={entry.name}
+                              avatarUrl={displayUrl}
+                              ringColor={ringColor}
+                              apiBasePath={target.apiBasePath}
+                              title={
+                                entry.dispatcherId
+                                  ? "Editing the linked dispatcher's photo"
+                                  : "Edit avatar"
+                              }
+                              onAvatarChange={(url) => {
+                                setEntries((prev) =>
+                                  prev.map((e) => {
+                                    if (entry.dispatcherId) {
+                                      // FK-linked edit propagates to every row sharing this dispatcher
+                                      return e.dispatcherId === entry.dispatcherId
+                                        ? { ...e, dispatcherAvatarUrl: url }
+                                        : e
+                                    }
+                                    return e.employeeId === entry.employeeId
+                                      ? { ...e, avatarUrl: url }
+                                      : e
+                                  }),
+                                )
+                              }}
+                            />
+                          )
+                        })()}
                         <div className="min-w-0">
                           <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate">
                             {entry.name}

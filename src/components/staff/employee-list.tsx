@@ -7,7 +7,8 @@ import { Search, ChevronDown, Check, ChevronLeft, ChevronRight, Pencil, Trash2, 
 import { toast } from "sonner";
 import type { StaffEmployee } from "@/lib/db/employees";
 import { BranchChip } from "@/components/ui/branch-chip";
-import { EmployeeAvatarView } from "./employee-avatar-view";
+import { DispatcherAvatar } from "./dispatcher-avatar";
+import { selectAvatarTarget } from "@/lib/staff/avatar-target";
 
 const EmployeeDrawer = dynamic(
   () => import("./employee-drawer").then((m) => m.EmployeeDrawer),
@@ -203,16 +204,54 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
               className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
             >
               {/* Employee avatar + name */}
-              <div className="flex items-center gap-3">
-                <EmployeeAvatarView
-                  name={emp.name}
-                  gender={emp.gender}
-                  avatarUrl={emp.avatarUrl}
-                  dispatcherAvatarUrl={emp.dispatcherAvatarUrl}
-                />
-                <div>
+              <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+                {(() => {
+                  const target = selectAvatarTarget({
+                    employeeId: emp.id,
+                    dispatcherId: emp.dispatcherId,
+                  });
+                  const displayUrl = emp.dispatcherAvatarUrl ?? emp.avatarUrl;
+                  const ringColor =
+                    emp.gender === "MALE"
+                      ? "var(--color-brand)"
+                      : emp.gender === "FEMALE"
+                        ? "var(--color-female-ring)"
+                        : "var(--color-outline-variant)";
+                  return (
+                    <DispatcherAvatar
+                      dispatcherId={target.subjectId}
+                      name={emp.name}
+                      avatarUrl={displayUrl}
+                      ringColor={ringColor}
+                      apiBasePath={target.apiBasePath}
+                      title={
+                        emp.dispatcherId
+                          ? "Editing the linked dispatcher's photo"
+                          : "Edit avatar"
+                      }
+                      onAvatarChange={(url) => {
+                        setItems((prev) =>
+                          prev.map((row) => {
+                            if (emp.dispatcherId) {
+                              return row.dispatcherId === emp.dispatcherId
+                                ? { ...row, dispatcherAvatarUrl: url }
+                                : row;
+                            }
+                            return row.id === emp.id ? { ...row, avatarUrl: url } : row;
+                          }),
+                        );
+                      }}
+                    />
+                  );
+                })()}
+                <button
+                  type="button"
+                  onClick={() => setDrawerEmployee(emp)}
+                  className="text-left hover:opacity-70 transition-opacity"
+                  aria-label={`Open ${emp.name} drawer`}
+                >
                   <p className="text-[0.84rem] font-medium text-on-surface leading-tight">{emp.name}</p>
-                </div>
+                </button>
               </div>
 
               {/* Type chip */}
