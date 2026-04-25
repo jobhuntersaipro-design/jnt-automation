@@ -56,6 +56,32 @@ interface LaidOutColumn extends SummaryColumn {
   w: number;
 }
 
+/**
+ * Truncate `text` with an ellipsis so it fits in `maxWidth` when rendered in
+ * the given font at `fontSize`. pdfkit's own `{ lineBreak: false, ellipsis:
+ * true }` silently wraps onto a second line (which then overlaps the next
+ * row) unless combined with an explicit `height` — measuring + hard-clipping
+ * here avoids depending on that behaviour at all.
+ *
+ * Assumes the caller has already called `doc.font()` / `doc.fontSize()`
+ * with the matching font, since widthOfString reads from the current doc state.
+ */
+function fitText(doc: PDFKit.PDFDocument, text: string, maxWidth: number): string {
+  if (doc.widthOfString(text) <= maxWidth) return text;
+  const ellipsis = "…";
+  const ellipsisW = doc.widthOfString(ellipsis);
+  if (ellipsisW > maxWidth) return ""; // column too narrow for even "…"
+  // Binary search for the longest prefix that fits with ellipsis appended.
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >>> 1;
+    if (doc.widthOfString(text.slice(0, mid)) + ellipsisW <= maxWidth) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo) + ellipsis;
+}
+
 function layoutColumns(columns: SummaryColumn[]): LaidOutColumn[] {
   const totalFlex = columns.reduce((sum, c) => sum + (c.flex ?? 1), 0);
   let x = PAGE_MARGIN;
@@ -105,10 +131,13 @@ function drawHeaderRow(
 ): number {
   doc.font("Helvetica-Bold").fontSize(7).fillColor(C_MUTED);
   for (const col of columns) {
-    doc.text(col.label.toUpperCase(), col.x, y, {
+    const label = fitText(doc, col.label.toUpperCase(), col.w - 4);
+    doc.text(label, col.x, y, {
       width: col.w - 4,
+      height: HEADER_ROW_HEIGHT,
       align: col.align ?? "left",
       characterSpacing: 0.6,
+      lineBreak: false,
     });
   }
   const bottom = y + HEADER_ROW_HEIGHT - 3;
@@ -133,11 +162,12 @@ function drawBodyRow(
       .font(col.tabular ? "Courier" : "Helvetica")
       .fontSize(9)
       .fillColor(C_TEXT);
-    doc.text(values[i] ?? "", col.x, y, {
+    const value = fitText(doc, values[i] ?? "", col.w - 4);
+    doc.text(value, col.x, y, {
       width: col.w - 4,
+      height: BODY_ROW_HEIGHT,
       align: col.align ?? "left",
       lineBreak: false,
-      ellipsis: true,
     });
   }
   const bottom = y + BODY_ROW_HEIGHT - 3;
@@ -169,11 +199,12 @@ function drawFooterRow(
       .font(col.tabular ? "Courier-Bold" : "Helvetica-Bold")
       .fontSize(9)
       .fillColor(C_TEXT);
-    doc.text(values[i] ?? "", col.x, y + 3, {
+    const value = fitText(doc, values[i] ?? "", col.w - 4);
+    doc.text(value, col.x, y + 3, {
       width: col.w - 4,
+      height: FOOTER_ROW_HEIGHT,
       align: col.align ?? "left",
       lineBreak: false,
-      ellipsis: true,
     });
   }
   return y + FOOTER_ROW_HEIGHT;
