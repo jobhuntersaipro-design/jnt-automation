@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle } from "lucide-react"
+import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
@@ -365,7 +365,31 @@ export function PayrollTab() {
   const [icPrompt, setIcPrompt] = useState<{ employeeId: string; name: string } | null>(null)
   const [icInput, setIcInput] = useState("")
   const [savingIc, setSavingIc] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<PayrollEntry | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard()
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/employees/${deleteTarget.employeeId}`, { method: "DELETE" })
+      if (!res.ok) throw new Error()
+      setEntries((prev) => prev.filter((e) => e.employeeId !== deleteTarget.employeeId))
+      setSelectedIds((prev) => {
+        if (!prev.has(deleteTarget.employeeId)) return prev
+        const next = new Set(prev)
+        next.delete(deleteTarget.employeeId)
+        return next
+      })
+      toast.success(`${deleteTarget.name} deleted`)
+      setDeleteTarget(null)
+    } catch {
+      toast.error("Failed to delete employee")
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   // Clear selection when month/year changes
   useEffect(() => { setSelectedIds(new Set()) }, [month, year])
@@ -888,39 +912,50 @@ export function PayrollTab() {
                       </span>
                     </td>
 
-                    {/* Status / Payslip */}
+                    {/* Status / Payslip / Delete */}
                     <td className="py-2.5 px-2 text-center">
-                      {entry.isSaved ? (
-                        <button
-                          onClick={() => handleGeneratePayslip(entry)}
-                          disabled={generatingId === entry.employeeId}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 hover:border-brand/50 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                        >
-                          {generatingId === entry.employeeId ? (
-                            <>
-                              <Loader2 size={12} className="animate-spin" />
-                              <span>Generating…</span>
-                            </>
-                          ) : (
-                            <>
-                              <FileText size={12} />
-                              <span>Generate Payslip</span>
-                            </>
-                          )}
-                        </button>
-                      ) : (
-                        <span
-                          className="inline-flex items-center gap-1.5 text-[0.7rem] text-on-surface-variant/70"
-                          title={isReady ? "Save payroll to enable" : "Working hours required"}
-                        >
+                      <div className="inline-flex flex-col items-center gap-1">
+                        {entry.isSaved ? (
+                          <button
+                            onClick={() => handleGeneratePayslip(entry)}
+                            disabled={generatingId === entry.employeeId}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] font-medium text-brand border border-brand/30 rounded-md hover:bg-brand/5 hover:border-brand/50 transition-colors disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                          >
+                            {generatingId === entry.employeeId ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                <span>Generating…</span>
+                              </>
+                            ) : (
+                              <>
+                                <FileText size={12} />
+                                <span>Generate Payslip</span>
+                              </>
+                            )}
+                          </button>
+                        ) : (
                           <span
-                            className={`inline-block w-2 h-2 rounded-full ${
-                              isReady ? "bg-emerald-500" : "bg-gray-300"
-                            }`}
-                          />
-                          {isReady ? "Ready" : "Hours required"}
-                        </span>
-                      )}
+                            className="inline-flex items-center gap-1.5 text-[0.7rem] text-on-surface-variant/70"
+                            title={isReady ? "Save payroll to enable" : "Working hours required"}
+                          >
+                            <span
+                              className={`inline-block w-2 h-2 rounded-full ${
+                                isReady ? "bg-emerald-500" : "bg-gray-300"
+                              }`}
+                            />
+                            {isReady ? "Ready" : "Hours required"}
+                          </span>
+                        )}
+                        <button
+                          onClick={() => setDeleteTarget(entry)}
+                          title={`Delete ${entry.name}`}
+                          aria-label={`Delete ${entry.name}`}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[0.72rem] font-medium text-critical border border-critical/30 rounded-md hover:bg-critical/5 hover:border-critical/50 transition-colors cursor-pointer whitespace-nowrap"
+                        >
+                          <Trash2 size={12} />
+                          <span>Delete</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -993,6 +1028,40 @@ export function PayrollTab() {
       )}
 
       {payslipGuardDialog}
+
+      {/* Delete Employee Dialog */}
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-on-surface/40"
+            onClick={() => !deleting && setDeleteTarget(null)}
+          />
+          <div className="relative bg-white rounded-[0.75rem] p-6 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] max-w-sm w-full mx-4">
+            <h3 className="font-heading font-semibold text-[1.1rem] text-on-surface">
+              Delete {deleteTarget.name}?
+            </h3>
+            <p className="text-[0.84rem] text-on-surface-variant mt-2">
+              This will permanently delete this employee{deleteTarget.isSaved ? " and their saved salary record for this month" : ""}. This cannot be undone.
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="px-4 py-2 text-[0.84rem] font-medium text-on-surface-variant hover:bg-surface-hover rounded-[0.375rem] transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-[0.84rem] font-medium text-white bg-critical rounded-[0.375rem] hover:bg-critical/90 transition-colors disabled:opacity-60"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

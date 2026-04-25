@@ -206,6 +206,7 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
                     />
                   )}
                   <DecimalInput
+                    cents
                     value={tier.commission}
                     onChange={(n) => setTierField(i, "commission", String(n))}
                     className={INPUT}
@@ -272,6 +273,7 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
                     {values.bonusTiers.map((tier, i) => (
                       <DecimalInput
                         key={tier.tier}
+                        cents
                         value={tier.commission}
                         onChange={(n) => {
                           setValues((v) => ({

@@ -533,39 +533,39 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
             {weightTiers.map((tier, i) => (
               <div key={tier.tier} className="grid grid-cols-[2rem_1fr_1fr_1fr] gap-x-2 items-center">
                 <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={tier.minWeight}
-                  disabled={i === 0}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(",", ".");
-                    if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "minWeight", v);
-                  }}
-                  className={`w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 ${i === 0 ? "disabled:opacity-40 disabled:bg-surface-low" : ""}`}
-                />
-                {i === 2 ? (
-                  <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
-                ) : (
+                {/* Min/Max use the focused/raw buffer in DecimalInput (non-cents)
+                    so partial entries like "5." don't get round-tripped through
+                    parseFloat back into "5", which is what was wiping the dot
+                    before the user could type the decimal places. */}
+                {i === 0 ? (
                   <input
                     type="text"
                     inputMode="decimal"
-                    value={tier.maxWeight ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(",", ".");
-                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "maxWeight", v);
-                    }}
+                    value={tier.minWeight}
+                    disabled
+                    readOnly
+                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-surface-low border border-outline-variant/30 rounded-lg text-on-surface text-center opacity-40"
+                  />
+                ) : (
+                  <DecimalInput
+                    value={tier.minWeight}
+                    onChange={(n) => handleTierFieldChange(i, "minWeight", String(n))}
                     className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                   />
                 )}
-                <input
-                  type="text"
-                  inputMode="decimal"
+                {i === 2 ? (
+                  <div className="w-full px-2 py-1 text-[0.78rem] text-on-surface-variant/50 text-center border border-transparent">∞</div>
+                ) : (
+                  <DecimalInput
+                    value={tier.maxWeight ?? 0}
+                    onChange={(n) => handleTierFieldChange(i, "maxWeight", String(n))}
+                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                  />
+                )}
+                <DecimalInput
+                  cents
                   value={tier.commission}
-                  onChange={(e) => {
-                    const v = e.target.value.replace(",", ".");
-                    if (v === "" || /^\d*\.?\d*$/.test(v)) handleTierFieldChange(i, "commission", v);
-                  }}
+                  onChange={(n) => handleTierFieldChange(i, "commission", String(n))}
                   className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-brand/5 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                 />
               </div>
@@ -648,14 +648,10 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
               {bonusTiers.map((tier, i) => (
                 <div key={tier.tier} className="grid grid-cols-[2rem_1fr] gap-x-2 items-center">
                   <span className="text-[0.7rem] font-semibold text-on-surface-variant text-center">T{tier.tier}</span>
-                  <input
-                    type="text"
-                    inputMode="decimal"
+                  <DecimalInput
+                    cents
                     value={tier.commission}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(",", ".");
-                      if (v === "" || /^\d*\.?\d*$/.test(v)) handleBonusTierRateChange(i, v);
-                    }}
+                    onChange={(n) => handleBonusTierRateChange(i, String(n))}
                     className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-white border border-outline-variant/30 rounded-lg text-on-surface text-center hover:bg-emerald-50 hover:border-outline-variant/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/40"
                   />
                 </div>

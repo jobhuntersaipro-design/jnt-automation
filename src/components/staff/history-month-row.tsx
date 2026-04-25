@@ -120,38 +120,68 @@ function StatChip({
   );
 }
 
-/** Text-based decimal input that always uses "." with optional +/- stepper */
-function DecimalField({ value, onChange, className, step = 0.01, showStepper }: {
+/**
+ * Decimal input — when `cents` is set, behaves calculator-style:
+ *   value=0  → typing 5 → 0.05 → typing 2 → 0.52 → typing 1 → 5.21
+ * Otherwise it's a free-form decimal text input. Stepper is opt-in via `showStepper`.
+ *
+ * The cents path keeps a digits-only buffer (`raw`) and divides by 100 for the
+ * numeric value, so typing builds the amount up from the right — matching
+ * how the rest of the app's currency inputs (DecimalInput in defaults-drawer
+ * and dispatcher-row) already behave.
+ */
+function DecimalField({ value, onChange, className, step = 0.01, showStepper, cents }: {
   value: number;
   onChange: (n: number) => void;
   className?: string;
   step?: number;
   showStepper?: boolean;
+  cents?: boolean;
 }) {
-  const [raw, setRaw] = useState(value.toString());
+  const [raw, setRaw] = useState(
+    cents ? Math.round(value * 100).toString() : value.toString(),
+  );
   const [focused, setFocused] = useState(false);
 
-  const display = focused ? raw : value.toFixed(2);
+  const formatCents = (digits: string) => {
+    const n = parseInt(digits || "0", 10);
+    return (n / 100).toFixed(2);
+  };
+
+  const display = cents
+    ? (focused ? formatCents(raw) : value.toFixed(2))
+    : (focused ? raw : value.toFixed(2));
 
   const nudge = (dir: 1 | -1) => {
-    const next = Math.max(0, Math.round((value + dir * step) * 100) / 100);
+    const inc = cents ? 0.01 : step;
+    const next = Math.max(0, Math.round((value + dir * inc) * 100) / 100);
     onChange(next);
+    if (cents) setRaw(Math.round(next * 100).toString());
   };
 
   return (
     <div className="relative group/stepper">
       <input
         type="text"
-        inputMode="decimal"
+        inputMode={cents ? "numeric" : "decimal"}
         value={display}
         onChange={(e) => {
-          const v = e.target.value.replace(",", ".");
-          if (v === "" || /^\d*\.?\d*$/.test(v)) {
-            setRaw(v);
-            onChange(v === "" ? 0 : parseFloat(v) || 0);
+          if (cents) {
+            const digits = e.target.value.replace(/\D/g, "");
+            setRaw(digits);
+            onChange(parseInt(digits || "0", 10) / 100);
+          } else {
+            const v = e.target.value.replace(",", ".");
+            if (v === "" || /^\d*\.?\d*$/.test(v)) {
+              setRaw(v);
+              onChange(v === "" ? 0 : parseFloat(v) || 0);
+            }
           }
         }}
-        onFocus={() => { setFocused(true); setRaw(value.toString()); }}
+        onFocus={() => {
+          setFocused(true);
+          setRaw(cents ? Math.round(value * 100).toString() : value.toString());
+        }}
         onBlur={() => setFocused(false)}
         className={className}
       />
@@ -509,6 +539,7 @@ export function HistoryMonthRow({
                     <span className="text-[0.72rem] text-on-surface-variant">kg</span>
                     <span className="text-[0.75rem] text-on-surface-variant ml-2">RM</span>
                     <DecimalField
+                      cents
                       value={t.commission}
                       onChange={(v) => updateTier(i, "commission", v)}
                       className={FIELD_CLASS}
@@ -568,6 +599,7 @@ export function HistoryMonthRow({
                           <div className="flex items-center gap-1">
                             <span className="text-[0.75rem] text-on-surface-variant">RM</span>
                             <DecimalField
+                              cents
                               value={t.commission}
                               onChange={(v) =>
                                 setBonusTier((prev) => {
