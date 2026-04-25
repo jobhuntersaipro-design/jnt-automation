@@ -57,14 +57,61 @@ interface LaidOutColumn extends SummaryColumn {
 }
 
 /**
- * Truncate `text` with an ellipsis so it fits in `maxWidth` when rendered in
- * the given font at `fontSize`. pdfkit's own `{ lineBreak: false, ellipsis:
- * true }` silently wraps onto a second line (which then overlaps the next
- * row) unless combined with an explicit `height` — measuring + hard-clipping
- * here avoids depending on that behaviour at all.
+ * Split `text` into lines that each fit in `maxWidth`, breaking on word
+ * boundaries (or on character boundaries for words wider than the column).
+ * The caller draws each line at explicit y coordinates with
+ * `lineBreak: false`, bypassing pdfkit's own wrapping and auto-pagination —
+ * which was leaving blank trailing pages when wrapped text crossed the
+ * page bottom margin.
  *
  * Assumes the caller has already called `doc.font()` / `doc.fontSize()`
- * with the matching font, since widthOfString reads from the current doc state.
+ * since widthOfString reads from the current doc state.
+ */
+function splitToLines(doc: PDFKit.PDFDocument, text: string, maxWidth: number): string[] {
+  if (!text) return [""];
+  if (doc.widthOfString(text) <= maxWidth) return [text];
+
+  const lines: string[] = [];
+  const words = text.split(/\s+/);
+  let current = "";
+
+  const pushBreakingLong = (word: string) => {
+    // Rare: a single word is wider than the column. Break it on character
+    // boundaries so we still don't overflow.
+    let chunk = "";
+    for (const ch of word) {
+      if (doc.widthOfString(chunk + ch) <= maxWidth) {
+        chunk += ch;
+      } else {
+        if (chunk) lines.push(chunk);
+        chunk = ch;
+      }
+    }
+    if (chunk) current = chunk;
+  };
+
+  for (const word of words) {
+    if (!word) continue;
+    const candidate = current ? current + " " + word : word;
+    if (doc.widthOfString(candidate) <= maxWidth) {
+      current = candidate;
+    } else {
+      if (current) lines.push(current);
+      if (doc.widthOfString(word) > maxWidth) {
+        current = "";
+        pushBreakingLong(word);
+      } else {
+        current = word;
+      }
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length > 0 ? lines : [text];
+}
+
+/**
+ * Single-line truncation with an ellipsis — used for header / footer and for
+ * tabular columns where wrapping is undesirable.
  */
 function fitText(doc: PDFKit.PDFDocument, text: string, maxWidth: number): string {
   if (doc.widthOfString(text) <= maxWidth) return text;
@@ -150,41 +197,48 @@ function drawHeaderRow(
   return bottom + 3;
 }
 
+// Body text line-height (Helvetica 9pt) — manual line spacing so we don't
+// depend on pdfkit's internal lineGap state during multi-line rendering.
+const BODY_LINE_HEIGHT = 11;
+
 /**
- * Measure the height a body row will take given the widest column's wrap.
- * Non-tabular columns (names, IDs, labels) are allowed to wrap onto multiple
- * lines so no content is hidden. Tabular columns (numbers, dates) stay on
- * one line — they shouldn't exceed their column width in practice.
+ * Pre-split each row's non-tabular columns into manually-broken lines so
+ * we can render with `lineBreak: false`. Returns the lines per column AND
+ * the row's total height. Doing this in one pass means we don't measure
+ * twice with potentially different doc state.
  */
-function measureBodyRowHeight(
+function planBodyRow(
   doc: PDFKit.PDFDocument,
   columns: LaidOutColumn[],
   values: string[],
-): number {
-  let maxTextHeight = 0;
+): { lines: string[][]; rowHeight: number } {
+  const lines: string[][] = [];
+  let maxLineCount = 1;
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
     const value = values[i] ?? "";
-    if (!value) continue;
     doc.font(col.tabular ? "Courier" : "Helvetica").fontSize(9);
-    // Tabular columns: single-line height. Non-tabular: wrapped height.
-    const h = col.tabular
-      ? doc.currentLineHeight()
-      : doc.heightOfString(value, {
-          width: col.w - 4,
-          align: col.align ?? "left",
-        });
-    if (h > maxTextHeight) maxTextHeight = h;
+    if (col.tabular) {
+      // Tabular: keep on one line, truncate defensively if it would overflow.
+      lines.push([fitText(doc, value, col.w - 4)]);
+    } else {
+      const cellLines = splitToLines(doc, value, col.w - 4);
+      lines.push(cellLines);
+      if (cellLines.length > maxLineCount) maxLineCount = cellLines.length;
+    }
   }
-  // BODY_ROW_HEIGHT is the single-line minimum (padding included). Stretch
-  // for wrapped rows so the row-bottom rule sits below all lines.
-  return Math.max(BODY_ROW_HEIGHT, maxTextHeight + 4);
+  // BODY_ROW_HEIGHT is the single-line minimum (padding included).
+  const rowHeight = Math.max(
+    BODY_ROW_HEIGHT,
+    maxLineCount * BODY_LINE_HEIGHT + 3,
+  );
+  return { lines, rowHeight };
 }
 
 function drawBodyRow(
   doc: PDFKit.PDFDocument,
   columns: LaidOutColumn[],
-  values: string[],
+  preLines: string[][],
   y: number,
   rowHeight: number,
 ): number {
@@ -194,28 +248,12 @@ function drawBodyRow(
       .font(col.tabular ? "Courier" : "Helvetica")
       .fontSize(9)
       .fillColor(C_TEXT);
-    if (col.tabular) {
-      // Numbers / dates / IDs — stay on one line. Truncate defensively if
-      // somehow they exceed the column (shouldn't happen with current data).
-      const value = fitText(doc, values[i] ?? "", col.w - 4);
-      doc.text(value, col.x, y, {
+    const cellLines = preLines[i];
+    for (let li = 0; li < cellLines.length; li++) {
+      doc.text(cellLines[li], col.x, y + li * BODY_LINE_HEIGHT, {
         width: col.w - 4,
-        height: rowHeight,
         align: col.align ?? "left",
         lineBreak: false,
-      });
-    } else {
-      // Names / labels — wrap to next line in-row so no content is hidden.
-      // `height: rowHeight` is critical: without it, pdfkit auto-paginates
-      // when wrapped text would overflow the page's bottom margin, even
-      // though our outer loop already paginated. The result was extra
-      // blank/half-empty pages. With height set, pdfkit treats the text
-      // as a constrained box (we already measured it fits via
-      // measureBodyRowHeight, so nothing gets clipped).
-      doc.text(values[i] ?? "", col.x, y, {
-        width: col.w - 4,
-        height: rowHeight,
-        align: col.align ?? "left",
       });
     }
   }
@@ -282,13 +320,13 @@ function buildDocument(
   y = drawHeaderRow(doc, columns, y);
 
   for (const row of input.rows) {
-    const rowHeight = measureBodyRowHeight(doc, columns, row);
-    if (y + rowHeight > BOTTOM_LIMIT) {
+    const plan = planBodyRow(doc, columns, row);
+    if (y + plan.rowHeight > BOTTOM_LIMIT) {
       doc.addPage();
       y = PAGE_MARGIN;
       y = drawHeaderRow(doc, columns, y);
     }
-    y = drawBodyRow(doc, columns, row, y, rowHeight);
+    y = drawBodyRow(doc, columns, plan.lines, y, plan.rowHeight);
   }
 
   if (input.footer) {
