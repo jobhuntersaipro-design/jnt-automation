@@ -1,48 +1,24 @@
-# Current Feature: PDF Generation Refactor — Kill Prewarm, Standardise on pdfkit
+# Current Feature
 
 ## Status
 
-Not Started
+<!-- Not Started | In Progress | Complete -->
 
 ## Goals
 
-- Delete the eager prewarm fan-out pipeline end-to-end (triggered on every recalculate + confirm; burns Lambda/QStash minutes whether or not anyone downloads). Keep `pdf-cache.ts` + `deleteCachedBlobs` cache-bust behaviour — only the eager regeneration goes.
-- Port `@react-pdf/renderer` call sites ([src/lib/pdf/summary-table.tsx](src/lib/pdf/summary-table.tsx) + [src/lib/staff/payslip-generator.ts](src/lib/staff/payslip-generator.ts)) to pdfkit so the codebase has one PDF library. Remove `@react-pdf/renderer` from `package.json` after port.
-- Revert month-detail PDF button ([month-detail-client.tsx:159](src/components/staff/month-detail-client.tsx#L159)) + payroll-history row UI back to always-enabled — cache hit → 302 → R2; cache miss → synchronous pdfkit write-through (Pro plan's 60 s ceiling covers worst-case ~30 s).
-- Drop `computeDownloadButtonState`, `<PrewarmIndicator>`, `usePrewarmStatus`, and all associated tests — dead code after removal.
-- Leave bulk ZIP pipeline, per-record `pdfkit` month-detail generator, and `pdf-cache.ts` untouched.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- **Spec:** [context/features/pdf-job-refactor-spec.md](context/features/pdf-job-refactor-spec.md) (loaded 2026-04-24).
-- **Supersedes:** `pdf-download-prewarm-ux-spec.md` — the Prewarm UX feature currently on branch `feature/line-item-pdf-prewarm-ux` (committed + pushed, not merged). **Open decision: abandon that branch vs. merge-then-revert.** Abandoning is cleaner — the new feature tears out both the UX and the backend it leans on. Merge-then-revert doubles the churn for zero value.
-- **Answers locked in (from 2026-04-24 clarifying thread):**
-  - Q1 = **A** — kill prewarm entirely, no opt-in variant.
-  - Q2 = **Pro plan** — leave per-record month-detail synchronous on cache miss; pdfkit's observed worst-case (~30 s at 2 500 parcels) fits comfortably under 60 s `maxDuration`.
-  - Q3 = **Port now** — `@react-pdf/renderer` goes in this feature, not a follow-up.
-  - Q4 = **No new surface** — bulk ZIP already async-job-based, stays as-is.
-  - Q5 = **Collapse onto `BulkJob` progress** for the bulk ZIP indicator on payroll-history; per-record button shows nothing special (browser download spinner during rare cache-miss path).
-- **Implementation order (removal-first, port-second):**
-  1. RED tests: `Buffer` shape + content substring checks on the two ported modules.
-  2. Delete `enqueuePrewarm` + `seedPrewarmQueued` calls from [confirm/route.ts](src/app/api/upload/[uploadId]/confirm/route.ts) + [recalculate/route.ts](src/app/api/payroll/upload/[uploadId]/recalculate/route.ts). Keep `deleteCachedBlobs`.
-  3. Revert UI: drop `usePrewarmStatus` + `<PrewarmIndicator>` from `month-detail-client.tsx` and `payroll-history.tsx`. Delete `download-button-state.ts` + `.test.ts` + the indicator component.
-  4. Delete prewarm backend: `prewarm.ts`, `prewarm-job.ts`, `/api/payroll-cache/prewarm/route.ts`, `/api/payroll-cache/status/route.ts`, `use-prewarm-status.ts` + all associated tests.
-  5. Port `summary-table.tsx` → `src/lib/pdf/summary-table-pdfkit.ts` with same `renderSummaryTablePdf({ title, columns, rows, totalsRow })` contract. Swap 3 import sites.
-  6. Port `payslip-generator.ts` → `src/lib/staff/payslip-generator-pdfkit.ts` with identical `EmployeePayslipInput` contract + 3 templates (Supervisor/Admin, Store Keeper, Combined). Swap 4 import sites.
-  7. `npm uninstall @react-pdf/renderer`. `grep -ri "@react-pdf/renderer" .` should be empty.
-  8. Manual smoke: 8 scenarios listed in spec §5.8.
-- **Rollout:** single PR, no schema migration, no env changes. Prewarm's Redis keys (`prewarm:state:*`) expire naturally within 30 days.
-- **Acceptance:**
-  - `grep -ri 'prewarm\|PrewarmState\|PrewarmIndicator' src/` returns zero results.
-  - `grep -ri "@react-pdf/renderer" .` returns zero results outside `node_modules`.
-  - `package.json` no longer lists `@react-pdf/renderer`.
-  - `npm run build` + `npm run test` clean.
-  - QStash dashboard shows zero prewarm-related messages over 24 h post-deploy.
-  - Visual diff ≤ 5 px on all 3 payslip templates vs. current React-PDF output (side-by-side in PR description).
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-25: **PDF Generation Refactor — Kill Prewarm, Standardise on pdfkit** — Completed & deployed to prod. Spec: `context/features/pdf-job-refactor-spec.md`. Shipped on branch `feature/pdf-job-refactor`, merged to `main` (commit `0d53ec7`) then `7145c4f` drops the diagnostic. Branch deleted. **Prewarm deletion (1,008 LOC):** removed `src/lib/staff/{prewarm,prewarm-job}.ts`, `/api/payroll-cache/{status,prewarm,prewarm/worker/{chunk,finalize}}/route.ts`, `src/lib/hooks/use-prewarm-status.ts`, and the `enqueuePrewarm` + `seedPrewarmQueued` call sites in `confirm/route.ts` + `recalculate/route.ts`. `deleteCachedBlobs` cache-bust kept. Cache layer (`pdf-cache.ts`) + R2 layout unchanged — blobs now populated lazily on first download via write-through. Payroll-history `Line items` dropdown reverted to always-enabled; progress comes from the `BulkJob` notification bell flow (shipped 2026-04-22). **`@react-pdf/renderer` → pdfkit port:** three modules rewritten — `src/lib/pdf/summary-table.tsx`, `src/lib/staff/payslip-generator.ts`, `src/lib/payroll/pdf-generator.ts`. Same exported signatures; 7 caller routes untouched. 11 new regression tests on buffer shape + edge cases. `@react-pdf/renderer` removed from `package.json`. **Scope grew beyond the spec** during the same branch (all merged together): (a) 4 employee bugs — tax-number removal propagation fix in drawer, new Employees list section on `/branches/[code]`, hours/basic-pay UI alignment for Supervisor/Admin, combined-payslip deduction double-count fix. (b) Downloads Center UX — per-row Cancel button, `Clear all` now also cancels running jobs (via new `cancelJob(jobId, agentId)` + `POST /api/.../bulk/[jobId]/cancel` route). (c) **Critical `streamZipToR2` deadlock fix** — old code awaited `archive.finalize()` BEFORE `upload.done()`. Archiver piped into PassThrough (16 KB default buffer); once full, writes blocked waiting for a reader; Upload only starts consuming on `done()`. Small archives (fan-out chunk parts) slipped through because they fit under 16 KB. Full-month zips (47 dispatchers × ~200 KB PDFs = ~10 MB) hung forever. Fix: run `finalize()` + `upload.done()` concurrently via `Promise.all` + 2 min timeout. Ships observability: stage-timing logs in `runBulkExport`, `httpUploadProgress` logs in `streamZipToR2`, and a fail-fast env-var guard on missing R2 creds. (d) Combined-payslip TOTAL fix — employee+dispatcher admin saved gross = basic pay only because save-route dispatcher lookup required `Employee.dispatcherId` FK. PDF route name-matched, so addition rows included dispatcher tiers but TOTAL didn't. Fixed save route to fall back to name+branch match (mirrors the existing GET state loader + PDF route), and payslip generator now recomputes TOTAL/NET from displayed row sums so the rendered PDF is always internally consistent even if stored fields are stale. Existing saved records require a re-save to fix their stored gross/statutory. (e) Payroll-tab statutory overrides — client payload now includes `epfEmployee`/`socsoEmployee`/`eisEmployee` + employer counterparts; server uses them verbatim when present (falls back to auto-calc only when a field is absent), so cleared zeros persist. (f) Layout — Payroll page widened `max-w-6xl` → `max-w-[90rem]` so the Actions column isn't cut off; `PortalDropdown` clamped to viewport. Employee drawer now portaled to `document.body` so parent transform/filter/contain CSS can't break its `fixed` positioning (was clipping on the branch-detail page). **Deploy:** Vercel build initially failed with `PrismaConfigEnvError: DIRECT_URL missing` — fixed by adding `DIRECT_URL` to Vercel's env vars (Neon Direct, non-pooled connection string) alongside the existing `DATABASE_URL` (pooled). `prisma.config.ts` diagnostic removed in `7145c4f`. **Tests:** 264 vitest green. **Files touched: 36.** **Net: +1,847 / –2,172 (–325 LOC overall).** **Manual prod follow-ups:** (i) re-save any Staff → Payroll months affected by the combined-admin-dispatcher bug so their stored gross/statutory/net update. (ii) rotate the Neon DB password pasted into the 2026-04-25 troubleshooting thread.
+
+- 2026-04-24: **Line-Item PDF Download — Prewarm UX** — **Abandoned (unmerged).** Spec: `context/features/pdf-download-prewarm-ux-spec.md`. Branch `feature/line-item-pdf-prewarm-ux` was committed + pushed but never merged — superseded by the **PDF Generation Refactor** feature which deletes the entire prewarm pipeline (UX + backend) the day after it was built. Commits on the abandoned branch (`c058231` configurable concurrency, `5f0dc8d` prewarm UX on month-detail button) are preserved in Git history on the deleted remote branch only. Rationale for abandonment: user reported prewarm "takes too long and too much resources" — the async-job pattern already used by the bulk ZIP export makes eager prewarm architecturally unnecessary. Merging this branch just to revert it in the next PR would have doubled the churn for zero value.
 
 - 2026-04-24: **Line-Item PDF Download — Prewarm UX** — **Abandoned (unmerged).** Spec: `context/features/pdf-download-prewarm-ux-spec.md`. Branch `feature/line-item-pdf-prewarm-ux` was committed + pushed but never merged — superseded by the **PDF Generation Refactor** feature which deletes the entire prewarm pipeline (UX + backend) the day after it was built. Commits on the abandoned branch (`c058231` configurable concurrency, `5f0dc8d` prewarm UX on month-detail button) are preserved in Git history on the deleted remote branch only. Rationale for abandonment: user reported prewarm "takes too long and too much resources" — the async-job pattern already used by the bulk ZIP export makes eager prewarm architecturally unnecessary. Merging this branch just to revert it in the next PR would have doubled the churn for zero value.
 
