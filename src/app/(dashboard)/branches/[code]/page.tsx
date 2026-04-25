@@ -164,6 +164,89 @@ export default async function BranchDetailPage({
           <BranchTrendChart trend={trend} />
         </section>
 
+        {/* Employees at this branch — listed first so newly-added rows from
+            the Add Employee button land visibly. */}
+        <section
+          id="employees-section"
+          aria-label="Employees at this branch"
+          className="scroll-mt-24 lg:scroll-mt-28 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
+        >
+          <header className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap">
+            <div>
+              <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface">
+                Employees
+              </h2>
+              <p className="text-[0.78rem] text-on-surface-variant mt-0.5">
+                Supervisors, admins, and store keepers at this branch
+              </p>
+            </div>
+            <Link
+              href="/staff"
+              className="text-[0.78rem] font-medium text-brand hover:underline"
+            >
+              Manage all employees →
+            </Link>
+          </header>
+          {employees.length === 0 ? (
+            <p className="px-6 pb-6 text-[0.85rem] text-on-surface-variant">
+              No employees at this branch yet. Use the <span className="font-medium">Add employee</span> button above.
+            </p>
+          ) : (
+            <div className="border-t border-outline-variant/15">
+              <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1.2fr_0.6fr] gap-x-3 px-6 py-2 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60 bg-surface-low/50">
+                <span>Name</span>
+                <span>Position</span>
+                <span>Employee ID</span>
+                <span>IC Number</span>
+                <span className="text-right">Status</span>
+              </div>
+              <ul>
+                {employees.map((e) => (
+                  <li
+                    key={e.employeeId}
+                    className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_0.6fr] gap-x-3 gap-y-1 items-center px-6 py-3 border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-hover/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <EmployeeAvatarView
+                        name={e.name}
+                        gender={e.gender}
+                        avatarUrl={e.avatarUrl}
+                        dispatcherAvatarUrl={e.dispatcherAvatarUrl}
+                      />
+                      <Link
+                        href={`/staff?highlight=${encodeURIComponent(e.employeeId)}`}
+                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
+                      >
+                        {e.name}
+                      </Link>
+                    </div>
+                    <span className="text-[0.78rem] text-on-surface-variant">
+                      {e.type === "STORE_KEEPER" ? "Store Keeper" : e.type === "SUPERVISOR" ? "Supervisor" : "Admin"}
+                    </span>
+                    <span className="text-[0.78rem] text-on-surface-variant tabular-nums truncate">
+                      {e.extId ?? "—"}
+                    </span>
+                    <span className="text-[0.78rem] text-on-surface-variant tabular-nums">
+                      {e.icNo || "—"}
+                    </span>
+                    <span className="text-right">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 text-[0.65rem] font-medium rounded-full ring-1 ring-inset ${
+                          e.isComplete
+                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
+                            : "bg-amber-50 text-amber-700 ring-amber-200"
+                        }`}
+                      >
+                        {e.isComplete ? "Complete" : "Missing IC"}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+
         {/* Dispatchers list */}
         <section
           id="dispatchers-section"
@@ -256,87 +339,6 @@ export default async function BranchDetailPage({
           )}
         </section>
 
-        {/* Employees at this branch — appears after Add Employee so new rows land visibly here */}
-        <section
-          id="employees-section"
-          aria-label="Employees at this branch"
-          className="scroll-mt-24 lg:scroll-mt-28 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
-        >
-          <header className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap">
-            <div>
-              <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface">
-                Employees
-              </h2>
-              <p className="text-[0.78rem] text-on-surface-variant mt-0.5">
-                Supervisors, admins, and store keepers at this branch
-              </p>
-            </div>
-            <Link
-              href="/staff"
-              className="text-[0.78rem] font-medium text-brand hover:underline"
-            >
-              Manage all employees →
-            </Link>
-          </header>
-          {employees.length === 0 ? (
-            <p className="px-6 pb-6 text-[0.85rem] text-on-surface-variant">
-              No employees at this branch yet. Use the <span className="font-medium">Add employee</span> button above.
-            </p>
-          ) : (
-            <div className="border-t border-outline-variant/15">
-              <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1.2fr_0.6fr] gap-x-3 px-6 py-2 text-[0.65rem] font-medium uppercase tracking-wider text-on-surface-variant/60 bg-surface-low/50">
-                <span>Name</span>
-                <span>Position</span>
-                <span>Employee ID</span>
-                <span>IC Number</span>
-                <span className="text-right">Status</span>
-              </div>
-              <ul>
-                {employees.map((e) => (
-                  <li
-                    key={e.employeeId}
-                    className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_0.6fr] gap-x-3 gap-y-1 items-center px-6 py-3 border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-hover/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <EmployeeAvatarView
-                        name={e.name}
-                        gender={e.gender}
-                        avatarUrl={e.avatarUrl}
-                        dispatcherAvatarUrl={e.dispatcherAvatarUrl}
-                      />
-                      <Link
-                        href={`/staff?highlight=${encodeURIComponent(e.employeeId)}`}
-                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
-                      >
-                        {e.name}
-                      </Link>
-                    </div>
-                    <span className="text-[0.78rem] text-on-surface-variant">
-                      {e.type === "STORE_KEEPER" ? "Store Keeper" : e.type === "SUPERVISOR" ? "Supervisor" : "Admin"}
-                    </span>
-                    <span className="text-[0.78rem] text-on-surface-variant tabular-nums truncate">
-                      {e.extId ?? "—"}
-                    </span>
-                    <span className="text-[0.78rem] text-on-surface-variant tabular-nums">
-                      {e.icNo || "—"}
-                    </span>
-                    <span className="text-right">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 text-[0.65rem] font-medium rounded-full ring-1 ring-inset ${
-                          e.isComplete
-                            ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
-                            : "bg-amber-50 text-amber-700 ring-amber-200"
-                        }`}
-                      >
-                        {e.isComplete ? "Complete" : "Missing IC"}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
       </main>
     </div>
   );
