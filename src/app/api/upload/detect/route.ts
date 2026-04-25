@@ -33,10 +33,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "r2Key and fileName are required" }, { status: 400 });
   }
 
+  const t0 = Date.now();
+  const tag = `[upload/detect] ${r2Key.slice(-40)}`;
+  const lap = (msg: string) =>
+    console.log(`${tag} +${((Date.now() - t0) / 1000).toFixed(1)}s ${msg}`);
+  lap("start");
+
   // Parse just enough rows to detect branch + month/year
   let rows;
   try {
     rows = await parseExcelFromR2(r2Key);
+    lap(`parsed ${rows.length} rows from R2`);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     console.error("[upload/detect] parse failed", { r2Key, detail });
@@ -89,6 +96,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [month, year] = topDate.split("-").map(Number);
+  lap(`detected branch=${detectedBranch} ${year}-${String(month).padStart(2, "0")}`);
 
   // Find or auto-create branch for this agent
   let branch = await prisma.branch.findFirst({
@@ -118,9 +126,12 @@ export async function POST(req: NextRequest) {
 
   // Auto-create unknown dispatchers with default rules so they appear on Staff page
   const { unknown } = await splitDispatchers(rows, agentId);
+  lap(`splitDispatchers: ${unknown.length} unknown`);
   if (unknown.length > 0) {
     const defaults = await getAgentDefaults(agentId);
+    lap("loaded agent defaults");
 
+    const txStart = Date.now();
     await prisma.$transaction(async (tx) => {
       // For each unknown extId, find or create the Dispatcher + its Assignment
       const upsertedDispatchers: { id: string }[] = [];
@@ -209,6 +220,7 @@ export async function POST(req: NextRequest) {
         });
       }
     }, { timeout: 120000 });
+    lap(`seeded ${unknown.length} unknown dispatchers in ${((Date.now() - txStart) / 1000).toFixed(1)}s tx`);
 
     // Notify about new dispatchers
     if (unknown.length > 0) {
@@ -247,6 +259,7 @@ export async function POST(req: NextRequest) {
     // Trigger processing
     await updateUploadStatus(result.uploadId!, "PROCESSING");
     await dispatchWorker(result.uploadId!, "parse");
+    lap(`done — uploadId=${result.uploadId?.slice(0, 8)} (new) total=${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
     return NextResponse.json({
       isDuplicate: false,
@@ -281,6 +294,7 @@ export async function POST(req: NextRequest) {
 
   await updateUploadStatus(uploadId, "PROCESSING");
   await dispatchWorker(uploadId, "parse");
+  lap(`done — uploadId=${uploadId.slice(0, 8)} (replace) total=${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
   return NextResponse.json({
     isDuplicate: false,
