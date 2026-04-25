@@ -128,7 +128,9 @@ export async function POST(req: NextRequest) {
   const { unknown } = await splitDispatchers(rows, agentId);
   lap(`splitDispatchers: ${unknown.length} unknown`);
   if (unknown.length > 0) {
-    const defaults = await getAgentDefaults(agentId);
+    // Auto-detected branch — pull that branch's defaults if set, otherwise
+    // fall back to the agent-level defaults.
+    const defaults = await getAgentDefaults(agentId, branch.id);
     lap("loaded agent defaults");
 
     const txStart = Date.now();

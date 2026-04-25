@@ -18,13 +18,32 @@ export async function POST(req: NextRequest) {
     }
     const body = parsed.data;
 
-    // Get dispatcher IDs — filtered to selection if provided, otherwise all
+    // Resolve optional branch filter — when the caller is editing one
+    // branch's defaults, "apply to all" should mean "all dispatchers in that
+    // branch", not every dispatcher across the agent. Explicit
+    // dispatcherIds always win over the branch narrowing.
+    let branchId: string | undefined;
+    if (body.branchCode) {
+      const branch = await prisma.branch.findFirst({
+        where: { agentId, code: body.branchCode },
+        select: { id: true },
+      });
+      if (!branch) {
+        return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+      }
+      branchId = branch.id;
+    }
+
+    // Get dispatcher IDs — filtered to selection if provided, otherwise the
+    // branch (if specified), otherwise all.
     const dispatchers = await prisma.dispatcher.findMany({
       where: {
         branch: { agentId },
         ...(body.dispatcherIds && body.dispatcherIds.length > 0
           ? { id: { in: body.dispatcherIds } }
-          : {}),
+          : branchId
+            ? { branchId }
+            : {}),
       },
       select: { id: true },
     });

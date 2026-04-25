@@ -20,7 +20,7 @@ model Agent {
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
-  defaults              AgentDefault?
+  defaults              AgentDefault[]
   paymentRecords        PaymentRecord[]
   notifications         Notification[]
   employees             Employee[]
@@ -35,7 +35,12 @@ model Agent {
 
 model AgentDefault {
   id                 String  @id @default(cuid())
-  agentId            String  @unique
+  agentId            String
+  // Optional branch scope. NULL means "agent-level fallback" used by any
+  // branch that does not have its own override row. A non-NULL branchId
+  // means this row is the override for that specific branch — looked up
+  // first by getAgentDefaults(agentId, branchId).
+  branchId           String?
   // Weight tiers
   tier1MinWeight     Float   @default(0)
   tier1MaxWeight     Float   @default(5)
@@ -57,7 +62,11 @@ model AgentDefault {
   dailyThreshold     Int     @default(70)
   subsidyAmount      Float   @default(15)
 
-  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent  Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, branchId])
+  @@index([agentId])
 }
 
 model Account {
@@ -107,6 +116,7 @@ model Branch {
   assignments DispatcherAssignment[]
   employees   Employee[]
   uploads     Upload[]
+  defaults    AgentDefault[]
   agent       Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt

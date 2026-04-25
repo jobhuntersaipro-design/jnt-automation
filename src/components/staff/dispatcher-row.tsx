@@ -105,8 +105,21 @@ function DecimalInput({ value, onChange, className, onClick, cents }: {
   );
 }
 
-/** Grid: check | name | branch | IC | tiers | sep | bonusTierEarnings(3) | sep | petrol(3) | status | actions */
-export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_0.6fr_4px_0.4fr_0.6fr_0.6fr_0.4fr_0.5fr] items-center gap-x-1.5";
+/** Grid: check | name | branch | IC | tiers | sep | bonusTierEarnings(3) | sep | petrol(3) | status | actions
+ *
+ * Bonus tier Amount cell mirrors the Weight Tier cell width (1.1fr) because
+ * both render 3 RM-rate chips side by side — the previous 0.6fr was too
+ * narrow, so CSS Grid expanded the cell at min-content (chip width),
+ * pushing the Petrol section right and breaking alignment with the row 1
+ * group labels and row 2 sub-headers (which contain only short text and
+ * fit at the fr-allocated widths).
+ *
+ * Petrol Amount cell uses 1.1fr (same as bonus) so the BONUS TIER and
+ * PETROL group-underline widths above match exactly. Petrol's content is
+ * just a single RM input so the extra space is harmless — symmetry is
+ * what the eye reads.
+ */
+export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_0.4fr_0.5fr] items-center gap-x-1.5";
 
 /**
  * Portaled popover that anchors to a button. Escapes the table's

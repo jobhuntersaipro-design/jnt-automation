@@ -546,20 +546,38 @@ export function DispatchersClient({
             Swipe left to edit tier / incentive / petrol settings →
           </p>
           <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto">
-            {/* Grouped column headers */}
-            {/* Row 1: group labels */}
-            <div className={`${ROW_GRID} px-5 pt-2.5 pb-0`}>
-              <span /><span /><span /><span /><span />
-              <span />
-              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#12B981", borderColor: "rgba(18, 185, 129, 0.3)" }}>Bonus Tier</span>
-              <span />
-              <span className="col-span-3 text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1" style={{ color: "#D4A017", borderColor: "rgba(251, 192, 36, 0.35)" }}>Petrol</span>
-              <span /><span />
-            </div>
-            {/* Row 2: sub-column labels */}
-            <div className={`${ROW_GRID} px-5 pt-1 pb-2 border-b border-outline-variant/15`}>
-              {/* Select all checkbox */}
-              <div className="flex justify-center">
+            {/*
+              Header — single grid with two row tracks so the standalone
+              columns ("First Seen" and the trailing actions slot) can
+              span both rows and sit vertically centered. Without this the
+              First Seen header sat low in row 2 while the cells around it
+              had a tall group-label/underline above, leaving it visually
+              orphaned and not aligned with its value below.
+
+              Group labels (Bonus Tier / Petrol) are <div>s so border-b-2
+              spans the full cell width; both groups end up with identical
+              underline lengths since the bonus and petrol Amount cells are
+              now the same fr (1.1) — see ROW_GRID comment.
+            */}
+            <div
+              className={`${ROW_GRID.replace("items-center", "")} grid-rows-[auto_auto] px-5 pt-2.5 pb-2 border-b border-outline-variant/15`}
+            >
+              {/* Row 1 — group labels */}
+              <div
+                style={{ gridColumn: "7 / span 3", gridRow: 1, color: "#12B981", borderColor: "rgba(18, 185, 129, 0.3)" }}
+                className="text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1"
+              >
+                Bonus Tier
+              </div>
+              <div
+                style={{ gridColumn: "11 / span 3", gridRow: 1, color: "#D4A017", borderColor: "rgba(251, 192, 36, 0.35)" }}
+                className="text-center text-[0.8rem] font-semibold tracking-[0.06em] uppercase border-b-2 pb-1"
+              >
+                Petrol
+              </div>
+
+              {/* Row 2 — sub-column labels */}
+              <div style={{ gridColumn: 1, gridRow: 2 }} className="flex justify-center pt-1">
                 <input
                   type="checkbox"
                   checked={checkedIds.size > 0 && paged.every((d) => checkedIds.has(d.id))}
@@ -574,29 +592,37 @@ export function DispatchersClient({
                   className="w-3.5 h-3.5 rounded-sm border-outline-variant/40 text-brand focus:ring-brand/30 cursor-pointer accent-brand"
                 />
               </div>
-              {[
-                "Dispatcher", "Branch", "IC No", "Tiers",
-                "",
-                "Eligible", "Min Orders", "Amount (RM)",
-                "",
-                "Eligible", "Min Orders", "Amount (RM)",
-                "First Seen", "",
-              ].map((h, i) => (
-                h === "First Seen" ? (
-                  <button
-                    key={`${h}-${i}`}
-                    type="button"
-                    onClick={() => { setFilterNew((v) => !v); setPage(1); }}
-                    className={`text-[0.62rem] font-medium tracking-[0.05em] uppercase text-center cursor-pointer hover:text-brand transition-colors ${filterNew ? "text-brand underline underline-offset-2" : "text-on-surface-variant"}`}
-                  >
-                    {filterNew ? "NEW Only" : "First Seen"}
-                  </button>
-                ) : (
-                  <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase text-center ${i === 0 ? "text-left!" : ""}`}>
-                    {h}
-                  </span>
-                )
+              {([
+                { col: 2,  label: "Dispatcher",  align: "left" as const },
+                { col: 3,  label: "Branch",      align: "center" as const },
+                { col: 4,  label: "IC No",       align: "center" as const },
+                { col: 5,  label: "Tiers",       align: "center" as const },
+                { col: 7,  label: "Eligible",    align: "center" as const },
+                { col: 8,  label: "Min Orders",  align: "center" as const },
+                { col: 9,  label: "Amount (RM)", align: "center" as const },
+                { col: 11, label: "Eligible",    align: "center" as const },
+                { col: 12, label: "Min Orders",  align: "center" as const },
+                { col: 13, label: "Amount (RM)", align: "center" as const },
+              ]).map((h) => (
+                <span
+                  key={h.col}
+                  style={{ gridColumn: h.col, gridRow: 2 }}
+                  className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase pt-1 ${h.align === "left" ? "text-left" : "text-center"}`}
+                >
+                  {h.label}
+                </span>
               ))}
+
+              {/* First Seen — spans both rows so it sits at the vertical
+                  centre of the header, level with the value below. */}
+              <button
+                type="button"
+                onClick={() => { setFilterNew((v) => !v); setPage(1); }}
+                style={{ gridColumn: 14, gridRow: "1 / span 2" }}
+                className={`self-center text-[0.62rem] font-medium tracking-[0.05em] uppercase text-center cursor-pointer hover:text-brand transition-colors ${filterNew ? "text-brand underline underline-offset-2" : "text-on-surface-variant"}`}
+              >
+                {filterNew ? "NEW Only" : "First Seen"}
+              </button>
             </div>
 
             {/* Rows */}
@@ -687,6 +713,8 @@ export function DispatchersClient({
         <DefaultsDrawer
           checkedIds={checkedIds}
           initialValues={defaults}
+          branchCodes={localBranchCodes}
+          initialBranchCode={selectedBranch}
           onClose={() => setShowDefaults(false)}
           onApplied={() => {
             setCheckedIds(new Set());

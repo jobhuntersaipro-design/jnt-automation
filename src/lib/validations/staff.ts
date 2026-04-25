@@ -42,6 +42,13 @@ export const defaultsBodySchema = z.object({
 
 export const applyDefaultsBodySchema = defaultsBodySchema.extend({
   dispatcherIds: z.array(z.string()).optional(),
+  /**
+   * When set, "apply to all" narrows to dispatchers in this branch only.
+   * Saves writes from blasting an unrelated branch's dispatchers when the
+   * agent is editing one branch's defaults. Ignored when dispatcherIds is
+   * given (explicit selection wins).
+   */
+  branchCode: z.string().optional(),
 });
 
 export const adjustmentsSchema = z.object({

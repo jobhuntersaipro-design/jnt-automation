@@ -311,38 +311,84 @@ function drawRemarks(doc: PDFKit.PDFDocument, yTop: number): number {
   return yTop + 28;
 }
 
-function drawFooter(doc: PDFKit.PDFDocument, data: PayslipData, yTop: number): void {
-  const footerY = Math.max(yTop + 40, PAGE_HEIGHT - MARGIN - 100);
+function drawFooter(
+  doc: PDFKit.PDFDocument,
+  data: PayslipData,
+  yTop: number,
+  stampBuffer: Buffer | null,
+): void {
+  // Place footer immediately under the table — short payslips no longer
+  // leave a big blank gap before the signatures, saving paper. Previously
+  // the footerY was clamped to PAGE_HEIGHT - MARGIN - 100 which always
+  // pushed signatures near the bottom of the page.
+  const footerY = yTop + 16;
   const blockW = 180;
   const leftX = CONTENT_LEFT;
   const rightX = CONTENT_RIGHT - blockW;
   const dots = ".......................";
 
-  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
-  doc.text(dots, leftX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
-  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text("PREPARED BY", leftX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+  // Reserve 70px of vertical space for the stamp only when one is
+  // provided — without a stamp, the signatures collapse upward.
+  const stampHeight = stampBuffer ? 70 : 0;
 
-  if (data.stampImageUrl) {
+  doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  doc.text(dots, leftX, footerY + stampHeight, { width: blockW, align: "center", lineBreak: false });
+  doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+  doc.text("PREPARED BY", leftX, footerY + stampHeight + 12, { width: blockW, align: "center", lineBreak: false });
+
+  if (stampBuffer) {
     try {
-      if (/^data:|^\/|^[a-zA-Z]:\\/.test(data.stampImageUrl)) {
-        doc.image(data.stampImageUrl, rightX + (blockW - 70) / 2, footerY, {
-          width: 70,
-          height: 70,
-          fit: [70, 70],
-        });
-      }
+      doc.image(stampBuffer, rightX + (blockW - 70) / 2, footerY, {
+        width: 70,
+        height: 70,
+        fit: [70, 70],
+      });
     } catch {
       // swallow — payslip still renders without stamp
     }
   }
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
-  doc.text(dots, rightX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
+  doc.text(dots, rightX, footerY + stampHeight, { width: blockW, align: "center", lineBreak: false });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text("APPROVED BY", rightX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+  doc.text("APPROVED BY", rightX, footerY + stampHeight + 12, { width: blockW, align: "center", lineBreak: false });
 }
 
-function buildDocument(doc: PDFKit.PDFDocument, data: PayslipData): void {
+/**
+ * Fetch / decode the stamp URL into a Buffer pdfkit's `image()` can
+ * consume. HTTPS URLs are common in prod (R2 public URL on the agent
+ * record) and pdfkit can't load them inline; we have to materialize the
+ * bytes first. Failures are non-fatal — the payslip just renders without
+ * the stamp.
+ */
+async function resolveStampBuffer(url: string | null | undefined): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    if (url.startsWith("data:")) {
+      const comma = url.indexOf(",");
+      if (comma === -1) return null;
+      return Buffer.from(url.slice(comma + 1), "base64");
+    }
+    if (/^https?:\/\//i.test(url)) {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const ab = await res.arrayBuffer();
+      return Buffer.from(ab);
+    }
+    if (/^\/|^[a-zA-Z]:\\/.test(url)) {
+      const { readFile } = await import("node:fs/promises");
+      return await readFile(url);
+    }
+  } catch {
+    // fall through
+  }
+  return null;
+}
+
+function buildDocument(
+  doc: PDFKit.PDFDocument,
+  data: PayslipData,
+  stampBuffer: Buffer | null,
+): void {
   let y = drawCompanyHeader(doc, data, MARGIN);
 
   const boxTop = y;
@@ -398,7 +444,7 @@ function buildDocument(doc: PDFKit.PDFDocument, data: PayslipData): void {
   rect(doc, CONTENT_LEFT, boxTop, CONTENT_WIDTH, boxBottom - boxTop);
   vline(doc, MID_X, particularsTop, boxBottom);
 
-  drawFooter(doc, data, boxBottom);
+  drawFooter(doc, data, boxBottom, stampBuffer);
 }
 
 export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<Buffer> {
@@ -443,7 +489,12 @@ export async function generatePayslipPdf(input: GeneratePayslipInput): Promise<B
     doc.on("error", reject);
   });
 
-  buildDocument(doc, data);
+  // Pre-fetch the stamp before drawing — pdfkit's `image()` is sync and
+  // can't accept remote URLs. Stamp on the agent record is an R2 https
+  // URL, so without this round-trip the stamp would silently no-op.
+  const stampBuffer = await resolveStampBuffer(input.stampImageUrl);
+
+  buildDocument(doc, data, stampBuffer);
   doc.end();
   return done;
 }

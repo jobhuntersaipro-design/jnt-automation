@@ -157,7 +157,7 @@ function EditableCell({
       onKeyDown={handleKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-all cursor-text ${
+      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-center rounded-md border bg-surface transition-all cursor-text ${
         focused
           ? "border-brand outline-none ring-2 ring-brand/30 bg-brand/5 text-brand font-semibold shadow-sm"
           : "border-outline-variant/30 hover:border-outline-variant/60 hover:bg-surface-hover/40"
@@ -179,7 +179,7 @@ function SortHeader({
 }: {
   label: string;
   columnKey: SortKey;
-  align: "left" | "right";
+  align: "left" | "right" | "center";
   color?: string;
   compact?: boolean;
   sortKey: SortKey | null;
@@ -189,14 +189,22 @@ function SortHeader({
 }) {
   const active = sortKey === columnKey;
   const Arrow = active && sortDir === "asc" ? ArrowUp : ArrowDown;
+  // Inner-flex justify maps the parent <th>'s text-* alignment onto the
+  // sort button's contents. `mx-auto` for center makes the inline-flex
+  // button sit centered within the cell so the underlying value column
+  // (also text-center) lines up directly below.
+  const justify =
+    align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
+  const horizontalSpacer =
+    align === "right" ? "ml-auto" : align === "center" ? "mx-auto" : "";
   return (
     <button
       type="button"
       onClick={() => onToggle(columnKey)}
       disabled={disabled}
-      className={`inline-flex items-center gap-1 ${align === "right" ? "justify-end" : "justify-start"} ${
-        align === "right" ? "ml-auto" : ""
-      } ${compact ? "text-[0.68rem]" : "text-[0.72rem]"} uppercase tracking-wider font-medium select-none transition-colors ${
+      className={`inline-flex items-center gap-1 ${justify} ${horizontalSpacer} ${
+        compact ? "text-[0.68rem]" : "text-[0.72rem]"
+      } uppercase tracking-wider font-medium select-none transition-colors ${
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
       }`}
       style={color ? { color } : undefined}
@@ -736,8 +744,8 @@ export function SalaryTable({
                 <th rowSpan={2} className="py-2 px-4 font-medium align-bottom">
                   <SortHeader label="Dispatcher" columnKey="name" align="left" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom">
-                  <SortHeader label="Orders" columnKey="totalOrders" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom">
+                  <SortHeader label="Orders" columnKey="totalOrders" align="center" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
                 <th
                   colSpan={2}
@@ -745,28 +753,28 @@ export function SalaryTable({
                 >
                   Base Salary
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#B27F08" }}>
-                  <SortHeader label="Petrol" columnKey="petrolSubsidy" align="right" color="#B27F08" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom" style={{ color: "#B27F08" }}>
+                  <SortHeader label="Petrol" columnKey="petrolSubsidy" align="center" color="#B27F08" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">
-                  <SortHeader label="Penalty" columnKey="penalty" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom text-critical">
+                  <SortHeader label="Penalty" columnKey="penalty" align="center" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom text-critical">
-                  <SortHeader label="Advance" columnKey="advance" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom text-critical">
+                  <SortHeader label="Advance" columnKey="advance" align="center" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-right align-bottom" style={{ color: "#12B981" }}>
-                  <SortHeader label="Commission" columnKey="commission" align="right" color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom" style={{ color: "#12B981" }}>
+                  <SortHeader label="Commission" columnKey="commission" align="center" color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-4 font-medium text-right align-bottom text-brand">
-                  <SortHeader label="Net Salary" columnKey="netSalary" align="right" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th rowSpan={2} className="py-2 px-4 font-medium text-center align-bottom text-brand">
+                  <SortHeader label="Net Salary" columnKey="netSalary" align="center" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
               </tr>
               <tr className="text-left text-[0.68rem] uppercase tracking-wider text-on-surface-variant/70 bg-surface-low">
-                <th className="pt-0.5 pb-2 px-3 font-medium text-right">
-                  <SortHeader label="Default Tier" columnKey="baseSalary" align="right" compact sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th className="pt-0.5 pb-2 px-3 font-medium text-center">
+                  <SortHeader label="Default Tier" columnKey="baseSalary" align="center" compact sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th className="pt-0.5 pb-2 px-3 font-medium text-right" style={{ color: "#12B981" }}>
-                  <SortHeader label="Bonus Tier" columnKey="bonusTierEarnings" align="right" compact color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
+                <th className="pt-0.5 pb-2 px-3 font-medium text-center" style={{ color: "#12B981" }}>
+                  <SortHeader label="Bonus Tier" columnKey="bonusTierEarnings" align="center" compact color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
               </tr>
             </thead>
@@ -821,14 +829,14 @@ export function SalaryTable({
                     {editMode ? (
                       <>
                         {/* Read-only: Orders, Default Tier, Bonus Tier, Petrol */}
-                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-on-surface">
                           {r.totalOrders.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-on-surface">
                           {formatRM(r.baseSalary)}
                         </td>
                         <td
-                          className="py-2.5 px-3 text-right tabular-nums"
+                          className="py-2.5 px-3 text-center tabular-nums"
                           style={{
                             color: r.bonusTierEarnings > 0 ? "#12B981" : "var(--color-on-surface-variant)",
                             opacity: r.bonusTierEarnings > 0 ? 1 : 0.4,
@@ -837,7 +845,7 @@ export function SalaryTable({
                           {r.bonusTierEarnings > 0 ? formatRM(r.bonusTierEarnings) : "—"}
                         </td>
                         <td
-                          className="py-2.5 px-3 text-right tabular-nums"
+                          className="py-2.5 px-3 text-center tabular-nums"
                           style={{
                             color: r.petrolSubsidy > 0 ? "#B27F08" : "var(--color-on-surface-variant)",
                             opacity: r.petrolSubsidy > 0 ? 1 : 0.4,
@@ -846,21 +854,21 @@ export function SalaryTable({
                           {r.petrolSubsidy > 0 ? formatRM(r.petrolSubsidy) : "—"}
                         </td>
                         {/* Editable: Penalty, Advance, Commission */}
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-center">
                           <EditableCell
                             value={r.penalty}
                             isAmount
                             onChange={(v) => updateField(r.dispatcherId, "penalty", v)}
                           />
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-center">
                           <EditableCell
                             value={r.advance}
                             isAmount
                             onChange={(v) => updateField(r.dispatcherId, "advance", v)}
                           />
                         </td>
-                        <td className="py-2.5 px-3 text-right">
+                        <td className="py-2.5 px-3 text-center">
                           <EditableCell
                             value={r.commission}
                             isAmount
@@ -870,14 +878,14 @@ export function SalaryTable({
                       </>
                     ) : (
                       <>
-                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-on-surface">
                           {r.totalOrders.toLocaleString()}
                         </td>
-                        <td className="py-2.5 px-3 text-right tabular-nums text-on-surface">
+                        <td className="py-2.5 px-3 text-center tabular-nums text-on-surface">
                           {formatRM(r.baseSalary)}
                         </td>
                         <td
-                          className="py-2.5 px-3 text-right tabular-nums"
+                          className="py-2.5 px-3 text-center tabular-nums"
                           style={{
                             color: r.bonusTierEarnings > 0 ? "#12B981" : "var(--color-on-surface-variant)",
                             opacity: r.bonusTierEarnings > 0 ? 1 : 0.4,
@@ -886,7 +894,7 @@ export function SalaryTable({
                           {r.bonusTierEarnings > 0 ? formatRM(r.bonusTierEarnings) : "—"}
                         </td>
                         <td
-                          className="py-2.5 px-3 text-right tabular-nums"
+                          className="py-2.5 px-3 text-center tabular-nums"
                           style={{
                             color: r.petrolSubsidy > 0 ? "#B27F08" : "var(--color-on-surface-variant)",
                             opacity: r.petrolSubsidy > 0 ? 1 : 0.4,
@@ -894,14 +902,14 @@ export function SalaryTable({
                         >
                           {r.petrolSubsidy > 0 ? formatRM(r.petrolSubsidy) : "—"}
                         </td>
-                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
+                        <td className={`py-2.5 px-3 text-center tabular-nums ${r.penalty > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                           {r.penalty > 0 ? formatRM(r.penalty) : "—"}
                         </td>
-                        <td className={`py-2.5 px-3 text-right tabular-nums ${r.advance > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
+                        <td className={`py-2.5 px-3 text-center tabular-nums ${r.advance > 0 ? "text-critical" : "text-on-surface-variant/40"}`}>
                           {r.advance > 0 ? formatRM(r.advance) : "—"}
                         </td>
                         <td
-                          className="py-2.5 px-3 text-right tabular-nums"
+                          className="py-2.5 px-3 text-center tabular-nums"
                           style={{
                             color: r.commission > 0 ? "#12B981" : "var(--color-on-surface-variant)",
                             opacity: r.commission > 0 ? 1 : 0.4,
@@ -911,7 +919,7 @@ export function SalaryTable({
                         </td>
                       </>
                     )}
-                    <td className="py-2.5 px-4 text-right tabular-nums font-semibold text-brand">
+                    <td className="py-2.5 px-4 text-center tabular-nums font-semibold text-brand">
                       {formatRM(r.netSalary)}
                     </td>
                   </tr>

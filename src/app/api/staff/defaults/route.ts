@@ -2,8 +2,38 @@ import { NextRequest, NextResponse } from "next/server";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { defaultsBodySchema } from "@/lib/validations/staff";
+import { getAgentDefaults } from "@/lib/db/staff";
 
-export async function GET() {
+/**
+ * Resolve a branchCode (or its absence) to a concrete branchId scoped to
+ * the agent. Returns:
+ *   - { ok: true, branchId: string }  — branch matched
+ *   - { ok: true, branchId: null }    — caller wants the agent-level fallback
+ *   - { ok: false }                    — branchCode given but doesn't belong
+ *                                        to this agent
+ */
+async function resolveBranch(
+  agentId: string,
+  branchCode: string | null,
+): Promise<{ ok: true; branchId: string | null } | { ok: false }> {
+  if (!branchCode) return { ok: true, branchId: null };
+  const branch = await prisma.branch.findFirst({
+    where: { agentId, code: branchCode },
+    select: { id: true },
+  });
+  if (!branch) return { ok: false };
+  return { ok: true, branchId: branch.id };
+}
+
+/**
+ * GET /api/staff/defaults?branchCode=XYZ
+ *
+ * Returns the defaults a caller would resolve for that branch — branch
+ * override if one exists, otherwise the agent-level fallback, otherwise
+ * the hardcoded constants. Omitting branchCode returns the agent-level
+ * fallback directly.
+ */
+export async function GET(req: NextRequest) {
   try {
     const effective = await getEffectiveAgentId();
     if (!effective) {
@@ -11,47 +41,26 @@ export async function GET() {
     }
     const agentId = effective.agentId;
 
-    const defaults = await prisma.agentDefault.findUnique({
-      where: { agentId },
-    });
-
-    if (!defaults) {
-      return NextResponse.json({
-        weightTiers: [
-          { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.0 },
-          { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 1.4 },
-          { tier: 3, minWeight: 10.01, maxWeight: null, commission: 2.2 },
-        ],
-        bonusTiers: [
-          { tier: 1, minWeight: 0, maxWeight: 5, commission: 1.5 },
-          { tier: 2, minWeight: 5.01, maxWeight: 10, commission: 2.1 },
-          { tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
-        ],
-        incentiveRule: { orderThreshold: 2000 },
-        petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15 },
-      });
+    const branchCode = new URL(req.url).searchParams.get("branchCode");
+    const resolved = await resolveBranch(agentId, branchCode);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: "Branch not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
-      weightTiers: [
-        { tier: 1, minWeight: defaults.tier1MinWeight, maxWeight: defaults.tier1MaxWeight, commission: defaults.tier1Commission },
-        { tier: 2, minWeight: defaults.tier2MinWeight, maxWeight: defaults.tier2MaxWeight, commission: defaults.tier2Commission },
-        { tier: 3, minWeight: defaults.tier3MinWeight, maxWeight: null, commission: defaults.tier3Commission },
-      ],
-      bonusTiers: [
-        { tier: 1, minWeight: defaults.tier1MinWeight, maxWeight: defaults.tier1MaxWeight, commission: defaults.bonusTier1Commission },
-        { tier: 2, minWeight: defaults.tier2MinWeight, maxWeight: defaults.tier2MaxWeight, commission: defaults.bonusTier2Commission },
-        { tier: 3, minWeight: defaults.tier3MinWeight, maxWeight: null, commission: defaults.bonusTier3Commission },
-      ],
-      incentiveRule: { orderThreshold: defaults.orderThreshold },
-      petrolRule: { isEligible: defaults.petrolEligible, dailyThreshold: defaults.dailyThreshold, subsidyAmount: defaults.subsidyAmount },
-    });
+    const defaults = await getAgentDefaults(agentId, resolved.branchId);
+    return NextResponse.json(defaults);
   } catch (err) {
     console.error("[staff/defaults] GET error", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
+/**
+ * PUT /api/staff/defaults?branchCode=XYZ
+ *
+ * Upserts the defaults row for the given (agent, branch). Omitting
+ * branchCode writes to the agent-level fallback (branchId IS NULL).
+ */
 export async function PUT(req: NextRequest) {
   try {
     const effective = await getEffectiveAgentId();
@@ -59,6 +68,13 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const agentId = effective.agentId;
+
+    const branchCode = new URL(req.url).searchParams.get("branchCode");
+    const resolved = await resolveBranch(agentId, branchCode);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: "Branch not found" }, { status: 404 });
+    }
+    const branchId = resolved.branchId;
 
     const raw = await req.json();
     const parsed = defaultsBodySchema.safeParse(raw);
@@ -96,11 +112,30 @@ export async function PUT(req: NextRequest) {
       subsidyAmount: petrolRule.subsidyAmount,
     };
 
-    await prisma.agentDefault.upsert({
-      where: { agentId },
-      create: { agentId, ...shared },
-      update: shared,
-    });
+    if (branchId) {
+      // Branch-specific override — straightforward upsert on the composite key.
+      await prisma.agentDefault.upsert({
+        where: { agentId_branchId: { agentId, branchId } },
+        create: { agentId, branchId, ...shared },
+        update: shared,
+      });
+    } else {
+      // Agent-level fallback — branchId = NULL. Postgres unique indexes treat
+      // NULLs as distinct, so the composite unique on (agentId, branchId)
+      // doesn't enforce a single fallback row. Find first, then update or
+      // create — this works because the application always goes through
+      // this path for the fallback (no other writer creates branchId=NULL
+      // rows), so we never end up with concurrent fallback duplicates.
+      const existing = await prisma.agentDefault.findFirst({
+        where: { agentId, branchId: null },
+        select: { id: true },
+      });
+      if (existing) {
+        await prisma.agentDefault.update({ where: { id: existing.id }, data: shared });
+      } else {
+        await prisma.agentDefault.create({ data: { agentId, branchId: null, ...shared } });
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

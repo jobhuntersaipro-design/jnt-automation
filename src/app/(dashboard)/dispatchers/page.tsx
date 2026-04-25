@@ -17,7 +17,10 @@ export default async function DispatchersPage() {
   const [dispatchers, allBranches, defaults, payrollHistory] = await Promise.all([
     getDispatchers(agentId, {}),
     prisma.branch.findMany({ where: { agentId }, select: { code: true }, orderBy: { code: "asc" } }),
-    getAgentDefaults(agentId),
+    // Initial drawer state mirrors "All branches" — the agent-level fallback.
+    // The drawer fetches per-branch values on demand when the user picks a
+    // specific branch, so we don't need to pre-resolve them here.
+    getAgentDefaults(agentId, null),
     getPayrollHistory(agentId),
   ]);
 

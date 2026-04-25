@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { X, Loader2, ChevronDown, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useClickOutside } from "@/lib/hooks/use-click-outside";
+import { useRef } from "react";
 
 const BTN = "flex-1 px-1.5 text-[0.6rem] text-on-surface-variant hover:text-brand transition-colors";
 
@@ -102,14 +104,61 @@ interface DefaultValues {
 interface DefaultsDrawerProps {
   checkedIds: Set<string>;
   initialValues: DefaultValues;
+  /**
+   * Every branch the agent has, sorted. Lets the user pick the branch the
+   * defaults should be saved against. An empty string means "All branches"
+   * (the agent-level fallback row, branchId = NULL).
+   */
+  branchCodes: string[];
+  /**
+   * Branch the user already filtered the dispatcher list to, used as the
+   * initial selection so they don't have to pick again. "" → All branches.
+   */
+  initialBranchCode: string;
   onClose: () => void;
   onApplied: () => Promise<void>;
 }
 
-export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }: DefaultsDrawerProps) {
+export function DefaultsDrawer({ checkedIds, initialValues, branchCodes, initialBranchCode, onClose, onApplied }: DefaultsDrawerProps) {
   const [values, setValues] = useState<DefaultValues>(initialValues);
   const [applying, setApplying] = useState(false);
   const [incentiveEnabled, setBonusTierEnabled] = useState(initialValues.incentiveRule.orderThreshold > 0);
+  const [branchCode, setBranchCode] = useState<string>(initialBranchCode);
+  const [loadingBranch, setLoadingBranch] = useState(false);
+  const [branchOpen, setBranchOpen] = useState(false);
+  const branchRef = useRef<HTMLDivElement>(null);
+  useClickOutside(branchRef, () => setBranchOpen(false));
+
+  // Always fetch fresh defaults for the picked branch — we can't trust
+  // `initialValues` because the parent only loads the agent-level fallback,
+  // not branch-specific overrides. If the drawer opens already filtered to
+  // a branch (selectedBranch passed as initialBranchCode), we still need
+  // to fetch that branch's data; relying on initialValues meant the drawer
+  // showed the agent fallback even when a branch override existed, and the
+  // reverse case where the user expected the agent fallback to fall through
+  // for a branch with no override.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoadingBranch(true);
+      try {
+        const url = branchCode
+          ? `/api/staff/defaults?branchCode=${encodeURIComponent(branchCode)}`
+          : "/api/staff/defaults";
+        const res = await fetch(url);
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as DefaultValues;
+        if (cancelled) return;
+        setValues(data);
+        setBonusTierEnabled(data.incentiveRule.orderThreshold > 0);
+      } catch {
+        if (!cancelled) toast.error("Failed to load defaults for this branch");
+      } finally {
+        if (!cancelled) setLoadingBranch(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [branchCode]);
 
   const INPUT =
     "w-full px-2.5 py-1.5 text-[0.84rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40";
@@ -128,16 +177,25 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
   async function handleApply(mode: "all" | "selected") {
     setApplying(true);
     try {
-      // Save defaults to DB first
-      await fetch("/api/staff/defaults", {
+      // Save defaults to DB first — scoped to the branch the user picked.
+      // `branchCode === ""` writes to the agent-level fallback row.
+      const putUrl = branchCode
+        ? `/api/staff/defaults?branchCode=${encodeURIComponent(branchCode)}`
+        : "/api/staff/defaults";
+      await fetch(putUrl, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(values),
       });
 
-      const payload = mode === "selected"
+      // Apply the values to dispatchers. When a branch is selected, "all"
+      // means "all dispatchers in this branch" — applying the saved branch
+      // override agent-wide would be confusing. The route narrows by
+      // branchCode when given.
+      const payload: Record<string, unknown> = mode === "selected"
         ? { ...values, dispatcherIds: Array.from(checkedIds) }
-        : values;
+        : { ...values };
+      if (branchCode) payload.branchCode = branchCode;
       const res = await fetch("/api/staff/apply-defaults", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -145,9 +203,12 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
       });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      toast.success(`Defaults applied to ${data.count} dispatchers`, { duration: 5000 });
-      // Wait for data refresh before closing
+      // Wait for the dispatcher list to refresh BEFORE showing the toast,
+      // so the values in the table actually reflect the change at the
+      // moment the user reads "Defaults applied". Previously the toast
+      // appeared first and the table updated several hundred ms later.
       await onApplied();
+      toast.success(`Defaults applied to ${data.count} dispatchers`, { duration: 5000 });
       onClose();
     } catch {
       toast.error("Failed to apply defaults");
@@ -161,16 +222,63 @@ export function DefaultsDrawer({ checkedIds, initialValues, onClose, onApplied }
       <div className="absolute inset-0 bg-on-surface/40" onClick={onClose} />
       <div className="relative ml-auto w-full max-w-md bg-white h-full shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] flex flex-col animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-outline-variant/15">
-          <div>
-            <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface">Default Settings</h2>
-            <p className="text-[0.72rem] text-on-surface-variant mt-0.5">
-              Set values here, then apply to all dispatchers at once.
-            </p>
+        <div className="px-6 py-4 border-b border-outline-variant/15">
+          <div className="flex items-start justify-between">
+            <div>
+              <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface">Default Settings</h2>
+              <p className="text-[0.72rem] text-on-surface-variant mt-0.5">
+                Defaults are saved per branch. Pick a branch below to edit
+                its rules — &ldquo;All branches&rdquo; saves the agent-wide fallback.
+              </p>
+            </div>
+            <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-hover transition-colors">
+              <X size={18} />
+            </button>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-on-surface-variant hover:bg-surface-hover transition-colors">
-            <X size={18} />
-          </button>
+
+          {/* Branch picker */}
+          <div className="mt-3 flex items-center gap-2">
+            <label className="text-[0.7rem] uppercase tracking-[0.05em] text-on-surface-variant font-medium shrink-0">
+              Branch
+            </label>
+            <div ref={branchRef} className="relative flex-1">
+              <button
+                type="button"
+                onClick={() => setBranchOpen((o) => !o)}
+                disabled={loadingBranch || applying}
+                className="w-full flex items-center justify-between px-3 py-1.5 text-[0.82rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface hover:bg-surface-hover transition-colors disabled:opacity-60"
+              >
+                <span className="flex items-center gap-2">
+                  {loadingBranch && <Loader2 size={12} className="animate-spin text-on-surface-variant" />}
+                  {branchCode || "All branches (agent default)"}
+                </span>
+                <ChevronDown size={14} className="text-on-surface-variant" />
+              </button>
+              {branchOpen && (
+                <div className="absolute z-10 left-0 right-0 mt-1 bg-white border border-outline-variant/30 rounded-[0.375rem] shadow-[0_8px_24px_-8px_rgba(25,28,29,0.15)] max-h-60 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => { setBranchCode(""); setBranchOpen(false); }}
+                    className={`w-full flex items-center justify-between px-3 py-1.5 text-[0.82rem] transition-colors ${branchCode === "" ? "text-brand font-medium bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                  >
+                    All branches (agent default)
+                    {branchCode === "" && <Check size={12} className="text-brand" />}
+                  </button>
+                  {branchCodes.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => { setBranchCode(code); setBranchOpen(false); }}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-[0.82rem] transition-colors ${branchCode === code ? "text-brand font-medium bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                    >
+                      {code}
+                      {branchCode === code && <Check size={12} className="text-brand" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Body */}

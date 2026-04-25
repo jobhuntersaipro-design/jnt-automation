@@ -466,44 +466,59 @@ function drawEmployerAndNetPay(
   return Math.max(yLeft, yRight) + innerPadY;
 }
 
-function drawFooter(doc: PDFKit.PDFDocument, data: EmployeePayslipInput, yTop: number): void {
-  const footerY = Math.max(yTop + 40, PAGE_HEIGHT - MARGIN - 100);
+function drawFooter(
+  doc: PDFKit.PDFDocument,
+  data: EmployeePayslipInput,
+  yTop: number,
+  stampBuffer: Buffer | null,
+): void {
+  // Place the footer immediately below the table so short payslips don't
+  // leave a big blank area on the page (save paper). The previous code
+  // pinned the footer near the page bottom via Math.max(..., PAGE_HEIGHT
+  // - MARGIN - 100), which produced a fixed-position footer regardless of
+  // table height.
+  const tableGap = 16;
+  const footerY = yTop + tableGap;
+
   const blockW = 180;
   const leftX = CONTENT_LEFT;
   const rightX = CONTENT_RIGHT - blockW;
   const dots = "…………………………..";
 
+  // Stamp area exists on the right when a stamp is provided. When absent,
+  // there's no need to reserve 70px of vertical space — collapse the
+  // signatures right under the table.
+  const stampHeight = stampBuffer ? 70 : 0;
+
   // Left — PREPARED BY
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
-  doc.text(dots, leftX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
+  doc.text(dots, leftX, footerY + stampHeight, { width: blockW, align: "center", lineBreak: false });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text("PREPARED BY", leftX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+  doc.text("PREPARED BY", leftX, footerY + stampHeight + 12, { width: blockW, align: "center", lineBreak: false });
 
   // Right — optional stamp + APPROVED BY
-  if (data.stampImageUrl) {
+  if (stampBuffer) {
     try {
-      // pdfkit's `image()` accepts a data URL, local path, or Buffer. Remote
-      // URLs aren't supported inline — callers pass through an already-fetched
-      // buffer encoded as a data URL, or a local file path. If the input is an
-      // HTTPS URL we skip silently rather than crashing the whole payslip.
-      if (/^data:|^\/|^[a-zA-Z]:\\/.test(data.stampImageUrl)) {
-        doc.image(data.stampImageUrl, rightX + (blockW - 70) / 2, footerY, {
-          width: 70,
-          height: 70,
-          fit: [70, 70],
-        });
-      }
+      doc.image(stampBuffer, rightX + (blockW - 70) / 2, footerY, {
+        width: 70,
+        height: 70,
+        fit: [70, 70],
+      });
     } catch {
       // swallow — payslip still renders without stamp
     }
   }
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
-  doc.text(dots, rightX, footerY + 70, { width: blockW, align: "center", lineBreak: false });
+  doc.text(dots, rightX, footerY + stampHeight, { width: blockW, align: "center", lineBreak: false });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text("APPROVED BY", rightX, footerY + 82, { width: blockW, align: "center", lineBreak: false });
+  doc.text("APPROVED BY", rightX, footerY + stampHeight + 12, { width: blockW, align: "center", lineBreak: false });
 }
 
-function buildDocument(doc: PDFKit.PDFDocument, data: EmployeePayslipInput): void {
+function buildDocument(
+  doc: PDFKit.PDFDocument,
+  data: EmployeePayslipInput,
+  stampBuffer: Buffer | null,
+): void {
   // Company header
   let y = drawCompanyHeader(doc, data, MARGIN);
 
@@ -564,9 +579,47 @@ function buildDocument(doc: PDFKit.PDFDocument, data: EmployeePayslipInput): voi
   // the mid line is continuous because the separator runs top-to-bottom.)
 
   // Footer (stamp + signatures, outside the box)
-  drawFooter(doc, data, boxBottom);
+  drawFooter(doc, data, boxBottom, stampBuffer);
   // Silence unused-var warnings for markers we kept for readability
   void tableHeaderTop;
+}
+
+/**
+ * Resolve `input.stampImageUrl` into a Buffer pdfkit can actually consume.
+ *
+ *   - data: URLs / absolute file paths → already supported by pdfkit, but
+ *     we still convert data URLs to Buffer for uniformity.
+ *   - http(s):// (the prod case — R2 public URL is what gets persisted on
+ *     the agent record) → fetch and return the raw bytes. Without this
+ *     step pdfkit's `image()` would silently skip the stamp because the
+ *     internal regex didn't match an HTTPS URL.
+ *
+ * Failures are non-fatal: the payslip renders without the stamp.
+ */
+async function resolveStampBuffer(url: string | null | undefined): Promise<Buffer | null> {
+  if (!url) return null;
+  try {
+    if (url.startsWith("data:")) {
+      const comma = url.indexOf(",");
+      if (comma === -1) return null;
+      const b64 = url.slice(comma + 1);
+      return Buffer.from(b64, "base64");
+    }
+    if (/^https?:\/\//i.test(url)) {
+      const res = await fetch(url);
+      if (!res.ok) return null;
+      const ab = await res.arrayBuffer();
+      return Buffer.from(ab);
+    }
+    // Absolute path — pdfkit accepts it directly; pass-through Buffer.
+    if (/^\/|^[a-zA-Z]:\\/.test(url)) {
+      const { readFile } = await import("node:fs/promises");
+      return await readFile(url);
+    }
+  } catch {
+    // Swallow — caller renders the payslip without the stamp.
+  }
+  return null;
 }
 
 export async function generateEmployeePayslipPdf(
@@ -589,7 +642,13 @@ export async function generateEmployeePayslipPdf(
     doc.on("error", reject);
   });
 
-  buildDocument(doc, input);
+  // Fetch the stamp once before drawing — pdfkit's `image()` is sync and
+  // can't accept a remote URL directly. R2 hosts the stamp on https, so
+  // every payslip needs this round-trip unless the URL was already a
+  // data: URL or absolute path.
+  const stampBuffer = await resolveStampBuffer(input.stampImageUrl);
+
+  buildDocument(doc, input, stampBuffer);
   doc.end();
   return done;
 }

@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
   const gender = safeIcNo ? deriveGender(safeIcNo) : "UNKNOWN" as const;
   const trimmedName = name.trim();
 
-  const defs = await getAgentDefaults(agentId);
+  // Use the dispatcher's branch defaults if set, otherwise the agent fallback.
+  const defs = await getAgentDefaults(agentId, branch.id);
   const wt = defs.weightTiers;
   const it = defs.bonusTiers;
   const ir = defs.incentiveRule;

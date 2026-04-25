@@ -231,11 +231,16 @@ const FALLBACK_DEFAULTS: AgentDefaults = {
   petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15 },
 };
 
-export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> {
-  const d = await prisma.agentDefault.findUnique({ where: { agentId } });
-  if (!d) return FALLBACK_DEFAULTS;
-  // Bonus tier weight ranges mirror the weight tier ranges; only the
-  // commission rates differ.
+type AgentDefaultRow = {
+  tier1MinWeight: number; tier1MaxWeight: number; tier1Commission: number;
+  tier2MinWeight: number; tier2MaxWeight: number; tier2Commission: number;
+  tier3MinWeight: number; tier3Commission: number;
+  orderThreshold: number;
+  bonusTier1Commission: number; bonusTier2Commission: number; bonusTier3Commission: number;
+  petrolEligible: boolean; dailyThreshold: number; subsidyAmount: number;
+};
+
+function rowToDefaults(d: AgentDefaultRow): AgentDefaults {
   return {
     weightTiers: [
       { tier: 1, minWeight: d.tier1MinWeight, maxWeight: d.tier1MaxWeight, commission: d.tier1Commission },
@@ -250,6 +255,99 @@ export async function getAgentDefaults(agentId: string): Promise<AgentDefaults> 
     incentiveRule: { orderThreshold: d.orderThreshold },
     petrolRule: { isEligible: d.petrolEligible, dailyThreshold: d.dailyThreshold, subsidyAmount: d.subsidyAmount },
   };
+}
+
+function rowsHaveSameValues(a: AgentDefaultRow, b: AgentDefaultRow): boolean {
+  return (
+    a.tier1MinWeight === b.tier1MinWeight &&
+    a.tier1MaxWeight === b.tier1MaxWeight &&
+    a.tier1Commission === b.tier1Commission &&
+    a.tier2MinWeight === b.tier2MinWeight &&
+    a.tier2MaxWeight === b.tier2MaxWeight &&
+    a.tier2Commission === b.tier2Commission &&
+    a.tier3MinWeight === b.tier3MinWeight &&
+    a.tier3Commission === b.tier3Commission &&
+    a.orderThreshold === b.orderThreshold &&
+    a.bonusTier1Commission === b.bonusTier1Commission &&
+    a.bonusTier2Commission === b.bonusTier2Commission &&
+    a.bonusTier3Commission === b.bonusTier3Commission &&
+    a.petrolEligible === b.petrolEligible &&
+    a.dailyThreshold === b.dailyThreshold &&
+    a.subsidyAmount === b.subsidyAmount
+  );
+}
+
+/**
+ * Resolve the defaults for a given (agent, branch) pair.
+ *
+ * Lookup order:
+ *   1. branchId given → branch-specific override → agent fallback → constants
+ *   2. branchId omitted → "All branches" view:
+ *        a. AGGREGATE: if every branch has its own override AND all those
+ *           overrides carry the exact same values, return them. This makes
+ *           the drawer reflect the actual state across branches when the
+ *           user has manually set every branch to the same values.
+ *        b. Otherwise: agent-level fallback row (branchId IS NULL).
+ *        c. Otherwise: hardcoded constants.
+ *
+ * The aggregate path is the read-only "smart view" the user expected:
+ * after setting every branch to 2000 individually, the All-branches view
+ * shows 2000 even though the literal fallback row is still whatever was
+ * last saved there.
+ */
+export async function getAgentDefaults(
+  agentId: string,
+  branchId?: string | null,
+): Promise<AgentDefaults> {
+  // Branch-specific lookup — direct hit on the override row.
+  if (branchId) {
+    const d = await prisma.agentDefault.findUnique({
+      where: { agentId_branchId: { agentId, branchId } },
+    });
+    if (d) return rowToDefaults(d);
+    // Fall through to the same fallback chain used by All-branches.
+  }
+
+  // All-branches view: try aggregate first, then fallback.
+  const branches = await prisma.branch.findMany({
+    where: { agentId },
+    select: { id: true, code: true },
+  });
+
+  if (branches.length > 0) {
+    const overrides = await prisma.agentDefault.findMany({
+      where: { agentId, branchId: { in: branches.map((b) => b.id) } },
+    });
+    // Debug logging — remove once the aggregate behaviour is confirmed.
+    // Tells us in the dev terminal exactly why the aggregate is or is not
+    // kicking in for a given GET /api/staff/defaults call.
+    if (process.env.NODE_ENV !== "production") {
+      const codeById = new Map(branches.map((b) => [b.id, b.code]));
+      const summary = overrides.map((o) => ({
+        branch: codeById.get(o.branchId ?? "") ?? o.branchId,
+        orderThreshold: o.orderThreshold,
+      }));
+      console.log(
+        `[defaults-aggregate] agent=${agentId.slice(0, 8)} branches=${branches.length} overrides=${overrides.length} rows=`,
+        summary,
+      );
+    }
+    if (overrides.length === branches.length && overrides.length > 0) {
+      const first = overrides[0];
+      const allSame = overrides.every((o) => rowsHaveSameValues(o, first));
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[defaults-aggregate] allSame=${allSame}`);
+      }
+      if (allSame) return rowToDefaults(first);
+    }
+  }
+
+  const fallback = await prisma.agentDefault.findFirst({
+    where: { agentId, branchId: null },
+  });
+  if (fallback) return rowToDefaults(fallback);
+
+  return FALLBACK_DEFAULTS;
 }
 
 export function computeIsComplete(
