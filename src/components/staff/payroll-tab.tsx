@@ -914,7 +914,7 @@ export function PayrollTab() {
 
                     {/* Status / Payslip / Delete */}
                     <td className="py-2.5 px-2 text-left">
-                      <div className="inline-flex flex-col items-start gap-1">
+                      <div className="inline-flex flex-col items-start gap-2">
                         {entry.isSaved ? (
                           <button
                             onClick={() => handleGeneratePayslip(entry)}
