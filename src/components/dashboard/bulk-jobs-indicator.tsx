@@ -237,7 +237,13 @@ class BulkJobsStore {
       const data = await res.json();
       const next: ActiveJob[] = data.jobs ?? [];
 
-      // Finalize jobs that dropped out of the active set.
+      // First pass — figure out which watched jobs have transitioned to
+      // terminal AND look up their final status, but DEFER the toast until
+      // after we've updated `activeJobs` + emitted. Otherwise the toast
+      // appears while subscribers (the Downloads panel) still see the old
+      // active list, so the panel row reads as "running" when the user
+      // sees the "ready" toast — and there's no Download button yet.
+      const pendingToasts: Array<() => void> = [];
       for (const [jobId, prev] of Array.from(this.watched.entries())) {
         if (next.find((j) => j.jobId === jobId)) continue;
         if (this.finalized.has(jobId)) {
@@ -262,19 +268,22 @@ class BulkJobsStore {
               prev.kind === "payslip"
                 ? "Payslips ready"
                 : `${prev.format.toUpperCase()} export ready`;
-            toast.success(title, {
-              description: filename,
-              duration: 15_000,
-              action: {
-                label: "Download",
-                onClick: () => downloadZip(jobId, filename),
-              },
-            });
+            pendingToasts.push(() =>
+              toast.success(title, {
+                description: filename,
+                duration: 15_000,
+                action: {
+                  label: "Download",
+                  onClick: () => downloadZip(jobId, filename),
+                },
+              }),
+            );
           } else if (status.status === "failed") {
             this.justFinished.set(jobId, Date.now());
-            toast.error("Bulk export failed", {
-              description: status.error || "Unknown error",
-            });
+            const errMsg = status.error || "Unknown error";
+            pendingToasts.push(() =>
+              toast.error("Bulk export failed", { description: errMsg }),
+            );
           }
         } catch {
           // ignore transient
@@ -303,11 +312,32 @@ class BulkJobsStore {
         if (ts < cutoff) this.justFinished.delete(id);
       }
       this.emit();
+
+      // Now that subscribers have seen the new state, fire the toasts on
+      // the next microtask so the Downloads panel has a paint cycle to
+      // pull the "done" row from /recent. Without this delay the Download
+      // button can appear ~100 ms after the toast.
+      if (pendingToasts.length > 0) {
+        queueMicrotask(() => {
+          for (const fire of pendingToasts) fire();
+        });
+      }
     } catch {
       // ignore transient
     } finally {
       this.inFlight = false;
     }
+  }
+
+  /**
+   * Public force-refresh — runs an immediate tick if one isn't already in
+   * flight. Used by the Downloads panel after Cancel / Clear-all / Retry
+   * so the active list (and the bell ring) updates within the same paint
+   * frame as the user's action, instead of waiting up to 1.5 s for the
+   * next scheduled tick.
+   */
+  forceTick(): Promise<void> {
+    return this.tick();
   }
 }
 
@@ -355,6 +385,18 @@ export function useJustFinishedCount(): number {
 /** Call when the Downloads tab opens — clears the red dot. */
 export function acknowledgeDownloadsSeen(): void {
   bulkJobsStore.acknowledgeFinishes();
+}
+
+/**
+ * Force the global active-jobs poll to run NOW. Returns a promise that
+ * resolves once the tick completes (or immediately if one is already in
+ * flight). Use after a mutation (cancel, clear, retry) so the bell ring +
+ * Downloads panel reflect the new state in the same paint frame as the
+ * toast — without this you get a 1.5 s lag where the toast says
+ * "Cancelled" but the row still shows the spinner.
+ */
+export function forceBulkJobsRefresh(): Promise<void> {
+  return bulkJobsStore.forceTick();
 }
 
 /* ─── Progress ring component ──────────────────────────────────────── */

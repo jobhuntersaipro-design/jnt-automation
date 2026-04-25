@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import {
   announceBulkExportStarted,
   downloadZip,
+  forceBulkJobsRefresh,
   useActiveJobs,
   type ActiveJob,
   type BulkJobKind,
@@ -140,6 +141,25 @@ export function DownloadsPanel() {
     }
   }, []);
 
+  // Whenever a job leaves the global `active` list, force a /recent refetch
+  // immediately. The global store fires its completion toast on the same
+  // tick the job exits active — without this, the panel waits up to 1.5 s
+  // before its next own poll picks up the "done" status, so the toast says
+  // "ready" but the row has no Download button yet.
+  const prevActiveIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const currentIds = new Set(active.map((j) => j.jobId));
+    let removed = false;
+    for (const id of prevActiveIdsRef.current) {
+      if (!currentIds.has(id)) {
+        removed = true;
+        break;
+      }
+    }
+    prevActiveIdsRef.current = currentIds;
+    if (removed) void fetchRecent();
+  }, [active, fetchRecent]);
+
   // Adaptive poll cadence: 1.5 s while any row is still running (so stage +
   // counter feel live during generation), 3 s when everything is terminal.
   const anyActive = useMemo(
@@ -235,11 +255,13 @@ export function DownloadsPanel() {
         toast.error("Clear failed");
         return;
       }
-      // Optimistic — /recent endpoint now also cancels in-flight jobs, so
-      // both the recent list and the active rows should disappear. Refetch
-      // once to pick up whatever Redis state landed.
+      // Refresh BOTH the recent list (this component) AND the global active
+      // list (the bell ring + the merged `rows` below) before any toast or
+      // user-facing state change. Without `forceBulkJobsRefresh`, the
+      // active list polls on its own 1.5 s cadence and would still show
+      // the cancelled rows for up to 1.5 s after Clear all.
       setRecent([]);
-      await fetchRecent();
+      await Promise.all([fetchRecent(), forceBulkJobsRefresh()]);
     } catch {
       toast.error("Clear failed");
     } finally {
@@ -259,8 +281,12 @@ export function DownloadsPanel() {
           toast.error("Cancel failed");
           return;
         }
+        // Sync both sources of truth BEFORE the toast so the row reflects
+        // the cancel at the same instant the toast appears. Without this
+        // the user sees "Export cancelled" while the row still has the
+        // running-state spinner + X button.
+        await Promise.all([fetchRecent(), forceBulkJobsRefresh()]);
         toast.success("Export cancelled");
-        await fetchRecent();
       } catch {
         toast.error("Cancel failed");
       } finally {
