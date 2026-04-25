@@ -354,18 +354,39 @@ function drawTableBody(
   return yTop + rowCount * ROW_H;
 }
 
-function drawTotalRow(doc: PDFKit.PDFDocument, gross: number, yTop: number): number {
+function drawTotalRow(
+  doc: PDFKit.PDFDocument,
+  gross: number,
+  deductionsTotal: number,
+  yTop: number,
+): number {
   hline(doc, CONTENT_LEFT, CONTENT_RIGHT, yTop);
   const rowH = 16;
   const y = yTop + 3;
   const leftAmountX = MID_X - AMOUNT_COL_W;
+  const rightAmountX = CONTENT_RIGHT - AMOUNT_COL_W;
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
+
+  // Left side — TOTAL of additions
   doc.text("TOTAL :-", CONTENT_LEFT + ROW_PAD_X, y, {
     width: (MID_X - CONTENT_LEFT) - AMOUNT_COL_W - ROW_PAD_X * 2,
     align: "center",
     lineBreak: false,
   });
   doc.text(formatRM(gross), leftAmountX, y, {
+    width: AMOUNT_COL_W - ROW_PAD_X,
+    align: "right",
+    lineBreak: false,
+  });
+
+  // Right side — TOTAL of deductions (mirrors the layout above so the two
+  // totals sit on the same row, matching the hand-annotated reference).
+  doc.text("TOTAL :-", MID_X + ROW_PAD_X, y, {
+    width: (CONTENT_RIGHT - MID_X) - AMOUNT_COL_W - ROW_PAD_X * 2,
+    align: "center",
+    lineBreak: false,
+  });
+  doc.text(formatRM(deductionsTotal), rightAmountX, y, {
     width: AMOUNT_COL_W - ROW_PAD_X,
     align: "right",
     lineBreak: false,
@@ -528,7 +549,7 @@ function buildDocument(doc: PDFKit.PDFDocument, data: EmployeePayslipInput): voi
   const displayedNet = displayedGross - displayedDeductions;
 
   // TOTAL row
-  y = drawTotalRow(doc, displayedGross, bodyBottom);
+  y = drawTotalRow(doc, displayedGross, displayedDeductions, bodyBottom);
   const totalBottom = y;
 
   // Employer contribution + Net Pay (uses displayedNet — consistent with TOTAL)
