@@ -88,6 +88,8 @@ export type BranchSummary = {
   monthCount: number;
   totals: {
     netSalary: number;
+    /** Dispatcher-vs-staff split of `netSalary`. See spec data-model note. */
+    netSalaryByRole: { dispatcher: number; staff: number };
     baseSalary: number;
     bonusTier: number;
     petrolSubsidy: number;
@@ -125,7 +127,7 @@ export type BranchEmployeeRow = {
   name: string;
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
   extId: string | null;
-  /** Masked IC ("••••••••1234") for display; empty string if no IC set. */
+  /** Raw 12-digit IC (or empty string if no IC set). */
   icNo: string;
   isComplete: boolean;
   avatarUrl: string | null;
@@ -160,7 +162,7 @@ export async function getBranchDetail(
   });
   if (!branch) return null;
 
-  const [assignments, salaryRecords, employees] = await Promise.all([
+  const [assignments, salaryRecords, employees, employeeSalaryRecords] = await Promise.all([
     prisma.dispatcherAssignment.findMany({
       where: { branchId: branch.id },
       select: {
@@ -200,6 +202,10 @@ export async function getBranchDetail(
         dispatcher: { select: { avatarUrl: true } },
       },
       orderBy: [{ type: "asc" }, { name: "asc" }],
+    }),
+    prisma.employeeSalaryRecord.findMany({
+      where: { employee: { branchId: branch.id, agentId } },
+      select: { netSalary: true },
     }),
   ]);
 
@@ -279,8 +285,8 @@ export async function getBranchDetail(
     (a, b) => a.year * 12 + a.month - (b.year * 12 + b.month),
   );
 
-  // Summary totals
-  const totals = salaryRecords.reduce(
+  // Summary totals — dispatcher half from SalaryRecord
+  const dispatcherTotals = salaryRecords.reduce(
     (acc, r) => ({
       netSalary: acc.netSalary + r.netSalary,
       baseSalary: acc.baseSalary + r.baseSalary,
@@ -301,12 +307,23 @@ export async function getBranchDetail(
     },
   );
 
+  const staffNetSalary = employeeSalaryRecords.reduce((s, r) => s + r.netSalary, 0);
+
+  const totals = {
+    ...dispatcherTotals,
+    netSalary: dispatcherTotals.netSalary + staffNetSalary,
+    netSalaryByRole: {
+      dispatcher: dispatcherTotals.netSalary,
+      staff: staffNetSalary,
+    },
+  };
+
   const employeeRows: BranchEmployeeRow[] = employees.map((e) => ({
     employeeId: e.id,
     name: e.name,
     type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER",
     extId: e.extId,
-    icNo: e.icNo ? "•".repeat(8) + e.icNo.slice(-4) : "",
+    icNo: e.icNo ?? "",
     isComplete: !!e.icNo,
     avatarUrl: e.avatarUrl,
     dispatcherAvatarUrl: e.dispatcher?.avatarUrl ?? null,

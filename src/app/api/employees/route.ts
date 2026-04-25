@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         id: employee.id,
         extId: employee.extId ?? "",
         name: employee.name,
-        icNo: employee.icNo ? "••••••••" + employee.icNo.slice(-4) : "",
+        icNo: employee.icNo ?? "",
         rawIcNo: employee.icNo ?? "",
         gender: employee.gender,
         avatarUrl: employee.avatarUrl,

@@ -73,6 +73,49 @@ function StatCard({
   );
 }
 
+function AvgMonthlySalaryCard({ data }: { data: SummaryStats }) {
+  const dispatcherAvg = data.avgMonthlySalary.dispatcher;
+  const staffAvg = data.avgMonthlySalary.staff;
+  const dispatcherEmpty = dispatcherAvg === 0;
+  const staffEmpty = staffAvg === 0;
+  // Combined-period average for the delta — meaningful only if both periods
+  // had any people. Falls back to whichever side has data.
+  const combined = dispatcherAvg + staffAvg;
+  const prevCombined = data.prev.avgMonthlySalary.dispatcher + data.prev.avgMonthlySalary.staff;
+
+  return (
+    <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
+      <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
+      <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
+        Avg Monthly Salary
+      </p>
+      <div className="pl-2 flex flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[0.78rem] text-on-surface-variant">Dispatchers</span>
+          <span
+            className={`tabular-nums text-[1.05rem] font-semibold ${
+              dispatcherEmpty ? "text-on-surface-variant/40" : "text-on-surface"
+            }`}
+          >
+            {dispatcherEmpty ? "—" : `RM ${fmtRM(dispatcherAvg)}`}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[0.78rem] text-on-surface-variant">Staff</span>
+          <span
+            className={`tabular-nums text-[1.05rem] font-semibold ${
+              staffEmpty ? "text-on-surface-variant/40" : "text-on-surface"
+            }`}
+          >
+            {staffEmpty ? "—" : `RM ${fmtRM(staffAvg)}`}
+          </span>
+        </div>
+      </div>
+      <div className="pl-2"><Delta current={combined} prev={prevCombined} /></div>
+    </div>
+  );
+}
+
 export function SummaryCards({ data, filters }: { data: SummaryStats; filters: Filters }) {
   const prevLabel = getPrevPeriodLabel(filters);
   return (
@@ -92,16 +135,15 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
         >
           RM {fmtRM(data.totalNetPayout)}
         </p>
+        <p className="text-[0.78rem] text-white/80 tabular-nums">
+          Dispatchers RM {fmtRM(data.netPayoutByRole.dispatcher)}
+          {" · "}
+          Staff RM {fmtRM(data.netPayoutByRole.staff)}
+        </p>
         <Delta current={data.totalNetPayout} prev={data.prev.totalNetPayout} invert />
       </div>
 
-      <StatCard
-        label="Avg Monthly Salary"
-        value={`RM ${fmtRM(data.avgMonthlySalary)}`}
-        subtitle={
-          <Delta current={data.avgMonthlySalary} prev={data.prev.avgMonthlySalary} />
-        }
-      />
+      <AvgMonthlySalaryCard data={data} />
       <StatCard
         label="Total Dispatchers"
         value={fmtCount(data.totalDispatchers)}

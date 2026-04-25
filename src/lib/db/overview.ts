@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { splitNetPayout, computeAvgMonthlySalary } from "./breakdown";
 
 export type Filters = {
   selectedBranchCodes: string[];
@@ -42,17 +43,30 @@ function buildBranchWhere(agentId: string, selectedBranchCodes: string[]) {
   return { dispatcher: { branch: { agentId } } };
 }
 
+function buildEmployeeBranchWhere(agentId: string, selectedBranchCodes: string[]) {
+  if (selectedBranchCodes.length > 0) {
+    return {
+      employee: { agentId, branch: { code: { in: selectedBranchCodes } } },
+    };
+  }
+  return { employee: { agentId } };
+}
+
 // ─── Summary Stats ────────────────────────────────────────────
 
 export type SummaryStats = {
   totalNetPayout: number;
-  avgMonthlySalary: number;
+  netPayoutByRole: { dispatcher: number; staff: number };
+  avgMonthlySalary: { dispatcher: number; staff: number };
   totalDispatchers: number;
+  totalStaff: number;
   totalOrders: number;
   prev: {
     totalNetPayout: number;
-    avgMonthlySalary: number;
+    netPayoutByRole: { dispatcher: number; staff: number };
+    avgMonthlySalary: { dispatcher: number; staff: number };
     totalDispatchers: number;
+    totalStaff: number;
     totalOrders: number;
   };
 };
@@ -65,8 +79,9 @@ export async function getSummaryStats(
   const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
   const prevMonths = shiftBack(months);
   const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+  const employeeWhere = buildEmployeeBranchWhere(agentId, selectedBranchCodes);
 
-  const [records, prevRecords] = await Promise.all([
+  const [records, prevRecords, empRecords, prevEmpRecords] = await Promise.all([
     prisma.salaryRecord.findMany({
       where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
       select: { dispatcherId: true, netSalary: true, totalOrders: true },
@@ -75,28 +90,53 @@ export async function getSummaryStats(
       where: { ...branchWhere, OR: prevMonths.map(({ month, year }) => ({ month, year })) },
       select: { dispatcherId: true, netSalary: true, totalOrders: true },
     }),
+    prisma.employeeSalaryRecord.findMany({
+      where: { ...employeeWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+      select: { employeeId: true, netSalary: true },
+    }),
+    prisma.employeeSalaryRecord.findMany({
+      where: { ...employeeWhere, OR: prevMonths.map(({ month, year }) => ({ month, year })) },
+      select: { employeeId: true, netSalary: true },
+    }),
   ]);
 
-  const totalNetPayout = records.reduce((s, r) => s + r.netSalary, 0);
+  const split = splitNetPayout(records, empRecords);
+  const prevSplit = splitNetPayout(prevRecords, prevEmpRecords);
+
   const uniqueDispatchers = new Set(records.map((r) => r.dispatcherId)).size;
+  const uniqueStaff = new Set(empRecords.map((r) => r.employeeId)).size;
   const totalOrders = records.reduce((s, r) => s + r.totalOrders, 0);
-  const avgMonthlySalary = uniqueDispatchers > 0 ? totalNetPayout / uniqueDispatchers : 0;
 
   const prevUniqueDispatchers = new Set(prevRecords.map((r) => r.dispatcherId)).size;
+  const prevUniqueStaff = new Set(prevEmpRecords.map((r) => r.employeeId)).size;
   const prevTotalOrders = prevRecords.reduce((s, r) => s + r.totalOrders, 0);
-  const prevNetPayout = prevRecords.reduce((s, r) => s + r.netSalary, 0);
-  const prevAvgMonthlySalary =
-    prevUniqueDispatchers > 0 ? prevNetPayout / prevUniqueDispatchers : 0;
+
+  const avgMonthlySalary = computeAvgMonthlySalary({
+    dispatcherTotal: split.dispatcher,
+    dispatcherUnique: uniqueDispatchers,
+    staffTotal: split.staff,
+    staffUnique: uniqueStaff,
+  });
+  const prevAvgMonthlySalary = computeAvgMonthlySalary({
+    dispatcherTotal: prevSplit.dispatcher,
+    dispatcherUnique: prevUniqueDispatchers,
+    staffTotal: prevSplit.staff,
+    staffUnique: prevUniqueStaff,
+  });
 
   return {
-    totalNetPayout,
+    totalNetPayout: split.total,
+    netPayoutByRole: { dispatcher: split.dispatcher, staff: split.staff },
     avgMonthlySalary,
     totalDispatchers: uniqueDispatchers,
+    totalStaff: uniqueStaff,
     totalOrders,
     prev: {
-      totalNetPayout: prevNetPayout,
+      totalNetPayout: prevSplit.total,
+      netPayoutByRole: { dispatcher: prevSplit.dispatcher, staff: prevSplit.staff },
       avgMonthlySalary: prevAvgMonthlySalary,
       totalDispatchers: prevUniqueDispatchers,
+      totalStaff: prevUniqueStaff,
       totalOrders: prevTotalOrders,
     },
   };
@@ -142,6 +182,53 @@ export async function getMonthlyPayoutTrend(
       month: MONTH_ABBR[v.month - 1],
       actual: v.netSalary,
       baseSalary: v.baseSalary,
+    }));
+}
+
+// ─── Net Payout by Role Trend ─────────────────────────────────
+
+export type RoleBreakdownPoint = { month: string; dispatcher: number; staff: number };
+
+export async function getMonthlyDispatcherStaffBreakdown(
+  agentId: string,
+  filters: Filters,
+): Promise<RoleBreakdownPoint[]> {
+  const { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear } = filters;
+  const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
+  const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+  const employeeWhere = buildEmployeeBranchWhere(agentId, selectedBranchCodes);
+
+  const [dispatcherRecords, staffRecords] = await Promise.all([
+    prisma.salaryRecord.findMany({
+      where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+      select: { month: true, year: true, netSalary: true },
+    }),
+    prisma.employeeSalaryRecord.findMany({
+      where: { ...employeeWhere, OR: months.map(({ month, year }) => ({ month, year })) },
+      select: { month: true, year: true, netSalary: true },
+    }),
+  ]);
+
+  const grouped = new Map<string, { dispatcher: number; staff: number; month: number }>();
+  const ensure = (key: string, month: number) =>
+    grouped.get(key) ?? { dispatcher: 0, staff: 0, month };
+  for (const r of dispatcherRecords) {
+    const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
+    const cur = ensure(key, r.month);
+    grouped.set(key, { ...cur, dispatcher: cur.dispatcher + r.netSalary });
+  }
+  for (const r of staffRecords) {
+    const key = `${r.year}-${String(r.month).padStart(2, "0")}`;
+    const cur = ensure(key, r.month);
+    grouped.set(key, { ...cur, staff: cur.staff + r.netSalary });
+  }
+
+  return [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => ({
+      month: MONTH_ABBR[v.month - 1],
+      dispatcher: v.dispatcher,
+      staff: v.staff,
     }));
 }
 

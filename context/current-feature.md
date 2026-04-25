@@ -2,15 +2,20 @@
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress — branch `feature/dispatcher-staff-breakdown`. Spec at `context/features/dispatcher-staff-breakdown-spec.md`.
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Overview hero card subline + Avg Monthly Salary card show dispatcher / staff split.
+- Replace Net-Payout-vs-Base-Salary line chart with a stacked bar of dispatcher + staff per month.
+- Branch detail Net payout card shows the same split.
+- Stop masking IC numbers everywhere.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- `EmployeeSalaryRecord.netSalary` already absorbs combined-record dispatcher gross — known overlap, flagged in spec, deferred.
+- Pure helpers `splitNetPayout` + `computeAvgMonthlySalary` extracted for TDD coverage.
+- `maskIc` helper kept on disk; only call sites change.
 
 ## History
 
