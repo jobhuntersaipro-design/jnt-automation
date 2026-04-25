@@ -49,7 +49,7 @@ function LoginForm() {
       }
 
       if (result?.error || !result?.ok) {
-        setError("Invalid email or password.");
+        toast.error("Invalid email or password");
         return;
       }
 
@@ -60,7 +60,7 @@ function LoginForm() {
       if (code === "pending_approval") {
         router.push("/auth/pending");
       } else {
-        setError("Invalid email or password.");
+        toast.error("Invalid email or password");
       }
     }
   }
