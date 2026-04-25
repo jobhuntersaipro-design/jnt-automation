@@ -2,15 +2,21 @@
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress — branch `feature/payroll-edit-permissions`. Spec at `context/features/payroll-edit-permissions-spec.md`.
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Lock the `Hours` column on Supervisor / Admin payroll rows; force `workingHours=0` and `hourlyWage=0` on save for those types.
+- Lock implicit `Basic Pay` for Store Keeper rows (no UI input); force `basicPay=0` on save for those types.
+- Per-row Pay sub-label: `Basic Pay` for Sup/Admin, `Pay/Hour` for Store Keeper.
+- Existing OT-hours data on Sup/Admin records normalizes silently on the next save — no migration script.
+- Payslip calculations stay self-consistent (already row-driven); regression-tested for all 3 templates.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Existing tests: `src/lib/payroll/__tests__/statutory.test.ts`, `src/lib/staff/__tests__/payslip-generator.test.ts` doesn't exist yet — will create.
+- TDD: write failing tests for the new save-path normalization + payslip row builders, then implement.
+- No DB migration. No payslip PDF layout change.
 
 ## History
 

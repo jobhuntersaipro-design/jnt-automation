@@ -57,23 +57,23 @@ interface PayrollEntry {
 const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolAllowance", "kpiAllowance", "otherAllowance"])
 
 function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
-  const employeeGross =
-    entry.type === "STORE_KEEPER"
-      ? calculateStoreKeeperGross(
-          entry.workingHours,
-          entry.hourlyWage,
-          entry.petrolAllowance,
-          entry.kpiAllowance,
-          entry.otherAllowance
-        )
-      : calculateSupervisorGross(
-          entry.basicPay,
-          entry.petrolAllowance,
-          entry.kpiAllowance,
-          entry.otherAllowance,
-          entry.workingHours,
-          entry.hourlyWage
-        )
+  // Per-type gating mirrors the server `computeEmployeeSalaryForSave`:
+  // Sup/Admin ignore hours/hourlyWage; Store Keeper ignores basicPay.
+  const isStoreKeeper = entry.type === "STORE_KEEPER"
+  const employeeGross = isStoreKeeper
+    ? calculateStoreKeeperGross(
+        entry.workingHours,
+        entry.hourlyWage,
+        entry.petrolAllowance,
+        entry.kpiAllowance,
+        entry.otherAllowance,
+      )
+    : calculateSupervisorGross(
+        entry.basicPay,
+        entry.petrolAllowance,
+        entry.kpiAllowance,
+        entry.otherAllowance,
+      )
 
   const totalGross = employeeGross + entry.dispatcherGross
 
@@ -237,7 +237,18 @@ export function PayrollTab() {
       const res = await fetch(`/api/employee-payroll/${month}/${year}`)
       if (!res.ok) throw new Error("Failed to fetch")
       const data = await res.json()
-      setEntries(data.entries)
+      // Normalize legacy OT-on-Sup/Admin records: drop saved hours/hourlyWage
+      // from local state so the table reflects the basic-pay-only formula.
+      // The DB still holds the old values until the next Confirm & Save.
+      const normalized: PayrollEntry[] = (data.entries as PayrollEntry[]).map((e) => {
+        if (e.type === "STORE_KEEPER") return e
+        if (e.workingHours === 0 && e.hourlyWage === 0) return e
+        return recalcEntry(
+          { ...e, workingHours: 0, hourlyWage: 0 },
+          "workingHours",
+        )
+      })
+      setEntries(normalized)
     } catch {
       toast.error("Failed to load payroll data")
     } finally {
@@ -253,6 +264,11 @@ export function PayrollTab() {
     setEntries((prev) =>
       prev.map((e) => {
         if (e.employeeId !== employeeId) return e
+        // Guard against writes that don't apply to this employee type. The UI
+        // already hides those inputs, but this keeps the state machine honest.
+        const isStoreKeeper = e.type === "STORE_KEEPER"
+        if (isStoreKeeper && field === "basicPay") return e
+        if (!isStoreKeeper && (field === "workingHours" || field === "hourlyWage")) return e
         const updated = { ...e, [field]: value }
         return recalcEntry(updated, field)
       })
@@ -269,27 +285,34 @@ export function PayrollTab() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload = entries.map((e) => ({
-        employeeId: e.employeeId,
-        basicPay: e.basicPay,
-        workingHours: e.workingHours,
-        hourlyWage: e.hourlyWage,
-        kpiAllowance: e.kpiAllowance,
-        petrolAllowance: e.petrolAllowance,
-        otherAllowance: e.otherAllowance,
-        pcb: e.pcb,
-        penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
-        advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
-        // Statutory overrides — let users persist manual edits (including
-        // explicit zeros). Omitted fields would otherwise be recomputed
-        // server-side from gross, overwriting any cleared value.
-        epfEmployee: e.epfEmployee,
-        socsoEmployee: e.socsoEmployee,
-        eisEmployee: e.eisEmployee,
-        epfEmployer: e.epfEmployer,
-        socsoEmployer: e.socsoEmployer,
-        eisEmployer: e.eisEmployer,
-      }))
+      const payload = entries.map((e) => {
+        const isStoreKeeper = e.type === "STORE_KEEPER"
+        return {
+          employeeId: e.employeeId,
+          // Force per-type wage source: Sup/Admin → basicPay only;
+          // Store Keeper → workingHours × hourlyWage only.
+          // Server re-applies the same gating, but we strip irrelevant
+          // values here so the payload reflects intent.
+          basicPay: isStoreKeeper ? 0 : e.basicPay,
+          workingHours: isStoreKeeper ? e.workingHours : 0,
+          hourlyWage: isStoreKeeper ? e.hourlyWage : 0,
+          kpiAllowance: e.kpiAllowance,
+          petrolAllowance: e.petrolAllowance,
+          otherAllowance: e.otherAllowance,
+          pcb: e.pcb,
+          penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
+          advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
+          // Statutory overrides — let users persist manual edits (including
+          // explicit zeros). Omitted fields would otherwise be recomputed
+          // server-side from gross, overwriting any cleared value.
+          epfEmployee: e.epfEmployee,
+          socsoEmployee: e.socsoEmployee,
+          eisEmployee: e.eisEmployee,
+          epfEmployer: e.epfEmployer,
+          socsoEmployer: e.socsoEmployer,
+          eisEmployer: e.eisEmployer,
+        }
+      })
 
       const res = await fetch(`/api/employee-payroll/${month}/${year}`, {
         method: "POST",
@@ -669,7 +692,8 @@ export function PayrollTab() {
                       )}
                     </td>
 
-                    {/* Basic Pay / Hourly Wage */}
+                    {/* Pay column — Basic Pay for Sup/Admin, Pay/Hour for Store Keeper.
+                        Per-row sub-label disambiguates which one is being edited. */}
                     <td className="py-2.5 px-1">
                       <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
@@ -677,32 +701,24 @@ export function PayrollTab() {
                           onChange={(v) => updateEntry(entry.employeeId, isStoreKeeper ? "hourlyWage" : "basicPay", v)}
                         />
                       </div>
+                      <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                        {isStoreKeeper ? "Pay / Hour" : "Basic Pay"}
+                      </div>
                     </td>
 
-                    {/* Working Hours — editable for all types. For Supervisor/Admin
-                        it adds `hours × hourlyWage` on top of basicPay; for Store
-                        Keeper it drives the whole wage. An hourly-wage sub-input
-                        appears under the hours input for Supervisor/Admin once
-                        they enter hours, so they can set the per-hour rate. */}
+                    {/* Hours — editable only for Store Keeper. Supervisor/Admin
+                        rows render an em-dash; their wage is monthly Basic Pay only. */}
                     <td className="py-2.5 px-1">
-                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                        <HoursInput
-                          value={entry.workingHours}
-                          onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
-                        />
-                      </div>
-                      {!isStoreKeeper && entry.workingHours > 0 && (
-                        <div className="mt-1">
-                          <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                            <CalcCurrencyInput
-                              value={entry.hourlyWage}
-                              onChange={(v) => updateEntry(entry.employeeId, "hourlyWage", v)}
-                              light
-                            />
-                          </div>
-                          <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
-                            RM / hr
-                          </div>
+                      {isStoreKeeper ? (
+                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                          <HoursInput
+                            value={entry.workingHours}
+                            onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
+                          />
+                        </div>
+                      ) : (
+                        <div className="text-center text-[0.8rem] text-on-surface-variant/40 tabular-nums" aria-label="Not applicable">
+                          —
                         </div>
                       )}
                     </td>
