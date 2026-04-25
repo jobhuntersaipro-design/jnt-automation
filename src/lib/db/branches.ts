@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Gender } from "@/generated/prisma/client";
 
 export type BranchOverviewCard = {
   branchCode: string;
@@ -115,6 +116,8 @@ export type BranchDispatcherRow = {
   monthsActive: number;
   /** Most recent salary record month label (e.g. "Apr 2026") or null if none */
   lastActive: string | null;
+  avatarUrl: string | null;
+  gender: Gender;
 };
 
 export type BranchEmployeeRow = {
@@ -125,6 +128,10 @@ export type BranchEmployeeRow = {
   /** Masked IC ("••••••••1234") for display; empty string if no IC set. */
   icNo: string;
   isComplete: boolean;
+  avatarUrl: string | null;
+  /** Avatar of the linked dispatcher (FK) — wins on display when set. */
+  dispatcherAvatarUrl: string | null;
+  gender: Gender;
 };
 
 export type BranchDetail = {
@@ -161,7 +168,7 @@ export async function getBranchDetail(
         extId: true,
         startedAt: true,
         endedAt: true,
-        dispatcher: { select: { id: true, name: true } },
+        dispatcher: { select: { id: true, name: true, avatarUrl: true, gender: true } },
       },
       orderBy: { startedAt: "desc" },
     }),
@@ -188,6 +195,9 @@ export async function getBranchDetail(
         type: true,
         extId: true,
         icNo: true,
+        avatarUrl: true,
+        gender: true,
+        dispatcher: { select: { avatarUrl: true } },
       },
       orderBy: [{ type: "asc" }, { name: "asc" }],
     }),
@@ -237,6 +247,8 @@ export async function getBranchDetail(
       totalOrders: stats?.totalOrders ?? 0,
       monthsActive: stats?.months.size ?? 0,
       lastActive: lastMonth > 0 ? `${MONTH_ABBR[lastMonth]} ${lastYear}` : null,
+      avatarUrl: a.dispatcher.avatarUrl,
+      gender: a.dispatcher.gender,
     });
   }
   dispatchers.sort((a, b) => b.totalNetSalary - a.totalNetSalary);
@@ -296,6 +308,9 @@ export async function getBranchDetail(
     extId: e.extId,
     icNo: e.icNo ? "•".repeat(8) + e.icNo.slice(-4) : "",
     isComplete: !!e.icNo,
+    avatarUrl: e.avatarUrl,
+    dispatcherAvatarUrl: e.dispatcher?.avatarUrl ?? null,
+    gender: e.gender,
   }));
 
   return {

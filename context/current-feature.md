@@ -2,15 +2,19 @@
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress — branch `feature/avatar-everywhere`. Spec at `context/features/avatar-everywhere-spec.md`.
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Show 32-px gender-ringed avatars in `/branches/[code]` dispatcher + employee tables (read-only).
+- Make `/staff?tab=settings` and `/staff?tab=payroll` avatars editable (upload / replace / delete) — same dialog as `/dispatchers?tab=settings`.
+- When an employee is linked to a dispatcher (FK), edits route to the dispatcher's avatar so the displayed photo and persisted target stay in sync.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Avatar upload APIs already exist for both subjects: `/api/staff/[id]/avatar` and `/api/employees/[id]/avatar`.
+- `DispatcherAvatar` component is already generic via `apiBasePath` prop — reuse, don't rename.
+- New pure helper `selectAvatarTarget` + tests; the rest is presentational + Prisma SELECT extension.
 
 ## History
 

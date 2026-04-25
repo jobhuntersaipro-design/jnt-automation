@@ -7,6 +7,7 @@ import { getBranchDetail } from "@/lib/db/branches";
 import { getBranchColor } from "@/lib/branch-colors";
 import { BranchTrendChart } from "@/components/branches/branch-trend-chart";
 import { AddEmployeeButton } from "@/components/branches/add-employee-button";
+import { EmployeeAvatarView } from "@/components/staff/employee-avatar-view";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -209,12 +210,19 @@ export default async function BranchDetailPage({
                     key={d.dispatcherId}
                     className="grid grid-cols-1 sm:grid-cols-[2fr_1.2fr_0.7fr_0.7fr_1fr_1fr_0.6fr] gap-x-3 gap-y-1 items-center px-6 py-3 border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-hover/40 transition-colors"
                   >
-                    <Link
-                      href={`/dispatchers?highlight=${encodeURIComponent(d.extId)}`}
-                      className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
-                    >
-                      {d.name}
-                    </Link>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <EmployeeAvatarView
+                        name={d.name}
+                        gender={d.gender}
+                        avatarUrl={d.avatarUrl}
+                      />
+                      <Link
+                        href={`/dispatchers?highlight=${encodeURIComponent(d.extId)}`}
+                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
+                      >
+                        {d.name}
+                      </Link>
+                    </div>
                     <span className="text-[0.78rem] text-on-surface-variant tabular-nums truncate">
                       {d.extId}
                     </span>
@@ -289,12 +297,20 @@ export default async function BranchDetailPage({
                     key={e.employeeId}
                     className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1.2fr_0.6fr] gap-x-3 gap-y-1 items-center px-6 py-3 border-b border-outline-variant/10 last:border-b-0 hover:bg-surface-hover/40 transition-colors"
                   >
-                    <Link
-                      href={`/staff?highlight=${encodeURIComponent(e.employeeId)}`}
-                      className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
-                    >
-                      {e.name}
-                    </Link>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <EmployeeAvatarView
+                        name={e.name}
+                        gender={e.gender}
+                        avatarUrl={e.avatarUrl}
+                        dispatcherAvatarUrl={e.dispatcherAvatarUrl}
+                      />
+                      <Link
+                        href={`/staff?highlight=${encodeURIComponent(e.employeeId)}`}
+                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
+                      >
+                        {e.name}
+                      </Link>
+                    </div>
                     <span className="text-[0.78rem] text-on-surface-variant">
                       {e.type === "STORE_KEEPER" ? "Store Keeper" : e.type === "SUPERVISOR" ? "Supervisor" : "Admin"}
                     </span>
