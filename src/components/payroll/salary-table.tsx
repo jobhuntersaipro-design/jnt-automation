@@ -266,17 +266,23 @@ export function SalaryTable({
 
   // Filtered + sorted records for display. Pinned rows always float to the
   // top; sort is applied within each group (pinned / unpinned).
+  // In edit mode, freeze the sort order so rows don't jump as netSalary changes.
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    const matched = records.filter((r) => {
+    const source = editMode ? preEditRecords : records;
+    const matched = source.filter((r) => {
       if (q && !r.name.toLowerCase().includes(q) && !r.extId.toLowerCase().includes(q)) {
         return false;
       }
       if (highPerformerOnly && !isHighPerformer(r)) return false;
       return true;
     });
-    return sortAndPinRows(matched, sortKey, sortDir);
-  }, [records, search, highPerformerOnly, sortKey, sortDir]);
+    const sorted = editMode ? matched : sortAndPinRows(matched, sortKey, sortDir);
+    // In edit mode, map sorted rows back to live records so edits are visible
+    if (!editMode) return sorted;
+    const liveMap = new Map(records.map((r) => [r.dispatcherId, r]));
+    return sorted.map((r) => liveMap.get(r.dispatcherId) ?? r);
+  }, [records, preEditRecords, editMode, search, highPerformerOnly, sortKey, sortDir]);
 
   // Header click handler — asc → desc → clear.
   const toggleSort = useCallback((key: SortKey) => {
