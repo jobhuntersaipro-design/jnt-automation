@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import crypto from "crypto";
-import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 import { forgotPasswordLimiter, extractIp } from "@/lib/rate-limit";
+import { sendPasswordResetEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   const ip = extractIp((await headers()).get("x-forwarded-for"));
@@ -54,25 +54,7 @@ export async function POST(req: NextRequest) {
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const resetUrl = `${baseUrl}/auth/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
 
-  if (process.env.RESEND_API_KEY) {
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    await resend.emails.send({
-      from: "EasyStaff <help@easystaff.top>",
-      to: email,
-      subject: "Reset your password — EasyStaff",
-      text: [
-        `Hi ${agent.name},`,
-        "",
-        "You requested a password reset. Click the link below to set a new password:",
-        "",
-        resetUrl,
-        "",
-        "This link expires in 1 hour.",
-        "",
-        "If you didn't request this, you can safely ignore this email.",
-      ].join("\n"),
-    });
-  }
+  await sendPasswordResetEmail(email, agent.name, resetUrl);
 
   return NextResponse.json({ message: "If an account exists, a reset link has been sent." });
 }

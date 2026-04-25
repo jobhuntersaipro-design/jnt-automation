@@ -53,6 +53,67 @@ function wrapInTemplate(body: string): string {
 }
 
 /**
+ * Send password reset email with a one-time link. Uses the same branded
+ * template as the approval mail so the user sees consistent EasyStaff
+ * styling across all account-flow emails.
+ */
+export async function sendPasswordResetEmail(
+  agentEmail: string,
+  agentName: string,
+  resetUrl: string,
+) {
+  const resend = getResend();
+  if (!resend) return;
+
+  const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
+        Reset your password
+      </h2>
+      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
+        Hi ${agentName},
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
+        We received a request to reset the password on your EasyStaff account. Click the button below to choose a new one — the link expires in 1 hour.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+        <tr>
+          <td style="background-color:#0056D2;border-radius:6px;">
+            <a href="${resetUrl}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+              Reset password
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0 0 4px;font-size:13px;color:#424654;line-height:1.5;">
+        If the button doesn't work, copy and paste this link into your browser:
+      </p>
+      <p style="margin:0 0 24px;font-size:13px;word-break:break-all;">
+        <a href="${resetUrl}" style="color:#0056D2;text-decoration:none;">${resetUrl}</a>
+      </p>
+      <p style="margin:0;padding:14px 16px;font-size:13px;color:#424654;line-height:1.5;background-color:#f3f4f5;border-left:3px solid #940002;border-radius:4px;">
+        Didn't ask for this? You can safely ignore this email — your password will not change unless you click the link above.
+      </p>
+  `);
+
+  await resend.emails.send({
+    from: "EasyStaff <help@easystaff.top>",
+    to: agentEmail,
+    subject: "Reset your password — EasyStaff",
+    html,
+    text: [
+      `Hi ${agentName},`,
+      "",
+      "We received a request to reset the password on your EasyStaff account.",
+      "Click the link below to choose a new one — it expires in 1 hour.",
+      "",
+      resetUrl,
+      "",
+      "Didn't ask for this? You can safely ignore this email — your password will not change unless you click the link above.",
+    ].join("\n"),
+  });
+}
+
+/**
  * Send approval notification email to the agent.
  */
 export async function sendApprovalEmail(agentEmail: string, agentName: string) {
