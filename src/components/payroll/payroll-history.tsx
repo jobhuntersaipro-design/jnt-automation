@@ -412,7 +412,7 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
   return (
     <div className="flex flex-col gap-4">
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="relative" ref={branchFilterRef}>
           <button
             type="button"
@@ -462,10 +462,10 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
           placeholder="Search by branch or month..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-52"
+          className="px-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 flex-1 min-w-32 sm:flex-none sm:w-52"
         />
 
-        <div className="ml-auto text-[0.78rem] text-on-surface-variant/70 tabular-nums">
+        <div className="ml-auto text-[0.78rem] text-on-surface-variant/70 tabular-nums whitespace-nowrap">
           {totals.count} {totals.count === 1 ? "record" : "records"}
         </div>
       </div>

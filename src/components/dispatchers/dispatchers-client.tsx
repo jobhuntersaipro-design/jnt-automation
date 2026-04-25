@@ -381,7 +381,7 @@ export function DispatchersClient({
               Manage dispatchers and salary rules across all branches.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
             {activeTab === "settings" && (
               <>
                 <BulkDetailDownload />
@@ -477,7 +477,7 @@ export function DispatchersClient({
         ) : (
         <>
         {/* Filters */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div ref={branchRef} className="relative">
             <button
               onClick={() => setBranchOpen((o) => !o)}
@@ -509,14 +509,14 @@ export function DispatchersClient({
             )}
           </div>
 
-          <div className="relative">
+          <div className="relative flex-1 sm:flex-none min-w-32">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
             <input
               type="text"
               placeholder="Search name or ID..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-52 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
+              className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
             />
           </div>
 
