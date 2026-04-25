@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Truck, ShieldCheck, ClipboardList, Package } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getBranchDetail } from "@/lib/db/branches";
 import { getBranchColor } from "@/lib/branch-colors";
@@ -45,6 +46,49 @@ export default async function BranchDetailPage({
   const branchColor = getBranchColor(summary.branchCode);
   const branchCodes = allBranches.map((b) => b.code);
 
+  const supervisorCount = employees.filter((e) => e.type === "SUPERVISOR").length;
+  const adminCount = employees.filter((e) => e.type === "ADMIN").length;
+  const storeKeeperCount = employees.filter((e) => e.type === "STORE_KEEPER").length;
+
+  const peopleCards: PeopleCard[] = [
+    {
+      label: "Dispatchers",
+      count: summary.dispatcherCount,
+      icon: Truck,
+      tileBg: "bg-brand/10",
+      tileFg: "text-brand",
+      countColor: "text-brand",
+      target: "#dispatchers-section",
+    },
+    {
+      label: "Supervisors",
+      count: supervisorCount,
+      icon: ShieldCheck,
+      tileBg: "bg-emerald-50",
+      tileFg: "text-emerald-700",
+      countColor: "text-emerald-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Admins",
+      count: adminCount,
+      icon: ClipboardList,
+      tileBg: "bg-purple-50",
+      tileFg: "text-purple-700",
+      countColor: "text-purple-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Store keepers",
+      count: storeKeeperCount,
+      icon: Package,
+      tileBg: "bg-amber-50",
+      tileFg: "text-amber-700",
+      countColor: "text-amber-700",
+      target: "#employees-section",
+    },
+  ];
+
   const summaryCards = [
     { label: "Net payout", value: formatRMShort(summary.totals.netSalary), accent: "text-brand" },
     { label: "Base salary", value: formatRMShort(summary.totals.baseSalary), accent: "text-on-surface" },
@@ -78,13 +122,22 @@ export default async function BranchDetailPage({
           <AddEmployeeButton branchCode={summary.branchCode} branchCodes={branchCodes} />
         </div>
         <p className="text-[0.78rem] text-on-surface-variant mt-1">
-          {summary.dispatcherCount} dispatcher{summary.dispatcherCount === 1 ? "" : "s"} ·{" "}
           {summary.monthCount} month{summary.monthCount === 1 ? "" : "s"} of salary records ·{" "}
           {summary.totals.totalOrders.toLocaleString()} lifetime orders
         </p>
       </header>
 
       <main className="px-4 lg:px-8 pb-12 space-y-6">
+        {/* People at branch — role count cards (Dispatchers / Supervisors / Admins / Store keepers) */}
+        <section
+          aria-label="People at branch"
+          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+        >
+          {peopleCards.map((c) => (
+            <PeopleCountCard key={c.label} card={c} />
+          ))}
+        </section>
+
         {/* Summary cards */}
         <section
           aria-label="Branch totals"
@@ -112,8 +165,9 @@ export default async function BranchDetailPage({
 
         {/* Dispatchers list */}
         <section
+          id="dispatchers-section"
           aria-label="Dispatchers at this branch"
-          className="bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
+          className="scroll-mt-24 lg:scroll-mt-28 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
         >
           <header className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap">
             <div>
@@ -196,8 +250,9 @@ export default async function BranchDetailPage({
 
         {/* Employees at this branch — appears after Add Employee so new rows land visibly here */}
         <section
+          id="employees-section"
           aria-label="Employees at this branch"
-          className="bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
+          className="scroll-mt-24 lg:scroll-mt-28 bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant overflow-hidden"
         >
           <header className="flex items-center justify-between gap-3 px-6 py-4 flex-wrap">
             <div>
@@ -268,5 +323,46 @@ export default async function BranchDetailPage({
         </section>
       </main>
     </div>
+  );
+}
+
+type PeopleCard = {
+  label: string;
+  count: number;
+  icon: LucideIcon;
+  tileBg: string;
+  tileFg: string;
+  countColor: string;
+  target: string;
+};
+
+function PeopleCountCard({ card }: { card: PeopleCard }) {
+  const Icon = card.icon;
+  const empty = card.count === 0;
+  return (
+    <a
+      href={card.target}
+      aria-label={`Jump to ${card.label} at this branch (${card.count})`}
+      className="group block bg-white rounded-[0.75rem] p-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant cursor-pointer hover:shadow-[0_12px_40px_-12px_rgba(25,28,29,0.12)] transition-shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/50"
+    >
+      <div className="flex items-center gap-2">
+        <span
+          className={`shrink-0 w-7 h-7 rounded-md flex items-center justify-center ${card.tileBg} ${card.tileFg}`}
+          aria-hidden
+        >
+          <Icon size={14} strokeWidth={2.2} />
+        </span>
+        <p className="text-[0.65rem] uppercase tracking-wider text-on-surface-variant/70 font-medium">
+          {card.label}
+        </p>
+      </div>
+      <p
+        className={`mt-1.5 text-[1.05rem] font-semibold tabular-nums ${
+          empty ? "text-on-surface-variant/40" : card.countColor
+        }`}
+      >
+        {card.count}
+      </p>
+    </a>
   );
 }
