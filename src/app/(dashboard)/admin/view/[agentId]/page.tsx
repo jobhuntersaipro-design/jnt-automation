@@ -18,7 +18,7 @@ export default async function AgentViewPage({
   if (!data) redirect("/admin");
 
   return (
-    <main className="flex-1 overflow-y-auto px-16 py-8">
+    <main className="flex-1 overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
       <AgentViewClient data={data} />
     </main>
   );

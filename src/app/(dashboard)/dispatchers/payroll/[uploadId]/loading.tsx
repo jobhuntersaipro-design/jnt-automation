@@ -12,17 +12,17 @@ export default function SalaryTableLoading() {
         <div className="absolute h-full bg-brand/60" style={{ animation: "progress-indeterminate-2 2s 0.5s infinite ease-in-out" }} />
       </div>
 
-      <div className="px-16 py-8 flex flex-col gap-6">
-        <div className="flex items-center gap-4">
+      <div className="px-4 lg:px-16 py-6 lg:py-8 flex flex-col gap-6">
+        <div className="flex flex-wrap items-center gap-4">
           <Skeleton className="h-8 w-8 rounded" />
-          <Skeleton className="h-7 w-64" />
+          <Skeleton className="h-7 w-64 max-w-full" />
           <div className="ml-auto flex gap-2">
             <Skeleton className="h-9 w-24" />
             <Skeleton className="h-9 w-24" />
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {Array.from({ length: 5 }).map((_, i) => (
             <Skeleton key={i} className={`h-20 rounded-lg ${i === 0 ? "col-span-1" : ""}`} />
           ))}

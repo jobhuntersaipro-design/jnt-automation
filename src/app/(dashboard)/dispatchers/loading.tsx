@@ -14,25 +14,25 @@ export default function DispatchersLoading() {
       </div>
 
       {/* Header placeholder */}
-      <div className="px-8 pt-5 pb-4 flex items-center justify-between gap-6">
+      <div className="px-4 lg:px-8 pt-4 lg:pt-5 pb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex flex-col gap-2">
           <Skeleton className="h-7 w-28" />
-          <Skeleton className="h-4 w-72" />
+          <Skeleton className="h-4 w-48 lg:w-72 max-w-full" />
         </div>
         <Skeleton className="h-9 w-36" />
       </div>
 
       {/* Filters placeholder */}
-      <div className="px-8 pb-4 flex items-center gap-3">
+      <div className="px-4 lg:px-8 pb-4 flex flex-wrap items-center gap-3">
         <Skeleton className="h-9 w-36" />
-        <Skeleton className="h-9 w-52" />
-        <div className="ml-auto">
-          <Skeleton className="h-4 w-48" />
+        <Skeleton className="h-9 flex-1 min-w-32 sm:flex-none sm:w-52" />
+        <div className="sm:ml-auto">
+          <Skeleton className="h-4 w-32 sm:w-48" />
         </div>
       </div>
 
       {/* Table placeholder */}
-      <div className="px-8">
+      <div className="px-4 lg:px-8">
         <div className="bg-white rounded-[0.75rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)]">
           {/* Header row */}
           <div className="px-6 py-3 flex gap-4">

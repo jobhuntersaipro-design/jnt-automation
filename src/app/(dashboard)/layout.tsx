@@ -32,7 +32,12 @@ export default async function DashboardLayout({
       )}
       {/* Top nav */}
       <header className="h-14 lg:h-16 shrink-0 flex items-center px-4 lg:px-16 bg-surface-dim relative">
-        <MobileNav isSuperAdmin={session?.user?.isSuperAdmin ?? false} impersonating={isImpersonating} />
+        <MobileNav
+          isSuperAdmin={session?.user?.isSuperAdmin ?? false}
+          impersonating={isImpersonating}
+          userName={session?.user?.name ?? "User"}
+          userImage={session?.user?.image}
+        />
 
         <a href="/dashboard" className="shrink-0">
           <Image

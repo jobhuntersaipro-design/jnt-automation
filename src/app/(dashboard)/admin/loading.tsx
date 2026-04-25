@@ -12,7 +12,7 @@ export default function AdminLoading() {
         <div className="absolute h-full bg-brand/60" style={{ animation: "progress-indeterminate-2 2s 0.5s infinite ease-in-out" }} />
       </div>
 
-      <div className="px-16 py-8 max-w-5xl mx-auto flex flex-col gap-6">
+      <div className="px-4 lg:px-16 py-6 lg:py-8 max-w-5xl mx-auto flex flex-col gap-6">
         <div className="flex flex-col gap-1">
           <Skeleton className="h-8 w-40" />
           <Skeleton className="h-4 w-72" />

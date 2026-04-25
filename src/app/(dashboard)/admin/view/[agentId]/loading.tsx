@@ -12,9 +12,9 @@ export default function AgentViewLoading() {
         <div className="absolute h-full bg-brand/60" style={{ animation: "progress-indeterminate-2 2s 0.5s infinite ease-in-out" }} />
       </div>
 
-      <div className="px-16 py-8 max-w-5xl mx-auto flex flex-col gap-6">
+      <div className="px-4 lg:px-16 py-6 lg:py-8 max-w-5xl mx-auto flex flex-col gap-6">
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-20 rounded-lg" />
           ))}
