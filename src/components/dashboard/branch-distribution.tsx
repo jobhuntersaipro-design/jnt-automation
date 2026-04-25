@@ -162,13 +162,15 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No branch data available
           </div>
-        ) : cw > 0 && ch > 0 ? (
+        ) : cw > 0 && ch > 0 ? (() => {
+          const isNarrow = cw < 480;
+          return (
             <BarChart
               width={cw}
               height={Math.round(ch * 1.1)}
               data={chartData}
               margin={{ top: 8, right: 8, bottom: 36, left: 0 }}
-              barSize={64}
+              barSize={isNarrow ? 36 : 64}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onMouseMove={(state: any) => {
                 if (state.isTooltipActive && typeof state.activeTooltipIndex === "number") {
@@ -190,10 +192,10 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
               <YAxis
                 domain={domain}
                 tickFormatter={(v) => fmtTick(v, metric)}
-                tick={{ fontSize: 11, fill: "#424654", dx: -4 }}
+                tick={{ fontSize: isNarrow ? 10 : 11, fill: "#424654", dx: -4 }}
                 axisLine={false}
                 tickLine={false}
-                width={metric === "netPayout" ? 96 : 68}
+                width={isNarrow ? (metric === "netPayout" ? 52 : 40) : metric === "netPayout" ? 96 : 68}
               />
               <Tooltip
                 content={(props) => (
@@ -220,7 +222,8 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
                 }}
               />
             </BarChart>
-        ) : null}
+          );
+        })() : null}
       </div>
     </div>
   );

@@ -597,7 +597,11 @@ export function PayrollTab() {
           No employees found. Add employees in the Settings tab first.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="flex flex-col gap-1.5">
+          <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1">
+            Swipe left to see more columns →
+          </p>
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
           <table className="w-full" style={{ minWidth: 1180 }}>
             <thead>
               <tr>
@@ -923,6 +927,7 @@ export function PayrollTab() {
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

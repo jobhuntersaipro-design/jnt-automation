@@ -83,8 +83,14 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
   const yMaxDispatcher = computeNiceMax(data.map((d) => d.dispatcher));
   const yMaxStaff = computeNiceMax(data.map((d) => d.staff));
 
+  // Shrink axis gutters on narrow viewports so the actual plot area stays
+  // legible on iPhone 14 (390px) — desktop widths unchanged.
+  const isNarrow = cw > 0 && cw < 480;
+  const axisWidth = isNarrow ? 38 : 56;
+  const tickFontSize = isNarrow ? 10 : 11;
+
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       <div className="shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
           <div>
@@ -114,11 +120,11 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
             No data for selected range
           </div>
         ) : cw > 0 && ch > 0 ? (
-          <LineChart width={cw} height={ch} data={data} margin={{ top: 10, right: 16, bottom: 0, left: 8 }}>
+          <LineChart width={cw} height={ch} data={data} margin={{ top: 10, right: isNarrow ? 4 : 16, bottom: 0, left: 0 }}>
             <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis
               dataKey="month"
-              tick={{ fill: CHART_COLORS.axisText, fontSize: 11 }}
+              tick={{ fill: CHART_COLORS.axisText, fontSize: tickFontSize }}
               axisLine={{ stroke: CHART_COLORS.grid }}
               tickLine={false}
             />
@@ -126,21 +132,21 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
               yAxisId="dispatcher"
               orientation="left"
               domain={[0, yMaxDispatcher]}
-              tick={{ fill: CHART_COLORS.brand, fontSize: 11 }}
+              tick={{ fill: CHART_COLORS.brand, fontSize: tickFontSize }}
               tickFormatter={fmtY}
               axisLine={false}
               tickLine={false}
-              width={56}
+              width={axisWidth}
             />
             <YAxis
               yAxisId="staff"
               orientation="right"
               domain={[0, yMaxStaff]}
-              tick={{ fill: CHART_COLORS.bonusTierEarnings, fontSize: 11 }}
+              tick={{ fill: CHART_COLORS.bonusTierEarnings, fontSize: tickFontSize }}
               tickFormatter={fmtY}
               axisLine={false}
               tickLine={false}
-              width={56}
+              width={axisWidth}
             />
             <Tooltip content={<CustomTooltip />} />
             <Line

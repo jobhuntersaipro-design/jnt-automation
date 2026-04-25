@@ -718,6 +718,9 @@ export function SalaryTable({
       </div>
 
       {/* Table */}
+      <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1 mb-1.5">
+        Swipe left to see more columns →
+      </p>
       <div className="rounded-xl bg-surface-card border border-outline-variant/15 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-[0.82rem]">

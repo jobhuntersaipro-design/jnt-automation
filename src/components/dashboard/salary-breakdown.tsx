@@ -105,27 +105,29 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
       </div>
 
       <div ref={chartRef} style={{ height: "14rem", width: "100%" }}>
-        {cw > 0 && ch > 0 ? (
+        {cw > 0 && ch > 0 ? (() => {
+          const isNarrow = cw < 480;
+          return (
           <BarChart
             width={cw}
             height={ch}
             data={data}
-            margin={{ top: 8, right: 16, bottom: 4, left: 0 }}
-            barSize={110}
+            margin={{ top: 8, right: isNarrow ? 4 : 16, bottom: 4, left: 0 }}
+            barSize={isNarrow ? 60 : 110}
           >
             <XAxis
               dataKey="month"
-              tick={{ fontSize: 13, fill: "#424654", dy: 4 }}
+              tick={{ fontSize: isNarrow ? 10 : 13, fill: "#424654", dy: 4 }}
               axisLine={false}
               tickLine={false}
-              padding={{ left: 24, right: 24 }}
+              padding={{ left: isNarrow ? 8 : 24, right: isNarrow ? 8 : 24 }}
             />
             <YAxis
               tickFormatter={fmtY}
-              tick={{ fontSize: 12, fill: "#424654", dx: -4 }}
+              tick={{ fontSize: isNarrow ? 10 : 12, fill: "#424654", dx: -4 }}
               axisLine={false}
               tickLine={false}
-              width={72}
+              width={isNarrow ? 44 : 72}
             />
             <Tooltip content={<TooltipContent />} cursor={false} />
             {SEGMENTS.map(({ key, label, color }, i) => (
@@ -143,7 +145,8 @@ export function SalaryBreakdown({ data }: { data: BreakdownPoint[] }) {
               />
             ))}
           </BarChart>
-        ) : null}
+          );
+        })() : null}
       </div>
     </div>
   );
