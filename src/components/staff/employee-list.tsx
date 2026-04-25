@@ -186,7 +186,11 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto mt-4">
+        <>
+        <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1 mt-4 mb-1.5">
+          Swipe left to see more columns →
+        </p>
+        <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto sm:mt-4">
           {/* Column headers */}
           <div className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 pt-3 pb-2 border-b border-outline-variant/15">
             {["Employee", "Type", "Branch", "IC No", "Pay", "Dispatcher", "Status", ""].map((h, i) => (
@@ -325,6 +329,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
             </div>
           ))}
         </div>
+        </>
       )}
 
       {/* Pagination */}

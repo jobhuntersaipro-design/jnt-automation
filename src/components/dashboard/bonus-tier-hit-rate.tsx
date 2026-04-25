@@ -86,23 +86,25 @@ export function BonusTierHitRate({ data }: { data: HitRatePoint[] }) {
       </div>
 
       <div ref={chartRef} style={{ height: "14rem", width: "100%" }}>
-        {cw > 0 && ch > 0 ? (
-          <LineChart width={cw} height={ch} data={data} margin={{ top: 8, right: 16, bottom: 4, left: 0 }}>
+        {cw > 0 && ch > 0 ? (() => {
+          const isNarrow = cw < 480;
+          return (
+          <LineChart width={cw} height={ch} data={data} margin={{ top: 8, right: isNarrow ? 4 : 16, bottom: 4, left: 0 }}>
             <CartesianGrid vertical={false} stroke="#f3f4f5" strokeWidth={1} />
             <XAxis
               dataKey="month"
-              tick={{ fontSize: 13, fill: "#424654", dy: 4 }}
+              tick={{ fontSize: isNarrow ? 10 : 13, fill: "#424654", dy: 4 }}
               axisLine={false}
               tickLine={false}
-              padding={{ left: 12, right: 12 }}
+              padding={{ left: isNarrow ? 4 : 12, right: isNarrow ? 4 : 12 }}
             />
             <YAxis
               domain={[yMin, yMax]}
               tickFormatter={(v: number) => `${v}%`}
-              tick={{ fontSize: 12, fill: "#424654", dx: -15 }}
+              tick={{ fontSize: isNarrow ? 10 : 12, fill: "#424654", dx: isNarrow ? -6 : -15 }}
               axisLine={false}
               tickLine={false}
-              width={64}
+              width={isNarrow ? 36 : 64}
             />
             <Tooltip content={<TooltipContent data={data} />} />
             <Line
@@ -115,7 +117,8 @@ export function BonusTierHitRate({ data }: { data: HitRatePoint[] }) {
               activeDot={{ r: 6, fill: CHART_COLORS.brand, strokeWidth: 0 }}
             />
           </LineChart>
-        ) : null}
+          );
+        })() : null}
       </div>
     </div>
   );

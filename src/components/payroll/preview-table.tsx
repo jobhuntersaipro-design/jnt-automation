@@ -286,6 +286,9 @@ export function PreviewTable({
 
   return (
     <div className="rounded-lg bg-surface-card border border-outline-variant/15 overflow-hidden">
+      <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 px-3 pt-2">
+        Swipe left to see more columns →
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-[0.82rem]">
           <thead>

@@ -541,6 +541,10 @@ export function DispatchersClient({
             <p className="text-[0.9rem] text-on-surface-variant">No dispatchers match your search.</p>
           </div>
         ) : (
+          <>
+          <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1 mb-1.5">
+            Swipe left to edit tier / incentive / petrol settings →
+          </p>
           <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto">
             {/* Grouped column headers */}
             {/* Row 1: group labels */}
@@ -621,6 +625,7 @@ export function DispatchersClient({
               </div>
             ))}
           </div>
+          </>
         )}
 
         {/* Pagination */}

@@ -476,6 +476,10 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
           No payroll records yet.
         </div>
       ) : (
+        <>
+        <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1 mb-1.5">
+          Swipe left to see more columns →
+        </p>
         <div className="bg-surface-card rounded-xl border border-outline-variant/15 overflow-x-auto">
           {/* Header */}
           <div className="grid grid-cols-[minmax(6rem,0.75fr)_minmax(4.5rem,0.55fr)_minmax(3rem,0.35fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_minmax(6.5rem,1fr)_19rem] gap-x-3 items-center px-4 py-2.5 bg-surface-container-low/60 border-b border-outline-variant/15">
@@ -615,6 +619,7 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
             </div>
           )}
         </div>
+        </>
       )}
     </div>
   );
