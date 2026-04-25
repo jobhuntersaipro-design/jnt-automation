@@ -209,7 +209,13 @@ function SortHeader({
         type="button"
         onClick={() => onToggle(columnKey)}
         disabled={disabled}
-        className={`relative block w-full text-center ${baseCls}`}
+        // px-5 reserves space on both sides so the absolutely-positioned
+        // arrow at right-1 has its own zone clear of the label text. The
+        // padding is symmetric, so `text-center` still puts the label at
+        // the cell's geometric centre — and therefore vertically aligned
+        // with the value cell below (which is also text-center, no extra
+        // padding inside the td).
+        className={`relative block w-full text-center px-2 ${baseCls}`}
         style={color ? { color } : undefined}
         aria-label={ariaLabel}
       >
@@ -794,10 +800,10 @@ export function SalaryTable({
                 </th>
               </tr>
               <tr className="text-left text-[0.68rem] uppercase tracking-wider text-on-surface-variant/70 bg-surface-low">
-                <th className="pt-0.5 pb-2 px-3 font-medium text-center">
+                <th className="pt-2 pb-2 px-3 font-medium text-center">
                   <SortHeader label="Default Tier" columnKey="baseSalary" align="center" compact sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th className="pt-0.5 pb-2 px-3 font-medium text-center" style={{ color: "#12B981" }}>
+                <th className="pt-2 pb-2 px-3 font-medium text-center" style={{ color: "#12B981" }}>
                   <SortHeader label="Bonus Tier" columnKey="bonusTierEarnings" align="center" compact color="#12B981" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
               </tr>

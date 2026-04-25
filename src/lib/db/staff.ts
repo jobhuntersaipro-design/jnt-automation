@@ -240,6 +240,29 @@ type AgentDefaultRow = {
   petrolEligible: boolean; dailyThreshold: number; subsidyAmount: number;
 };
 
+/**
+ * Hard-coded fallback as a row-shaped object so per-field aggregation can
+ * borrow individual values from it when the DB has no agent-fallback row.
+ * Mirrors FALLBACK_DEFAULTS verbatim — keep them in sync.
+ */
+const FALLBACK_ROW: AgentDefaultRow = {
+  tier1MinWeight: 0,
+  tier1MaxWeight: 5,
+  tier1Commission: 1.0,
+  tier2MinWeight: 5.01,
+  tier2MaxWeight: 10,
+  tier2Commission: 1.4,
+  tier3MinWeight: 10.01,
+  tier3Commission: 2.2,
+  orderThreshold: 2000,
+  bonusTier1Commission: 1.5,
+  bonusTier2Commission: 2.1,
+  bonusTier3Commission: 3.3,
+  petrolEligible: true,
+  dailyThreshold: 70,
+  subsidyAmount: 15,
+};
+
 function rowToDefaults(d: AgentDefaultRow): AgentDefaults {
   return {
     weightTiers: [
@@ -266,37 +289,22 @@ const COMPARED_FIELDS: Array<keyof AgentDefaultRow> = [
   "petrolEligible", "dailyThreshold", "subsidyAmount",
 ];
 
-function rowsHaveSameValues(a: AgentDefaultRow, b: AgentDefaultRow): boolean {
-  return COMPARED_FIELDS.every((f) => a[f] === b[f]);
-}
-
-/**
- * Dev-only diff helper — returns the list of fields that differ between
- * two rows so we can print exactly what's blocking the aggregate match.
- */
-function diffRows(a: AgentDefaultRow, b: AgentDefaultRow): string[] {
-  return COMPARED_FIELDS.filter((f) => a[f] !== b[f]).map(
-    (f) => `${f}: ${JSON.stringify(a[f])} vs ${JSON.stringify(b[f])}`,
-  );
-}
 
 /**
  * Resolve the defaults for a given (agent, branch) pair.
  *
- * Lookup order:
- *   1. branchId given → branch-specific override → agent fallback → constants
- *   2. branchId omitted → "All branches" view:
- *        a. AGGREGATE: if every branch has its own override AND all those
- *           overrides carry the exact same values, return them. This makes
- *           the drawer reflect the actual state across branches when the
- *           user has manually set every branch to the same values.
- *        b. Otherwise: agent-level fallback row (branchId IS NULL).
- *        c. Otherwise: hardcoded constants.
- *
- * The aggregate path is the read-only "smart view" the user expected:
- * after setting every branch to 2000 individually, the All-branches view
- * shows 2000 even though the literal fallback row is still whatever was
- * last saved there.
+ *   1. branchId given → branch-specific override → fall through to (2).
+ *   2. No branchId / no override → PER-FIELD AGGREGATE for the
+ *      "All branches" view:
+ *        - For each field, compute every branch's effective value
+ *          (its override row, or the agent fallback if no override).
+ *        - If all branches' values agree on that field, surface it.
+ *        - Otherwise surface the fallback row's value for that field.
+ *      This way the drawer can show e.g. orderThreshold=3000 (all
+ *      branches agree) even if tier1Commission diverges between branches
+ *      (which keeps the agent fallback's tier1Commission). Replaces the
+ *      old row-level "all fields must match or fall back entirely"
+ *      heuristic that was too coarse to be useful.
  */
 export async function getAgentDefaults(
   agentId: string,
@@ -308,63 +316,72 @@ export async function getAgentDefaults(
       where: { agentId_branchId: { agentId, branchId } },
     });
     if (d) return rowToDefaults(d);
-    // Fall through to the same fallback chain used by All-branches.
+    // Fall through to the same all-branches resolution below.
   }
 
-  // All-branches view: try aggregate first, then fallback.
-  const branches = await prisma.branch.findMany({
-    where: { agentId },
-    select: { id: true, code: true },
-  });
+  const [branches, fallbackRow] = await Promise.all([
+    prisma.branch.findMany({
+      where: { agentId },
+      select: { id: true, code: true },
+    }),
+    prisma.agentDefault.findFirst({ where: { agentId, branchId: null } }),
+  ]);
 
-  if (branches.length > 0) {
-    const overrides = await prisma.agentDefault.findMany({
-      where: { agentId, branchId: { in: branches.map((b) => b.id) } },
+  // No branches yet → just use the literal fallback row (or constants).
+  if (branches.length === 0) {
+    return fallbackRow ? rowToDefaults(fallbackRow) : FALLBACK_DEFAULTS;
+  }
+
+  const overrides = await prisma.agentDefault.findMany({
+    where: { agentId, branchId: { in: branches.map((b) => b.id) } },
+  });
+  const overrideByBranchId = new Map<string, AgentDefaultRow>();
+  for (const o of overrides) {
+    if (o.branchId) overrideByBranchId.set(o.branchId, o);
+  }
+  // Borrow individual values from this row when the field doesn't
+  // unanimously agree across branches.
+  const baseRow: AgentDefaultRow = fallbackRow ?? FALLBACK_ROW;
+
+  // Per-field aggregate. Each branch's "effective" value is its override
+  // (if any) or the fallback row. If all branches share the same effective
+  // value for a field, that value wins; otherwise the field stays on the
+  // base fallback.
+  const aggregated: Record<string, unknown> = { ...baseRow };
+  const agreed: string[] = [];
+  const diverged: string[] = [];
+  for (const field of COMPARED_FIELDS) {
+    const valuesPerBranch = branches.map((b) => {
+      const o = overrideByBranchId.get(b.id);
+      return o ? (o as Record<string, unknown>)[field] : (baseRow as Record<string, unknown>)[field];
     });
-    // Debug logging — remove once the aggregate behaviour is confirmed.
-    // Tells us in the dev terminal exactly why the aggregate is or is not
-    // kicking in for a given GET /api/staff/defaults call.
-    if (process.env.NODE_ENV !== "production") {
-      const codeById = new Map(branches.map((b) => [b.id, b.code]));
-      const summary = overrides.map((o) => ({
-        branch: codeById.get(o.branchId ?? "") ?? o.branchId,
-        orderThreshold: o.orderThreshold,
-      }));
-      console.log(
-        `[defaults-aggregate] agent=${agentId.slice(0, 8)} branches=${branches.length} overrides=${overrides.length} rows=`,
-        summary,
-      );
-    }
-    if (overrides.length === branches.length && overrides.length > 0) {
-      const first = overrides[0];
-      const allSame = overrides.every((o) => rowsHaveSameValues(o, first));
-      if (process.env.NODE_ENV !== "production") {
-        if (allSame) {
-          console.log(`[defaults-aggregate] allSame=true → returning aggregate`);
-        } else {
-          // Print every diverging field for the failing rows so a future
-          // mismatch is fixable without poking the DB by hand.
-          for (let i = 1; i < overrides.length; i++) {
-            const diffs = diffRows(first, overrides[i]);
-            if (diffs.length > 0) {
-              const codeById = new Map(branches.map((b) => [b.id, b.code]));
-              const a = codeById.get(first.branchId ?? "") ?? "first";
-              const b = codeById.get(overrides[i].branchId ?? "") ?? `row${i}`;
-              console.log(`[defaults-aggregate] diff ${a} vs ${b}:`, diffs);
-            }
-          }
-        }
-      }
-      if (allSame) return rowToDefaults(first);
+    const first = valuesPerBranch[0];
+    const allSame = valuesPerBranch.every((v) => v === first);
+    if (allSame) {
+      aggregated[field] = first;
+      agreed.push(field);
+    } else {
+      diverged.push(field);
     }
   }
 
-  const fallback = await prisma.agentDefault.findFirst({
-    where: { agentId, branchId: null },
-  });
-  if (fallback) return rowToDefaults(fallback);
+  if (process.env.NODE_ENV !== "production") {
+    const codeById = new Map(branches.map((b) => [b.id, b.code]));
+    const summary = overrides.map((o) => ({
+      branch: codeById.get(o.branchId ?? "") ?? o.branchId,
+      orderThreshold: o.orderThreshold,
+    }));
+    console.log(
+      `[defaults-aggregate] agent=${agentId.slice(0, 8)} branches=${branches.length} overrides=${overrides.length} rows=`,
+      summary,
+    );
+    console.log(
+      `[defaults-aggregate] per-field: ${agreed.length} agreed, ${diverged.length} diverged`,
+      diverged.length > 0 ? `(diverged: ${diverged.join(", ")} — using fallback for these)` : "",
+    );
+  }
 
-  return FALLBACK_DEFAULTS;
+  return rowToDefaults(aggregated as unknown as AgentDefaultRow);
 }
 
 export function computeIsComplete(
