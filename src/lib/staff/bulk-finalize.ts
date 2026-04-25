@@ -1,13 +1,12 @@
-import archiver from "archiver";
 import yauzl from "yauzl";
-import { PassThrough, Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { Upload } from "@aws-sdk/lib-storage";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { getJob, updateJob } from "./bulk-job";
 import { getMonthDetailsBatch } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
 import { zipKey } from "./pdf-cache";
+import { streamZipToR2 } from "./streaming-zip";
 
 /**
  * Finalize worker — merges all per-chunk part ZIPs into one final archive
@@ -69,6 +68,8 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
     // manually invalidated (see pdf-cache.ts — no R2 lifecycle on
     // payroll-cache/). Parts are small (<=CHUNK_SIZE × ~500KB) so holding
     // them in memory is fine.
+    console.log(`[bulk-finalize] ${jobId.slice(0, 8)} extracting ${partKeys.length} part(s)`);
+    const tExtract = Date.now();
     const partEntries: Array<{ fileName: string; buffer: Buffer }[]> = [];
     let totalFiles = 0;
     for (const partKey of partKeys) {
@@ -76,6 +77,9 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
       partEntries.push(entries);
       totalFiles += entries.length;
     }
+    console.log(
+      `[bulk-finalize] ${jobId.slice(0, 8)} extracted ${totalFiles} file(s) from ${partKeys.length} part(s) in ${((Date.now() - tExtract) / 1000).toFixed(1)}s`,
+    );
     if (totalFiles === 0) {
       await updateJob(jobId, {
         status: "failed",
@@ -84,36 +88,21 @@ export async function finalizeBulkExport(jobId: string): Promise<void> {
       return;
     }
 
-    // Open the output archive: archiver → PassThrough → lib-storage Upload.
-    // Level 1 zlib — entries are already compressed (PDFs), so minimal
-    // compression keeps CPU low and output size only slightly larger.
-    const archive = archiver("zip", { zlib: { level: 1 } });
-    const passthrough = new PassThrough();
-    archive.pipe(passthrough);
-
-    const upload = new Upload({
-      client: r2,
-      params: {
-        Bucket: R2_BUCKET,
-        Key: finalKey,
-        Body: passthrough,
-        ContentType: "application/zip",
-      },
-      queueSize: 2,
-    });
-    archive.on("error", (err) => passthrough.destroy(err));
-
     await updateJob(jobId, { stage: "uploading" });
+    console.log(`[bulk-finalize] ${jobId.slice(0, 8)} streaming ${totalFiles} files → ${finalKey}`);
 
-    // Runs sequentially — archiver doesn't support concurrent writes.
-    for (const entries of partEntries) {
-      for (const entry of entries) {
-        archive.append(entry.buffer, { name: entry.fileName });
-      }
-    }
-
-    await archive.finalize();
-    await upload.done();
+    // Use streamZipToR2 — same archiver+PassThrough+lib-storage pattern as
+    // the chunk worker, but with the critical fix: it kicks off finalize
+    // WITHOUT awaiting before upload.done(). The previous inlined code here
+    // had `await archive.finalize(); await upload.done();` in the wrong
+    // order, which deadlocked once the PassThrough's 16 KB buffer filled
+    // (i.e. on every real export, since PDFs are MB+). The function would
+    // hang at `archive.finalize()` until Vercel killed it at maxDuration,
+    // leaving the job stuck in stage="uploading" forever.
+    const flatEntries = partEntries.flatMap((part) =>
+      part.map((e) => ({ fileName: e.fileName, data: e.buffer })),
+    );
+    await streamZipToR2(finalKey, flatEntries);
 
     // Clean up part ZIPs. Non-fatal — the 30-day R2 lifecycle rule is the
     // safety net if this loop errors partway.
