@@ -206,8 +206,15 @@ function drawBodyRow(
       });
     } else {
       // Names / labels — wrap to next line in-row so no content is hidden.
+      // `height: rowHeight` is critical: without it, pdfkit auto-paginates
+      // when wrapped text would overflow the page's bottom margin, even
+      // though our outer loop already paginated. The result was extra
+      // blank/half-empty pages. With height set, pdfkit treats the text
+      // as a constrained box (we already measured it fits via
+      // measureBodyRowHeight, so nothing gets clipped).
       doc.text(values[i] ?? "", col.x, y, {
         width: col.w - 4,
+        height: rowHeight,
         align: col.align ?? "left",
       });
     }
