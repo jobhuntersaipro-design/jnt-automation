@@ -257,23 +257,26 @@ function rowToDefaults(d: AgentDefaultRow): AgentDefaults {
   };
 }
 
+const COMPARED_FIELDS: Array<keyof AgentDefaultRow> = [
+  "tier1MinWeight", "tier1MaxWeight", "tier1Commission",
+  "tier2MinWeight", "tier2MaxWeight", "tier2Commission",
+  "tier3MinWeight", "tier3Commission",
+  "orderThreshold",
+  "bonusTier1Commission", "bonusTier2Commission", "bonusTier3Commission",
+  "petrolEligible", "dailyThreshold", "subsidyAmount",
+];
+
 function rowsHaveSameValues(a: AgentDefaultRow, b: AgentDefaultRow): boolean {
-  return (
-    a.tier1MinWeight === b.tier1MinWeight &&
-    a.tier1MaxWeight === b.tier1MaxWeight &&
-    a.tier1Commission === b.tier1Commission &&
-    a.tier2MinWeight === b.tier2MinWeight &&
-    a.tier2MaxWeight === b.tier2MaxWeight &&
-    a.tier2Commission === b.tier2Commission &&
-    a.tier3MinWeight === b.tier3MinWeight &&
-    a.tier3Commission === b.tier3Commission &&
-    a.orderThreshold === b.orderThreshold &&
-    a.bonusTier1Commission === b.bonusTier1Commission &&
-    a.bonusTier2Commission === b.bonusTier2Commission &&
-    a.bonusTier3Commission === b.bonusTier3Commission &&
-    a.petrolEligible === b.petrolEligible &&
-    a.dailyThreshold === b.dailyThreshold &&
-    a.subsidyAmount === b.subsidyAmount
+  return COMPARED_FIELDS.every((f) => a[f] === b[f]);
+}
+
+/**
+ * Dev-only diff helper — returns the list of fields that differ between
+ * two rows so we can print exactly what's blocking the aggregate match.
+ */
+function diffRows(a: AgentDefaultRow, b: AgentDefaultRow): string[] {
+  return COMPARED_FIELDS.filter((f) => a[f] !== b[f]).map(
+    (f) => `${f}: ${JSON.stringify(a[f])} vs ${JSON.stringify(b[f])}`,
   );
 }
 
@@ -336,7 +339,21 @@ export async function getAgentDefaults(
       const first = overrides[0];
       const allSame = overrides.every((o) => rowsHaveSameValues(o, first));
       if (process.env.NODE_ENV !== "production") {
-        console.log(`[defaults-aggregate] allSame=${allSame}`);
+        if (allSame) {
+          console.log(`[defaults-aggregate] allSame=true → returning aggregate`);
+        } else {
+          // Print every diverging field for the failing rows so a future
+          // mismatch is fixable without poking the DB by hand.
+          for (let i = 1; i < overrides.length; i++) {
+            const diffs = diffRows(first, overrides[i]);
+            if (diffs.length > 0) {
+              const codeById = new Map(branches.map((b) => [b.id, b.code]));
+              const a = codeById.get(first.branchId ?? "") ?? "first";
+              const b = codeById.get(overrides[i].branchId ?? "") ?? `row${i}`;
+              console.log(`[defaults-aggregate] diff ${a} vs ${b}:`, diffs);
+            }
+          }
+        }
       }
       if (allSame) return rowToDefaults(first);
     }
