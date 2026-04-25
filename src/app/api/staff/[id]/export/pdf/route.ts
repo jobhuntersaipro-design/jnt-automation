@@ -66,11 +66,11 @@ export async function GET(
 
   const rows = records.map((r) => [
     `${MONTH_NAMES[r.month - 1]} ${r.year}`,
-    String(r.totalOrders),
+    r.totalOrders.toLocaleString("en-US"),
     fmt(r.baseSalary),
     r.bonusTierEarnings > 0 ? fmt(r.bonusTierEarnings) : "—",
     r.petrolSubsidy > 0 ? fmt(r.petrolSubsidy) : "—",
-    String(r.petrolQualifyingDays || "—"),
+    r.petrolQualifyingDays ? r.petrolQualifyingDays.toLocaleString("en-US") : "—",
     r.penalty > 0 ? fmt(r.penalty) : "—",
     r.advance > 0 ? fmt(r.advance) : "—",
     fmt(r.netSalary),
@@ -101,11 +101,11 @@ export async function GET(
 
   const footer = [
     "TOTAL",
-    String(totals.totalOrders),
+    totals.totalOrders.toLocaleString("en-US"),
     fmt(totals.baseSalary),
     fmt(totals.bonusTierEarnings),
     fmt(totals.petrolSubsidy),
-    String(totals.petrolQualifyingDays),
+    totals.petrolQualifyingDays.toLocaleString("en-US"),
     fmt(totals.penalty),
     fmt(totals.advance),
     fmt(totals.netSalary),

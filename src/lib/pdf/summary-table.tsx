@@ -150,11 +150,43 @@ function drawHeaderRow(
   return bottom + 3;
 }
 
+/**
+ * Measure the height a body row will take given the widest column's wrap.
+ * Non-tabular columns (names, IDs, labels) are allowed to wrap onto multiple
+ * lines so no content is hidden. Tabular columns (numbers, dates) stay on
+ * one line — they shouldn't exceed their column width in practice.
+ */
+function measureBodyRowHeight(
+  doc: PDFKit.PDFDocument,
+  columns: LaidOutColumn[],
+  values: string[],
+): number {
+  let maxTextHeight = 0;
+  for (let i = 0; i < columns.length; i++) {
+    const col = columns[i];
+    const value = values[i] ?? "";
+    if (!value) continue;
+    doc.font(col.tabular ? "Courier" : "Helvetica").fontSize(9);
+    // Tabular columns: single-line height. Non-tabular: wrapped height.
+    const h = col.tabular
+      ? doc.currentLineHeight()
+      : doc.heightOfString(value, {
+          width: col.w - 4,
+          align: col.align ?? "left",
+        });
+    if (h > maxTextHeight) maxTextHeight = h;
+  }
+  // BODY_ROW_HEIGHT is the single-line minimum (padding included). Stretch
+  // for wrapped rows so the row-bottom rule sits below all lines.
+  return Math.max(BODY_ROW_HEIGHT, maxTextHeight + 4);
+}
+
 function drawBodyRow(
   doc: PDFKit.PDFDocument,
   columns: LaidOutColumn[],
   values: string[],
   y: number,
+  rowHeight: number,
 ): number {
   for (let i = 0; i < columns.length; i++) {
     const col = columns[i];
@@ -162,15 +194,25 @@ function drawBodyRow(
       .font(col.tabular ? "Courier" : "Helvetica")
       .fontSize(9)
       .fillColor(C_TEXT);
-    const value = fitText(doc, values[i] ?? "", col.w - 4);
-    doc.text(value, col.x, y, {
-      width: col.w - 4,
-      height: BODY_ROW_HEIGHT,
-      align: col.align ?? "left",
-      lineBreak: false,
-    });
+    if (col.tabular) {
+      // Numbers / dates / IDs — stay on one line. Truncate defensively if
+      // somehow they exceed the column (shouldn't happen with current data).
+      const value = fitText(doc, values[i] ?? "", col.w - 4);
+      doc.text(value, col.x, y, {
+        width: col.w - 4,
+        height: rowHeight,
+        align: col.align ?? "left",
+        lineBreak: false,
+      });
+    } else {
+      // Names / labels — wrap to next line in-row so no content is hidden.
+      doc.text(values[i] ?? "", col.x, y, {
+        width: col.w - 4,
+        align: col.align ?? "left",
+      });
+    }
   }
-  const bottom = y + BODY_ROW_HEIGHT - 3;
+  const bottom = y + rowHeight - 3;
   doc
     .moveTo(PAGE_MARGIN, bottom)
     .lineTo(PAGE_MARGIN + CONTENT_WIDTH, bottom)
@@ -233,12 +275,13 @@ function buildDocument(
   y = drawHeaderRow(doc, columns, y);
 
   for (const row of input.rows) {
-    if (y + BODY_ROW_HEIGHT > BOTTOM_LIMIT) {
+    const rowHeight = measureBodyRowHeight(doc, columns, row);
+    if (y + rowHeight > BOTTOM_LIMIT) {
       doc.addPage();
       y = PAGE_MARGIN;
       y = drawHeaderRow(doc, columns, y);
     }
-    y = drawBodyRow(doc, columns, row, y);
+    y = drawBodyRow(doc, columns, row, y, rowHeight);
   }
 
   if (input.footer) {

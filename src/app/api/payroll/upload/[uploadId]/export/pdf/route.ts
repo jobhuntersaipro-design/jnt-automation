@@ -36,7 +36,7 @@ export async function GET(
   const rows = records.map((r) => [
     r.name,
     r.extId,
-    String(r.totalOrders),
+    r.totalOrders.toLocaleString("en-US"),
     fmt(r.baseSalary),
     r.bonusTierEarnings > 0 ? fmt(r.bonusTierEarnings) : "—",
     r.petrolSubsidy > 0 ? fmt(r.petrolSubsidy) : "—",
@@ -52,7 +52,7 @@ export async function GET(
   const footer = [
     "TOTAL",
     "",
-    String(records.reduce((s, r) => s + r.totalOrders, 0)),
+    records.reduce((s, r) => s + r.totalOrders, 0).toLocaleString("en-US"),
     fmt(totalDefaultTier),
     fmt(totalBonusTier),
     fmt(summary.totalPetrolSubsidy),

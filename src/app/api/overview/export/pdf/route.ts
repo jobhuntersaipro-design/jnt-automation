@@ -129,8 +129,8 @@ export async function GET(req: NextRequest) {
       rows: rows.map((r) => [
         r.branch,
         r.month,
-        String(r.dispatcherCount),
-        String(r.totalOrders),
+        r.dispatcherCount.toLocaleString("en-US"),
+        r.totalOrders.toLocaleString("en-US"),
         fmt(r.totalNetPayout),
       ]),
     });
@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
       r.name,
       r.month,
       r.branch,
-      String(r.totalOrders),
+      r.totalOrders.toLocaleString("en-US"),
       fmt(r.baseSalary),
       fmt(r.bonusTierEarnings),
       fmt(r.petrolSubsidy),
