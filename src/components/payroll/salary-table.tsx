@@ -209,7 +209,6 @@ function SortHeader({
       }`}
       style={color ? { color } : undefined}
       aria-label={`Sort by ${label}${active ? ` (currently ${sortDir === "asc" ? "ascending" : "descending"})` : ""}`}
-      aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
     >
       <span>{label}</span>
       <Arrow
