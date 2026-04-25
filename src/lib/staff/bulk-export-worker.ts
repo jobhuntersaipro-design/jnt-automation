@@ -19,6 +19,46 @@ import { zipKey } from "./pdf-cache";
 
 const qstash = new Client({ token: process.env.QSTASH_TOKEN ?? "" });
 
+// Surface obvious prod misconfigs at boot so a stuck export traces back to
+// the missing env var instead of silently dropping QStash messages. Logs
+// once per cold start; harmless in dev (we use the inline path there).
+if (process.env.NODE_ENV === "production") {
+  const missing: string[] = [];
+  if (!process.env.QSTASH_TOKEN) missing.push("QSTASH_TOKEN");
+  if (!process.env.QSTASH_CURRENT_SIGNING_KEY) missing.push("QSTASH_CURRENT_SIGNING_KEY");
+  if (!process.env.QSTASH_NEXT_SIGNING_KEY) missing.push("QSTASH_NEXT_SIGNING_KEY");
+  if (!process.env.NEXT_PUBLIC_APP_URL) missing.push("NEXT_PUBLIC_APP_URL");
+  if (missing.length > 0) {
+    console.warn(
+      `[bulk-export] PROD env vars missing — QStash fan-out will fall back to inline (which will hit Vercel function timeout on big exports): ${missing.join(", ")}`,
+    );
+  } else if (process.env.NEXT_PUBLIC_APP_URL?.includes("localhost")) {
+    console.warn(
+      `[bulk-export] PROD NEXT_PUBLIC_APP_URL points to localhost — QStash cannot reach the worker. Value: ${process.env.NEXT_PUBLIC_APP_URL}`,
+    );
+  }
+}
+
+// Surface fire-and-forget worker crashes that escape the try/catch inside
+// runBulkExport — for example, a synchronous throw in module init or a
+// rejection from a stray Promise that wasn't awaited. Without this, the
+// rejection lands on Node's default handler (silent in Next dev) and the
+// worker just disappears mid-run, leaving the Redis job stuck on whatever
+// stage it was on. Installed once per process.
+declare global {
+  // eslint-disable-next-line no-var
+  var __bulkExportRejectionHandlerInstalled: boolean | undefined;
+}
+if (!globalThis.__bulkExportRejectionHandlerInstalled) {
+  process.on("unhandledRejection", (reason) => {
+    const msg = reason instanceof Error ? reason.stack ?? reason.message : String(reason);
+    if (msg.includes("bulk-export") || msg.includes("month-detail") || msg.includes("streamZipToR2")) {
+      console.error("[bulk-export] unhandledRejection in worker:", msg);
+    }
+  });
+  globalThis.__bulkExportRejectionHandlerInstalled = true;
+}
+
 /**
  * Inline (single-worker) month-detail export — used by the dev path. One
  * process walks every dispatcher, streams the ZIP into R2, flips the job
@@ -166,7 +206,15 @@ export async function startBulkExportFanout(jobId: string): Promise<void> {
     });
 
     const workerUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/dispatchers/month-detail/bulk/worker/chunk`;
-    await Promise.all(
+    console.log(
+      `[bulk-export-fanout] ${jobId.slice(0, 8)} publishing ${chunks.length} chunk(s) to ${workerUrl}`,
+    );
+
+    // allSettled — partial publish failures must not silently lose chunks.
+    // Promise.all bails on the first rejection and the remaining publishes
+    // never happen, but `totalChunks=N` is already on the Redis record so
+    // the job sits forever waiting for chunks that were never sent.
+    const results = await Promise.allSettled(
       chunks.map((c) =>
         qstash.publishJSON({
           url: workerUrl,
@@ -175,6 +223,41 @@ export async function startBulkExportFanout(jobId: string): Promise<void> {
         }),
       ),
     );
+
+    const failed: Array<{ chunkIndex: number; error: string }> = [];
+    results.forEach((r, i) => {
+      if (r.status === "rejected") {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        failed.push({ chunkIndex: i, error: msg });
+        console.error(
+          `[bulk-export-fanout] ${jobId.slice(0, 8)} chunk ${i} publish failed:`,
+          msg,
+        );
+      }
+    });
+    console.log(
+      `[bulk-export-fanout] ${jobId.slice(0, 8)} publish summary: ${results.length - failed.length}/${results.length} succeeded`,
+    );
+    if (failed.length === results.length) {
+      // Every publish failed — flip the job so the user sees a real error
+      // instead of an indefinite spinner. Most likely cause: bad QStash
+      // token, wrong NEXT_PUBLIC_APP_URL, or QStash outage.
+      await updateJob(jobId, {
+        status: "failed",
+        error: `All ${results.length} QStash publishes failed. First error: ${failed[0]?.error ?? "unknown"}`,
+      });
+    } else if (failed.length > 0) {
+      // Partial — the job will still finalize because finalize triggers on
+      // "all chunks terminal" and unpublished chunks stay `pending` forever
+      // BUT incrementChunksDone never reaches totalChunks. We have to mark
+      // those slots failed in the chunks hash so `incrementChunksDone` can
+      // catch up via finalize-on-all-terminal logic. Cheaper: just fail the
+      // job — partial output isn't useful and the user can retry.
+      await updateJob(jobId, {
+        status: "failed",
+        error: `${failed.length}/${results.length} QStash publishes failed. First error: ${failed[0]?.error ?? "unknown"}`,
+      });
+    }
   } catch (err) {
     console.error(`[bulk-export-fanout] job ${jobId} failed to dispatch:`, err);
     // Fall back to inline so the export still completes.
@@ -185,23 +268,48 @@ export async function startBulkExportFanout(jobId: string): Promise<void> {
 }
 
 /**
- * Fire-and-forget dispatcher.
+ * Awaitable dispatcher.
  *   - Dev: run the inline worker on the local event loop (QStash can't
  *     reach localhost reliably).
  *   - Prod: fan out via QStash. If QStash envs aren't configured, fall
  *     back to the inline path so the feature still works.
+ *
+ * Callers (the start route) wrap this in `after()` so Vercel keeps the
+ * function alive until publish completes. Returning a Promise lets the
+ * call site observe the actual outcome instead of swallowing it on a
+ * detached fire-and-forget chain.
  */
-export function dispatchBulkExport(jobId: string): void {
+export async function runDispatchBulkExport(jobId: string): Promise<void> {
   const isDev = process.env.NODE_ENV !== "production";
-  if (isDev || !process.env.QSTASH_TOKEN || !process.env.NEXT_PUBLIC_APP_URL) {
-    Promise.resolve()
-      .then(() => runBulkExport(jobId))
-      .catch((e) => console.error("[bulk-export] dispatch failed:", e));
+  const useInline =
+    isDev || !process.env.QSTASH_TOKEN || !process.env.NEXT_PUBLIC_APP_URL;
+  console.log(
+    `[bulk-export] dispatching ${jobId.slice(0, 8)} via ${useInline ? "inline" : "qstash-fanout"}` +
+      (!isDev
+        ? ` (qstashToken=${process.env.QSTASH_TOKEN ? "set" : "MISSING"} appUrl=${process.env.NEXT_PUBLIC_APP_URL ? "set" : "MISSING"} signingKey=${process.env.QSTASH_CURRENT_SIGNING_KEY ? "set" : "MISSING"})`
+        : ""),
+  );
+  if (useInline) {
+    await runBulkExport(jobId);
     return;
   }
+  await startBulkExportFanout(jobId);
+}
+
+/**
+ * @deprecated Use `runDispatchBulkExport` wrapped in `after()` from
+ * the route handler. Kept as a thin shim so any remaining caller still
+ * works, but it WILL race with Vercel function termination in prod.
+ */
+export function dispatchBulkExport(jobId: string): void {
   Promise.resolve()
-    .then(() => startBulkExportFanout(jobId))
-    .catch((e) => console.error("[bulk-export] fan-out failed:", e));
+    .then(() => runDispatchBulkExport(jobId))
+    .catch((e) =>
+      console.error(
+        `[bulk-export] dispatchBulkExport crashed for ${jobId.slice(0, 8)}:`,
+        e,
+      ),
+    );
 }
 
 /**

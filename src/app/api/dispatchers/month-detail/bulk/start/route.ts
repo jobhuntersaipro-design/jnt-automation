@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { randomUUID } from "node:crypto";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { createJob, updateJob } from "@/lib/staff/bulk-job";
-import { dispatchBulkExport } from "@/lib/staff/bulk-export-worker";
+import { runDispatchBulkExport } from "@/lib/staff/bulk-export-worker";
 import { hasCached, zipKey } from "@/lib/staff/pdf-cache";
 
 /**
@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
   }
 
   const jobId = randomUUID();
+  console.log(
+    `[bulk-start] ${jobId.slice(0, 8)} agent=${effective.agentId.slice(0, 8)} ${year}-${String(month).padStart(2, "0")} ${format}`,
+  );
   const job = await createJob({
     jobId,
     agentId: effective.agentId,
@@ -50,6 +53,7 @@ export async function POST(req: NextRequest) {
   // usual; the user sees "ready" within one poll.
   const cachedKey = zipKey(effective.agentId, year, month, format);
   if (await hasCached(cachedKey).catch(() => false)) {
+    console.log(`[bulk-start] ${jobId.slice(0, 8)} cache HIT — short-circuit`);
     await updateJob(jobId, {
       status: "done",
       stage: "done",
@@ -60,7 +64,27 @@ export async function POST(req: NextRequest) {
   }
 
   // Cache miss — normal worker dispatch.
-  dispatchBulkExport(jobId);
+  //
+  // We wrap the dispatch in `after()` (Next.js 15+) so it runs AFTER the
+  // 200 has been sent to the client but is still part of the same Vercel
+  // function invocation. Without this, prod fire-and-forget races against
+  // Vercel terminating the function the moment the response leaves — the
+  // job stays at status="queued" and the user sees the spinner forever.
+  // Dev (Node) keeps the promise alive regardless, which is why this only
+  // surfaces in prod.
+  console.log(`[bulk-start] ${jobId.slice(0, 8)} cache MISS — dispatching worker (via after())`);
+  after(async () => {
+    try {
+      await runDispatchBulkExport(jobId);
+    } catch (err) {
+      console.error(
+        `[bulk-start] ${jobId.slice(0, 8)} dispatch threw — marking job failed:`,
+        err,
+      );
+      const message = err instanceof Error ? err.message : "Dispatch failed";
+      await updateJob(jobId, { status: "failed", error: message }).catch(() => {});
+    }
+  });
 
   return NextResponse.json({ jobId: job.jobId });
 }

@@ -159,7 +159,18 @@ export async function updateJob(
   patch: Partial<Omit<BulkJob, "jobId" | "agentId" | "createdAt">>,
 ): Promise<void> {
   const existing = await getJob(jobId);
-  if (!existing) return;
+  if (!existing) {
+    // Silent skip is the #1 reason a bulk export "loops forever" — the worker
+    // races ahead but its updateJob writes land on a missing record (TTL,
+    // evict, dev hot-reload that wiped the key). The job stays in whatever
+    // state was last written, the active poller keeps showing it, and the
+    // user sees the spinner forever. Log it so we can tell.
+    console.warn(
+      `[bulk-job] updateJob(${jobId.slice(0, 8)}) skipped — record missing in Redis. Patch was:`,
+      Object.keys(patch),
+    );
+    return;
+  }
   const wasTerminal = existing.status === "done" || existing.status === "failed";
   const next: BulkJob = {
     ...existing,

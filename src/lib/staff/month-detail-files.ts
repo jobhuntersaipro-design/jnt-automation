@@ -42,11 +42,21 @@ export interface GenerateMonthFilesArgs {
 export async function generateMonthDetailFiles(
   args: GenerateMonthFilesArgs,
 ): Promise<GeneratedMonthFile[]> {
+  const t0 = Date.now();
+  const tag = `[month-detail-files] ${args.year}-${String(args.month).padStart(2, "0")} ${args.format}`;
+  console.log(
+    `${tag} fetching MonthDetail batch (agent=${args.agentId.slice(0, 8)}${
+      args.dispatcherIds ? ` dispatcherIds=${args.dispatcherIds.length}` : ""
+    })`,
+  );
   const details = await getMonthDetailsBatch(
     args.agentId,
     args.year,
     args.month,
     args.dispatcherIds,
+  );
+  console.log(
+    `${tag} fetched ${details.length} MonthDetail rows in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
   );
   if (details.length === 0) return [];
 
@@ -58,6 +68,10 @@ export async function generateMonthDetailFiles(
   const concurrency = args.format === "pdf" ? 8 : 8;
   let completed = 0;
   const failures: Array<{ extId: string; name: string; error: Error }> = [];
+  // Heartbeat: log every Nth file so you can watch progress in dev. Without
+  // this, a hung dispatcher (PDF render that never resolves, missing
+  // weightTiersSnapshot, etc.) looks identical to a slow one.
+  const HEARTBEAT_EVERY = Math.max(1, Math.min(25, Math.floor(details.length / 10)));
 
   const raw = await runPool<MonthDetail, GeneratedMonthFile | null>(
     details,
@@ -101,6 +115,15 @@ export async function generateMonthDetailFiles(
         }
 
         completed++;
+        if (
+          completed === 1 ||
+          completed === details.length ||
+          completed % HEARTBEAT_EVERY === 0
+        ) {
+          console.log(
+            `${tag} ${completed}/${details.length} (${((Date.now() - t0) / 1000).toFixed(1)}s) — ${detail.dispatcher.name}`,
+          );
+        }
         if (args.onFile) {
           await args.onFile({
             fileName,
@@ -127,6 +150,9 @@ export async function generateMonthDetailFiles(
   );
 
   const successes = raw.filter((f): f is GeneratedMonthFile => f !== null);
+  console.log(
+    `${tag} complete — ${successes.length} succeeded, ${failures.length} failed in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+  );
 
   // If every dispatcher failed, fail loudly. Returning [] here would let
   // callers write a 22-byte empty zip to the canonical cache key and keep
