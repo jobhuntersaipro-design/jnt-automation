@@ -4,32 +4,11 @@ import { getEffectiveAgentId } from "@/lib/impersonation"
 import {
   calculateStatutory,
   calculateNetSalary,
-  calculateSupervisorGross,
-  calculateStoreKeeperGross,
 } from "@/lib/payroll/statutory"
-import type { EmployeeType } from "@/generated/prisma/client"
-
-interface EmployeeEntry {
-  employeeId: string
-  basicPay: number
-  workingHours: number
-  hourlyWage: number
-  kpiAllowance: number
-  petrolAllowance: number
-  otherAllowance: number
-  pcb: number
-  penalty: number
-  advance: number
-  // Optional statutory overrides. When present, trust the client (user
-  // edited the amount manually). When absent, fall back to auto-calc
-  // from the combined gross.
-  epfEmployee?: number
-  socsoEmployee?: number
-  eisEmployee?: number
-  epfEmployer?: number
-  socsoEmployer?: number
-  eisEmployer?: number
-}
+import {
+  computeEmployeeSalaryForSave,
+  type EmployeeSavePayload,
+} from "@/lib/payroll/employee-salary-save"
 
 export async function GET(
   _req: NextRequest,
@@ -198,7 +177,7 @@ export async function POST(
     }
 
     const body = await req.json()
-    const { entries } = body as { entries: EmployeeEntry[] }
+    const { entries } = body as { entries: EmployeeSavePayload[] }
 
     if (!Array.isArray(entries) || entries.length === 0) {
       return NextResponse.json({ error: "No entries provided" }, { status: 400 })
@@ -296,61 +275,18 @@ export async function POST(
             : null
         const dispatcherRecord =
           linkedDispatcherRecord ??
-          (nameMatchKey ? nameMatchDispatcherSalaries.get(nameMatchKey) : undefined)
+          (nameMatchKey ? nameMatchDispatcherSalaries.get(nameMatchKey) : null) ??
+          null
 
-        const dispatcherGross = dispatcherRecord
-          ? dispatcherRecord.baseSalary +
-            dispatcherRecord.bonusTierEarnings +
-            dispatcherRecord.petrolSubsidy
-          : 0
-
-        const employeeGross =
-          emp.type === "STORE_KEEPER"
-            ? calculateStoreKeeperGross(
-                entry.workingHours,
-                entry.hourlyWage,
-                entry.petrolAllowance,
-                entry.kpiAllowance,
-                entry.otherAllowance
-              )
-            : calculateSupervisorGross(
-                entry.basicPay,
-                entry.petrolAllowance,
-                entry.kpiAllowance,
-                entry.otherAllowance,
-                entry.workingHours,
-                entry.hourlyWage
-              )
-
-        const totalGross = employeeGross + dispatcherGross
-        const computed = calculateStatutory(totalGross)
-
-        // Honor client statutory overrides when present (user edited the
-        // field manually — including clearing to 0). Fall back to the
-        // auto-computed value only when the field is missing from the
-        // payload. Without this, a user who clears EPF can't save zero
-        // because we'd silently overwrite with the computed amount.
-        const statutory = {
-          epfEmployee: entry.epfEmployee ?? computed.epfEmployee,
-          socsoEmployee: entry.socsoEmployee ?? computed.socsoEmployee,
-          eisEmployee: entry.eisEmployee ?? computed.eisEmployee,
-          epfEmployer: entry.epfEmployer ?? computed.epfEmployer,
-          socsoEmployer: entry.socsoEmployer ?? computed.socsoEmployer,
-          eisEmployer: entry.eisEmployer ?? computed.eisEmployer,
-        }
-
-        // Combined penalty/advance: dispatcher + manual employee entry
-        const dispatcherPenalty = dispatcherRecord?.penalty ?? 0
-        const dispatcherAdvance = dispatcherRecord?.advance ?? 0
-        const penalty = entry.penalty + dispatcherPenalty
-        const advance = entry.advance + dispatcherAdvance
-
-        const netSalary = calculateNetSalary(
-          totalGross,
-          statutory,
-          entry.pcb,
-          penalty,
-          advance
+        const computed = computeEmployeeSalaryForSave(
+          {
+            id: emp.id,
+            type: emp.type,
+            name: emp.name,
+            branchId: emp.branchId,
+          },
+          entry,
+          dispatcherRecord ?? null,
         )
 
         return prisma.employeeSalaryRecord.upsert({
@@ -365,32 +301,10 @@ export async function POST(
             employeeId: entry.employeeId,
             month,
             year,
-            basicPay: entry.basicPay,
-            workingHours: entry.workingHours,
-            hourlyWage: entry.hourlyWage,
-            kpiAllowance: entry.kpiAllowance,
-            petrolAllowance: entry.petrolAllowance,
-            otherAllowance: entry.otherAllowance,
-            grossSalary: totalGross,
-            ...statutory,
-            pcb: entry.pcb,
-            penalty,
-            advance,
-            netSalary,
+            ...computed,
           },
           update: {
-            basicPay: entry.basicPay,
-            workingHours: entry.workingHours,
-            hourlyWage: entry.hourlyWage,
-            kpiAllowance: entry.kpiAllowance,
-            petrolAllowance: entry.petrolAllowance,
-            otherAllowance: entry.otherAllowance,
-            grossSalary: totalGross,
-            ...statutory,
-            pcb: entry.pcb,
-            penalty,
-            advance,
-            netSalary,
+            ...computed,
           },
         })
       })
