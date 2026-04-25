@@ -197,12 +197,23 @@ function SortHeader({
     align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
   const horizontalSpacer =
     align === "right" ? "ml-auto" : align === "center" ? "mx-auto" : "";
+  // For center-aligned headers we want a full-width flex button so the
+  // label can wrap and stay centered (e.g. "Default Tier" splitting onto
+  // two lines in the narrow Base Salary sub-columns). `text-center` on the
+  // button centers each wrapped line, and `flex w-full` makes the button
+  // fill the cell so wrapping isn't pushed to the left edge of an
+  // inline-block. Right/left aligned columns keep the original
+  // inline-flex layout.
+  const isCenter = align === "center";
+  const layout = isCenter
+    ? `flex w-full justify-center text-center ${horizontalSpacer}`
+    : `inline-flex items-center gap-1 ${justify} ${horizontalSpacer}`;
   return (
     <button
       type="button"
       onClick={() => onToggle(columnKey)}
       disabled={disabled}
-      className={`inline-flex items-center gap-1 ${justify} ${horizontalSpacer} ${
+      className={`items-center gap-1 ${layout} ${
         compact ? "text-[0.68rem]" : "text-[0.72rem]"
       } uppercase tracking-wider font-medium select-none transition-colors ${
         disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
@@ -212,7 +223,7 @@ function SortHeader({
     >
       <span>{label}</span>
       <Arrow
-        className={`w-3 h-3 transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
+        className={`w-3 h-3 shrink-0 transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
       />
     </button>
   );
@@ -743,7 +754,7 @@ export function SalaryTable({
                 <th rowSpan={2} className="py-2 px-4 font-medium align-bottom">
                   <SortHeader label="Dispatcher" columnKey="name" align="left" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
-                <th rowSpan={2} className="py-2 px-3 font-medium text-center align-bottom">
+                <th rowSpan={2} className="py-2 px-1 font-medium text-center align-bottom">
                   <SortHeader label="Orders" columnKey="totalOrders" align="center" sortKey={sortKey} sortDir={sortDir} onToggle={toggleSort} disabled={editMode} />
                 </th>
                 <th
