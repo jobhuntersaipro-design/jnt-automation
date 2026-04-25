@@ -73,6 +73,44 @@ function StatCard({
   );
 }
 
+function TotalPeopleCard({ data }: { data: SummaryStats }) {
+  const dispatcherEmpty = data.totalDispatchers === 0;
+  const staffEmpty = data.totalStaff === 0;
+  const combined = data.totalDispatchers + data.totalStaff;
+  const prevCombined = data.prev.totalDispatchers + data.prev.totalStaff;
+  return (
+    <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
+      <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
+      <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
+        Total People
+      </p>
+      <div className="pl-2 flex flex-col gap-1">
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[0.78rem] text-on-surface-variant">Dispatchers</span>
+          <span
+            className={`tabular-nums text-[1.05rem] font-semibold ${
+              dispatcherEmpty ? "text-on-surface-variant/40" : "text-on-surface"
+            }`}
+          >
+            {dispatcherEmpty ? "—" : fmtCount(data.totalDispatchers)}
+          </span>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-[0.78rem] text-on-surface-variant">Staff</span>
+          <span
+            className={`tabular-nums text-[1.05rem] font-semibold ${
+              staffEmpty ? "text-on-surface-variant/40" : "text-on-surface"
+            }`}
+          >
+            {staffEmpty ? "—" : fmtCount(data.totalStaff)}
+          </span>
+        </div>
+      </div>
+      <div className="pl-2"><Delta current={combined} prev={prevCombined} /></div>
+    </div>
+  );
+}
+
 function AvgMonthlySalaryCard({ data }: { data: SummaryStats }) {
   const dispatcherAvg = data.avgMonthlySalary.dispatcher;
   const staffAvg = data.avgMonthlySalary.staff;
@@ -144,11 +182,7 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
       </div>
 
       <AvgMonthlySalaryCard data={data} />
-      <StatCard
-        label="Total Dispatchers"
-        value={fmtCount(data.totalDispatchers)}
-        subtitle={<Delta current={data.totalDispatchers} prev={data.prev.totalDispatchers} />}
-      />
+      <TotalPeopleCard data={data} />
       <StatCard
         label="Total Orders"
         value={fmtCount(data.totalOrders)}

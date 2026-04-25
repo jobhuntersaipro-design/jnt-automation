@@ -2,8 +2,8 @@
 
 import { useContainerSize } from "@/lib/hooks/use-container-size";
 import {
-  BarChart,
-  Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   Tooltip,
@@ -42,42 +42,46 @@ function CustomTooltip({
   if (!active || !payload || payload.length === 0) return null;
   const p = payload[0]?.payload;
   if (!p) return null;
-  const total = p.dispatcher + p.staff;
   return (
     <div className="bg-white rounded-md shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 px-3 py-2 text-[0.78rem]">
       <p className="font-semibold text-on-surface mb-1">{label}</p>
       <div className="flex items-center justify-between gap-3 text-on-surface-variant">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: CHART_COLORS.brand }} />
+          <span className="inline-block w-2.5 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.brand }} />
           Dispatchers
         </span>
         <span className="tabular-nums">{fmtFull(p.dispatcher)}</span>
       </div>
       <div className="flex items-center justify-between gap-3 text-on-surface-variant">
         <span className="flex items-center gap-1.5">
-          <span className="inline-block w-2 h-2 rounded-sm" style={{ backgroundColor: CHART_COLORS.bonusTierEarnings }} />
+          <span className="inline-block w-2.5 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.bonusTierEarnings }} />
           Staff
         </span>
         <span className="tabular-nums">{fmtFull(p.staff)}</span>
-      </div>
-      <div className="flex items-center justify-between gap-3 mt-1 pt-1 border-t border-outline-variant/15 font-medium text-on-surface">
-        <span>Total</span>
-        <span className="tabular-nums">{fmtFull(total)}</span>
       </div>
     </div>
   );
 }
 
-export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] }) {
-  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
-
-  // Y-axis zoom: round up to nice step so the tallest stacked bar isn't flush with the top.
-  const max = data.reduce((m, p) => Math.max(m, p.dispatcher + p.staff), 0);
+function computeNiceMax(values: number[]): number {
+  const max = values.reduce((m, v) => Math.max(m, v), 0);
+  if (max === 0) return 100;
   const pad = max * 0.1;
   const rawStep = (max + pad) / 5;
   const magnitude = Math.pow(10, Math.floor(Math.log10(Math.max(rawStep, 1))));
   const step = Math.ceil(rawStep / magnitude) * magnitude;
-  const yMax = max > 0 ? Math.ceil((max + pad) / step) * step : 100;
+  return Math.ceil((max + pad) / step) * step;
+}
+
+export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] }) {
+  const { ref: chartRef, width: cw, height: ch } = useContainerSize();
+
+  // Dual-axis: dispatcher on left (brand), staff on right (emerald). Each axis
+  // zoomed to its own data so low-volume staff doesn't vanish against high
+  // dispatcher totals. The visual cost is that the two lines cannot be
+  // compared by eye — the tooltip remains the source of truth for absolute RM.
+  const yMaxDispatcher = computeNiceMax(data.map((d) => d.dispatcher));
+  const yMaxStaff = computeNiceMax(data.map((d) => d.staff));
 
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
@@ -88,16 +92,16 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
               Net Payout by Role
             </h2>
             <p className="text-[0.9rem] text-on-surface-variant mt-0.5">
-              Monthly dispatcher and staff salary, stacked
+              Dispatcher (left axis) vs Staff (right axis)
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4 sm:shrink-0 sm:pt-1">
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: CHART_COLORS.brand }} />
+              <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.brand }} />
               <span className="text-[0.8rem] text-on-surface-variant">Dispatchers</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: CHART_COLORS.bonusTierEarnings }} />
+              <div className="w-6 h-0.5 rounded-full" style={{ backgroundColor: CHART_COLORS.bonusTierEarnings }} />
               <span className="text-[0.8rem] text-on-surface-variant">Staff</span>
             </div>
           </div>
@@ -110,7 +114,7 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
             No data for selected range
           </div>
         ) : cw > 0 && ch > 0 ? (
-          <BarChart width={cw} height={ch} data={data} margin={{ top: 10, right: 12, bottom: 0, left: 8 }}>
+          <LineChart width={cw} height={ch} data={data} margin={{ top: 10, right: 16, bottom: 0, left: 8 }}>
             <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis
               dataKey="month"
@@ -119,17 +123,45 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
               tickLine={false}
             />
             <YAxis
-              domain={[0, yMax]}
-              tick={{ fill: CHART_COLORS.axisText, fontSize: 11 }}
+              yAxisId="dispatcher"
+              orientation="left"
+              domain={[0, yMaxDispatcher]}
+              tick={{ fill: CHART_COLORS.brand, fontSize: 11 }}
               tickFormatter={fmtY}
               axisLine={false}
               tickLine={false}
               width={56}
             />
-            <Tooltip cursor={{ fill: CHART_COLORS.grid }} content={<CustomTooltip />} />
-            <Bar dataKey="dispatcher" stackId="net" fill={CHART_COLORS.brand} radius={[0, 0, 0, 0]} />
-            <Bar dataKey="staff" stackId="net" fill={CHART_COLORS.bonusTierEarnings} radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <YAxis
+              yAxisId="staff"
+              orientation="right"
+              domain={[0, yMaxStaff]}
+              tick={{ fill: CHART_COLORS.bonusTierEarnings, fontSize: 11 }}
+              tickFormatter={fmtY}
+              axisLine={false}
+              tickLine={false}
+              width={56}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            <Line
+              yAxisId="dispatcher"
+              type="monotone"
+              dataKey="dispatcher"
+              stroke={CHART_COLORS.brand}
+              strokeWidth={2}
+              dot={{ r: 3, fill: CHART_COLORS.brand }}
+              activeDot={{ r: 5 }}
+            />
+            <Line
+              yAxisId="staff"
+              type="monotone"
+              dataKey="staff"
+              stroke={CHART_COLORS.bonusTierEarnings}
+              strokeWidth={2}
+              dot={{ r: 3, fill: CHART_COLORS.bonusTierEarnings }}
+              activeDot={{ r: 5 }}
+            />
+          </LineChart>
         ) : null}
       </div>
     </div>
