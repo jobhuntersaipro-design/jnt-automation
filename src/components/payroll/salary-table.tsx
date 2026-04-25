@@ -189,37 +189,51 @@ function SortHeader({
 }) {
   const active = sortKey === columnKey;
   const Arrow = active && sortDir === "asc" ? ArrowUp : ArrowDown;
-  // Inner-flex justify maps the parent <th>'s text-* alignment onto the
-  // sort button's contents. `mx-auto` for center makes the inline-flex
-  // button sit centered within the cell so the underlying value column
-  // (also text-center) lines up directly below.
-  const justify =
-    align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start";
-  const horizontalSpacer =
-    align === "right" ? "ml-auto" : align === "center" ? "mx-auto" : "";
-  // For center-aligned headers we want a full-width flex button so the
-  // label can wrap and stay centered (e.g. "Default Tier" splitting onto
-  // two lines in the narrow Base Salary sub-columns). `text-center` on the
-  // button centers each wrapped line, and `flex w-full` makes the button
-  // fill the cell so wrapping isn't pushed to the left edge of an
-  // inline-block. Right/left aligned columns keep the original
-  // inline-flex layout.
-  const isCenter = align === "center";
-  const layout = isCenter
-    ? `flex w-full justify-center text-center ${horizontalSpacer}`
-    : `inline-flex items-center gap-1 ${justify} ${horizontalSpacer}`;
+  const sizeCls = compact ? "text-[0.68rem]" : "text-[0.72rem]";
+  const baseCls = `${sizeCls} uppercase tracking-wider font-medium select-none transition-colors ${
+    disabled
+      ? "cursor-not-allowed opacity-60"
+      : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
+  }`;
+  const ariaLabel = `Sort by ${label}${active ? ` (currently ${sortDir === "asc" ? "ascending" : "descending"})` : ""}`;
+
+  // Center-aligned headers use a full-width relative-positioned button so
+  // the label sits at the column's geometric centre (matching the
+  // text-centered value below). The arrow lives in absolute position at
+  // the right edge so it doesn't shift the label off-centre, and so the
+  // label keeps centering even when it wraps to two lines (e.g.
+  // "Default Tier" inside the narrow Base Salary sub-columns).
+  if (align === "center") {
+    return (
+      <button
+        type="button"
+        onClick={() => onToggle(columnKey)}
+        disabled={disabled}
+        className={`relative block w-full text-center ${baseCls}`}
+        style={color ? { color } : undefined}
+        aria-label={ariaLabel}
+      >
+        <span className="wrap-break-word">{label}</span>
+        <Arrow
+          className={`absolute right-1 top-1/2 -translate-y-1/2 w-3 h-3 transition-opacity ${active ? "opacity-100" : "opacity-0 group-hover:opacity-40"}`}
+        />
+      </button>
+    );
+  }
+
+  // Left/right alignment keep the original inline-flex layout — the arrow
+  // sits inline next to the label as that matches the visual convention
+  // for left/right columns (e.g. "Dispatcher").
+  const justify = align === "right" ? "justify-end" : "justify-start";
+  const horizontalSpacer = align === "right" ? "ml-auto" : "";
   return (
     <button
       type="button"
       onClick={() => onToggle(columnKey)}
       disabled={disabled}
-      className={`items-center gap-1 ${layout} ${
-        compact ? "text-[0.68rem]" : "text-[0.72rem]"
-      } uppercase tracking-wider font-medium select-none transition-colors ${
-        disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
-      }`}
+      className={`inline-flex items-center gap-1 ${justify} ${horizontalSpacer} ${baseCls}`}
       style={color ? { color } : undefined}
-      aria-label={`Sort by ${label}${active ? ` (currently ${sortDir === "asc" ? "ascending" : "descending"})` : ""}`}
+      aria-label={ariaLabel}
     >
       <span>{label}</span>
       <Arrow
