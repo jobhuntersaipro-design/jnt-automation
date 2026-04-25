@@ -2,15 +2,20 @@
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress — branch `feature/branch-detail-staff-cards`. Spec at `context/features/branch-detail-staff-cards-spec.md`.
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add a row of 4 role-count cards (Dispatchers / Supervisors / Admins / Store keepers) at the top of `/branches/[code]`, above the existing 6 financial cards.
+- Cards use the same icon palette already established on the `/branches` list page (`Truck` / `ShieldCheck` / `ClipboardList` / `Package`).
+- Cards are in-page anchors — click jumps to the corresponding section (dispatchers → dispatchers table, staff roles → employees table).
+- Drop the dispatcher count from the subtitle line since it's now a card.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- No DB schema change. Counts derived from already-loaded `employees` array.
+- No new tests — server component, presentational.
+- Manual QA at 375 / 768 / 1280 + scroll-anchor + keyboard tab + zero-state branches.
 
 ## History
 
