@@ -2,24 +2,21 @@
 
 ## Status
 
-In Progress — branch `feature/branch-detail-staff-cards`. Spec at `context/features/branch-detail-staff-cards-spec.md`.
+<!-- Not Started | In Progress | Complete -->
 
 ## Goals
 
-- Add a row of 4 role-count cards (Dispatchers / Supervisors / Admins / Store keepers) at the top of `/branches/[code]`, above the existing 6 financial cards.
-- Cards use the same icon palette already established on the `/branches` list page (`Truck` / `ShieldCheck` / `ClipboardList` / `Package`).
-- Cards are in-page anchors — click jumps to the corresponding section (dispatchers → dispatchers table, staff roles → employees table).
-- Drop the dispatcher count from the subtitle line since it's now a card.
+<!-- Bullet points of what success looks like -->
 
 ## Notes
 
-- No DB schema change. Counts derived from already-loaded `employees` array.
-- No new tests — server component, presentational.
-- Manual QA at 375 / 768 / 1280 + scroll-anchor + keyboard tab + zero-state branches.
+<!-- Additional context, constraints, or details from spec -->
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-04-25: **Branch Detail — People at Branch Cards** — Completed. Spec: `context/features/branch-detail-staff-cards-spec.md`. Branch `feature/branch-detail-staff-cards` → merged to `main` (commit `6d56cc4`). Branch deleted. **What changed**: `/branches/[code]` gains a new `<section aria-label="People at branch">` directly above the 6 financial cards, holding 4 role-count cards (Dispatchers / Supervisors / Admins / Store keepers). Each card mirrors the financial-card visual (white card, left accent, label, big tabular-nums count) plus a 28×28 icon tile in the role tint — `Truck` brand, `ShieldCheck` emerald, `ClipboardList` purple, `Package` amber, all from `lucide-react`, palette identical to the `/branches` list page's `CountRow`. Cards render as `<a href="#…-section">` so they're in-page anchors: Dispatchers → `#dispatchers-section` (the existing dispatcher table), three staff roles → `#employees-section` (the existing employee table). Both destination sections gain `scroll-mt-24 lg:scroll-mt-28` so the sticky header doesn't cover the row after the jump. **Subtitle update**: dropped the now-redundant `"X dispatchers"` count — header subtitle is `"Y months of salary records · Z lifetime orders"`. **Data**: counts derived in the page from the already-loaded `employees: BranchEmployeeRow[]`; `dispatcherCount` from `summary.dispatcherCount`. No schema change, no `lib/db/branches` change. **Files touched: 1 page.tsx + 1 spec.md.** **Net: +226 / –7 LOC** (most of which is the new `PeopleCountCard` component + the cards array). Empty-count cells render in `text-on-surface-variant/40` to distinguish from non-zero. Keyboard nav: `focus-visible:ring-2 focus-visible:ring-brand/50` on each card; `aria-label="Jump to <Role> at this branch (N)"`. **Manual QA verified at 375 / 768 / 1280** — 2×2 grid mobile, 4-across tablet+desktop, click-jump confirmed via DOM evaluation (`href` attribute, hash change, target visibility). 276 vitest green, build clean. **Out of scope**: clicking Supervisors does not filter the destination Employees table by role — adding a role-filtered query-string for the staff list is a separate feature.
 
 - 2026-04-25: **Mobile-Responsive Cleanup — Cramped Toolbars + Filter Rows** — Completed. Branch `fix/mobile-responsive-cleanup` → merged to `main` (commit `5222066`). Branch deleted. **Audit at 375px** flagged 4 broken layouts: Dispatchers settings toolbar (last button off-screen), Dispatchers filter row (search fixed `w-52` pushed count off-screen), Payroll History filter row (`0 records` truncated mid-word), and 3 dashboard chart headings where the right-side legend/KPI/search forced the H2 title to wrap into 5 narrow lines (`Net Payout vs Base Salary`, `Bonus Tier Hit Rate`, `Top Dispatchers`). **Pattern**: every fix was the same — replace `flex items-center` (forced single row) with `flex flex-wrap` or `flex-col sm:flex-row` so children stack on mobile and inline from `sm` (640px) up. Search inputs gained `flex-1 min-w-32 sm:flex-none sm:w-52` so they fill the remaining row at 375px but keep their fixed width on tablet+. Verified at 375 / 768 / 1024 — desktop unchanged. **Files touched: 5.** **Net: +13 / –13 (0 LOC delta).** No spec doc — was straightforward CSS class adjustments, audited via Playwright at iPhone size. **Out of scope (deferred)**: 16-column Staff Payroll table only fits 3 columns at 375px; horizontal scroll works, but a card-view rewrite for mobile is a separate feature.
 
