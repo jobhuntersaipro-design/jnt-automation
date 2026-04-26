@@ -30,6 +30,13 @@ interface PayrollEntry {
   icNo: string | null
   gender: Gender
   avatarUrl: string | null
+  /**
+   * Active/inactive flag — mirrors the toggle on /staff?tab=settings.
+   * Inactive rows are dimmed, read-only, excluded from summary totals +
+   * bulk payslip selection, and skipped on Confirm & Save (per spec §6.1:
+   * skip, don't upsert zeros — preserves any prior saved record untouched).
+   */
+  isActive: boolean
   dispatcherId: string | null
   dispatcherAvatarUrl: string | null
   hasDispatcherMatch: boolean
@@ -118,10 +125,12 @@ function CalcCurrencyInput({
   value,
   onChange,
   light = false,
+  disabled = false,
 }: {
   value: number
   onChange: (val: number) => void
   light?: boolean
+  disabled?: boolean
 }) {
   const [cents, setCents] = useState(() => floatToCents(value))
   const [lastValue, setLastValue] = useState(value)
@@ -133,6 +142,7 @@ function CalcCurrencyInput({
   }
 
   function handleKey(e: React.KeyboardEvent) {
+    if (disabled) return
     e.preventDefault()
     // Select all + delete/backspace → clear entire field
     const input = e.target as HTMLInputElement
@@ -175,10 +185,12 @@ function CalcCurrencyInput({
       type="text"
       inputMode="none"
       readOnly
+      disabled={disabled}
+      tabIndex={disabled ? -1 : undefined}
       value={display}
       placeholder="0.00"
       onKeyDown={handleKey}
-      className={`peer w-full bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold cursor-text ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
+      className={`peer w-full bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : "cursor-text"} ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
     />
   )
 }
@@ -186,9 +198,11 @@ function CalcCurrencyInput({
 function HoursInput({
   value,
   onChange,
+  disabled = false,
 }: {
   value: number
   onChange: (val: number) => void
+  disabled?: boolean
 }) {
   const [editing, setEditing] = useState<string | null>(null)
 
@@ -198,12 +212,15 @@ function HoursInput({
     <input
       type="text"
       inputMode="decimal"
+      disabled={disabled}
+      tabIndex={disabled ? -1 : undefined}
       value={display}
       placeholder="0"
-      className="w-full bg-transparent text-center text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 caret-primary focus:outline-none focus:text-primary focus:font-semibold"
-      onFocus={() => setEditing(value > 0 ? value.toString() : "")}
-      onChange={(e) => setEditing(e.target.value.replace(/[^\d.]/g, ""))}
+      className={`w-full bg-transparent text-center text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 caret-primary focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : ""}`}
+      onFocus={() => { if (!disabled) setEditing(value > 0 ? value.toString() : "") }}
+      onChange={(e) => { if (!disabled) setEditing(e.target.value.replace(/[^\d.]/g, "")) }}
       onBlur={() => {
+        if (disabled) return
         const parsed = parseFloat(editing ?? "")
         const final = isNaN(parsed) ? 0 : Math.min(parsed, 9999)
         setEditing(null)
@@ -246,7 +263,11 @@ export function PayrollTab() {
       // Normalize legacy OT-on-Sup/Admin records: drop saved hours/hourlyWage
       // from local state so the table reflects the basic-pay-only formula.
       // The DB still holds the old values until the next Confirm & Save.
-      const normalized: PayrollEntry[] = (data.entries as PayrollEntry[]).map((e) => {
+      // Also coerce missing `isActive` to `true` — the safer default per
+      // spec §8 (treat undefined as active so we don't silently disable rows
+      // if the server payload regresses).
+      const normalized: PayrollEntry[] = (data.entries as PayrollEntry[]).map((raw) => {
+        const e: PayrollEntry = { ...raw, isActive: raw.isActive ?? true }
         if (e.type === "STORE_KEEPER") return e
         if (e.workingHours === 0 && e.hourlyWage === 0) return e
         return recalcEntry(
@@ -283,10 +304,52 @@ export function PayrollTab() {
 
   const allReady = useMemo(() => {
     return entries.every((e) => {
+      // Inactive entries are skipped on save, so they don't gate the button.
+      if (!e.isActive) return true
       if (e.type === "STORE_KEEPER" && e.workingHours <= 0) return false
       return true
     })
   }, [entries])
+
+  // Optimistic active/inactive toggle — flip locally first, then PATCH the
+  // employee. Reverts and toasts on failure. The same /api/employees/[id]
+  // endpoint backs the toggle on /staff?tab=settings.
+  const toggleActive = useCallback(async (employeeId: string, nextActive: boolean) => {
+    let snapshotName = ""
+    setEntries((prev) =>
+      prev.map((e) => {
+        if (e.employeeId !== employeeId) return e
+        snapshotName = e.name
+        return { ...e, isActive: nextActive }
+      }),
+    )
+    // Drop from selection when going inactive — bulk payslip can't include it.
+    if (!nextActive) {
+      setSelectedIds((prev) => {
+        if (!prev.has(employeeId)) return prev
+        const next = new Set(prev)
+        next.delete(employeeId)
+        return next
+      })
+    }
+    try {
+      const res = await fetch(`/api/employees/${employeeId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: nextActive }),
+      })
+      if (!res.ok) throw new Error()
+      toast.success(`${snapshotName} marked ${nextActive ? "active" : "inactive"}`)
+    } catch {
+      // Revert
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.employeeId === employeeId ? { ...e, isActive: !nextActive } : e,
+        ),
+      )
+      toast.error("Failed to update status")
+    }
+  }, [])
 
   const branchOptions = useMemo(() => {
     const set = new Set<string>()
@@ -304,34 +367,39 @@ export function PayrollTab() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const payload = entries.map((e) => {
-        const isStoreKeeper = e.type === "STORE_KEEPER"
-        return {
-          employeeId: e.employeeId,
-          // Force per-type wage source: Sup/Admin → basicPay only;
-          // Store Keeper → workingHours × hourlyWage only.
-          // Server re-applies the same gating, but we strip irrelevant
-          // values here so the payload reflects intent.
-          basicPay: isStoreKeeper ? 0 : e.basicPay,
-          workingHours: isStoreKeeper ? e.workingHours : 0,
-          hourlyWage: isStoreKeeper ? e.hourlyWage : 0,
-          kpiAllowance: e.kpiAllowance,
-          petrolAllowance: e.petrolAllowance,
-          otherAllowance: e.otherAllowance,
-          pcb: e.pcb,
-          penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
-          advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
-          // Statutory overrides — let users persist manual edits (including
-          // explicit zeros). Omitted fields would otherwise be recomputed
-          // server-side from gross, overwriting any cleared value.
-          epfEmployee: e.epfEmployee,
-          socsoEmployee: e.socsoEmployee,
-          eisEmployee: e.eisEmployee,
-          epfEmployer: e.epfEmployer,
-          socsoEmployer: e.socsoEmployer,
-          eisEmployer: e.eisEmployer,
-        }
-      })
+      // Skip inactive employees per spec §6.1: don't upsert at all, leave any
+      // existing record untouched. User can flip the toggle and re-save to
+      // resume payroll for that person.
+      const payload = entries
+        .filter((e) => e.isActive)
+        .map((e) => {
+          const isStoreKeeper = e.type === "STORE_KEEPER"
+          return {
+            employeeId: e.employeeId,
+            // Force per-type wage source: Sup/Admin → basicPay only;
+            // Store Keeper → workingHours × hourlyWage only.
+            // Server re-applies the same gating, but we strip irrelevant
+            // values here so the payload reflects intent.
+            basicPay: isStoreKeeper ? 0 : e.basicPay,
+            workingHours: isStoreKeeper ? e.workingHours : 0,
+            hourlyWage: isStoreKeeper ? e.hourlyWage : 0,
+            kpiAllowance: e.kpiAllowance,
+            petrolAllowance: e.petrolAllowance,
+            otherAllowance: e.otherAllowance,
+            pcb: e.pcb,
+            penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
+            advance: e.hasDispatcherMatch ? e.advance - e.dispatcherAdvance : e.advance,
+            // Statutory overrides — let users persist manual edits (including
+            // explicit zeros). Omitted fields would otherwise be recomputed
+            // server-side from gross, overwriting any cleared value.
+            epfEmployee: e.epfEmployee,
+            socsoEmployee: e.socsoEmployee,
+            eisEmployee: e.eisEmployee,
+            epfEmployer: e.epfEmployer,
+            socsoEmployer: e.socsoEmployer,
+            eisEmployer: e.eisEmployer,
+          }
+        })
 
       const res = await fetch(`/api/employee-payroll/${month}/${year}`, {
         method: "POST",
@@ -354,21 +422,24 @@ export function PayrollTab() {
   }
 
   // Summary calculations — reflect the active branch filter so totals match
-  // what the user sees in the table.
+  // what the user sees in the table. Inactive entries are excluded so the
+  // hero "Total Net Payout" matches what will actually be saved.
   const totals = useMemo(() => {
-    return displayedEntries.reduce(
-      (acc, e) => ({
-        gross: acc.gross + e.grossSalary,
-        epfEmployee: acc.epfEmployee + e.epfEmployee,
-        socsoEmployee: acc.socsoEmployee + e.socsoEmployee,
-        eisEmployee: acc.eisEmployee + e.eisEmployee,
-        net: acc.net + e.netSalary,
-        epfEmployer: acc.epfEmployer + e.epfEmployer,
-        socsoEmployer: acc.socsoEmployer + e.socsoEmployer,
-        eisEmployer: acc.eisEmployer + e.eisEmployer,
-      }),
-      { gross: 0, epfEmployee: 0, socsoEmployee: 0, eisEmployee: 0, net: 0, epfEmployer: 0, socsoEmployer: 0, eisEmployer: 0 }
-    )
+    return displayedEntries
+      .filter((e) => e.isActive)
+      .reduce(
+        (acc, e) => ({
+          gross: acc.gross + e.grossSalary,
+          epfEmployee: acc.epfEmployee + e.epfEmployee,
+          socsoEmployee: acc.socsoEmployee + e.socsoEmployee,
+          eisEmployee: acc.eisEmployee + e.eisEmployee,
+          net: acc.net + e.netSalary,
+          epfEmployer: acc.epfEmployer + e.epfEmployer,
+          socsoEmployer: acc.socsoEmployer + e.socsoEmployer,
+          eisEmployer: acc.eisEmployer + e.eisEmployer,
+        }),
+        { gross: 0, epfEmployee: 0, socsoEmployee: 0, eisEmployee: 0, net: 0, epfEmployer: 0, socsoEmployer: 0, eisEmployer: 0 }
+      )
   }, [displayedEntries])
 
   const years = useMemo(() => {
@@ -412,9 +483,17 @@ export function PayrollTab() {
   // Clear selection when month/year/branch filter changes
   useEffect(() => { setSelectedIds(new Set()) }, [month, year, branchFilter])
 
-  const allSaved = useMemo(
-    () => displayedEntries.length > 0 && displayedEntries.every((e) => e.isSaved),
+  // Active entries only — the bulk-select header, "all saved?" hint, and
+  // "select all" affordance ignore inactive rows since their payslip
+  // generation and selection are disabled.
+  const activeDisplayedEntries = useMemo(
+    () => displayedEntries.filter((e) => e.isActive),
     [displayedEntries],
+  )
+
+  const allSaved = useMemo(
+    () => activeDisplayedEntries.length > 0 && activeDisplayedEntries.every((e) => e.isSaved),
+    [activeDisplayedEntries],
   )
 
   const toggleSelect = useCallback((id: string) => {
@@ -427,12 +506,12 @@ export function PayrollTab() {
   }, [])
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === displayedEntries.length) {
+    if (selectedIds.size === activeDisplayedEntries.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(displayedEntries.map((e) => e.employeeId)))
+      setSelectedIds(new Set(activeDisplayedEntries.map((e) => e.employeeId)))
     }
-  }, [selectedIds.size, displayedEntries])
+  }, [selectedIds.size, activeDisplayedEntries])
 
   const handleGeneratePayslip = useCallback(async (entry: PayrollEntry) => {
     if (!entry.icNo) {
@@ -692,7 +771,7 @@ export function PayrollTab() {
             Swipe left to see more columns →
           </p>
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full" style={{ minWidth: 1180 }}>
+          <table className="w-full" style={{ minWidth: 1280 }}>
             <thead>
               <tr>
                 {allSaved && (
@@ -728,6 +807,7 @@ export function PayrollTab() {
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
                 <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Net</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Status</th>
                 <th className="pb-3" style={{ width: 150 }}></th>
               </tr>
             </thead>
@@ -735,21 +815,29 @@ export function PayrollTab() {
               {displayedEntries.map((entry) => {
                 const isStoreKeeper = entry.type === "STORE_KEEPER"
                 const isReady = isStoreKeeper ? entry.workingHours > 0 : true
+                const inactive = !entry.isActive
 
                 return (
                   <tr
                     key={entry.employeeId}
-                    className="group hover:bg-surface-hover/50 transition-colors border-b border-outline-variant/15 last:border-b-0"
+                    className={`group hover:bg-surface-hover/50 transition-colors border-b border-outline-variant/15 last:border-b-0 ${
+                      inactive ? "opacity-50" : ""
+                    }`}
                   >
-                    {/* Checkbox */}
+                    {/* Checkbox — only for active rows; inactive rows can't be
+                        bulk-selected for payslip generation. */}
                     {allSaved && (
                       <td className="py-2.5 pl-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(entry.employeeId)}
-                          onChange={() => toggleSelect(entry.employeeId)}
-                          className="rounded accent-brand"
-                        />
+                        {inactive ? (
+                          <span className="block w-3.5 h-3.5" aria-hidden />
+                        ) : (
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(entry.employeeId)}
+                            onChange={() => toggleSelect(entry.employeeId)}
+                            className="rounded accent-brand"
+                          />
+                        )}
                       </td>
                     )}
 
@@ -834,6 +922,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={isStoreKeeper ? entry.hourlyWage : entry.basicPay}
                           onChange={(v) => updateEntry(entry.employeeId, isStoreKeeper ? "hourlyWage" : "basicPay", v)}
+                          disabled={inactive}
                         />
                       </div>
                       <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
@@ -849,6 +938,7 @@ export function PayrollTab() {
                           <HoursInput
                             value={entry.workingHours}
                             onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
+                            disabled={inactive}
                           />
                         </div>
                       ) : (
@@ -864,6 +954,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.petrolAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "petrolAllowance", v)}
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -874,6 +965,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.kpiAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "kpiAllowance", v)}
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -884,6 +976,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.otherAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "otherAllowance", v)}
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -906,6 +999,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.pcb}
                           onChange={(v) => updateEntry(entry.employeeId, "pcb", v)}
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -916,6 +1010,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.penalty}
                           onChange={(v) => updateEntry(entry.employeeId, "penalty", v)}
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -926,6 +1021,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.epfEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "epfEmployee", v)}
+                          disabled={inactive}
                         />
                       </div>
                       <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
@@ -933,6 +1029,7 @@ export function PayrollTab() {
                           value={entry.epfEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "epfEmployer", v)}
                           light
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -943,6 +1040,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.socsoEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "socsoEmployee", v)}
+                          disabled={inactive}
                         />
                       </div>
                       <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
@@ -950,6 +1048,7 @@ export function PayrollTab() {
                           value={entry.socsoEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "socsoEmployer", v)}
                           light
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -960,6 +1059,7 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.eisEmployee}
                           onChange={(v) => updateEntry(entry.employeeId, "eisEmployee", v)}
+                          disabled={inactive}
                         />
                       </div>
                       <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
@@ -967,6 +1067,7 @@ export function PayrollTab() {
                           value={entry.eisEmployer}
                           onChange={(v) => updateEntry(entry.employeeId, "eisEmployer", v)}
                           light
+                          disabled={inactive}
                         />
                       </div>
                     </td>
@@ -978,10 +1079,61 @@ export function PayrollTab() {
                       </span>
                     </td>
 
-                    {/* Status / Payslip / Delete */}
+                    {/* Status — Active/Inactive toggle. The chip below the
+                        toggle echoes the state in case the row dim makes the
+                        toggle hard to read. */}
+                    <td className="py-2.5 px-1 text-center align-middle">
+                      <div className="inline-flex flex-col items-center gap-1">
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={entry.isActive}
+                          aria-label={
+                            entry.isActive
+                              ? `Click to mark ${entry.name} inactive`
+                              : `Click to mark ${entry.name} active`
+                          }
+                          title={
+                            entry.isActive ? "Click to mark inactive" : "Click to mark active"
+                          }
+                          onClick={() => toggleActive(entry.employeeId, !entry.isActive)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors cursor-pointer ${
+                            entry.isActive ? "bg-emerald-500" : "bg-gray-300"
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform shadow-sm ${
+                              entry.isActive ? "translate-x-5" : "translate-x-1"
+                            }`}
+                          />
+                        </button>
+                        <span
+                          className={`inline-flex items-center px-1.5 py-0.5 text-[0.6rem] font-medium tracking-wide rounded-md ${
+                            entry.isActive
+                              ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200"
+                              : "bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-200"
+                          }`}
+                        >
+                          {entry.isActive ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Payslip / Delete — Delete still works on inactive rows
+                        so the user doesn't have to re-activate before deleting.
+                        Generate Payslip is hidden for inactive rows since their
+                        salary intent is "no payroll this month". */}
                     <td className="py-2.5 px-2 text-left">
                       <div className="inline-flex flex-col items-start gap-2">
-                        {entry.isSaved ? (
+                        {inactive ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 text-[0.7rem] text-on-surface-variant/60"
+                            title="Payslip disabled while inactive"
+                          >
+                            <span className="inline-block w-2 h-2 rounded-full bg-gray-300" />
+                            Skipped on save
+                          </span>
+                        ) : entry.isSaved ? (
                           <button
                             onClick={() => handleGeneratePayslip(entry)}
                             disabled={generatingId === entry.employeeId}

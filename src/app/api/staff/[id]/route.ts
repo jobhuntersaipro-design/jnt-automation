@@ -1,6 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
+import { getStaffDispatcherById } from "@/lib/db/staff";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const effective = await getEffectiveAgentId();
+    if (!effective) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const { id } = await params;
+    const dispatcher = await getStaffDispatcherById(effective.agentId, id);
+    if (!dispatcher) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json({ dispatcher });
+  } catch (err) {
+    console.error("[staff] GET error", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
 
 export async function DELETE(
   _req: NextRequest,

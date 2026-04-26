@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,11 +17,20 @@ import {
   Pin,
   ArrowUp,
   ArrowDown,
+  Loader2,
 } from "lucide-react";
 import { PreviewSummaryCards } from "./preview-summary-cards";
 import { usePayslipGuard } from "@/components/settings/use-payslip-guard";
 import { readBonusTierSnapshot } from "@/lib/staff/bonus-tier-snapshot";
 import { sortAndPinRows, type SortKey, type SortDirection } from "@/lib/payroll/sort-rows";
+import type { StaffDispatcher } from "@/lib/db/staff";
+
+// Dynamic-import to avoid bundling the drawer (and its history-tab subtree)
+// into the salary-table page until a user actually clicks a dispatcher name.
+const DispatcherDrawer = dynamic(
+  () => import("@/components/staff/dispatcher-drawer").then((m) => m.DispatcherDrawer),
+  { ssr: false },
+);
 
 export interface SalaryRecordRow {
   dispatcherId: string;
@@ -277,6 +287,11 @@ export function SalaryTable({
   const [sortKey, setSortKey] = useState<SortKey | null>("netSalary");
   const [sortDir, setSortDir] = useState<SortDirection>("desc");
   const [pinBusy, setPinBusy] = useState<Set<string>>(new Set());
+  // Slide-in drawer state — clicking a dispatcher name fetches the full
+  // StaffDispatcher (assignments, tiers, …) on demand and renders the same
+  // DispatcherDrawer used on /dispatchers?tab=settings.
+  const [drawerDispatcher, setDrawerDispatcher] = useState<StaffDispatcher | null>(null);
+  const [loadingDrawerId, setLoadingDrawerId] = useState<string | null>(null);
   const { check: checkPayslipSetup, dialog: payslipGuardDialog } = usePayslipGuard();
 
   useEffect(() => {
@@ -321,6 +336,33 @@ export function SalaryTable({
     const liveMap = new Map(records.map((r) => [r.dispatcherId, r]));
     return sorted.map((r) => liveMap.get(r.dispatcherId) ?? r);
   }, [records, preEditRecords, editMode, search, highPerformerOnly, sortKey, sortDir]);
+
+  // Lazy-fetch the full StaffDispatcher for a row when the name is clicked,
+  // then mount the DispatcherDrawer with it. Errors surface as a toast and
+  // leave the table state untouched — silent failures here would be
+  // user-hostile because the click target gives no immediate feedback
+  // beyond the spinner.
+  const openDrawer = useCallback(async (dispatcherId: string) => {
+    if (editMode) return;
+    setLoadingDrawerId(dispatcherId);
+    try {
+      const res = await fetch(`/api/staff/${dispatcherId}`, { credentials: "include" });
+      if (!res.ok) {
+        toast.error("Couldn't load dispatcher");
+        return;
+      }
+      const data = await res.json();
+      if (!data?.dispatcher) {
+        toast.error("Couldn't load dispatcher");
+        return;
+      }
+      setDrawerDispatcher(data.dispatcher);
+    } catch {
+      toast.error("Couldn't load dispatcher");
+    } finally {
+      setLoadingDrawerId(null);
+    }
+  }, [editMode]);
 
   // Header click handler — asc → desc → clear.
   const toggleSort = useCallback((key: SortKey) => {
@@ -843,7 +885,23 @@ export function SalaryTable({
                             className={`w-3.5 h-3.5 ${r.isPinned ? "fill-current" : ""}`}
                           />
                         </button>
-                        <p className="font-medium text-on-surface leading-tight uppercase">{r.name}</p>
+                        <button
+                          type="button"
+                          onClick={() => openDrawer(r.dispatcherId)}
+                          disabled={editMode || loadingDrawerId === r.dispatcherId}
+                          aria-label={`Open salary history for ${r.name}`}
+                          title={editMode ? "Exit edit mode to view history" : "View salary history"}
+                          className={`inline-flex items-center gap-1.5 font-medium text-on-surface leading-tight uppercase transition-colors ${
+                            editMode
+                              ? "cursor-not-allowed"
+                              : "cursor-pointer hover:text-brand focus:text-brand focus:outline-none focus:ring-2 focus:ring-brand/30 rounded-sm"
+                          }`}
+                        >
+                          {r.name}
+                          {loadingDrawerId === r.dispatcherId && (
+                            <Loader2 className="w-3 h-3 animate-spin text-on-surface-variant" />
+                          )}
+                        </button>
                         {isHighPerformer(r) && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md"
@@ -1034,6 +1092,23 @@ export function SalaryTable({
       )}
 
       {payslipGuardDialog}
+
+      {drawerDispatcher && (
+        <DispatcherDrawer
+          dispatcher={drawerDispatcher}
+          onClose={() => setDrawerDispatcher(null)}
+          onAvatarChange={(dispatcherId, avatarUrl) => {
+            // The salary-table row doesn't currently render an avatar, but
+            // keep state in sync for SalaryRecordRow.avatarUrl in case a
+            // future row design surfaces it. Cheap, avoids drift.
+            setRecords((prev) =>
+              prev.map((r) =>
+                r.dispatcherId === dispatcherId ? { ...r, avatarUrl } : r,
+              ),
+            );
+          }}
+        />
+      )}
     </div>
   );
 }

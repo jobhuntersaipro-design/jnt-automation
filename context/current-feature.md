@@ -2,15 +2,21 @@
 
 ## Status
 
-Complete
+In Progress — feature/dispatcher-link-and-staff-status
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- **(1) Dispatcher slide-in on `/dispatchers/payroll/[uploadId]`** — make each dispatcher name a clickable button that opens the existing `DispatcherDrawer` (history view, branch chips, edit-recalculate). Lazy-fetch the full `StaffDispatcher` shape via a new `GET /api/staff/[id]` endpoint.
+- **(2) Active/Inactive column on `/staff?tab=payroll`** — add a Status column with a toggle that mirrors the Settings-tab behavior. Inactive rows are dimmed, inputs disabled, excluded from summary totals + bulk payslip selection. Toggle hits the existing `PATCH /api/employees/[id]` (no schema change — `Employee.isActive` already exists on prod).
+
+Full spec: `context/features/dispatcher-link-and-staff-status-spec.md`.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Confirmed via clarifying Q&A 2026-04-26: page scope = salary table only; modal content = history; inactive UX = dimmed-not-hidden; column slot = separate column before Generate Payslip / Delete.
+- §6.1 resolved (2026-04-26): on Confirm & Save, **inactive entries are skipped** — no upsert, leave their DB record untouched. User explicitly chose option (a).
+- No DB migration needed — `Employee.isActive` shipped on 2026-04-27.
+- Branch: `feature/dispatcher-link-and-staff-status` (not yet created — waiting for sign-off).
 
 ## History
 

@@ -151,6 +151,97 @@ const MONTH_ABBR = [
   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 ];
 
+/**
+ * Fetch a single dispatcher in the same shape `getDispatchers` returns, scoped
+ * by agent. Used by the salary-table slide-in modal — `DispatcherDrawer` needs
+ * the full `StaffDispatcher` (assignments, tiers, rules, firstSeen, …) and the
+ * salary-table rows only carry an id + name. agentId scope is enforced both on
+ * the Dispatcher row and as a defensive filter on the latest-record probe.
+ */
+export async function getStaffDispatcherById(
+  agentId: string,
+  dispatcherId: string,
+): Promise<StaffDispatcher | null> {
+  const [d, latestRecord] = await Promise.all([
+    prisma.dispatcher.findFirst({
+      where: { id: dispatcherId, agentId },
+      include: {
+        assignments: {
+          include: { branch: { select: { code: true } } },
+          orderBy: { startedAt: "desc" },
+        },
+        weightTiers: {
+          select: { tier: true, minWeight: true, maxWeight: true, commission: true },
+          orderBy: { tier: "asc" as const },
+        },
+        incentiveRule: { select: { orderThreshold: true } },
+        bonusTiers: {
+          select: { tier: true, minWeight: true, maxWeight: true, commission: true },
+          orderBy: { tier: "asc" as const },
+        },
+        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
+        salaryRecords: {
+          select: { month: true, year: true },
+          orderBy: [{ year: "asc" }, { month: "asc" }],
+          take: 1,
+        },
+      },
+    }),
+    prisma.salaryRecord.findFirst({
+      where: { dispatcher: { agentId } },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      select: { month: true, year: true },
+    }),
+  ]);
+
+  if (!d) return null;
+
+  let latestMonth = latestRecord?.month ?? 0;
+  let latestYear = latestRecord?.year ?? 0;
+  for (const sr of d.salaryRecords) {
+    if (sr.year > latestYear || (sr.year === latestYear && sr.month > latestMonth)) {
+      latestYear = sr.year;
+      latestMonth = sr.month;
+    }
+  }
+
+  const earliest = d.salaryRecords[0];
+  let firstSeen: string;
+  if (!earliest) {
+    firstSeen = "NEW";
+  } else if (earliest.year === latestYear && earliest.month === latestMonth) {
+    firstSeen = "NEW";
+  } else {
+    firstSeen = `${MONTH_ABBR[earliest.month - 1]} ${earliest.year}`;
+  }
+
+  const assignments: StaffAssignment[] = d.assignments.map((a) => ({
+    branchCode: a.branch.code,
+    extId: a.extId,
+  }));
+  const primaryBranchCode = assignments[0]?.branchCode ?? "";
+  const primaryExtId = assignments[0]?.extId ?? d.extId;
+
+  return {
+    id: d.id,
+    extId: primaryExtId,
+    name: d.name,
+    icNo: d.icNo ?? "",
+    gender: d.gender,
+    avatarUrl: d.avatarUrl,
+    isPinned: d.isPinned,
+    branchCode: primaryBranchCode,
+    assignments,
+    isComplete: computeIsComplete(d.name, d.icNo, primaryExtId),
+    firstSeen,
+    rawIcNo: d.icNo ?? "",
+    weightTiers: d.weightTiers,
+    bonusTiers: d.bonusTiers,
+    incentiveRule: d.incentiveRule,
+    petrolRule: d.petrolRule,
+  };
+}
+
 export type DispatcherDetail = {
   id: string;
   extId: string;
