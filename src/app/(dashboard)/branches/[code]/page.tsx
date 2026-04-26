@@ -12,6 +12,17 @@ import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+// Map every EmployeeType variant to its display label. Using a Record forces
+// exhaustiveness — adding a new type at the schema/union level becomes a TS
+// error here until this map is updated, preventing the "fell through to
+// Admin" bug that previously hid DRIVER rows behind the Admin label.
+const EMPLOYEE_TYPE_LABEL: Record<"SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER", string> = {
+  SUPERVISOR: "Supervisor",
+  ADMIN: "Admin",
+  STORE_KEEPER: "Store Keeper",
+  DRIVER: "Driver",
+};
+
 function formatRM(value: number): string {
   return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -242,7 +253,7 @@ export default async function BranchDetailPage({
                       </Link>
                     </div>
                     <span className="text-[0.78rem] text-on-surface-variant">
-                      {e.type === "STORE_KEEPER" ? "Store Keeper" : e.type === "SUPERVISOR" ? "Supervisor" : "Admin"}
+                      {EMPLOYEE_TYPE_LABEL[e.type]}
                     </span>
                     <span className="text-[0.78rem] text-on-surface-variant tabular-nums truncate">
                       {e.extId ?? "—"}
