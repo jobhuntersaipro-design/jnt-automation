@@ -69,8 +69,8 @@ export interface EmployeeSalarySaveResult {
  * without DB plumbing.
  *
  * Per-type editable matrix (see `context/features/payroll-edit-permissions-spec.md`):
- *   - SUPERVISOR / ADMIN → basicPay drives wage; workingHours and hourlyWage
- *     are forced to 0 regardless of payload.
+ *   - SUPERVISOR / ADMIN / DRIVER → basicPay drives wage; workingHours and
+ *     hourlyWage are forced to 0 regardless of payload.
  *   - STORE_KEEPER → workingHours × hourlyWage drives wage; basicPay is
  *     forced to 0 regardless of payload.
  */

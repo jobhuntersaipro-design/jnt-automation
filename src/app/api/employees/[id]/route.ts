@@ -65,7 +65,7 @@ export async function PATCH(
     }
 
     // Validate type enum
-    const VALID_TYPES = ["SUPERVISOR", "ADMIN", "STORE_KEEPER"] as const;
+    const VALID_TYPES = ["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"] as const;
     if (type !== undefined && !VALID_TYPES.includes(type as typeof VALID_TYPES[number])) {
       return NextResponse.json({ error: "Invalid employee type" }, { status: 400 });
     }

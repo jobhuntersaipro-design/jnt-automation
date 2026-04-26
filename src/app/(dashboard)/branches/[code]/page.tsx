@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Truck, ShieldCheck, ClipboardList, Package } from "lucide-react";
+import { ArrowLeft, Truck, ShieldCheck, ClipboardList, Package, Car } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getBranchDetail } from "@/lib/db/branches";
@@ -50,6 +50,7 @@ export default async function BranchDetailPage({
   const supervisorCount = employees.filter((e) => e.type === "SUPERVISOR").length;
   const adminCount = employees.filter((e) => e.type === "ADMIN").length;
   const storeKeeperCount = employees.filter((e) => e.type === "STORE_KEEPER").length;
+  const driverCount = employees.filter((e) => e.type === "DRIVER").length;
 
   const peopleCards: PeopleCard[] = [
     {
@@ -86,6 +87,15 @@ export default async function BranchDetailPage({
       tileBg: "bg-amber-50",
       tileFg: "text-amber-700",
       countColor: "text-amber-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Drivers",
+      count: driverCount,
+      icon: Car,
+      tileBg: "bg-rose-50",
+      tileFg: "text-rose-700",
+      countColor: "text-rose-700",
       target: "#employees-section",
     },
   ];
@@ -135,10 +145,10 @@ export default async function BranchDetailPage({
       </header>
 
       <main className="px-4 lg:px-8 pb-12 space-y-6">
-        {/* People at branch — role count cards (Dispatchers / Supervisors / Admins / Store keepers) */}
+        {/* People at branch — role count cards (Dispatchers / Supervisors / Admins / Store keepers / Drivers) */}
         <section
           aria-label="People at branch"
-          className="grid grid-cols-2 sm:grid-cols-4 gap-3"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
         >
           {peopleCards.map((c) => (
             <PeopleCountCard key={c.label} card={c} />

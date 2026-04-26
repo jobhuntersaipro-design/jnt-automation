@@ -15,7 +15,7 @@ const EmployeeDrawer = dynamic(
   { ssr: false },
 );
 
-type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
 type StatusFilter = "" | "active" | "inactive";
 
 const PAGE_SIZE = 20;
@@ -30,12 +30,14 @@ const TYPE_LABEL: Record<EmployeeType, string> = {
   SUPERVISOR: "Supervisor",
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
+  DRIVER: "Driver",
 };
 
 const TYPE_CHIP_CLASS: Record<EmployeeType, string> = {
   SUPERVISOR: "bg-blue-50 text-blue-700",
   ADMIN: "bg-purple-50 text-purple-700",
   STORE_KEEPER: "bg-amber-50 text-amber-700",
+  DRIVER: "bg-rose-50 text-rose-700",
 };
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
@@ -182,7 +184,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 All Types
                 {!filterType && <Check size={13} className="text-brand" />}
               </button>
-              {(["SUPERVISOR", "ADMIN", "STORE_KEEPER"] as EmployeeType[]).map((t) => (
+              {(["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"] as EmployeeType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => { setFilterType(t); setTypeOpen(false); setPage(1); }}

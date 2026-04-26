@@ -2,15 +2,23 @@
 
 ## Status
 
-Complete
+In Progress — feature/driver-position (TDD)
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add a `DRIVER` value to the `EmployeeType` enum so a fourth staff role can be created on `/staff?tab=settings` alongside Supervisor / Admin / Store Keeper.
+- Driver pay model = monthly basic pay (same gating as Sup/Admin in `employee-salary-save.ts`).
+- Driver payslip = Template 1 (Sup/Admin), with `POSITION = "DRIVER"`.
+- Driver count appears as a 5th card on the Branches detail "People at branch" section, with a `Car` icon and rose tint.
+- Pure additive change — no migration of existing data, no Dispatcher / payroll-formula impact.
+
+Spec: `context/features/driver-position-spec.md`.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Confirmed via 4-question clarifying round (all "Recommended" picks).
+- Schema migration must be applied to dev branch via `prisma migrate dev`; prod requires explicit `prisma migrate deploy` after merge.
+- TDD sequence: write failing Driver tests → schema → wire union types → UI surfaces → green.
 
 ## History
 

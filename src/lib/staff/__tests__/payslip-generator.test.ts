@@ -50,6 +50,19 @@ describe("generateEmployeePayslipPdf", () => {
     expect(buf.length).toBeGreaterThan(1024);
   });
 
+  it("driver template returns a valid PDF buffer (reuses Sup/Admin layout)", async () => {
+    // Driver pay model = monthly basic pay, same as Supervisor / Admin.
+    // Render must succeed and produce a PDF; the layout is Template 1.
+    const buf = await generateEmployeePayslipPdf(
+      baseInput({
+        employeeType: "DRIVER",
+        position: "Driver",
+      }),
+    );
+    expect(buf.subarray(0, 4).toString("ascii")).toBe("%PDF");
+    expect(buf.length).toBeGreaterThan(1024);
+  });
+
   it("store keeper template uses WAGES line + hides EPF NO", async () => {
     const buf = await generateEmployeePayslipPdf(
       baseInput({

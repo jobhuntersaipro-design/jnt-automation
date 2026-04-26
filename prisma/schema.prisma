@@ -231,12 +231,13 @@ model PetrolRule {
   dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
 }
 
-// ─── Employees (Supervisor / Admin / Store Keeper) ──────────
+// ─── Employees (Supervisor / Admin / Store Keeper / Driver) ──────────
 
 enum EmployeeType {
   SUPERVISOR
   ADMIN
   STORE_KEEPER
+  DRIVER
 }
 
 model Employee {

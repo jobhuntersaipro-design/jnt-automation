@@ -57,7 +57,7 @@ export interface EmployeePayslipInput {
   employeeName: string;
   icNo: string;
   position: string;
-  employeeType: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+  employeeType: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
   month: number;
   year: number;
 
@@ -98,6 +98,7 @@ const POSITION_LABEL: Record<string, string> = {
   SUPERVISOR: "SUPERVISOR",
   ADMIN: "ADMIN",
   STORE_KEEPER: "STORE KEEPER",
+  DRIVER: "DRIVER",
 };
 
 type Row = { label: string; amount: number };

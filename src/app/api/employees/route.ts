@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    if (!type || !["SUPERVISOR", "ADMIN", "STORE_KEEPER"].includes(type)) {
+    if (!type || !["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"].includes(type)) {
       return NextResponse.json({ error: "Valid employee type is required" }, { status: 400 });
     }
 

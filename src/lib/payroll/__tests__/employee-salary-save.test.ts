@@ -72,6 +72,45 @@ describe("computeEmployeeSalaryForSave — Sup/Admin", () => {
   });
 });
 
+describe("computeEmployeeSalaryForSave — Driver", () => {
+  it("forces workingHours and hourlyWage to 0 for DRIVER even when client sends them", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "DRIVER" }),
+      entry({ basicPay: 2800, workingHours: 12, hourlyWage: 25 }),
+      null,
+    );
+    expect(result.workingHours).toBe(0);
+    expect(result.hourlyWage).toBe(0);
+    // gross excludes 12 × 25 = 300 OT
+    expect(result.grossSalary).toBe(2800);
+  });
+
+  it("preserves basicPay as the only wage source for DRIVER", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "DRIVER" }),
+      entry({ basicPay: 3200 }),
+      null,
+    );
+    expect(result.basicPay).toBe(3200);
+    expect(result.grossSalary).toBe(3200);
+  });
+
+  it("combines basicPay + allowances for DRIVER gross", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "DRIVER" }),
+      entry({
+        basicPay: 2500,
+        petrolAllowance: 200,
+        kpiAllowance: 100,
+        otherAllowance: 50,
+      }),
+      null,
+    );
+    expect(result.basicPay).toBe(2500);
+    expect(result.grossSalary).toBe(2500 + 200 + 100 + 50);
+  });
+});
+
 describe("computeEmployeeSalaryForSave — Store Keeper", () => {
   it("forces basicPay to 0 even when client sends it", () => {
     const result = computeEmployeeSalaryForSave(

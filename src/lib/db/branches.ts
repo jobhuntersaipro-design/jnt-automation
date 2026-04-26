@@ -7,6 +7,7 @@ export type BranchOverviewCard = {
   supervisorCount: number;
   adminCount: number;
   storeKeeperCount: number;
+  driverCount: number;
   /** Most recent salary record month label, e.g. "Apr 2026", or null */
   lastActive: string | null;
   /** Lifetime net payout from all salary records uploaded to this branch */
@@ -48,10 +49,12 @@ export async function getBranchesOverview(agentId: string): Promise<BranchOvervi
     let supervisorCount = 0;
     let adminCount = 0;
     let storeKeeperCount = 0;
+    let driverCount = 0;
     for (const e of b.employees) {
       if (e.type === "SUPERVISOR") supervisorCount++;
       else if (e.type === "ADMIN") adminCount++;
       else if (e.type === "STORE_KEEPER") storeKeeperCount++;
+      else if (e.type === "DRIVER") driverCount++;
     }
 
     let lifetimeNetPayout = 0;
@@ -76,6 +79,7 @@ export async function getBranchesOverview(agentId: string): Promise<BranchOvervi
       supervisorCount,
       adminCount,
       storeKeeperCount,
+      driverCount,
       lastActive: lastSortKey > 0 ? `${MONTH_LABEL[lastMonth]} ${lastYear}` : null,
       lifetimeNetPayout,
     };
@@ -125,7 +129,7 @@ export type BranchDispatcherRow = {
 export type BranchEmployeeRow = {
   employeeId: string;
   name: string;
-  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
   extId: string | null;
   /** Raw 12-digit IC (or empty string if no IC set). */
   icNo: string;
@@ -321,7 +325,7 @@ export async function getBranchDetail(
   const employeeRows: BranchEmployeeRow[] = employees.map((e) => ({
     employeeId: e.id,
     name: e.name,
-    type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER",
+    type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER",
     extId: e.extId,
     icNo: e.icNo ?? "",
     isComplete: !!e.icNo,

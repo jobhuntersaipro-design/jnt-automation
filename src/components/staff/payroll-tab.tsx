@@ -25,7 +25,7 @@ const MONTHS = [
 interface PayrollEntry {
   employeeId: string
   name: string
-  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER"
+  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER"
   branchCode: string | null
   icNo: string | null
   gender: Gender
@@ -234,6 +234,7 @@ const TYPE_LABELS: Record<string, string> = {
   SUPERVISOR: "Supervisor",
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
+  DRIVER: "Driver",
 }
 
 export function PayrollTab() {

@@ -8,7 +8,7 @@ import { DispatcherAvatar } from "./dispatcher-avatar";
 import { EmployeeHistoryTab } from "./employee-history-tab";
 import type { StaffEmployee } from "@/lib/db/employees";
 
-type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
 
 interface EmployeeDrawerProps {
   employee?: StaffEmployee | null;
@@ -27,12 +27,14 @@ const TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
   { value: "SUPERVISOR", label: "Supervisor" },
   { value: "ADMIN", label: "Admin" },
   { value: "STORE_KEEPER", label: "Store Keeper" },
+  { value: "DRIVER", label: "Driver" },
 ];
 
 const TYPE_LABEL: Record<EmployeeType, string> = {
   SUPERVISOR: "Supervisor",
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
+  DRIVER: "Driver",
 };
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Truck, ShieldCheck, ClipboardList, Package, ArrowRight } from "lucide-react";
+import { Truck, ShieldCheck, ClipboardList, Package, Car, ArrowRight } from "lucide-react";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getBranchesOverview, type BranchOverviewCard } from "@/lib/db/branches";
 import { getBranchColor } from "@/lib/branch-colors";
@@ -21,7 +21,7 @@ export default async function BranchesPage() {
 
   const totalDispatchers = branches.reduce((s, b) => s + b.dispatcherCount, 0);
   const totalEmployees = branches.reduce(
-    (s, b) => s + b.supervisorCount + b.adminCount + b.storeKeeperCount,
+    (s, b) => s + b.supervisorCount + b.adminCount + b.storeKeeperCount + b.driverCount,
     0,
   );
 
@@ -77,7 +77,7 @@ function EmptyState() {
 
 function BranchCard({ branch }: { branch: BranchOverviewCard }) {
   const c = getBranchColor(branch.branchCode);
-  const totalEmployees = branch.supervisorCount + branch.adminCount + branch.storeKeeperCount;
+  const totalEmployees = branch.supervisorCount + branch.adminCount + branch.storeKeeperCount + branch.driverCount;
   const totalPeople = branch.dispatcherCount + totalEmployees;
 
   return (
@@ -138,6 +138,13 @@ function BranchCard({ branch }: { branch: BranchOverviewCard }) {
           value={branch.storeKeeperCount}
           color="text-amber-700"
           bg="bg-amber-50"
+        />
+        <CountRow
+          icon={Car}
+          label="Drivers"
+          value={branch.driverCount}
+          color="text-rose-700"
+          bg="bg-rose-50"
         />
       </ul>
 
