@@ -26,6 +26,7 @@ export type StaffEmployee = {
   /** Avatar of the linked dispatcher — takes precedence over `avatarUrl` when set. */
   dispatcherAvatarUrl: string | null;
   isComplete: boolean;
+  isActive: boolean;
 };
 
 export async function getEmployees(
@@ -78,5 +79,6 @@ export async function getEmployees(
     dispatcherBranch: e.dispatcher?.branch?.code ?? null,
     dispatcherAvatarUrl: e.dispatcher?.avatarUrl ?? null,
     isComplete: !!e.icNo,
+    isActive: e.isActive,
   }));
 }

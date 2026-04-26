@@ -137,6 +137,7 @@ export async function POST(req: NextRequest) {
         dispatcherBranch: employee.dispatcher?.branch?.code ?? null,
         dispatcherAvatarUrl: employee.dispatcher?.avatarUrl ?? null,
         isComplete: !!employee.icNo,
+        isActive: employee.isActive,
       },
     }, { status: 201 });
   } catch (err) {

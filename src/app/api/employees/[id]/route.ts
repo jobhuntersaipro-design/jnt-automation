@@ -27,7 +27,7 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId, epfNo, socsoNo, incomeTaxNo } = body as {
+    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId, epfNo, socsoNo, incomeTaxNo, isActive } = body as {
       name?: string;
       extId?: string | null;
       icNo?: string | null;
@@ -42,6 +42,7 @@ export async function PATCH(
       epfNo?: string | null;
       socsoNo?: string | null;
       incomeTaxNo?: string | null;
+      isActive?: boolean;
     };
 
     if (name !== undefined && !name.trim()) {
@@ -110,6 +111,12 @@ export async function PATCH(
     if (epfNo !== undefined) updateData.epfNo = epfNo?.trim() || null;
     if (socsoNo !== undefined) updateData.socsoNo = socsoNo?.trim() || null;
     if (incomeTaxNo !== undefined) updateData.incomeTaxNo = incomeTaxNo?.trim() || null;
+    if (isActive !== undefined) {
+      if (typeof isActive !== "boolean") {
+        return NextResponse.json({ error: "isActive must be a boolean" }, { status: 400 });
+      }
+      updateData.isActive = isActive;
+    }
 
     const updated = await prisma.employee.update({
       where: { id },

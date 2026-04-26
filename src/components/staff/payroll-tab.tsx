@@ -228,10 +228,14 @@ export function PayrollTab() {
   const [saving, setSaving] = useState(false)
   const [monthOpen, setMonthOpen] = useState(false)
   const [yearOpen, setYearOpen] = useState(false)
+  const [branchFilter, setBranchFilter] = useState<string>("")
+  const [branchOpen, setBranchOpen] = useState(false)
   const monthRef = useRef<HTMLDivElement>(null)
   const yearRef = useRef<HTMLDivElement>(null)
+  const branchRef = useRef<HTMLDivElement>(null)
   useClickOutside(monthRef, () => setMonthOpen(false))
   useClickOutside(yearRef, () => setYearOpen(false))
+  useClickOutside(branchRef, () => setBranchOpen(false))
 
   const fetchEntries = useCallback(async () => {
     setLoading(true)
@@ -283,6 +287,19 @@ export function PayrollTab() {
       return true
     })
   }, [entries])
+
+  const branchOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const e of entries) {
+      if (e.branchCode) set.add(e.branchCode)
+    }
+    return Array.from(set).sort()
+  }, [entries])
+
+  const displayedEntries = useMemo(() => {
+    if (!branchFilter) return entries
+    return entries.filter((e) => e.branchCode === branchFilter)
+  }, [entries, branchFilter])
 
   const handleSave = async () => {
     setSaving(true)
@@ -336,9 +353,10 @@ export function PayrollTab() {
     }
   }
 
-  // Summary calculations
+  // Summary calculations — reflect the active branch filter so totals match
+  // what the user sees in the table.
   const totals = useMemo(() => {
-    return entries.reduce(
+    return displayedEntries.reduce(
       (acc, e) => ({
         gross: acc.gross + e.grossSalary,
         epfEmployee: acc.epfEmployee + e.epfEmployee,
@@ -351,7 +369,7 @@ export function PayrollTab() {
       }),
       { gross: 0, epfEmployee: 0, socsoEmployee: 0, eisEmployee: 0, net: 0, epfEmployer: 0, socsoEmployer: 0, eisEmployer: 0 }
     )
-  }, [entries])
+  }, [displayedEntries])
 
   const years = useMemo(() => {
     const current = new Date().getFullYear()
@@ -391,10 +409,13 @@ export function PayrollTab() {
     }
   }
 
-  // Clear selection when month/year changes
-  useEffect(() => { setSelectedIds(new Set()) }, [month, year])
+  // Clear selection when month/year/branch filter changes
+  useEffect(() => { setSelectedIds(new Set()) }, [month, year, branchFilter])
 
-  const allSaved = useMemo(() => entries.length > 0 && entries.every((e) => e.isSaved), [entries])
+  const allSaved = useMemo(
+    () => displayedEntries.length > 0 && displayedEntries.every((e) => e.isSaved),
+    [displayedEntries],
+  )
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -406,12 +427,12 @@ export function PayrollTab() {
   }, [])
 
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === entries.length) {
+    if (selectedIds.size === displayedEntries.length) {
       setSelectedIds(new Set())
     } else {
-      setSelectedIds(new Set(entries.map((e) => e.employeeId)))
+      setSelectedIds(new Set(displayedEntries.map((e) => e.employeeId)))
     }
-  }, [selectedIds.size, entries])
+  }, [selectedIds.size, displayedEntries])
 
   const handleGeneratePayslip = useCallback(async (entry: PayrollEntry) => {
     if (!entry.icNo) {
@@ -594,6 +615,47 @@ export function PayrollTab() {
               </div>
             )}
           </div>
+
+          {/* Branch selector */}
+          <div ref={branchRef} className="relative">
+            <button
+              onClick={() => setBranchOpen((o) => !o)}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-outline-variant/30 hover:border-outline-variant/60 transition-colors min-w-32 justify-between"
+            >
+              <span className="truncate">{branchFilter || "All branches"}</span>
+              <ChevronDown size={12} className={`text-on-surface-variant shrink-0 transition-transform ${branchOpen ? "rotate-180" : ""}`} />
+            </button>
+            {branchOpen && (
+              <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-40 py-1 max-h-60 overflow-y-auto">
+                <button
+                  onClick={() => { setBranchFilter(""); setBranchOpen(false) }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${
+                    !branchFilter ? "text-primary font-semibold bg-primary/5" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
+                  }`}
+                >
+                  All branches
+                  {!branchFilter && <Check size={13} className="text-primary" />}
+                </button>
+                {branchOptions.map((code) => (
+                  <button
+                    key={code}
+                    onClick={() => { setBranchFilter(code); setBranchOpen(false) }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${
+                      branchFilter === code ? "text-primary font-semibold bg-primary/5" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low"
+                    }`}
+                  >
+                    {code}
+                    {branchFilter === code && <Check size={13} className="text-primary" />}
+                  </button>
+                ))}
+                {branchOptions.length === 0 && (
+                  <div className="px-3.5 py-2 text-[0.72rem] text-on-surface-variant/60">
+                    No branches assigned
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <button
@@ -607,7 +669,7 @@ export function PayrollTab() {
       </div>
 
       {/* Summary Cards */}
-      {!loading && entries.length > 0 && (
+      {!loading && displayedEntries.length > 0 && (
         <PayrollSummaryCards totals={totals} />
       )}
 
@@ -619,6 +681,10 @@ export function PayrollTab() {
       ) : entries.length === 0 ? (
         <div className="text-center py-16 text-on-surface-variant text-[0.85rem]">
           No employees found. Add employees in the Settings tab first.
+        </div>
+      ) : displayedEntries.length === 0 ? (
+        <div className="text-center py-16 text-on-surface-variant text-[0.85rem]">
+          No employees in branch {branchFilter}.
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -633,7 +699,7 @@ export function PayrollTab() {
                   <th className="pb-3 pl-3" style={{ width: 30 }}>
                     <input
                       type="checkbox"
-                      checked={selectedIds.size === entries.length && entries.length > 0}
+                      checked={selectedIds.size === displayedEntries.length && displayedEntries.length > 0}
                       onChange={toggleSelectAll}
                       className="rounded accent-brand"
                     />
@@ -666,7 +732,7 @@ export function PayrollTab() {
               </tr>
             </thead>
             <tbody>
-              {entries.map((entry) => {
+              {displayedEntries.map((entry) => {
                 const isStoreKeeper = entry.type === "STORE_KEEPER"
                 const isReady = isStoreKeeper ? entry.workingHours > 0 : true
 

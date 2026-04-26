@@ -16,8 +16,15 @@ const EmployeeDrawer = dynamic(
 );
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER";
+type StatusFilter = "" | "active" | "inactive";
 
 const PAGE_SIZE = 20;
+
+const STATUS_LABEL: Record<StatusFilter, string> = {
+  "": "All Status",
+  active: "Active",
+  inactive: "Inactive",
+};
 
 const TYPE_LABEL: Record<EmployeeType, string> = {
   SUPERVISOR: "Supervisor",
@@ -59,8 +66,11 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
   const [items, setItems] = useState(serverData);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<EmployeeType | "">("");
+  const [filterStatus, setFilterStatus] = useState<StatusFilter>("");
   const [typeOpen, setTypeOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StaffEmployee | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [drawerEmployee, setDrawerEmployee] = useState<StaffEmployee | null | undefined>(undefined);
@@ -74,11 +84,13 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
     return items
       .filter((e) => {
         if (filterType && e.type !== filterType) return false;
+        if (filterStatus === "active" && !e.isActive) return false;
+        if (filterStatus === "inactive" && e.isActive) return false;
         if (q && !e.name.toLowerCase().includes(q) && !e.rawIcNo.includes(q)) return false;
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, filterType, search]);
+  }, [items, filterType, filterStatus, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -91,12 +103,34 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
       const res = await fetch(`/api/employees/${deleteTarget.id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       setItems((prev) => prev.filter((e) => e.id !== deleteTarget.id));
-      toast.success(`${deleteTarget.name} deleted`);
+      toast.success(`${deleteTarget.name.toUpperCase()} deleted`);
       setDeleteTarget(null);
     } catch {
       toast.error("Failed to delete employee");
     } finally {
       setDeleting(false);
+    }
+  }
+
+  async function toggleActive(emp: StaffEmployee) {
+    if (togglingId) return;
+    const next = !emp.isActive;
+    setTogglingId(emp.id);
+    // Optimistic — revert on failure.
+    setItems((prev) => prev.map((row) => (row.id === emp.id ? { ...row, isActive: next } : row)));
+    try {
+      const res = await fetch(`/api/employees/${emp.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isActive: next }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success(`${emp.name.toUpperCase()} marked ${next ? "active" : "inactive"}`);
+    } catch {
+      setItems((prev) => prev.map((row) => (row.id === emp.id ? { ...row, isActive: !next } : row)));
+      toast.error("Failed to update status");
+    } finally {
+      setTogglingId(null);
     }
   }
 
@@ -162,6 +196,31 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           )}
         </div>
 
+        {/* Status filter */}
+        <div className="relative">
+          <button
+            onClick={() => setStatusOpen((o) => !o)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-outline-variant/30 hover:border-outline-variant/60 transition-colors min-w-28 justify-between"
+          >
+            <span className="truncate">{STATUS_LABEL[filterStatus]}</span>
+            <ChevronDown size={12} className={`text-on-surface-variant shrink-0 transition-transform ${statusOpen ? "rotate-180" : ""}`} />
+          </button>
+          {statusOpen && (
+            <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-40 py-1">
+              {(["", "active", "inactive"] as StatusFilter[]).map((s) => (
+                <button
+                  key={s || "all"}
+                  onClick={() => { setFilterStatus(s); setStatusOpen(false); setPage(1); }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${filterStatus === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                >
+                  {STATUS_LABEL[s]}
+                  {filterStatus === s && <Check size={13} className="text-brand" />}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="relative">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           <input
@@ -192,8 +251,8 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
         </p>
         <div className="bg-white rounded-[0.75rem] flex flex-col shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] overflow-x-auto sm:mt-4">
           {/* Column headers */}
-          <div className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 pt-3 pb-2 border-b border-outline-variant/15">
-            {["Employee", "Type", "Branch", "IC No", "Pay", "Dispatcher", "Status", ""].map((h, i) => (
+          <div className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_0.7fr_3rem] px-5 pt-3 pb-2 border-b border-outline-variant/15">
+            {["Employee", "Type", "Branch", "IC No", "Pay", "Dispatcher", "Docs", "Status", ""].map((h, i) => (
               <span key={`${h}-${i}`} className={`text-[0.62rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase ${i === 0 ? "text-left" : "text-center"}`}>
                 {h}
               </span>
@@ -205,7 +264,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
             <div
               key={emp.id}
               onClick={() => setDrawerEmployee(emp)}
-              className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
+              className="grid grid-cols-[1.5fr_0.7fr_0.7fr_0.8fr_0.8fr_0.7fr_0.5fr_0.7fr_3rem] px-5 py-3 items-center border-b border-outline-variant/8 last:border-b-0 hover:bg-surface-hover cursor-pointer transition-colors"
             >
               {/* Employee avatar + name */}
               <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
@@ -254,7 +313,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                   className="text-left hover:opacity-70 transition-opacity"
                   aria-label={`Open ${emp.name} drawer`}
                 >
-                  <p className="text-[0.84rem] font-medium text-on-surface leading-tight">{emp.name}</p>
+                  <p className="text-[0.84rem] font-medium text-on-surface leading-tight uppercase">{emp.name}</p>
                 </button>
               </div>
 
@@ -302,13 +361,34 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 )}
               </p>
 
-              {/* Status */}
+              {/* Docs (formerly "Status") — Complete / Missing IC */}
               <div className="flex justify-center">
                 {emp.isComplete ? (
                   <span className="px-2 py-0.5 rounded-lg text-[0.68rem] font-medium bg-green-50 text-green-700">Complete</span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-lg text-[0.68rem] font-medium bg-amber-50 text-amber-700">Missing IC</span>
                 )}
+              </div>
+
+              {/* Status — Active / Inactive switch. Matches the eligibility
+                  toggle used in dispatcher settings. */}
+              <div className="flex justify-center" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => toggleActive(emp)}
+                  disabled={togglingId === emp.id}
+                  role="switch"
+                  aria-checked={emp.isActive}
+                  title={emp.isActive ? "Click to mark inactive" : "Click to mark active"}
+                  className="relative w-9 h-5 rounded-full transition-colors shrink-0 disabled:opacity-50"
+                  style={{ backgroundColor: emp.isActive ? "#12B981" : "rgba(195, 198, 214, 0.4)" }}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${
+                      emp.isActive ? "translate-x-4" : ""
+                    }`}
+                  />
+                </button>
               </div>
 
               {/* Actions */}
@@ -397,7 +477,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           <div className="absolute inset-0 bg-on-surface/40" onClick={() => !deleting && setDeleteTarget(null)} />
           <div className="relative bg-white rounded-[0.75rem] p-6 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.2)] max-w-sm w-full mx-4">
             <h3 className="font-heading font-semibold text-[1.1rem] text-on-surface">
-              Delete {deleteTarget.name}?
+              Delete <span className="uppercase">{deleteTarget.name}</span>?
             </h3>
             <p className="text-[0.84rem] text-on-surface-variant mt-2">
               This will permanently delete this employee. This cannot be undone.

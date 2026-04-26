@@ -271,7 +271,7 @@ export function EmployeeDrawer({
           )}
 
           <div className="flex-1 min-w-0">
-            <h2 className="font-heading font-semibold text-[1.1rem] text-on-surface truncate">
+            <h2 className={`font-heading font-semibold text-[1.1rem] text-on-surface truncate ${isEdit ? "uppercase" : ""}`}>
               {isEdit ? employee!.name : "New Employee"}
             </h2>
             <div className="flex items-center gap-1.5 mt-1 flex-wrap">

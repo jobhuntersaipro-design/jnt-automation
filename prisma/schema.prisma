@@ -249,6 +249,7 @@ model Employee {
   avatarUrl   String?
   type        EmployeeType
   branchId    String?
+  isActive    Boolean      @default(true)
 
   // Supervisor/Admin fields
   basicPay        Float?
