@@ -255,8 +255,11 @@ function drawParticulars(
         ["SOCSO NO", data.socsoNo ?? ""],
       ];
 
+  // Names are rendered uppercase to match the rest of the document (the
+  // payroll table also uses uppercase) — the user can type any casing
+  // when adding the employee but the printed payslip is always uniform.
   const leftParticulars: [string, string][] = [
-    ["NAME", data.employeeName],
+    ["NAME", data.employeeName.toUpperCase()],
     ["I/C NO", data.icNo],
     ["POSITION", position],
   ];

@@ -176,8 +176,11 @@ function drawParticulars(
   const lastDay = new Date(data.year, data.month, 0).getDate();
   const dateStr = `${String(lastDay).padStart(2, "0")}/${String(data.month).padStart(2, "0")}/${data.year}`;
 
+  // Names are rendered uppercase for consistency with the staff payroll
+  // table and the employee payslip — the user can type any casing when
+  // adding the dispatcher but the printed payslip is always uniform.
   const leftParticulars: [string, string][] = [
-    ["NAME", data.dispatcherName],
+    ["NAME", data.dispatcherName.toUpperCase()],
     ["I/C NO", data.icNo],
     ["POSITION", "DESPATCH"],
   ];

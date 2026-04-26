@@ -736,7 +736,7 @@ export function PayrollTab() {
                           )
                         })()}
                         <div className="min-w-0">
-                          <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate">
+                          <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate uppercase">
                             {entry.name}
                           </div>
                           <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
