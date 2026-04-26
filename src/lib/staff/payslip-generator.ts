@@ -322,36 +322,44 @@ function drawTableBody(
   const rowCount = Math.max(additions.length, deductions.length, 1);
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
 
+  const leftLabelW = (MID_X - CONTENT_LEFT) - AMOUNT_COL_W - ROW_PAD_X * 2;
+  const rightLabelW = (CONTENT_RIGHT - MID_X) - AMOUNT_COL_W - ROW_PAD_X * 2;
+
+  // Track Y manually instead of using `i * ROW_H`. pdfkit silently wraps
+  // long labels (e.g. "EMPLOYMENT INSURANCE SCHEME (EIS)") even with
+  // `lineBreak: false` once the text exceeds the width, so a fixed
+  // ROW_H caused the next row to render on top of the wrapped second
+  // line. Measuring each row's actual rendered height with
+  // `heightOfString` and advancing Y by max(left, right) keeps every
+  // row clean.
+  let y = yTop + ROW_PAD_Y;
   for (let i = 0; i < rowCount; i++) {
-    const y = yTop + i * ROW_H + ROW_PAD_Y;
     const add = additions[i];
+    const ded = deductions[i];
+
+    const addH = add ? doc.heightOfString(add.label, { width: leftLabelW }) : 0;
+    const dedH = ded ? doc.heightOfString(ded.label, { width: rightLabelW }) : 0;
+    const rowHeight = Math.max(ROW_H - ROW_PAD_Y, addH, dedH);
+
     if (add) {
-      doc.text(add.label, CONTENT_LEFT + ROW_PAD_X, y, {
-        width: (MID_X - CONTENT_LEFT) - AMOUNT_COL_W - ROW_PAD_X * 2,
-        lineBreak: false,
-        ellipsis: true,
-      });
+      doc.text(add.label, CONTENT_LEFT + ROW_PAD_X, y, { width: leftLabelW });
       doc.text(formatRM(add.amount), leftAmountX, y, {
         width: AMOUNT_COL_W - ROW_PAD_X,
         align: "right",
         lineBreak: false,
       });
     }
-    const ded = deductions[i];
     if (ded) {
-      doc.text(ded.label, MID_X + ROW_PAD_X, y, {
-        width: (CONTENT_RIGHT - MID_X) - AMOUNT_COL_W - ROW_PAD_X * 2,
-        lineBreak: false,
-        ellipsis: true,
-      });
+      doc.text(ded.label, MID_X + ROW_PAD_X, y, { width: rightLabelW });
       doc.text(formatRM(ded.amount), rightAmountX, y, {
         width: AMOUNT_COL_W - ROW_PAD_X,
         align: "right",
         lineBreak: false,
       });
     }
+    y += rowHeight;
   }
-  return yTop + rowCount * ROW_H;
+  return y;
 }
 
 function drawTotalRow(

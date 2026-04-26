@@ -262,15 +262,20 @@ function drawHalfDataRows(
   const amountX = (isLeft ? MID_X : CONTENT_RIGHT) - AMOUNT_COL_W;
 
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
+  // Allow each row's height to grow with wrapped labels (pdfkit silently
+  // wraps long labels even with `lineBreak: false`). Without measuring
+  // the actual rendered height the next row would render on top of the
+  // wrapped second line.
   let y = yTop + 2;
   for (const r of rows) {
-    doc.text(r.label, labelX, y, { width: labelW, lineBreak: false, ellipsis: true });
+    const labelHeight = doc.heightOfString(r.label, { width: labelW });
+    doc.text(r.label, labelX, y, { width: labelW });
     doc.text(formatRM(r.amount), amountX, y, {
       width: AMOUNT_COL_W - ROW_PAD_X,
       align: "right",
       lineBreak: false,
     });
-    y += ROW_H;
+    y += Math.max(ROW_H, labelHeight);
   }
   return y;
 }
