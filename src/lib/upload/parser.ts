@@ -141,11 +141,19 @@ export async function parseExcelBuffer(
 
     const waybillNumber = cellToString(row.getCell(1)); // Column A
     if (!waybillNumber) return;
+    // Sub-parcel rows (e.g. "680030939458201-02") have no weight and are
+    // billed under the parent waybill — exclude from order counts.
+    if (waybillNumber.includes("-")) return;
+
+    // Skip rows whose billing-weight cell is blank — those parcels weren't
+    // weighed and should not contribute to commission or order counts.
+    const weightCell = row.getCell(17); // Column Q
+    if (isEmptyCell(weightCell)) return;
 
     const branchName = cellToString(row.getCell(11)); // Column K
     const deliveryDate = cellToDate(row.getCell(12)); // Column L
     const dispatcherName = cellToString(row.getCell(14)); // Column N
-    const billingWeight = cellToWeight(row.getCell(17)); // Column Q
+    const billingWeight = cellToWeight(weightCell);
 
     rows.push({
       waybillNumber,
@@ -168,6 +176,12 @@ export async function parseExcelBuffer(
 function cellToString(cell: ExcelJS.Cell): string {
   if (cell.value == null) return "";
   return String(cell.value).trim();
+}
+
+function isEmptyCell(cell: ExcelJS.Cell): boolean {
+  if (cell.value == null) return true;
+  if (typeof cell.value === "string") return cell.value.trim() === "";
+  return false;
 }
 
 function cellToDate(cell: ExcelJS.Cell): Date | null {

@@ -16,7 +16,7 @@ async function buildWorkbook(
     date: Date;
     dispId: string;
     dispName: string;
-    weight: number;
+    weight: number | null;
   }>,
 ): Promise<Uint8Array> {
   const wb = new ExcelJS.Workbook();
@@ -35,7 +35,7 @@ async function buildWorkbook(
         row.getCell(12).value = r.date;
         row.getCell(13).value = r.dispId;
         row.getCell(14).value = r.dispName;
-        row.getCell(17).value = r.weight;
+        if (r.weight !== null) row.getCell(17).value = r.weight;
       });
     }
   }
@@ -56,7 +56,7 @@ async function buildWorkbookWithCaseCollision(
     date: Date;
     dispId: string;
     dispName: string;
-    weight: number;
+    weight: number | null;
   }>,
 ): Promise<Uint8Array> {
   // Two sheets named differently so exceljs will save them happily
@@ -109,6 +109,62 @@ describe("parseExcelBuffer — happy path", () => {
       billingWeight: 1.5,
     });
     expect(rows[0].deliveryDate).toBeInstanceOf(Date);
+  });
+
+  it("skips sub-parcel rows whose waybill contains a dash", async () => {
+    const buf = await buildWorkbook(
+      ["sheet1"],
+      "sheet1",
+      [
+        {
+          waybill: "680030939458201",
+          branch: "PHG379",
+          date: new Date("2026-02-01T07:00:00Z"),
+          dispId: "PHG379-01",
+          dispName: "ALICE",
+          weight: 2.0,
+        },
+        {
+          waybill: "680030939458201-02",
+          branch: "PHG379",
+          date: new Date("2026-02-01T07:00:00Z"),
+          dispId: "PHG379-01",
+          dispName: "ALICE",
+          weight: 0,
+        },
+      ],
+    );
+    const rows = await parseExcelBuffer(buf);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].waybillNumber).toBe("680030939458201");
+  });
+
+  it("skips rows whose billing-weight cell is empty", async () => {
+    const buf = await buildWorkbook(
+      ["sheet1"],
+      "sheet1",
+      [
+        {
+          waybill: "WBHEAVY",
+          branch: "PHG379",
+          date: new Date("2026-02-01T07:00:00Z"),
+          dispId: "PHG379-01",
+          dispName: "ALICE",
+          weight: 4.5,
+        },
+        {
+          waybill: "WBNOWEIGHT",
+          branch: "PHG379",
+          date: new Date("2026-02-01T07:00:00Z"),
+          dispId: "PHG379-01",
+          dispName: "ALICE",
+          weight: null,
+        },
+      ],
+    );
+    const rows = await parseExcelBuffer(buf);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].waybillNumber).toBe("WBHEAVY");
   });
 
   it("skips rows with no dispatcher ID or no waybill", async () => {
