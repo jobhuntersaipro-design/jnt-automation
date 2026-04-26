@@ -226,7 +226,7 @@ export default async function BranchDetailPage({
                       />
                       <Link
                         href={`/staff?highlight=${encodeURIComponent(e.employeeId)}`}
-                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
+                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate uppercase"
                       >
                         {e.name}
                       </Link>
@@ -312,7 +312,7 @@ export default async function BranchDetailPage({
                       />
                       <Link
                         href={`/dispatchers?highlight=${encodeURIComponent(d.extId)}`}
-                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate"
+                        className="text-[0.9rem] font-medium text-on-surface hover:text-brand truncate uppercase"
                       >
                         {d.name}
                       </Link>

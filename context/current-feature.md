@@ -2,15 +2,19 @@
 
 ## Status
 
-<!-- Not Started | In Progress | Complete -->
+In Progress — fix/mobile-dispatcher-row-and-name-case
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- BUG-1: Dispatchers Settings table is unreadable at 375px because the 15-column grid collapses fr-allocated widths to ~25px. Force horizontal scroll via a min-width on `ROW_GRID` so the parent's `overflow-x-auto` engages.
+- BUG-2: Dispatcher names render in stored case (mixed Title-case + UPPERCASE) on `/dispatchers` settings list, dispatcher salary table, and branch-detail dispatcher/employee tables — inconsistent with the recent uppercase normalization on the Staff payroll table + payslip PDFs. Add `uppercase` class at the four name-render sites so display is consistent everywhere.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Production QA on 2026-04-26 surfaced both as side-findings while verifying client feedback items 1–10 (9/10 verified, 1 blocked on credentials).
+- ROW_GRID is shared by `dispatchers-client.tsx` header and `dispatcher-row.tsx` rows so a single edit covers both.
+- Search uses `.toLowerCase()` already, so adding `uppercase` (CSS-only) does not affect search behavior.
+- DB stores the original case from the upload payload; this fix normalizes display only — no migration needed.
 
 ## History
 

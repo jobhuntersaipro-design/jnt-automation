@@ -843,7 +843,7 @@ export function SalaryTable({
                             className={`w-3.5 h-3.5 ${r.isPinned ? "fill-current" : ""}`}
                           />
                         </button>
-                        <p className="font-medium text-on-surface leading-tight">{r.name}</p>
+                        <p className="font-medium text-on-surface leading-tight uppercase">{r.name}</p>
                         {isHighPerformer(r) && (
                           <span
                             className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.64rem] font-semibold uppercase tracking-wide bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md"

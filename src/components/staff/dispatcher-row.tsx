@@ -119,7 +119,7 @@ function DecimalInput({ value, onChange, className, onClick, cents }: {
  * just a single RM input so the extra space is harmless — symmetry is
  * what the eye reads.
  */
-export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_0.4fr_0.5fr] items-center gap-x-1.5";
+export const ROW_GRID = "grid grid-cols-[1.6rem_1.2fr_0.55fr_1fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_4px_0.4fr_0.6fr_1.1fr_0.4fr_0.5fr] items-center gap-x-1.5 min-w-[1180px]";
 
 /**
  * Portaled popover that anchors to a button. Escapes the table's
@@ -464,7 +464,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
           className="min-w-0 text-left hover:opacity-70 transition-opacity"
           title="Open history"
         >
-          <p className="text-[0.82rem] font-medium text-on-surface truncate">{dispatcher.name}</p>
+          <p className="text-[0.82rem] font-medium text-on-surface truncate uppercase">{dispatcher.name}</p>
           <p className="text-[0.66rem] text-on-surface-variant">{dispatcher.extId}</p>
         </button>
       </div>
