@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
@@ -119,6 +120,9 @@ export async function POST(req: NextRequest) {
 
     return d;
   });
+
+  // Invalidate overview caches so the new dispatcher appears in counts.
+  revalidateTag("overview", { expire: 0 });
 
   return NextResponse.json({
     dispatcher: {

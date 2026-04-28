@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { getEffectiveAgentId } from "@/lib/impersonation";
@@ -136,6 +137,11 @@ export async function PATCH(
       });
     }
 
+    // Invalidate overview caches if branch/active state could affect counts.
+    if (branchCode !== undefined || isActive !== undefined) {
+      revalidateTag("overview", { expire: 0 });
+    }
+
     return NextResponse.json({ success: true, isComplete: !!updated.icNo });
   } catch (err) {
     console.error("[employees] PATCH error", err);
@@ -167,6 +173,7 @@ export async function DELETE(
     }
 
     await prisma.employee.delete({ where: { id } });
+    revalidateTag("overview", { expire: 0 });
 
     return NextResponse.json({ success: true });
   } catch (err) {

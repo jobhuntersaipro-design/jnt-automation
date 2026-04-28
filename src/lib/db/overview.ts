@@ -80,8 +80,23 @@ export async function getSummaryStats(
   const prevMonths = shiftBack(months);
   const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
   const employeeWhere = buildEmployeeBranchWhere(agentId, selectedBranchCodes);
+  const dispatcherBranchFilter =
+    selectedBranchCodes.length > 0
+      ? { branch: { agentId, code: { in: selectedBranchCodes } } }
+      : { branch: { agentId } };
+  const employeeBranchFilter =
+    selectedBranchCodes.length > 0
+      ? { agentId, branch: { code: { in: selectedBranchCodes } }, isActive: true }
+      : { agentId, isActive: true };
 
-  const [records, prevRecords, empRecords, prevEmpRecords] = await Promise.all([
+  const [
+    records,
+    prevRecords,
+    empRecords,
+    prevEmpRecords,
+    dispatcherRows,
+    employeeRows,
+  ] = await Promise.all([
     prisma.salaryRecord.findMany({
       where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
       select: { dispatcherId: true, netSalary: true, totalOrders: true },
@@ -98,45 +113,70 @@ export async function getSummaryStats(
       where: { ...employeeWhere, OR: prevMonths.map(({ month, year }) => ({ month, year })) },
       select: { employeeId: true, netSalary: true },
     }),
+    // Source-of-truth counts — period-agnostic. The "Total People" card
+    // is a snapshot of who works under the agent right now, not who got
+    // paid in the selected period. New staff/dispatchers without salary
+    // records would otherwise read as 0.
+    prisma.dispatcher.findMany({
+      where: dispatcherBranchFilter,
+      select: { id: true },
+    }),
+    prisma.employee.findMany({
+      where: employeeBranchFilter,
+      select: { id: true, dispatcherId: true },
+    }),
   ]);
 
   const split = splitNetPayout(records, empRecords);
   const prevSplit = splitNetPayout(prevRecords, prevEmpRecords);
 
-  const uniqueDispatchers = new Set(records.map((r) => r.dispatcherId)).size;
-  const uniqueStaff = new Set(empRecords.map((r) => r.employeeId)).size;
-  const totalOrders = records.reduce((s, r) => s + r.totalOrders, 0);
+  // Period-based unique counts are still used by avg-monthly-salary so the
+  // average stays denominated by people-who-actually-got-paid that month.
+  const periodUniqueDispatchers = new Set(records.map((r) => r.dispatcherId)).size;
+  const periodUniqueStaff = new Set(empRecords.map((r) => r.employeeId)).size;
+  const prevPeriodUniqueDispatchers = new Set(prevRecords.map((r) => r.dispatcherId)).size;
+  const prevPeriodUniqueStaff = new Set(prevEmpRecords.map((r) => r.employeeId)).size;
 
-  const prevUniqueDispatchers = new Set(prevRecords.map((r) => r.dispatcherId)).size;
-  const prevUniqueStaff = new Set(prevEmpRecords.map((r) => r.employeeId)).size;
+  const totalOrders = records.reduce((s, r) => s + r.totalOrders, 0);
   const prevTotalOrders = prevRecords.reduce((s, r) => s + r.totalOrders, 0);
+
+  // Snapshot counts: dedup employees who FK-link to a counted dispatcher
+  // (those people are already represented in the dispatcher count).
+  const dispatcherIds = new Set(dispatcherRows.map((d) => d.id));
+  const totalDispatchers = dispatcherIds.size;
+  const totalStaff = employeeRows.filter(
+    (e) => !e.dispatcherId || !dispatcherIds.has(e.dispatcherId),
+  ).length;
 
   const avgMonthlySalary = computeAvgMonthlySalary({
     dispatcherTotal: split.dispatcher,
-    dispatcherUnique: uniqueDispatchers,
+    dispatcherUnique: periodUniqueDispatchers,
     staffTotal: split.staff,
-    staffUnique: uniqueStaff,
+    staffUnique: periodUniqueStaff,
   });
   const prevAvgMonthlySalary = computeAvgMonthlySalary({
     dispatcherTotal: prevSplit.dispatcher,
-    dispatcherUnique: prevUniqueDispatchers,
+    dispatcherUnique: prevPeriodUniqueDispatchers,
     staffTotal: prevSplit.staff,
-    staffUnique: prevUniqueStaff,
+    staffUnique: prevPeriodUniqueStaff,
   });
 
   return {
     totalNetPayout: split.total,
     netPayoutByRole: { dispatcher: split.dispatcher, staff: split.staff },
     avgMonthlySalary,
-    totalDispatchers: uniqueDispatchers,
-    totalStaff: uniqueStaff,
+    totalDispatchers,
+    totalStaff,
     totalOrders,
     prev: {
       totalNetPayout: prevSplit.total,
       netPayoutByRole: { dispatcher: prevSplit.dispatcher, staff: prevSplit.staff },
       avgMonthlySalary: prevAvgMonthlySalary,
-      totalDispatchers: prevUniqueDispatchers,
-      totalStaff: prevUniqueStaff,
+      // People counts are point-in-time snapshots — there is no "prior
+      // period" equivalent. Mirror current values so any caller that still
+      // diffs them shows 0% change rather than misleading noise.
+      totalDispatchers,
+      totalStaff,
       totalOrders: prevTotalOrders,
     },
   };
@@ -397,20 +437,30 @@ export type BranchPoint = {
   name: string;
   netPayout: number;
   totalOrders: number;
-  dispatcherCount: number;
+  /**
+   * Unique people working under this branch right now: dispatchers +
+   * active staff, deduped so an employee FK-linked to a dispatcher is
+   * only counted once.
+   */
+  peopleCount: number;
 };
 
 export async function getBranchDistribution(agentId: string, filters: Filters): Promise<BranchPoint[]> {
   const months = buildMonthRange(filters.fromMonth, filters.fromYear, filters.toMonth, filters.toYear);
 
   // Note: intentionally ignores selectedBranchCodes — always shows all branches for comparison.
-  const [branches, records] = await Promise.all([
+  const [branches, dispatchers, employees, records] = await Promise.all([
     prisma.branch.findMany({
       where: { agentId },
-      select: {
-        code: true,
-        _count: { select: { dispatchers: true } },
-      },
+      select: { id: true, code: true },
+    }),
+    prisma.dispatcher.findMany({
+      where: { branch: { agentId } },
+      select: { id: true, branchId: true },
+    }),
+    prisma.employee.findMany({
+      where: { agentId, isActive: true, branchId: { not: null } },
+      select: { branchId: true, dispatcherId: true },
     }),
     prisma.salaryRecord.findMany({
       where: {
@@ -425,7 +475,6 @@ export async function getBranchDistribution(agentId: string, filters: Filters): 
     }),
   ]);
 
-  // Aggregate salary records by branch code
   const branchTotals = new Map<string, { netPayout: number; totalOrders: number }>();
   for (const r of records) {
     const code = r.dispatcher.branch.code;
@@ -436,8 +485,36 @@ export async function getBranchDistribution(agentId: string, filters: Filters): 
     });
   }
 
+  // People per branch: count dispatchers by their branchId, plus active
+  // employees by their branchId, but skip employees whose dispatcherId is
+  // already counted (they're the same person under two roles).
+  const dispatcherIdsByBranch = new Map<string, Set<string>>();
+  const allDispatcherIds = new Set<string>();
+  for (const d of dispatchers) {
+    allDispatcherIds.add(d.id);
+    let set = dispatcherIdsByBranch.get(d.branchId);
+    if (!set) {
+      set = new Set<string>();
+      dispatcherIdsByBranch.set(d.branchId, set);
+    }
+    set.add(d.id);
+  }
+  const staffByBranch = new Map<string, number>();
+  for (const e of employees) {
+    if (!e.branchId) continue;
+    if (e.dispatcherId && allDispatcherIds.has(e.dispatcherId)) continue;
+    staffByBranch.set(e.branchId, (staffByBranch.get(e.branchId) ?? 0) + 1);
+  }
+
   return branches.map((branch) => {
     const totals = branchTotals.get(branch.code) ?? { netPayout: 0, totalOrders: 0 };
-    return { name: branch.code, netPayout: totals.netPayout, totalOrders: totals.totalOrders, dispatcherCount: branch._count.dispatchers };
+    const dispatcherCount = dispatcherIdsByBranch.get(branch.id)?.size ?? 0;
+    const staffCount = staffByBranch.get(branch.id) ?? 0;
+    return {
+      name: branch.code,
+      netPayout: totals.netPayout,
+      totalOrders: totals.totalOrders,
+      peopleCount: dispatcherCount + staffCount,
+    };
   });
 }

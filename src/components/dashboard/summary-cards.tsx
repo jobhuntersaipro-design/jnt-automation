@@ -76,8 +76,7 @@ function StatCard({
 function TotalPeopleCard({ data }: { data: SummaryStats }) {
   const dispatcherEmpty = data.totalDispatchers === 0;
   const staffEmpty = data.totalStaff === 0;
-  const combined = data.totalDispatchers + data.totalStaff;
-  const prevCombined = data.prev.totalDispatchers + data.prev.totalStaff;
+  const total = data.totalDispatchers + data.totalStaff;
   return (
     <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
       <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
@@ -106,7 +105,9 @@ function TotalPeopleCard({ data }: { data: SummaryStats }) {
           </span>
         </div>
       </div>
-      <div className="pl-2"><Delta current={combined} prev={prevCombined} /></div>
+      <p className="pl-2 text-[0.78rem] text-on-surface-variant tabular-nums">
+        {total} unique people
+      </p>
     </div>
   );
 }

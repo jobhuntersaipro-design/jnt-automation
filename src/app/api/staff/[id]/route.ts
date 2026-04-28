@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { getStaffDispatcherById } from "@/lib/db/staff";
@@ -60,6 +61,8 @@ export async function DELETE(
       }
       await tx.dispatcher.delete({ where: { id } });
     });
+
+    revalidateTag("overview", { expire: 0 });
 
     return NextResponse.json({ success: true });
   } catch (err) {

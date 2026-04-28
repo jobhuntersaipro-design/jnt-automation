@@ -86,7 +86,7 @@ function CustomXTick({
   const cy = Number(y);
   const iconW = 11;
   const gap = 3;
-  const countStr = branch ? String(branch.dispatcherCount) : "";
+  const countStr = branch ? String(branch.peopleCount) : "";
   // Approximate text width at fontSize 12: ~7px per char
   const countW = countStr.length * 7;
   const rowW = iconW + gap + countW;

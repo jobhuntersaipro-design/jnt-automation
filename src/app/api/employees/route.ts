@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
@@ -112,6 +113,10 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Invalidate overview caches so the new staff member appears in the
+    // Total People + Branch Distribution counts on next dashboard render.
+    revalidateTag("overview", { expire: 0 });
 
     return NextResponse.json({
       employee: {
