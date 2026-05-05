@@ -303,14 +303,20 @@ export function PayrollTab() {
     )
   }, [])
 
-  const allReady = useMemo(() => {
-    return entries.every((e) => {
-      // Inactive entries are skipped on save, so they don't gate the button.
-      if (!e.isActive) return true
-      if (e.type === "STORE_KEEPER" && e.workingHours <= 0) return false
-      return true
-    })
-  }, [entries])
+  // Per-entry "ready" predicate: an entry is saveable when it's active and
+  // any type-specific gates pass (Store Keepers need workingHours > 0).
+  // Sup/Admin/Driver entries are always ready since basicPay can be 0.
+  const isEntryReady = useCallback((e: PayrollEntry): boolean => {
+    if (!e.isActive) return false
+    if (e.type === "STORE_KEEPER" && e.workingHours <= 0) return false
+    return true
+  }, [])
+
+  // Confirm & Save unlocks as soon as at least one active entry is ready.
+  // Not-ready entries (e.g. a Store Keeper with no hours yet) are skipped
+  // by handleSave — letting the user save partial progress without being
+  // blocked by colleagues whose payroll isn't filled in yet.
+  const anyReady = useMemo(() => entries.some(isEntryReady), [entries, isEntryReady])
 
   // Optimistic active/inactive toggle — flip locally first, then PATCH the
   // employee. Reverts and toasts on failure. The same /api/employees/[id]
@@ -371,8 +377,9 @@ export function PayrollTab() {
       // Skip inactive employees per spec §6.1: don't upsert at all, leave any
       // existing record untouched. User can flip the toggle and re-save to
       // resume payroll for that person.
-      const payload = entries
-        .filter((e) => e.isActive)
+      const readyEntries = entries.filter(isEntryReady)
+      const skippedCount = entries.filter((e) => e.isActive && !isEntryReady(e)).length
+      const payload = readyEntries
         .map((e) => {
           const isStoreKeeper = e.type === "STORE_KEEPER"
           return {
@@ -413,7 +420,16 @@ export function PayrollTab() {
         throw new Error(data.error || "Failed to save")
       }
 
-      toast.success(`Payroll saved for ${MONTHS[month - 1]} ${year}`)
+      const monthLabel = `${MONTHS[month - 1]} ${year}`
+      if (skippedCount > 0) {
+        toast.success(
+          `Payroll saved for ${monthLabel} — ${skippedCount} not-ready ${
+            skippedCount === 1 ? "entry" : "entries"
+          } skipped`,
+        )
+      } else {
+        toast.success(`Payroll saved for ${monthLabel}`)
+      }
       fetchEntries()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save payroll")
@@ -740,7 +756,7 @@ export function PayrollTab() {
 
         <button
           onClick={handleSave}
-          disabled={saving || loading || entries.length === 0 || !allReady}
+          disabled={saving || loading || entries.length === 0 || !anyReady}
           className="inline-flex items-center gap-2 px-4 py-1.5 bg-primary text-white text-[0.83rem] font-medium rounded-[0.375rem] hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving && <Loader2 size={14} className="animate-spin" />}
