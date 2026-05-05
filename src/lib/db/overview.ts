@@ -272,44 +272,109 @@ export async function getMonthlyDispatcherStaffBreakdown(
     }));
 }
 
-// ─── Salary Breakdown ─────────────────────────────────────────
+// ─── Payout per Branch ────────────────────────────────────────
 
-export type BreakdownPoint = {
+export type BranchPayoutPoint = {
   month: string;
-  baseSalary: number;
-  bonusTierEarnings: number;
-  petrolSubsidy: number;
-  deductions: number;
+  yearMonth: string;
+} & {
+  [branchCode: string]: number | string;
 };
 
-export async function getSalaryBreakdown(
+export type PayoutByBranchResult = {
+  data: BranchPayoutPoint[];
+  branches: string[];
+};
+
+export async function getMonthlyPayoutByBranch(
   agentId: string,
   filters: Filters,
-): Promise<BreakdownPoint[]> {
+): Promise<PayoutByBranchResult> {
   const { selectedBranchCodes, fromMonth, fromYear, toMonth, toYear } = filters;
   const months = buildMonthRange(fromMonth, fromYear, toMonth, toYear);
-  const branchWhere = buildBranchWhere(agentId, selectedBranchCodes);
+  const hasBranchFilter = selectedBranchCodes.length > 0;
 
-  const records = await prisma.salaryRecord.groupBy({
-    by: ["month", "year"],
-    where: { ...branchWhere, OR: months.map(({ month, year }) => ({ month, year })) },
-    _sum: {
-      baseSalary: true,
-      bonusTierEarnings: true,
-      petrolSubsidy: true,
-      penalty: true,
-      advance: true,
-    },
-    orderBy: [{ year: "asc" }, { month: "asc" }],
-  });
+  const [dispatcherRecords, staffRecords] = await Promise.all([
+    prisma.salaryRecord.findMany({
+      where: {
+        dispatcher: {
+          branch: {
+            agentId,
+            ...(hasBranchFilter && { code: { in: selectedBranchCodes } }),
+          },
+        },
+        OR: months.map(({ month, year }) => ({ month, year })),
+      },
+      select: {
+        month: true,
+        year: true,
+        netSalary: true,
+        dispatcher: { select: { branch: { select: { code: true } } } },
+      },
+    }),
+    prisma.employeeSalaryRecord.findMany({
+      where: {
+        employee: {
+          agentId,
+          ...(hasBranchFilter && { branch: { code: { in: selectedBranchCodes } } }),
+        },
+        OR: months.map(({ month, year }) => ({ month, year })),
+      },
+      select: {
+        month: true,
+        year: true,
+        netSalary: true,
+        employee: { select: { branch: { select: { code: true } } } },
+      },
+    }),
+  ]);
 
-  return records.map((r) => ({
-    month: MONTH_ABBR[r.month - 1],
-    baseSalary: r._sum.baseSalary ?? 0,
-    bonusTierEarnings: r._sum.bonusTierEarnings ?? 0,
-    petrolSubsidy: r._sum.petrolSubsidy ?? 0,
-    deductions: (r._sum.penalty ?? 0) + (r._sum.advance ?? 0),
-  }));
+  const grouped = new Map<
+    string,
+    { month: number; year: number; byBranch: Map<string, number> }
+  >();
+  const branchSet = new Set<string>();
+
+  const ensure = (year: number, month: number) => {
+    const key = `${year}-${String(month).padStart(2, "0")}`;
+    let entry = grouped.get(key);
+    if (!entry) {
+      entry = { month, year, byBranch: new Map() };
+      grouped.set(key, entry);
+    }
+    return entry;
+  };
+
+  for (const r of dispatcherRecords) {
+    const code = r.dispatcher.branch.code;
+    branchSet.add(code);
+    const cur = ensure(r.year, r.month);
+    cur.byBranch.set(code, (cur.byBranch.get(code) ?? 0) + r.netSalary);
+  }
+  for (const r of staffRecords) {
+    const code = r.employee.branch?.code;
+    if (!code) continue;
+    branchSet.add(code);
+    const cur = ensure(r.year, r.month);
+    cur.byBranch.set(code, (cur.byBranch.get(code) ?? 0) + r.netSalary);
+  }
+
+  const branches = [...branchSet].sort();
+
+  const data: BranchPayoutPoint[] = [...grouped.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([yearMonth, v]) => {
+      const point: BranchPayoutPoint = {
+        month: MONTH_ABBR[v.month - 1],
+        yearMonth,
+      };
+      for (const branch of branches) {
+        point[branch] = v.byBranch.get(branch) ?? 0;
+      }
+      return point;
+    });
+
+  return { data, branches };
 }
 
 // ─── Bonus Tier Hit Rate ───────────────────────────────────────

@@ -3,7 +3,7 @@ import {
   getSummaryStats,
   getMonthlyDispatcherStaffBreakdown,
   getBranchDistribution,
-  getSalaryBreakdown,
+  getMonthlyPayoutByBranch,
   getBonusTierHitRate,
   getTopDispatchers,
   type Filters,
@@ -44,9 +44,13 @@ export function fetchBranchDist(agentId: string, filters: Filters) {
   return unstable_cache(() => getBranchDistribution(agentId, filters), [key], { revalidate: TTL, tags: ["overview"] })();
 }
 
-export function fetchBreakdown(agentId: string, filters: Filters) {
-  const key = `overview:breakdown:${baseKey(agentId, filters)}`;
-  return unstable_cache(() => getSalaryBreakdown(agentId, filters), [key], { revalidate: TTL, tags: ["overview"] })();
+export function fetchPayoutByBranch(agentId: string, filters: Filters) {
+  const key = `overview:branch-payout:${baseKey(agentId, filters)}`;
+  return unstable_cache(
+    () => getMonthlyPayoutByBranch(agentId, filters),
+    [key],
+    { revalidate: TTL, tags: ["overview"] },
+  )();
 }
 
 export function fetchHitRate(agentId: string, filters: Filters) {
@@ -68,7 +72,7 @@ export function fetchDashboardData(agentId: string, filters: Filters) {
     fetchSummary(agentId, filters),
     fetchTrend(agentId, filters),
     fetchBranchDist(agentId, filters),
-    fetchBreakdown(agentId, filters),
+    fetchPayoutByBranch(agentId, filters),
     fetchHitRate(agentId, filters),
     fetchTopDispatchers(agentId, filters),
   ]);

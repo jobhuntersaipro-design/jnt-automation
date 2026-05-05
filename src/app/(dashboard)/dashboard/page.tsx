@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { DispatcherStaffBreakdown } from "@/components/dashboard/dispatcher-staff-breakdown";
 import { BranchDistribution } from "@/components/dashboard/branch-distribution";
-import { SalaryBreakdown } from "@/components/dashboard/salary-breakdown";
+import { PayoutPerBranch } from "@/components/dashboard/payout-per-branch";
 import { BonusTierHitRate } from "@/components/dashboard/bonus-tier-hit-rate";
 import { TopDispatchers } from "@/components/dashboard/top-dispatchers";
 import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
@@ -12,7 +12,7 @@ import {
   fetchSummary,
   fetchTrend,
   fetchBranchDist,
-  fetchBreakdown,
+  fetchPayoutByBranch,
   fetchHitRate,
   fetchTopDispatchers,
 } from "@/lib/db/overview-cached";
@@ -36,54 +36,127 @@ function ChartSkeleton({ heightClass = "h-72" }: { heightClass?: string }) {
   );
 }
 
-async function SummaryCardsAsync({
-  agentId,
-  filters,
-}: {
-  agentId: string;
-  filters: Filters;
-}) {
-  const data = await fetchSummary(agentId, filters);
-  return <SummaryCards data={data} filters={filters} />;
-}
-
-async function TrendChart({ agentId, filters }: { agentId: string; filters: Filters }) {
-  const data = await fetchTrend(agentId, filters);
-  return <DispatcherStaffBreakdown data={data} />;
-}
-
-async function BranchDistChart({ agentId, filters }: { agentId: string; filters: Filters }) {
-  const data = await fetchBranchDist(agentId, filters);
-  return <BranchDistribution data={data} />;
-}
-
-async function BreakdownChart({ agentId, filters }: { agentId: string; filters: Filters }) {
-  const data = await fetchBreakdown(agentId, filters);
-  return <SalaryBreakdown data={data} />;
-}
-
-async function HitRateChart({ agentId, filters }: { agentId: string; filters: Filters }) {
-  const data = await fetchHitRate(agentId, filters);
-  return <BonusTierHitRate data={data} />;
-}
-
-async function TopDispatchersTable({
-  agentId,
-  filters,
-}: {
-  agentId: string;
-  filters: Filters;
-}) {
-  const data = await fetchTopDispatchers(agentId, filters);
+/**
+ * Unified loading state for the whole dashboard content area. Shown while all
+ * charts fetch in parallel so the UI doesn't flicker chart-by-chart as each
+ * Suspense boundary settles.
+ */
+function DashboardLoading() {
   return (
-    <TopDispatchers
-      data={data}
-      action={
-        <div key="export">
-          <OverviewExport />
+    <div
+      role="status"
+      aria-live="polite"
+      aria-busy="true"
+      className="space-y-4 lg:space-y-6"
+    >
+      <span className="sr-only">Loading dashboard…</span>
+
+      <div className="rounded-[0.75rem] bg-surface-container-lowest border-l-4 border-on-surface-variant shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] p-10 flex flex-col items-center justify-center gap-4 text-center">
+        <svg
+          className="animate-spin h-7 w-7 text-brand"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="9"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeOpacity="0.18"
+          />
+          <path
+            d="M21 12a9 9 0 0 0-9-9"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+        </svg>
+        <div>
+          <p className="font-heading font-semibold text-[1.05rem] text-on-surface">
+            Loading overview…
+          </p>
+          <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
+            Crunching salary records, branches, and dispatcher performance.
+          </p>
         </div>
-      }
-    />
+      </div>
+
+      {/* Ghost layout below preserves vertical space so nothing jumps when
+          data resolves. */}
+      <ChartSkeleton heightClass="h-32" />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartSkeleton />
+        <ChartSkeleton />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartSkeleton />
+        <ChartSkeleton />
+      </div>
+      <ChartSkeleton heightClass="h-80" />
+    </div>
+  );
+}
+
+/**
+ * Awaits every overview query in parallel so the page renders all sections
+ * together. Wrapped in a single <Suspense> so the dashboard transitions in
+ * one motion from loading → fully-rendered.
+ */
+async function DashboardContent({
+  agentId,
+  filters,
+}: {
+  agentId: string;
+  filters: Filters;
+}) {
+  const [summary, trend, branchDist, payoutByBranch, hitRate, topDispatchers] =
+    await Promise.all([
+      fetchSummary(agentId, filters),
+      fetchTrend(agentId, filters),
+      fetchBranchDist(agentId, filters),
+      fetchPayoutByBranch(agentId, filters),
+      fetchHitRate(agentId, filters),
+      fetchTopDispatchers(agentId, filters),
+    ]);
+
+  return (
+    <>
+      <SummaryCards data={summary} filters={filters} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartErrorBoundary>
+          <DispatcherStaffBreakdown data={trend} />
+        </ChartErrorBoundary>
+        <ChartErrorBoundary>
+          <BranchDistribution data={branchDist} />
+        </ChartErrorBoundary>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <ChartErrorBoundary>
+          <PayoutPerBranch
+            data={payoutByBranch.data}
+            branches={payoutByBranch.branches}
+          />
+        </ChartErrorBoundary>
+        <ChartErrorBoundary>
+          <BonusTierHitRate data={hitRate} />
+        </ChartErrorBoundary>
+      </div>
+
+      <ChartErrorBoundary>
+        <TopDispatchers
+          data={topDispatchers}
+          action={
+            <div key="export">
+              <OverviewExport />
+            </div>
+          }
+        />
+      </ChartErrorBoundary>
+    </>
   );
 }
 
@@ -114,9 +187,6 @@ export default async function DashboardPage({
   const effective = await getEffectiveAgentId();
   const agentId = effective!.agentId;
 
-  // Only the branch codes for the filter UI are awaited up-front — everything
-  // else streams inside its own Suspense boundary so slow charts don't block
-  // fast ones (or the header).
   const allBranches = await prisma.branch.findMany({
     where: { agentId },
     select: { code: true },
@@ -147,43 +217,9 @@ export default async function DashboardPage({
 
       {/* Content */}
       <main className="px-4 lg:px-8 pb-16 space-y-4 lg:space-y-6">
-        <Suspense fallback={<ChartSkeleton heightClass="h-32" />}>
-          <SummaryCardsAsync agentId={agentId} filters={filters} />
+        <Suspense fallback={<DashboardLoading />}>
+          <DashboardContent agentId={agentId} filters={filters} />
         </Suspense>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartErrorBoundary>
-            <Suspense fallback={<ChartSkeleton />}>
-              <TrendChart agentId={agentId} filters={filters} />
-            </Suspense>
-          </ChartErrorBoundary>
-          <ChartErrorBoundary>
-            <Suspense fallback={<ChartSkeleton />}>
-              <BranchDistChart agentId={agentId} filters={filters} />
-            </Suspense>
-          </ChartErrorBoundary>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartErrorBoundary>
-            <Suspense fallback={<ChartSkeleton />}>
-              <BreakdownChart agentId={agentId} filters={filters} />
-            </Suspense>
-          </ChartErrorBoundary>
-          <ChartErrorBoundary>
-            <Suspense fallback={<ChartSkeleton />}>
-              <HitRateChart agentId={agentId} filters={filters} />
-            </Suspense>
-          </ChartErrorBoundary>
-        </div>
-
-        <div>
-          <ChartErrorBoundary>
-            <Suspense fallback={<ChartSkeleton heightClass="h-80" />}>
-              <TopDispatchersTable agentId={agentId} filters={filters} />
-            </Suspense>
-          </ChartErrorBoundary>
-        </div>
       </main>
     </div>
   );
