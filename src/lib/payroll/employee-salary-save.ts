@@ -4,13 +4,19 @@ import {
   calculateSupervisorGross,
   calculateStoreKeeperGross,
 } from "./statutory";
-import type { EmployeeType } from "@/generated/prisma/client";
+import type {
+  EmployeeType,
+  StoreKeeperSubtype,
+  PayMode,
+} from "@/generated/prisma/client";
 
 export interface EmployeeSavePayload {
   employeeId: string;
   basicPay: number;
   workingHours: number;
   hourlyWage: number;
+  /** HOUR | DAY — purely a payslip-label distinction; math is identical. */
+  payMode?: PayMode | null;
   kpiAllowance: number;
   petrolAllowance: number;
   otherAllowance: number;
@@ -30,6 +36,8 @@ export interface EmployeeSavePayload {
 export interface EmployeeForSave {
   id: string;
   type: EmployeeType;
+  /** null treated as TEMPORARY behavior for back-compat with untagged rows. */
+  storeKeeperSubtype?: StoreKeeperSubtype | null;
   name: string;
   branchId: string | null;
 }
@@ -46,6 +54,8 @@ export interface EmployeeSalarySaveResult {
   basicPay: number;
   workingHours: number;
   hourlyWage: number;
+  /** HOUR | DAY for Temporary store keepers; null when not applicable. */
+  payMode: PayMode | null;
   kpiAllowance: number;
   petrolAllowance: number;
   otherAllowance: number;
@@ -71,21 +81,30 @@ export interface EmployeeSalarySaveResult {
  * Per-type editable matrix (see `context/features/payroll-edit-permissions-spec.md`):
  *   - SUPERVISOR / ADMIN / DRIVER → basicPay drives wage; workingHours and
  *     hourlyWage are forced to 0 regardless of payload.
- *   - STORE_KEEPER → workingHours × hourlyWage drives wage; basicPay is
- *     forced to 0 regardless of payload.
+ *   - STORE_KEEPER (Permanent) → behaves like Sup/Admin: basicPay drives
+ *     wage; workingHours/hourlyWage forced to 0.
+ *   - STORE_KEEPER (Temporary, or untagged for back-compat) → workingHours
+ *     × hourlyWage drives wage. payMode (HOUR | DAY) is a payslip-label
+ *     distinction only — math is identical.
  */
 export function computeEmployeeSalaryForSave(
   emp: EmployeeForSave,
   entry: EmployeeSavePayload,
   dispatcherRecord: DispatcherRecordForSave | null,
 ): EmployeeSalarySaveResult {
-  const isStoreKeeper = emp.type === "STORE_KEEPER";
+  // Temporary or untagged store keepers use the units-rate (hourly/daily)
+  // branch. Permanent store keepers + Sup/Admin/Driver use the basicPay
+  // branch.
+  const isUnitsRate =
+    emp.type === "STORE_KEEPER" && emp.storeKeeperSubtype !== "PERMANENT";
 
-  const basicPay = isStoreKeeper ? 0 : entry.basicPay;
-  const workingHours = isStoreKeeper ? entry.workingHours : 0;
-  const hourlyWage = isStoreKeeper ? entry.hourlyWage : 0;
+  const basicPay = isUnitsRate ? 0 : entry.basicPay;
+  const workingHours = isUnitsRate ? entry.workingHours : 0;
+  const hourlyWage = isUnitsRate ? entry.hourlyWage : 0;
+  // payMode only meaningful for the units-rate branch; otherwise null.
+  const payMode: PayMode | null = isUnitsRate ? entry.payMode ?? "HOUR" : null;
 
-  const employeeGross = isStoreKeeper
+  const employeeGross = isUnitsRate
     ? calculateStoreKeeperGross(
         workingHours,
         hourlyWage,
@@ -143,6 +162,7 @@ export function computeEmployeeSalaryForSave(
     basicPay,
     workingHours,
     hourlyWage,
+    payMode,
     kpiAllowance: entry.kpiAllowance,
     petrolAllowance: entry.petrolAllowance,
     otherAllowance: entry.otherAllowance,

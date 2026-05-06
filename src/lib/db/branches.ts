@@ -130,6 +130,8 @@ export type BranchEmployeeRow = {
   employeeId: string;
   name: string;
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
+  /** Sub-tag on STORE_KEEPER rows. Null for any other type. */
+  storeKeeperSubtype: "TEMPORARY" | "PERMANENT" | null;
   extId: string | null;
   /** Raw 12-digit IC (or empty string if no IC set). */
   icNo: string;
@@ -199,6 +201,7 @@ export async function getBranchDetail(
         id: true,
         name: true,
         type: true,
+        storeKeeperSubtype: true,
         extId: true,
         icNo: true,
         avatarUrl: true,
@@ -326,6 +329,7 @@ export async function getBranchDetail(
     employeeId: e.id,
     name: e.name,
     type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER",
+    storeKeeperSubtype: e.storeKeeperSubtype,
     extId: e.extId,
     icNo: e.icNo ?? "",
     isComplete: !!e.icNo,

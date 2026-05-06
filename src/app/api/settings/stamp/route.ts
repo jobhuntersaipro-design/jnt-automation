@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET, R2_PUBLIC_URL } from "@/lib/r2";
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { validateImageMagicBytes } from "@/lib/utils/validate-image";
+import { makeStampBackgroundTransparent } from "@/lib/staff/stamp-transparency";
 
 const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
@@ -35,15 +36,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Only JPG, PNG, and WebP files are allowed" }, { status: 400 });
     }
 
-    const ext = detectedType === "image/jpeg" ? "jpg" : detectedType.split("/")[1];
+    // Knock out the white background so the stamp sits cleanly on top of the
+    // "APPROVED BY" signature line on payslips. Failure is non-fatal — fall
+    // back to the original bytes and a `.{ext}` extension if sharp throws on
+    // an unusual encoding.
+    let finalBuffer: Uint8Array = new Uint8Array(buffer);
+    let contentType: string = detectedType;
+    let ext = detectedType === "image/jpeg" ? "jpg" : detectedType.split("/")[1];
+    try {
+      const transparent = await makeStampBackgroundTransparent(buffer);
+      finalBuffer = new Uint8Array(transparent);
+      contentType = "image/png";
+      ext = "png";
+    } catch (err) {
+      console.error("[settings/stamp] background removal failed, storing original", err);
+    }
+
     const key = `stamps/${agentId}/stamp.${ext}`;
 
     await r2.send(
       new PutObjectCommand({
         Bucket: R2_BUCKET,
         Key: key,
-        Body: buffer,
-        ContentType: detectedType,
+        Body: finalBuffer,
+        ContentType: contentType,
       }),
     );
 

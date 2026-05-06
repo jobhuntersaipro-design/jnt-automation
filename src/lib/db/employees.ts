@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { EmployeeType, Gender } from "@/generated/prisma/client";
+import type { EmployeeType, Gender, StoreKeeperSubtype } from "@/generated/prisma/client";
 import { maskIc } from "./staff";
 
 export type StaffEmployee = {
@@ -11,6 +11,7 @@ export type StaffEmployee = {
   gender: Gender;
   avatarUrl: string | null;
   type: EmployeeType;
+  storeKeeperSubtype: StoreKeeperSubtype | null;
   branchCode: string | null;
   basicPay: number | null;
   hourlyWage: number | null;
@@ -31,14 +32,24 @@ export type StaffEmployee = {
 
 export async function getEmployees(
   agentId: string,
-  filters: { type?: EmployeeType; search?: string },
+  filters: {
+    type?: EmployeeType;
+    search?: string;
+    storeKeeperSubtype?: StoreKeeperSubtype;
+  },
 ): Promise<StaffEmployee[]> {
-  const { type, search } = filters;
+  const { type, search, storeKeeperSubtype } = filters;
+
+  // Picking a subtype implies type = STORE_KEEPER. Don't overwrite an explicit
+  // mismatched type — the API is responsible for rejecting that combo before
+  // we get here.
+  const effectiveType = storeKeeperSubtype ? "STORE_KEEPER" : type;
 
   const employees = await prisma.employee.findMany({
     where: {
       agentId,
-      ...(type && { type }),
+      ...(effectiveType && { type: effectiveType }),
+      ...(storeKeeperSubtype && { storeKeeperSubtype }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: "insensitive" as const } },
@@ -65,6 +76,7 @@ export async function getEmployees(
     gender: e.gender,
     avatarUrl: e.avatarUrl,
     type: e.type,
+    storeKeeperSubtype: e.storeKeeperSubtype,
     branchCode: e.branch?.code ?? null,
     basicPay: e.basicPay,
     hourlyWage: e.hourlyWage,

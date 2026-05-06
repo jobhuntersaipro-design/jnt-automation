@@ -58,6 +58,16 @@ export interface EmployeePayslipInput {
   icNo: string;
   position: string;
   employeeType: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
+  /**
+   * Sub-tag on STORE_KEEPER. Permanent → render like Sup/Admin (BASIC PAY).
+   * Temporary or null (untagged) → render WAGES (X HOUR/DAY).
+   */
+  storeKeeperSubtype?: "TEMPORARY" | "PERMANENT" | null;
+  /**
+   * Payslip line unit for Temporary store keepers. HOUR (default) → "WAGES
+   * (X HOUR)". DAY → "WAGES (X DAY)". Ignored for non-units-rate rows.
+   */
+  payMode?: "HOUR" | "DAY" | null;
   month: number;
   year: number;
 
@@ -125,7 +135,10 @@ function rect(
  */
 export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   const isCombined = !!data.dispatcherTierBreakdowns;
-  const isStoreKeeper = data.employeeType === "STORE_KEEPER";
+  // Units-rate rows render "WAGES (X HOUR/DAY)". Permanent store keepers
+  // render "BASIC PAY" like Sup/Admin/Driver.
+  const isUnitsRate =
+    data.employeeType === "STORE_KEEPER" && data.storeKeeperSubtype !== "PERMANENT";
   const rows: Row[] = [];
 
   if (isCombined && data.dispatcherTierBreakdowns) {
@@ -151,9 +164,10 @@ export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
     }
   }
 
-  if (isStoreKeeper) {
+  if (isUnitsRate) {
+    const unit = data.payMode === "DAY" ? "DAY" : "HOUR";
     rows.push({
-      label: `WAGES (${data.workingHours} HOUR)`,
+      label: `WAGES (${data.workingHours} ${unit})`,
       amount: data.workingHours * data.hourlyWage,
     });
   } else {
@@ -213,6 +227,14 @@ function drawCompanyHeader(doc: PDFKit.PDFDocument, data: EmployeePayslipInput, 
   return y + 12;
 }
 
+/**
+ * Renders a "LABEL : VALUE" row inside the particulars grid and returns the
+ * vertical height consumed. The value cell wraps at word boundaries when it
+ * exceeds the available width — long names like "MUHAMMAD RASYDAN QUSYAIRI
+ * BIN MOHD HOSNI" flow to a second line instead of overflowing onto the row
+ * below. The caller is responsible for advancing the y-cursor by the
+ * returned height so the next row starts safely below.
+ */
 function drawLabelColonValue(
   doc: PDFKit.PDFDocument,
   x: number,
@@ -220,18 +242,19 @@ function drawLabelColonValue(
   width: number,
   label: string,
   value: string,
-): void {
+): number {
   const labelW = 90;
   const colonW = 10;
+  const valueW = width - labelW - colonW;
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
   doc.text(label, x, y, { width: labelW, lineBreak: false });
   doc.text(":", x + labelW, y, { width: colonW, lineBreak: false });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text(value, x + labelW + colonW, y, {
-    width: width - labelW - colonW,
-    lineBreak: false,
-    ellipsis: true,
-  });
+  // Empty values render as "" — heightOfString crashes on undefined.
+  const safeValue = value || "";
+  const measuredH = safeValue ? doc.heightOfString(safeValue, { width: valueW }) : 12;
+  doc.text(safeValue, x + labelW + colonW, y, { width: valueW });
+  return Math.max(12, measuredH);
 }
 
 function drawParticulars(
@@ -267,13 +290,16 @@ function drawParticulars(
 
   const boxPadX = ROW_PAD_X;
   const boxPadY = 4;
-  const lineH = 12;
   let y = yTop + boxPadY;
   const halfW = CONTENT_WIDTH / 2;
   for (let i = 0; i < 3; i++) {
-    drawLabelColonValue(doc, CONTENT_LEFT + boxPadX, y, halfW - boxPadX * 2, leftParticulars[i][0], leftParticulars[i][1]);
-    drawLabelColonValue(doc, MID_X + boxPadX, y, halfW - boxPadX * 2, rightParticulars[i][0], rightParticulars[i][1] as string);
-    y += lineH;
+    // Render both halves at the same y. Each returns the height it consumed
+    // (single-line rows = 12pt, wrapped names = ~24pt). Advance the y-cursor
+    // by the larger of the two so the next row sits below whichever side
+    // grew taller.
+    const leftH = drawLabelColonValue(doc, CONTENT_LEFT + boxPadX, y, halfW - boxPadX * 2, leftParticulars[i][0], leftParticulars[i][1]);
+    const rightH = drawLabelColonValue(doc, MID_X + boxPadX, y, halfW - boxPadX * 2, rightParticulars[i][0], rightParticulars[i][1] as string);
+    y += Math.max(leftH, rightH);
   }
   return y + boxPadY;
 }

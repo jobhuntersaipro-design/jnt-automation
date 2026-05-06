@@ -5,7 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { getEmployees } from "@/lib/db/employees";
 import { getEffectiveAgentId } from "@/lib/impersonation";
-import type { EmployeeType } from "@/generated/prisma/client";
+import type { EmployeeType, StoreKeeperSubtype } from "@/generated/prisma/client";
+import {
+  isValidStoreKeeperSubtype,
+  validateSubtypeForType,
+} from "@/lib/staff/store-keeper-subtype";
 
 export async function GET(req: NextRequest) {
   try {
@@ -18,10 +22,15 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const type = url.searchParams.get("type") as EmployeeType | null;
     const search = url.searchParams.get("search") || undefined;
+    const subtypeRaw = url.searchParams.get("subtype");
+    const storeKeeperSubtype = isValidStoreKeeperSubtype(subtypeRaw)
+      ? (subtypeRaw as StoreKeeperSubtype)
+      : undefined;
 
     const employees = await getEmployees(agentId, {
       type: type || undefined,
       search,
+      storeKeeperSubtype,
     });
 
     return NextResponse.json({ employees });
@@ -40,11 +49,23 @@ export async function POST(req: NextRequest) {
     const agentId = effective.agentId;
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, dispatcherId, epfNo, socsoNo, incomeTaxNo } = body as {
+    const {
+      name,
+      extId,
+      icNo,
+      type,
+      storeKeeperSubtype,
+      branchCode,
+      dispatcherId,
+      epfNo,
+      socsoNo,
+      incomeTaxNo,
+    } = body as {
       name?: string;
       extId?: string;
       icNo?: string;
       type?: EmployeeType;
+      storeKeeperSubtype?: StoreKeeperSubtype | null;
       branchCode?: string;
       dispatcherId?: string;
       epfNo?: string;
@@ -58,6 +79,11 @@ export async function POST(req: NextRequest) {
 
     if (!type || !["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"].includes(type)) {
       return NextResponse.json({ error: "Valid employee type is required" }, { status: 400 });
+    }
+
+    const subtypeCheck = validateSubtypeForType(type, storeKeeperSubtype ?? null);
+    if (!subtypeCheck.ok) {
+      return NextResponse.json({ error: subtypeCheck.error }, { status: 400 });
     }
 
     if (!branchCode || !branchCode.trim()) {
@@ -92,6 +118,11 @@ export async function POST(req: NextRequest) {
     }
     const branchId = branch.id;
 
+    // Subtype only applies when type === STORE_KEEPER. Defense-in-depth even
+    // though `validateSubtypeForType` already rejected mismatches.
+    const safeSubtype: StoreKeeperSubtype | null =
+      type === "STORE_KEEPER" ? (storeKeeperSubtype ?? null) : null;
+
     const employee = await prisma.employee.create({
       data: {
         agentId: agentId,
@@ -100,6 +131,7 @@ export async function POST(req: NextRequest) {
         icNo: safeIcNo,
         gender,
         type,
+        storeKeeperSubtype: safeSubtype,
         branchId,
         dispatcherId: dispatcherId || null,
         epfNo: epfNo?.trim() || null,
@@ -128,6 +160,7 @@ export async function POST(req: NextRequest) {
         gender: employee.gender,
         avatarUrl: employee.avatarUrl,
         type: employee.type,
+        storeKeeperSubtype: employee.storeKeeperSubtype,
         branchCode: employee.branch?.code ?? null,
         basicPay: employee.basicPay,
         hourlyWage: employee.hourlyWage,

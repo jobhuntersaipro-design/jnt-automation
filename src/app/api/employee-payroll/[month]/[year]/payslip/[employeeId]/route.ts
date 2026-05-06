@@ -7,6 +7,7 @@ import {
   countBonusParcelsPerTier,
 } from "@/lib/staff/payslip-generator";
 import type { EmployeePayslipInput } from "@/lib/staff/payslip-generator";
+import { formatIc } from "@/lib/utils/ic";
 
 const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
@@ -120,7 +121,7 @@ export async function POST(
     }
   }
 
-  const icFormatted = employee.icNo.replace(/(\d{6})(\d{2})(\d{4})/, "$1-$2-$3");
+  const icFormatted = formatIc(employee.icNo);
 
   const input: EmployeePayslipInput = {
     companyName: agent?.name ?? "Company",
@@ -131,6 +132,8 @@ export async function POST(
     icNo: icFormatted,
     position: employee.type,
     employeeType: employee.type,
+    storeKeeperSubtype: employee.storeKeeperSubtype,
+    payMode: salaryRecord.payMode,
     month,
     year,
     epfNo: employee.epfNo,

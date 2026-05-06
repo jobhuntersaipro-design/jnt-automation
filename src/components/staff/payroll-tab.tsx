@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle, Trash2 } from "lucide-react"
+import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
@@ -16,16 +16,27 @@ import {
   calculateSupervisorGross,
   calculateStoreKeeperGross,
 } from "@/lib/payroll/statutory"
+import {
+  STORE_KEEPER_SUBTYPE_LABEL,
+  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
+} from "@/lib/staff/store-keeper-subtype"
+import { formatIcInput } from "@/lib/utils/ic"
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
 ]
 
+type EntryPayMode = "HOUR" | "DAY"
+
 interface PayrollEntry {
   employeeId: string
   name: string
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER"
+  /** Sub-tag on STORE_KEEPER rows. Null for any other type. */
+  storeKeeperSubtype: "TEMPORARY" | "PERMANENT" | null
+  /** HOUR | DAY for Temporary store keepers; ignored otherwise. */
+  payMode: EntryPayMode
   branchCode: string | null
   icNo: string | null
   gender: Gender
@@ -65,11 +76,21 @@ interface PayrollEntry {
 
 const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolAllowance", "kpiAllowance", "otherAllowance"])
 
+/**
+ * True when this row uses the units-rate (hour/day) pay model rather than
+ * monthly basic pay. Permanent store keepers + Sup/Admin/Driver use basicPay;
+ * Temporary or untagged store keepers use units × rate.
+ */
+function usesUnitsRate(entry: Pick<PayrollEntry, "type" | "storeKeeperSubtype">): boolean {
+  return entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype !== "PERMANENT"
+}
+
 function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
   // Per-type gating mirrors the server `computeEmployeeSalaryForSave`:
-  // Sup/Admin ignore hours/hourlyWage; Store Keeper ignores basicPay.
-  const isStoreKeeper = entry.type === "STORE_KEEPER"
-  const employeeGross = isStoreKeeper
+  //  - Sup / Admin / Driver / Permanent SK → basicPay drives gross.
+  //  - Temporary or untagged SK → workingHours × hourlyWage drives gross.
+  const isUnitsRate = usesUnitsRate(entry)
+  const employeeGross = isUnitsRate
     ? calculateStoreKeeperGross(
         entry.workingHours,
         entry.hourlyWage,
@@ -179,6 +200,9 @@ function CalcCurrencyInput({
   }
 
   const display = cents === "0" ? "" : centsToDisplay(cents)
+  // Always-2dp tooltip so users can read the full value on hover even when the
+  // column is too narrow to show every digit (RM 100,000+ is rare but possible).
+  const fullValue = centsToDisplay(cents === "0" ? "0" : cents)
 
   return (
     <input
@@ -189,8 +213,9 @@ function CalcCurrencyInput({
       tabIndex={disabled ? -1 : undefined}
       value={display}
       placeholder="0.00"
+      title={fullValue}
       onKeyDown={handleKey}
-      className={`peer w-full bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : "cursor-text"} ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
+      className={`peer w-full min-w-0 bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : "cursor-text"} ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
     />
   )
 }
@@ -237,6 +262,29 @@ const TYPE_LABELS: Record<string, string> = {
   DRIVER: "Driver",
 }
 
+const PAGE_SIZE = 20
+
+/**
+ * Mirrors the helper used on /staff?tab=settings — produces a compact page
+ * list like [1, "...", 4, 5, 6, "...", 12] so navigation stays one row even
+ * for large staff counts.
+ */
+function getPageNumbers(current: number, total: number): (number | "...")[] {
+  const pages: (number | "...")[] = []
+  const start = Math.max(1, current - 2)
+  const end = Math.min(total, current + 2)
+  if (start > 1) {
+    pages.push(1)
+    if (start > 2) pages.push("...")
+  }
+  for (let i = start; i <= end; i++) pages.push(i)
+  if (end < total) {
+    if (end < total - 1) pages.push("...")
+    pages.push(total)
+  }
+  return pages
+}
+
 export function PayrollTab() {
   const now = new Date()
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -248,6 +296,8 @@ export function PayrollTab() {
   const [yearOpen, setYearOpen] = useState(false)
   const [branchFilter, setBranchFilter] = useState<string>("")
   const [branchOpen, setBranchOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
   const monthRef = useRef<HTMLDivElement>(null)
   const yearRef = useRef<HTMLDivElement>(null)
   const branchRef = useRef<HTMLDivElement>(null)
@@ -268,8 +318,17 @@ export function PayrollTab() {
       // spec §8 (treat undefined as active so we don't silently disable rows
       // if the server payload regresses).
       const normalized: PayrollEntry[] = (data.entries as PayrollEntry[]).map((raw) => {
-        const e: PayrollEntry = { ...raw, isActive: raw.isActive ?? true }
-        if (e.type === "STORE_KEEPER") return e
+        const e: PayrollEntry = {
+          ...raw,
+          isActive: raw.isActive ?? true,
+          // payMode default for older saved records that pre-date the column.
+          payMode: raw.payMode ?? "HOUR",
+        }
+        // Rows that use units-rate (Temp / untagged SK) keep workingHours +
+        // hourlyWage. Anything else (Sup/Admin/Driver/Permanent SK) gets
+        // saved hours/wage zeroed so the displayed gross/statutory/net
+        // reflect the basicPay-only formula.
+        if (usesUnitsRate(e)) return e
         if (e.workingHours === 0 && e.hourlyWage === 0) return e
         return recalcEntry(
           { ...e, workingHours: 0, hourlyWage: 0 },
@@ -292,30 +351,44 @@ export function PayrollTab() {
     setEntries((prev) =>
       prev.map((e) => {
         if (e.employeeId !== employeeId) return e
-        // Guard against writes that don't apply to this employee type. The UI
-        // already hides those inputs, but this keeps the state machine honest.
-        const isStoreKeeper = e.type === "STORE_KEEPER"
-        if (isStoreKeeper && field === "basicPay") return e
-        if (!isStoreKeeper && (field === "workingHours" || field === "hourlyWage")) return e
+        // Guard against writes that don't apply to this row's pay model. The
+        // UI already hides the inactive inputs, but this keeps the state
+        // machine honest.
+        const isUnitsRate = usesUnitsRate(e)
+        if (isUnitsRate && field === "basicPay") return e
+        if (!isUnitsRate && (field === "workingHours" || field === "hourlyWage")) return e
         const updated = { ...e, [field]: value }
         return recalcEntry(updated, field)
       })
     )
   }, [])
 
+  /** Toggle Hour/Day mode for a Temporary store keeper row. Math is
+   *  unchanged — only the payslip label and the displayed Pay sub-text. */
+  const setEntryPayMode = useCallback((employeeId: string, mode: EntryPayMode) => {
+    setEntries((prev) =>
+      prev.map((e) =>
+        e.employeeId === employeeId && usesUnitsRate(e)
+          ? { ...e, payMode: mode }
+          : e,
+      ),
+    )
+  }, [])
+
   // Per-entry "ready" predicate: an entry is saveable when it's active and
-  // any type-specific gates pass (Store Keepers need workingHours > 0).
-  // Sup/Admin/Driver entries are always ready since basicPay can be 0.
+  // any type-specific gates pass. Units-rate rows (Temp/untagged Store
+  // Keeper) need workingHours > 0; Sup/Admin/Driver/Permanent SK entries
+  // are always ready since basicPay can be 0.
   const isEntryReady = useCallback((e: PayrollEntry): boolean => {
     if (!e.isActive) return false
-    if (e.type === "STORE_KEEPER" && e.workingHours <= 0) return false
+    if (usesUnitsRate(e) && e.workingHours <= 0) return false
     return true
   }, [])
 
   // Confirm & Save unlocks as soon as at least one active entry is ready.
-  // Not-ready entries (e.g. a Store Keeper with no hours yet) are skipped
-  // by handleSave — letting the user save partial progress without being
-  // blocked by colleagues whose payroll isn't filled in yet.
+  // Not-ready entries (e.g. a Temp Store Keeper with no hours yet) are
+  // skipped by handleSave — letting the user save partial progress without
+  // being blocked by colleagues whose payroll isn't filled in yet.
   const anyReady = useMemo(() => entries.some(isEntryReady), [entries, isEntryReady])
 
   // Optimistic active/inactive toggle — flip locally first, then PATCH the
@@ -366,10 +439,29 @@ export function PayrollTab() {
     return Array.from(set).sort()
   }, [entries])
 
+  // `displayedEntries` = full filtered set (branch + search). Used by hero
+  // totals, save payload, bulk select-all, and "all saved?" derivation so
+  // those reflect the user's current filter regardless of what page they're
+  // on. The table body iterates `pagedEntries` (a 20-row window).
   const displayedEntries = useMemo(() => {
-    if (!branchFilter) return entries
-    return entries.filter((e) => e.branchCode === branchFilter)
-  }, [entries, branchFilter])
+    const q = search.trim().toLowerCase()
+    return entries.filter((e) => {
+      if (branchFilter && e.branchCode !== branchFilter) return false
+      if (q) {
+        const nameMatch = e.name.toLowerCase().includes(q)
+        const icMatch = e.icNo ? e.icNo.includes(q) : false
+        if (!nameMatch && !icMatch) return false
+      }
+      return true
+    })
+  }, [entries, branchFilter, search])
+
+  const totalPages = Math.max(1, Math.ceil(displayedEntries.length / PAGE_SIZE))
+  const safePage = Math.min(page, totalPages)
+  const pagedEntries = useMemo(
+    () => displayedEntries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [displayedEntries, safePage],
+  )
 
   const handleSave = async () => {
     setSaving(true)
@@ -381,16 +473,18 @@ export function PayrollTab() {
       const skippedCount = entries.filter((e) => e.isActive && !isEntryReady(e)).length
       const payload = readyEntries
         .map((e) => {
-          const isStoreKeeper = e.type === "STORE_KEEPER"
+          const isUnitsRate = usesUnitsRate(e)
           return {
             employeeId: e.employeeId,
-            // Force per-type wage source: Sup/Admin → basicPay only;
-            // Store Keeper → workingHours × hourlyWage only.
+            // Force per-row wage source:
+            //  - basicPay branch (Sup / Admin / Driver / Permanent SK)
+            //  - units-rate branch (Temporary or untagged SK)
             // Server re-applies the same gating, but we strip irrelevant
             // values here so the payload reflects intent.
-            basicPay: isStoreKeeper ? 0 : e.basicPay,
-            workingHours: isStoreKeeper ? e.workingHours : 0,
-            hourlyWage: isStoreKeeper ? e.hourlyWage : 0,
+            basicPay: isUnitsRate ? 0 : e.basicPay,
+            workingHours: isUnitsRate ? e.workingHours : 0,
+            hourlyWage: isUnitsRate ? e.hourlyWage : 0,
+            payMode: isUnitsRate ? e.payMode : null,
             kpiAllowance: e.kpiAllowance,
             petrolAllowance: e.petrolAllowance,
             otherAllowance: e.otherAllowance,
@@ -499,6 +593,8 @@ export function PayrollTab() {
 
   // Clear selection when month/year/branch filter changes
   useEffect(() => { setSelectedIds(new Set()) }, [month, year, branchFilter])
+  // Reset to first page whenever the displayed set could meaningfully shrink.
+  useEffect(() => { setPage(1) }, [month, year, branchFilter, search])
 
   // Active entries only — the bulk-select header, "all saved?" hint, and
   // "select all" affordance ignore inactive rows since their payslip
@@ -752,6 +848,19 @@ export function PayrollTab() {
               </div>
             )}
           </div>
+
+          {/* Search — same shape + behaviour as the Settings tab so users
+              don't have to learn two patterns. Filters by name or IC. */}
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search name or IC..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-52 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
+            />
+          </div>
         </div>
 
         <button
@@ -780,7 +889,9 @@ export function PayrollTab() {
         </div>
       ) : displayedEntries.length === 0 ? (
         <div className="text-center py-16 text-on-surface-variant text-[0.85rem]">
-          No employees in branch {branchFilter}.
+          {search.trim()
+            ? `No employees match "${search.trim()}".`
+            : `No employees in branch ${branchFilter}.`}
         </div>
       ) : (
         <div className="flex flex-col gap-1.5">
@@ -788,7 +899,7 @@ export function PayrollTab() {
             Swipe left to see more columns →
           </p>
           <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full" style={{ minWidth: 1280 }}>
+          <table className="w-full" style={{ minWidth: 1720 }}>
             <thead>
               <tr>
                 {allSaved && (
@@ -801,37 +912,37 @@ export function PayrollTab() {
                     />
                   </th>
                 )}
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3" style={{ width: 160 }}>Employee</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 80 }}>Branch</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 85 }}>Pay</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 60 }}>Hours</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 70 }}>Petrol</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 70 }}>KPI</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 70 }}>Other</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 80 }}>Gross</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 65 }}>PCB</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 65 }}>Penalty</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 70 }}>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3" style={{ minWidth: 180 }}>Employee</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Branch</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Pay</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 80 }}>Hour/Day</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Petrol</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>KPI</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Other</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Gross</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>PCB</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Penalty</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
                   <div>EPF</div>
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 65 }}>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
                   <div>SOCSO</div>
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 55 }}>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
                   <div>EIS</div>
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Net</th>
+                <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 110 }}>Net</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Status</th>
                 <th className="pb-3" style={{ width: 150 }}></th>
               </tr>
             </thead>
             <tbody>
-              {displayedEntries.map((entry) => {
-                const isStoreKeeper = entry.type === "STORE_KEEPER"
-                const isReady = isStoreKeeper ? entry.workingHours > 0 : true
+              {pagedEntries.map((entry) => {
+                const isUnitsRate = usesUnitsRate(entry)
+                const isReady = isUnitsRate ? entry.workingHours > 0 : true
                 const inactive = !entry.isActive
 
                 return (
@@ -910,8 +1021,17 @@ export function PayrollTab() {
                           <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate uppercase">
                             {entry.name}
                           </div>
-                          <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5">
-                            {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? " + Dispatcher" : ""}
+                          <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5 flex items-center gap-1 flex-wrap">
+                            <span>
+                              {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? " + Dispatcher" : ""}
+                            </span>
+                            {entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[0.58rem] font-medium ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[entry.storeKeeperSubtype]}`}
+                              >
+                                {STORE_KEEPER_SUBTYPE_LABEL[entry.storeKeeperSubtype]}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -932,31 +1052,77 @@ export function PayrollTab() {
                       )}
                     </td>
 
-                    {/* Pay column — Basic Pay for Sup/Admin, Pay/Hour for Store Keeper.
-                        Per-row sub-label disambiguates which one is being edited. */}
+                    {/* Pay column — basicPay for Sup/Admin/Driver/Permanent SK,
+                        Pay/Hour or Pay/Day for Temporary SK. Per-row sub-label
+                        + Hour/Day toggle disambiguates which one is being
+                        edited. */}
                     <td className="py-2.5 px-1">
                       <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
-                          value={isStoreKeeper ? entry.hourlyWage : entry.basicPay}
-                          onChange={(v) => updateEntry(entry.employeeId, isStoreKeeper ? "hourlyWage" : "basicPay", v)}
+                          value={isUnitsRate ? entry.hourlyWage : entry.basicPay}
+                          onChange={(v) => updateEntry(entry.employeeId, isUnitsRate ? "hourlyWage" : "basicPay", v)}
                           disabled={inactive}
                         />
                       </div>
-                      <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
-                        {isStoreKeeper ? "Pay / Hour" : "Basic Pay"}
-                      </div>
+                      {isUnitsRate ? (
+                        <div
+                          className="inline-flex items-stretch rounded-[0.25rem] overflow-hidden ring-1 ring-outline-variant/30 mx-auto mt-1"
+                          role="radiogroup"
+                          aria-label="Pay mode for store keeper"
+                          style={{ display: "flex", justifyContent: "center", width: "fit-content", marginLeft: "auto", marginRight: "auto" }}
+                        >
+                          {(["HOUR", "DAY"] as EntryPayMode[]).map((mode) => {
+                            const active = entry.payMode === mode
+                            const label = mode === "HOUR" ? "Hour" : "Day"
+                            const title =
+                              mode === "HOUR"
+                                ? "Hourly pay × hours worked this month"
+                                : "Daily pay × days worked this month"
+                            return (
+                              <button
+                                key={mode}
+                                type="button"
+                                role="radio"
+                                aria-checked={active}
+                                disabled={inactive}
+                                title={title}
+                                onClick={() => setEntryPayMode(entry.employeeId, mode)}
+                                className={`px-2 py-0.5 text-[0.6rem] font-medium leading-none transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-1 ${
+                                  active
+                                    ? "bg-primary text-white"
+                                    : "bg-white text-on-surface-variant/80 hover:bg-surface-hover hover:text-on-surface"
+                                }`}
+                              >
+                                {label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                          Basic Pay
+                        </div>
+                      )}
                     </td>
 
-                    {/* Hours — editable only for Store Keeper. Supervisor/Admin
-                        rows render an em-dash; their wage is monthly Basic Pay only. */}
+                    {/* Hour/Day — editable only for Temp / untagged SK. Other
+                        rows render an em-dash; their wage is monthly Basic Pay
+                        only. Column header reads "Hour/Day" — the per-row
+                        sub-label flips between "Hours" / "Days" based on the
+                        active payMode. */}
                     <td className="py-2.5 px-1">
-                      {isStoreKeeper ? (
-                        <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
-                          <HoursInput
-                            value={entry.workingHours}
-                            onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
-                            disabled={inactive}
-                          />
+                      {isUnitsRate ? (
+                        <div>
+                          <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                            <HoursInput
+                              value={entry.workingHours}
+                              onChange={(v) => updateEntry(entry.employeeId, "workingHours", v)}
+                              disabled={inactive}
+                            />
+                          </div>
+                          <div className="text-[0.55rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                            {entry.payMode === "DAY" ? "Days" : "Hours"}
+                          </div>
                         </div>
                       ) : (
                         <div className="text-center text-[0.8rem] text-on-surface-variant/40 tabular-nums" aria-label="Not applicable">
@@ -1000,11 +1166,17 @@ export function PayrollTab() {
 
                     {/* Gross */}
                     <td className="py-2.5 px-1 text-center">
-                      <div className="text-[0.8rem] tabular-nums text-on-surface font-medium">
+                      <div
+                        className="text-[0.8rem] tabular-nums text-on-surface font-medium whitespace-nowrap"
+                        title={formatRM(entry.grossSalary)}
+                      >
                         {formatRM(entry.grossSalary)}
                       </div>
                       {entry.hasDispatcherMatch && entry.dispatcherGross > 0 && (
-                        <div className="text-[0.6rem] text-on-surface-variant/50 tabular-nums">
+                        <div
+                          className="text-[0.6rem] text-on-surface-variant/50 tabular-nums whitespace-nowrap"
+                          title={`Dispatcher gross: ${formatRM(entry.dispatcherGross)}`}
+                        >
                           +dispatch {formatRM(entry.dispatcherGross)}
                         </div>
                       )}
@@ -1091,7 +1263,10 @@ export function PayrollTab() {
 
                     {/* Net Salary */}
                     <td className="py-2.5 px-1 text-center">
-                      <span className="text-[0.85rem] tabular-nums text-primary font-semibold">
+                      <span
+                        className="text-[0.85rem] tabular-nums text-primary font-semibold whitespace-nowrap"
+                        title={formatRM(entry.netSalary)}
+                      >
                         {formatRM(entry.netSalary)}
                       </span>
                     </td>
@@ -1198,6 +1373,49 @@ export function PayrollTab() {
             </tbody>
           </table>
           </div>
+
+          {/* Pagination — mirrors the Settings tab. Hidden when only one
+              page so single-screen branches don't show empty chrome. */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase">
+                Showing {(safePage - 1) * PAGE_SIZE + 1}–{Math.min(safePage * PAGE_SIZE, displayedEntries.length)} of {displayedEntries.length}
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={safePage === 1}
+                  aria-label="Previous page"
+                  className="p-1.5 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                {getPageNumbers(safePage, totalPages).map((p, i) =>
+                  p === "..." ? (
+                    <span key={`ellipsis-${i}`} className="text-[0.72rem] text-on-surface-variant px-1">...</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setPage(p as number)}
+                      className={`w-7 h-7 flex items-center justify-center rounded-[0.375rem] text-[0.72rem] font-medium tabular-nums transition-colors cursor-pointer ${
+                        safePage === p ? "bg-brand text-white" : "text-on-surface-variant hover:bg-surface-hover"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={safePage === totalPages}
+                  aria-label="Next page"
+                  className="p-1.5 rounded-[0.375rem] text-on-surface-variant hover:bg-surface-hover disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1235,9 +1453,9 @@ export function PayrollTab() {
             </p>
             <input
               type="text"
-              value={icInput ? icInput.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+              value={formatIcInput(icInput)}
               onChange={(e) => setIcInput(e.target.value.replace(/\D/g, "").slice(0, 12))}
-              placeholder="12-digit IC number"
+              placeholder="YYMMDD-PB-####"
               maxLength={14}
               autoFocus
               className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 tabular-nums mb-4"

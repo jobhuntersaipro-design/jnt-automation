@@ -3,6 +3,7 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { formatIcInput } from "@/lib/utils/ic";
 
 interface UnknownDispatcher {
   extId: string;
@@ -225,11 +226,11 @@ export function NewDispatcherModal({
                       </label>
                       <input
                         type="text"
-                        maxLength={12}
-                        value={form.icNo}
-                        onChange={(e) => updateForm(d.extId, "icNo", e.target.value.replace(/\D/g, ""))}
-                        placeholder="123456789012"
-                        className="w-full px-3 py-2 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface placeholder:text-on-surface-variant/40"
+                        maxLength={14}
+                        value={formatIcInput(form.icNo)}
+                        onChange={(e) => updateForm(d.extId, "icNo", e.target.value.replace(/\D/g, "").slice(0, 12))}
+                        placeholder="YYMMDD-PB-####"
+                        className="w-full px-3 py-2 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface placeholder:text-on-surface-variant/40 tabular-nums"
                       />
                       {form.icNo.length > 0 && form.icNo.length !== 12 && (
                         <p className="text-[0.75rem] text-critical mt-1">

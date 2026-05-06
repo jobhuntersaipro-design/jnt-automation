@@ -1,16 +1,32 @@
-# Current Feature
+# Current Feature: Store Keeper Subtype (Temporary / Permanent)
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add a `StoreKeeperSubtype` enum (`TEMPORARY` / `PERMANENT`) and a nullable `Employee.storeKeeperSubtype` column — purely additive, no rewrite of existing rows
+- Surface the subtype as a chip beside the "Store Keeper" type chip in the employee list row + drawer header
+- Add a Subtype dropdown to the Add/Edit Employee drawer that renders only when `type === STORE_KEEPER`
+- Require the subtype on form submit when type is Store Keeper (DB column stays nullable for API tolerance)
+- Filter facet on the employee list (Temporary / Permanent / Any) — auto-narrows type filter to STORE_KEEPER when a subtype is picked
+- API CRUD: POST + PATCH accept + validate the field; PATCH auto-clears subtype to `null` whenever effective type leaves STORE_KEEPER
+- Subtype only applies to Store Keeper — Supervisor / Admin / Driver / Dispatcher reject non-null subtype with 400
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Spec: `context/features/store-keeper-subtype-spec.md`
+- Style: TDD (red → green → refactor) — add failing tests first per `/tdd-orchestrator`
+- Branch (planned): `feature/store-keeper-subtype`
+- **Sub-tag, not new enum** — keeps `EmployeeType.STORE_KEEPER` unchanged so existing per-type gating (hourly wage, payslip Template 2, statutory rules, payroll-tab UI) keeps working without widening every `=== "STORE_KEEPER"` branch
+- **No payslip / pay-formula change** — metadata only; Template 2, `computeEmployeeSalaryForSave`, and statutory math untouched
+- **Auto-clear in PATCH** is the correctness safety net — even if the UI forgets to clear the subtype on a type change, the API forces `null` whenever `effectiveType !== STORE_KEEPER`
+- **Existing prod store-keeper rows** land with `subtype = null` and render a muted "Set subtype" chip — no backfill, agents fill in over time
+- Migration: `prisma migrate dev --name add_store_keeper_subtype` against dev Neon branch (`ep-bold-unit-aml1ct5y`); additive nullable column + new enum type — non-breaking online DDL
+- **Manual prod follow-up after merge**: `prisma migrate deploy` against prod (matches the project's pattern for prod migrations, see Driver feature 2026-04-26)
+- Open items in spec §6 (defaults: filter visibility, payslip POSITION line, auto-select PERMANENT on type pick) — defer until implementation if not flagged sooner
+- Out of scope: splitting `STORE_KEEPER` enum, bulk-classify migration UI, branch-detail count split, subtype on Dispatcher records
 
 ## History
 

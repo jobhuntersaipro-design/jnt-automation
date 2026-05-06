@@ -147,6 +147,12 @@ function drawCompanyHeader(doc: PDFKit.PDFDocument, data: PayslipData, y: number
   return y + 12;
 }
 
+/**
+ * Renders a "LABEL : VALUE" row and returns the height consumed. The value
+ * cell wraps at word boundaries when it exceeds the available width — long
+ * dispatcher names flow to a second line instead of overflowing onto the
+ * row below. Caller advances the y-cursor by the returned height.
+ */
 function drawLabelColonValue(
   doc: PDFKit.PDFDocument,
   x: number,
@@ -155,17 +161,17 @@ function drawLabelColonValue(
   labelW: number,
   label: string,
   value: string,
-): void {
+): number {
   const colonW = 10;
+  const valueW = width - labelW - colonW;
   doc.font("Helvetica").fontSize(9).fillColor(BLACK);
   doc.text(label, x, y, { width: labelW, lineBreak: false });
   doc.text(":", x + labelW, y, { width: colonW, lineBreak: false });
   doc.font("Helvetica-Bold").fontSize(9).fillColor(BLACK);
-  doc.text(value, x + labelW + colonW, y, {
-    width: width - labelW - colonW,
-    lineBreak: false,
-    ellipsis: true,
-  });
+  const safeValue = value || "";
+  const measuredH = safeValue ? doc.heightOfString(safeValue, { width: valueW }) : 12;
+  doc.text(safeValue, x + labelW + colonW, y, { width: valueW });
+  return Math.max(12, measuredH);
 }
 
 function drawParticulars(
@@ -192,12 +198,14 @@ function drawParticulars(
 
   const boxPadX = ROW_PAD_X;
   const boxPadY = 4;
-  const lineH = 12;
   const labelW = 75; // matches original partLabel width
   let y = yTop + boxPadY;
   const halfW = CONTENT_WIDTH / 2;
   for (let i = 0; i < 3; i++) {
-    drawLabelColonValue(
+    // Each half returns the height it consumed; advance the y-cursor by the
+    // larger of the two so a wrapped name on the left doesn't overlap the
+    // row below.
+    const leftH = drawLabelColonValue(
       doc,
       CONTENT_LEFT + boxPadX,
       y,
@@ -206,7 +214,7 @@ function drawParticulars(
       leftParticulars[i][0],
       leftParticulars[i][1],
     );
-    drawLabelColonValue(
+    const rightH = drawLabelColonValue(
       doc,
       MID_X + boxPadX,
       y,
@@ -215,7 +223,7 @@ function drawParticulars(
       rightParticulars[i][0],
       rightParticulars[i][1],
     );
-    y += lineH;
+    y += Math.max(leftH, rightH);
   }
   return y + boxPadY;
 }

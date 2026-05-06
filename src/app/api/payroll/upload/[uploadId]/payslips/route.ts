@@ -3,6 +3,7 @@ import { getEffectiveAgentId } from "@/lib/impersonation";
 import { verifyUploadOwnership } from "@/lib/db/upload";
 import { prisma } from "@/lib/prisma";
 import { generatePayslipPdf } from "@/lib/payroll/pdf-generator";
+import { formatIc } from "@/lib/utils/ic";
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
 import { runPool } from "@/lib/upload/run-pool";
 
@@ -120,7 +121,7 @@ export async function POST(
           companyAddress: agent.companyAddress,
           stampImageUrl: agent.stampImageUrl,
           dispatcherName: record.dispatcher.name,
-          icNo: record.dispatcher.icNo ?? "",
+          icNo: formatIc(record.dispatcher.icNo),
           month: fullUpload.month,
           year: fullUpload.year,
           petrolSubsidy: record.petrolSubsidy,

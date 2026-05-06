@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import type { StaffDispatcher, AgentDefaults } from "@/lib/db/staff";
 import { BranchChip } from "@/components/ui/branch-chip";
 import { DispatcherAvatar } from "./dispatcher-avatar";
+import { formatIcInput } from "@/lib/utils/ic";
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";
 
@@ -497,7 +498,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       <div>
         <input
           type="text"
-          value={icNo ? icNo.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+          value={formatIcInput(icNo)}
           onChange={(e) => handleIcChange(e.target.value.replace(/\D/g, "").slice(0, 12))}
           onClick={(e) => e.stopPropagation()}
           placeholder="—"

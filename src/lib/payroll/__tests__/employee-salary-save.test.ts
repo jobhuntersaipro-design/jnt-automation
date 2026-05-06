@@ -111,8 +111,8 @@ describe("computeEmployeeSalaryForSave — Driver", () => {
   });
 });
 
-describe("computeEmployeeSalaryForSave — Store Keeper", () => {
-  it("forces basicPay to 0 even when client sends it", () => {
+describe("computeEmployeeSalaryForSave — Store Keeper (untagged or Temporary)", () => {
+  it("forces basicPay to 0 even when client sends it (untagged → temp behavior)", () => {
     const result = computeEmployeeSalaryForSave(
       emp({ type: "STORE_KEEPER" }),
       entry({ basicPay: 1234, workingHours: 180, hourlyWage: 6.5 }),
@@ -124,9 +124,9 @@ describe("computeEmployeeSalaryForSave — Store Keeper", () => {
     expect(result.grossSalary).toBe(180 * 6.5);
   });
 
-  it("computes gross as hours × wage + allowances", () => {
+  it("Temporary subtype computes gross as units × rate + allowances", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER" }),
+      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
       entry({
         workingHours: 160,
         hourlyWage: 10,
@@ -137,6 +137,45 @@ describe("computeEmployeeSalaryForSave — Store Keeper", () => {
       null,
     );
     expect(result.grossSalary).toBe(160 * 10 + 100 + 50 + 20);
+  });
+
+  it("Temporary subtype + day mode reuses the same units × rate math (label-only change)", () => {
+    // Day mode is purely a payslip-label distinction — math identical.
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
+      entry({ workingHours: 22, hourlyWage: 100 }),
+      null,
+    );
+    expect(result.grossSalary).toBe(22 * 100);
+  });
+});
+
+describe("computeEmployeeSalaryForSave — Store Keeper (Permanent)", () => {
+  it("forces workingHours and hourlyWage to 0 — basicPay drives gross like Sup/Admin", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "PERMANENT" }),
+      entry({ basicPay: 3500, workingHours: 200, hourlyWage: 9, petrolAllowance: 150 }),
+      null,
+    );
+    expect(result.basicPay).toBe(3500);
+    expect(result.workingHours).toBe(0);
+    expect(result.hourlyWage).toBe(0);
+    // 3500 + 150 — OT contribution from workingHours × hourlyWage excluded
+    expect(result.grossSalary).toBe(3650);
+  });
+
+  it("Permanent subtype combines basicPay with allowances", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "PERMANENT" }),
+      entry({
+        basicPay: 4000,
+        petrolAllowance: 200,
+        kpiAllowance: 300,
+        otherAllowance: 100,
+      }),
+      null,
+    );
+    expect(result.grossSalary).toBe(4000 + 200 + 300 + 100);
   });
 });
 

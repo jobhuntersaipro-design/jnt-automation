@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { X, ChevronDown, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { StaffDispatcher } from "@/lib/db/staff";
+import { formatIcInput } from "@/lib/utils/ic";
 
 interface AddDispatcherDrawerProps {
   branchCodes: string[];
@@ -169,9 +170,9 @@ export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, 
             </label>
             <input
               type="text"
-              value={icNo ? icNo.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+              value={formatIcInput(icNo)}
               onChange={(e) => { setIcNo(e.target.value.replace(/\D/g, "").slice(0, 12)); setErrors((p) => ({ ...p, icNo: "" })); }}
-              placeholder="12-digit IC number"
+              placeholder="YYMMDD-PB-####"
               maxLength={14}
               className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
             />

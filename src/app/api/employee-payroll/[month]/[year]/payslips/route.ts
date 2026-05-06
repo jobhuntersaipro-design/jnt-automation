@@ -9,6 +9,7 @@ import {
 import { generatePayslipZip } from "@/lib/payroll/zip-generator";
 import type { EmployeePayslipInput } from "@/lib/staff/payslip-generator";
 import { runPool } from "@/lib/upload/run-pool";
+import { formatIc } from "@/lib/utils/ic";
 
 // CPU-bound PDF render; matches the dispatcher-payslip and bulk-worker pools.
 const PAYSLIP_CONCURRENCY = 4;
@@ -125,7 +126,7 @@ export async function POST(
       };
     }
 
-    const icFormatted = emp.icNo.replace(/(\d{6})(\d{2})(\d{4})/, "$1-$2-$3");
+    const icFormatted = formatIc(emp.icNo);
 
     const input: EmployeePayslipInput = {
       companyName: agent?.name ?? "Company",
@@ -136,6 +137,8 @@ export async function POST(
       icNo: icFormatted,
       position: emp.type,
       employeeType: emp.type,
+      storeKeeperSubtype: emp.storeKeeperSubtype,
+      payMode: salaryRecord.payMode,
       month,
       year,
       epfNo: emp.epfNo,

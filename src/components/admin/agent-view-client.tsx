@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft, Building2, Users, FileText, Eye } from "lucide-react";
 import type { AgentView } from "@/lib/db/admin";
+import { formatIc } from "@/lib/utils/ic";
 
 const MONTH_ABBR = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -223,7 +224,7 @@ function StaffTab({ dispatchers }: { dispatchers: AgentView["dispatchers"] }) {
                     {d.branchCode}
                   </span>
                 </td>
-                <td className="py-2 px-3 text-on-surface-variant tabular-nums">{d.icNo || "—"}</td>
+                <td className="py-2 px-3 text-on-surface-variant tabular-nums">{d.icNo ? formatIc(d.icNo) : "—"}</td>
                 <td className="py-2 px-3 text-center text-on-surface-variant">
                   {d.gender === "MALE" ? "M" : d.gender === "FEMALE" ? "F" : "—"}
                 </td>

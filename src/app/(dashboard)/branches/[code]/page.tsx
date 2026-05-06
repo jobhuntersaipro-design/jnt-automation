@@ -9,6 +9,11 @@ import { BranchTrendChart } from "@/components/branches/branch-trend-chart";
 import { AddEmployeeButton } from "@/components/branches/add-employee-button";
 import { EmployeeAvatarView } from "@/components/staff/employee-avatar-view";
 import { prisma } from "@/lib/prisma";
+import {
+  STORE_KEEPER_SUBTYPE_LABEL,
+  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
+} from "@/lib/staff/store-keeper-subtype";
+import { formatIc } from "@/lib/utils/ic";
 
 export const dynamic = "force-dynamic";
 
@@ -252,14 +257,21 @@ export default async function BranchDetailPage({
                         {e.name}
                       </Link>
                     </div>
-                    <span className="text-[0.78rem] text-on-surface-variant">
-                      {EMPLOYEE_TYPE_LABEL[e.type]}
+                    <span className="inline-flex items-center gap-1.5 flex-wrap text-[0.78rem] text-on-surface-variant">
+                      <span>{EMPLOYEE_TYPE_LABEL[e.type]}</span>
+                      {e.type === "STORE_KEEPER" && e.storeKeeperSubtype && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[e.storeKeeperSubtype]}`}
+                        >
+                          {STORE_KEEPER_SUBTYPE_LABEL[e.storeKeeperSubtype]}
+                        </span>
+                      )}
                     </span>
                     <span className="text-[0.78rem] text-on-surface-variant tabular-nums truncate">
                       {e.extId ?? "—"}
                     </span>
                     <span className="text-[0.78rem] text-on-surface-variant tabular-nums">
-                      {e.icNo || "—"}
+                      {e.icNo ? formatIc(e.icNo) : "—"}
                     </span>
                     <span className="text-right">
                       <span

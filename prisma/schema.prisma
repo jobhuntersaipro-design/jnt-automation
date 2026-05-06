@@ -240,6 +240,16 @@ enum EmployeeType {
   DRIVER
 }
 
+enum StoreKeeperSubtype {
+  TEMPORARY
+  PERMANENT
+}
+
+enum PayMode {
+  HOUR
+  DAY
+}
+
 model Employee {
   id          String       @id @default(cuid())
   agentId     String
@@ -249,6 +259,7 @@ model Employee {
   gender      Gender       @default(UNKNOWN)
   avatarUrl   String?
   type        EmployeeType
+  storeKeeperSubtype StoreKeeperSubtype?  // null unless type = STORE_KEEPER
   branchId    String?
   isActive    Boolean      @default(true)
 
@@ -289,11 +300,16 @@ model EmployeeSalaryRecord {
 
   // Earnings
   basicPay        Float @default(0)
-  workingHours    Float @default(0) // store keeper only
-  hourlyWage      Float @default(0) // store keeper only
-  kpiAllowance    Float @default(0)
-  petrolAllowance Float @default(0)
-  otherAllowance  Float @default(0)
+  // For Temporary store keeper: workingHours stores units (hours OR days),
+  // hourlyWage stores rate per unit. payMode disambiguates the unit for
+  // payslip rendering ("WAGES (X HOUR)" vs "WAGES (X DAY)"). Null payMode
+  // means HOUR (back-compat for records saved before this column existed).
+  workingHours    Float    @default(0)
+  hourlyWage      Float    @default(0)
+  payMode         PayMode? // null treated as HOUR
+  kpiAllowance    Float    @default(0)
+  petrolAllowance Float    @default(0)
+  otherAllowance  Float    @default(0)
   grossSalary     Float
 
   // Statutory (employee share)

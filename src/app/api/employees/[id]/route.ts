@@ -3,6 +3,12 @@ import { revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { deriveGender } from "@/lib/utils/gender";
 import { getEffectiveAgentId } from "@/lib/impersonation";
+import type { StoreKeeperSubtype } from "@/generated/prisma/client";
+import {
+  validateSubtypeForType,
+  resolveSubtypeUpdate,
+  type EmployeeTypeName,
+} from "@/lib/staff/store-keeper-subtype";
 
 export async function PATCH(
   req: NextRequest,
@@ -28,11 +34,29 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { name, extId, icNo, type, branchCode, basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance, dispatcherId, epfNo, socsoNo, incomeTaxNo, isActive } = body as {
+    const {
+      name,
+      extId,
+      icNo,
+      type,
+      storeKeeperSubtype,
+      branchCode,
+      basicPay,
+      hourlyWage,
+      petrolAllowance,
+      kpiAllowance,
+      otherAllowance,
+      dispatcherId,
+      epfNo,
+      socsoNo,
+      incomeTaxNo,
+      isActive,
+    } = body as {
       name?: string;
       extId?: string | null;
       icNo?: string | null;
       type?: string;
+      storeKeeperSubtype?: StoreKeeperSubtype | null;
       branchCode?: string | null;
       basicPay?: number;
       hourlyWage?: number;
@@ -71,6 +95,17 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid employee type" }, { status: 400 });
     }
 
+    // Validate subtype against the effective type. We use whatever the
+    // PATCH will end up with — explicit type from payload, or the existing
+    // employee.type when type is not being updated.
+    if (storeKeeperSubtype !== undefined) {
+      const effectiveTypeForCheck = (type ?? employee.type) as EmployeeTypeName;
+      const subtypeCheck = validateSubtypeForType(effectiveTypeForCheck, storeKeeperSubtype);
+      if (!subtypeCheck.ok) {
+        return NextResponse.json({ error: subtypeCheck.error }, { status: 400 });
+      }
+    }
+
     // Validate numeric bounds
     const numericFields = { basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance };
     for (const [field, val] of Object.entries(numericFields)) {
@@ -105,6 +140,22 @@ export async function PATCH(
     }
     if (basicPay !== undefined) updateData.basicPay = effectiveType === "STORE_KEEPER" ? null : basicPay;
     if (hourlyWage !== undefined) updateData.hourlyWage = effectiveType === "STORE_KEEPER" ? hourlyWage : null;
+
+    // Auto-clear subtype when leaving STORE_KEEPER. If the caller explicitly
+    // passed a subtype value (even when staying STORE_KEEPER), persist that.
+    // If only `type` is changing TO STORE_KEEPER without an accompanying
+    // subtype, leave the column alone — the drawer's required-field check
+    // covers UX completeness.
+    if (type !== undefined && type !== "STORE_KEEPER") {
+      // Type is leaving STORE_KEEPER → force null regardless of payload.
+      updateData.storeKeeperSubtype = null;
+    } else if (storeKeeperSubtype !== undefined) {
+      const next = resolveSubtypeUpdate({
+        effectiveType: effectiveType as EmployeeTypeName,
+        payloadSubtype: storeKeeperSubtype,
+      });
+      if (next !== undefined) updateData.storeKeeperSubtype = next;
+    }
     if (petrolAllowance !== undefined) updateData.petrolAllowance = petrolAllowance;
     if (kpiAllowance !== undefined) updateData.kpiAllowance = kpiAllowance;
     if (otherAllowance !== undefined) updateData.otherAllowance = otherAllowance;

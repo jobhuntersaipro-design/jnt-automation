@@ -50,6 +50,24 @@ describe("generateEmployeePayslipPdf", () => {
     expect(buf.length).toBeGreaterThan(1024);
   });
 
+  it("renders without crashing when the employee name is too long to fit one line", async () => {
+    // Regression: previously the wrapped second line of the name overlapped
+    // with I/C NO. The particulars grid now grows the row height to fit the
+    // wrapped value, so subsequent rows shift down cleanly.
+    const buf = await generateEmployeePayslipPdf(
+      baseInput({
+        employeeName: "Muhammad Rasydan Qusyairi Bin Mohd Hosni Abdullah",
+        employeeType: "STORE_KEEPER",
+        position: "Store Keeper",
+        basicPay: 0,
+        workingHours: 193,
+        hourlyWage: 8.72,
+      }),
+    );
+    expect(buf.subarray(0, 4).toString("ascii")).toBe("%PDF");
+    expect(buf.length).toBeGreaterThan(1024);
+  });
+
   it("driver template returns a valid PDF buffer (reuses Sup/Admin layout)", async () => {
     // Driver pay model = monthly basic pay, same as Supervisor / Admin.
     // Render must succeed and produce a PDF; the layout is Template 1.
@@ -76,6 +94,62 @@ describe("generateEmployeePayslipPdf", () => {
     );
     expect(buf.subarray(0, 4).toString("ascii")).toBe("%PDF");
     expect(buf.length).toBeGreaterThan(1024);
+  });
+
+  it("temporary store keeper renders WAGES (X HOUR) by default", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "STORE_KEEPER",
+        storeKeeperSubtype: "TEMPORARY",
+        basicPay: 0,
+        workingHours: 180,
+        hourlyWage: 6.5,
+      }),
+    );
+    expect(rows[0].label).toBe("WAGES (180 HOUR)");
+    expect(rows[0].amount).toBe(180 * 6.5);
+  });
+
+  it("temporary store keeper with payMode=DAY renders WAGES (X DAY)", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "STORE_KEEPER",
+        storeKeeperSubtype: "TEMPORARY",
+        payMode: "DAY",
+        basicPay: 0,
+        workingHours: 22,
+        hourlyWage: 100,
+      }),
+    );
+    expect(rows[0].label).toBe("WAGES (22 DAY)");
+    expect(rows[0].amount).toBe(22 * 100);
+  });
+
+  it("permanent store keeper renders BASIC PAY like Sup/Admin", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "STORE_KEEPER",
+        storeKeeperSubtype: "PERMANENT",
+        basicPay: 4000,
+        workingHours: 0,
+        hourlyWage: 0,
+      }),
+    );
+    expect(rows.find((r) => r.label === "BASIC PAY")?.amount).toBe(4000);
+    expect(rows.find((r) => r.label.startsWith("WAGES"))).toBeUndefined();
+  });
+
+  it("untagged store keeper (subtype=null) preserves WAGES (X HOUR) for back-compat", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "STORE_KEEPER",
+        storeKeeperSubtype: null,
+        basicPay: 0,
+        workingHours: 160,
+        hourlyWage: 8,
+      }),
+    );
+    expect(rows[0].label).toBe("WAGES (160 HOUR)");
   });
 
   it("combined dispatcher + employee template renders tier breakdown rows", async () => {

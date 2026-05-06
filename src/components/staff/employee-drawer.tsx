@@ -7,6 +7,13 @@ import { toast } from "sonner";
 import { DispatcherAvatar } from "./dispatcher-avatar";
 import { EmployeeHistoryTab } from "./employee-history-tab";
 import type { StaffEmployee } from "@/lib/db/employees";
+import {
+  STORE_KEEPER_SUBTYPE_LABEL,
+  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
+  STORE_KEEPER_SUBTYPE_VALUES,
+  type StoreKeeperSubtype,
+} from "@/lib/staff/store-keeper-subtype";
+import { formatIcInput } from "@/lib/utils/ic";
 
 type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
 
@@ -81,11 +88,27 @@ export function EmployeeDrawer({
   const [socsoNo, setSocsoNo] = useState(employee?.socsoNo ?? "");
   const [incomeTaxNo, setIncomeTaxNo] = useState(employee?.incomeTaxNo ?? "");
   const [type, setType] = useState<EmployeeType>(employee?.type ?? "SUPERVISOR");
+  const [storeKeeperSubtype, setStoreKeeperSubtype] = useState<StoreKeeperSubtype | null>(
+    employee?.storeKeeperSubtype ?? null,
+  );
   const [branchCode, setBranchCode] = useState(employee?.branchCode ?? initialBranchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
 
   const [typeOpen, setTypeOpen] = useState(false);
+  const [subtypeOpen, setSubtypeOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
+
+  // Whenever the position dropdown moves away from STORE_KEEPER, clear the
+  // subtype so a stale value can't sneak through on submit. Defense-in-depth
+  // — the API also clears it server-side.
+  function handleTypeChange(next: EmployeeType) {
+    setType(next);
+    if (next !== "STORE_KEEPER") {
+      setStoreKeeperSubtype(null);
+      setErrors((p) => ({ ...p, storeKeeperSubtype: "" }));
+    }
+    setTypeOpen(false);
+  }
 
   // Add branch inline
   const [showAddBranch, setShowAddBranch] = useState(false);
@@ -146,6 +169,9 @@ export function EmployeeDrawer({
     if (!name.trim()) errs.name = "Name is required";
     if (!branchCode) errs.branchCode = "Branch is required";
     if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
+    if (type === "STORE_KEEPER" && !storeKeeperSubtype) {
+      errs.storeKeeperSubtype = "Pick a subtype";
+    }
     return errs;
   }
 
@@ -161,6 +187,7 @@ export function EmployeeDrawer({
         name: name.trim(),
         icNo: icNo.trim() || null,
         type,
+        storeKeeperSubtype: type === "STORE_KEEPER" ? storeKeeperSubtype : null,
         branchCode: branchCode || null,
         epfNo: epfNo.trim() || null,
         socsoNo: socsoNo.trim() || null,
@@ -194,6 +221,7 @@ export function EmployeeDrawer({
           rawIcNo: icNo.trim(),
           icNo: icNo.trim(),
           type,
+          storeKeeperSubtype: type === "STORE_KEEPER" ? storeKeeperSubtype : null,
           branchCode: branchCode || null,
           isComplete: !!icNo.trim(),
           gender: employee.gender,
@@ -280,6 +308,13 @@ export function EmployeeDrawer({
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg bg-brand/10 text-brand">
                 {TYPE_LABEL[type]}
               </span>
+              {type === "STORE_KEEPER" && storeKeeperSubtype && (
+                <span
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[storeKeeperSubtype]}`}
+                >
+                  {STORE_KEEPER_SUBTYPE_LABEL[storeKeeperSubtype]}
+                </span>
+              )}
               {branchCode && (
                 <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg bg-surface-low text-on-surface-variant tabular-nums">
                   {branchCode}
@@ -356,7 +391,7 @@ export function EmployeeDrawer({
                         <button
                           key={opt.value}
                           type="button"
-                          onClick={() => { setType(opt.value); setTypeOpen(false); }}
+                          onClick={() => handleTypeChange(opt.value)}
                           className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${type === opt.value ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
                         >
                           {opt.label}
@@ -367,6 +402,42 @@ export function EmployeeDrawer({
                   )}
                 </div>
               </Field>
+
+              {type === "STORE_KEEPER" && (
+                <Field label="Subtype" error={errors.storeKeeperSubtype}>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSubtypeOpen((o) => !o)}
+                      className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface transition-colors cursor-pointer ${errors.storeKeeperSubtype ? "border-critical/50" : "border-outline-variant/30"}`}
+                    >
+                      <span className={storeKeeperSubtype ? "text-on-surface" : "text-on-surface-variant/50"}>
+                        {storeKeeperSubtype ? STORE_KEEPER_SUBTYPE_LABEL[storeKeeperSubtype] : "Select subtype"}
+                      </span>
+                      <ChevronDown size={14} className={`text-on-surface-variant transition-transform ${subtypeOpen ? "rotate-180" : ""}`} />
+                    </button>
+                    {subtypeOpen && (
+                      <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-full py-1">
+                        {STORE_KEEPER_SUBTYPE_VALUES.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() => {
+                              setStoreKeeperSubtype(s);
+                              setSubtypeOpen(false);
+                              setErrors((p) => ({ ...p, storeKeeperSubtype: "" }));
+                            }}
+                            className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${storeKeeperSubtype === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                          >
+                            {STORE_KEEPER_SUBTYPE_LABEL[s]}
+                            {storeKeeperSubtype === s && <Check size={13} className="text-brand" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Field>
+              )}
 
               <Field label="Branch" error={errors.branchCode}>
                 <div className="relative">
@@ -439,9 +510,9 @@ export function EmployeeDrawer({
               <Field label="IC Number" optional error={errors.icNo}>
                 <input
                   type="text"
-                  value={icNo ? icNo.replace(/(\d{4})(?=\d)/g, "$1-") : ""}
+                  value={formatIcInput(icNo)}
                   onChange={(e) => { setIcNo(e.target.value.replace(/\D/g, "").slice(0, 12)); setErrors((p) => ({ ...p, icNo: "" })); }}
-                  placeholder="12-digit IC number"
+                  placeholder="YYMMDD-PB-####"
                   maxLength={14}
                   className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
                 />
