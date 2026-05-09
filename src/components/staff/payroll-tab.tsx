@@ -71,6 +71,13 @@ interface PayrollEntry {
   penalty: number
   advance: number
   netSalary: number
+  /**
+   * KWSP Jadual Ketiga p.12 bonus rule applied for this row — gross > 5k
+   * but base wage (gross − KPI) ≤ 5k, so employer EPF stays at 13% instead
+   * of dropping to 12%. Surfaced as a small badge on the EPF column. Defaults
+   * to false on rows from older API responses that don't ship the flag.
+   */
+  epfBonusRuleApplied?: boolean
   isSaved: boolean
 }
 
@@ -109,14 +116,18 @@ function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
 
   // Only auto-recalculate statutory when gross-affecting fields change
   if (GROSS_FIELDS.has(changedField)) {
-    const statutory = calculateStatutory(totalGross)
+    const statutory = calculateStatutory(totalGross, entry.kpiAllowance)
     const netSalary = calculateNetSalary(totalGross, statutory, entry.pcb, entry.penalty, entry.advance)
     return { ...entry, grossSalary: totalGross, ...statutory, netSalary }
   }
 
-  // For manual statutory/deduction edits, just recalculate net
+  // For manual statutory/deduction edits, just recalculate net.
+  // Recompute the bonus-rule flag too so the badge stays accurate when only
+  // statutory/deduction values were edited (the rule only depends on gross + KPI).
+  const baseWageWithoutBonus = Math.max(0, totalGross - entry.kpiAllowance)
+  const epfBonusRuleApplied = totalGross > 5000 && baseWageWithoutBonus <= 5000
   const net = totalGross - entry.epfEmployee - entry.socsoEmployee - entry.eisEmployee - entry.pcb - entry.penalty - entry.advance
-  return { ...entry, grossSalary: totalGross, netSalary: net }
+  return { ...entry, grossSalary: totalGross, epfBonusRuleApplied, netSalary: net }
 }
 
 function formatRM(val: number): string {
@@ -1066,7 +1077,7 @@ export function PayrollTab() {
                       </div>
                       {isUnitsRate ? (
                         <div
-                          className="inline-flex items-stretch rounded-[0.25rem] overflow-hidden ring-1 ring-outline-variant/30 mx-auto mt-1"
+                          className="inline-flex items-stretch rounded-lg overflow-hidden ring-1 ring-outline-variant/30 mx-auto mt-1"
                           role="radiogroup"
                           aria-label="Pay mode for store keeper"
                           style={{ display: "flex", justifyContent: "center", width: "fit-content", marginLeft: "auto", marginRight: "auto" }}
@@ -1221,6 +1232,23 @@ export function PayrollTab() {
                           disabled={inactive}
                         />
                       </div>
+                      {entry.epfBonusRuleApplied && (
+                        <div
+                          className="mt-1 text-[0.55rem] leading-snug text-amber-800 bg-amber-50 ring-1 ring-inset ring-amber-200 rounded px-1.5 py-1"
+                          title={
+                            "Per the KWSP Third Schedule (1 Oct 2025): when an employee normally earning ≤ RM5,000 receives a bonus that pushes the month's wages above RM5,000, the employer's EPF contribution stays at 13% (not 12%).\n\n" +
+                            "We treat KPI Allowance as the bonus proxy. Base wage (gross − KPI) is ≤ RM5,000 here, so the rule applies and the employer rate is held at 13%.\n\n" +
+                            "All EPF fields are still editable — override the auto values if your KPI is a regular monthly allowance rather than a true bonus."
+                          }
+                        >
+                          <p className="font-semibold uppercase tracking-[0.04em]">
+                            KWSP bonus rule
+                          </p>
+                          <p className="font-normal mt-0.5">
+                            Base wage (gross − KPI) is ≤ RM5,000 but KPI pushes the month above, so the employer rate stays at 13% instead of 12%.
+                          </p>
+                        </div>
+                      )}
                     </td>
 
                     {/* SOCSO */}

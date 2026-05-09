@@ -122,7 +122,9 @@ export async function GET(
         }
       }
 
-      const statutory = calculateStatutory(dispatcherGross)
+      // Initial unsaved entry — no employee wage/KPI yet, so the p.12 bonus
+      // rule has nothing to consider. Pass 0 explicitly.
+      const statutory = calculateStatutory(dispatcherGross, 0)
       const netSalary = calculateNetSalary(dispatcherGross, statutory, 0, dispatcherPenalty, dispatcherAdvance)
 
       return {

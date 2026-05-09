@@ -126,7 +126,9 @@ export function computeEmployeeSalaryForSave(
     : 0;
 
   const totalGross = employeeGross + dispatcherGross;
-  const computed = calculateStatutory(totalGross);
+  // Pass kpiAllowance so the schedule p.12 bonus rule can fire when an
+  // employee's base wage (excluding KPI) is ≤ RM5k but KPI pushes it over.
+  const computed = calculateStatutory(totalGross, entry.kpiAllowance);
 
   // Honor client overrides verbatim (including 0). Without this, a user who
   // manually clears EPF can't save zero — server would silently overwrite.
@@ -152,6 +154,7 @@ export function computeEmployeeSalaryForSave(
       epfEmployer,
       socsoEmployer,
       eisEmployer,
+      epfBonusRuleApplied: computed.epfBonusRuleApplied,
     },
     entry.pcb,
     penalty,
