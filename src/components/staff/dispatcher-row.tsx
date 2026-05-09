@@ -153,12 +153,35 @@ function TierPopover({
         Math.max(preferredLeft, 8),
         window.innerWidth - width - 8,
       );
-      setPos({ top: rect.bottom + 6, left: clampedLeft });
+
+      // Flip above the anchor when the panel would overflow the viewport
+      // bottom. Falls back to clamping inside the viewport if neither side
+      // fits — better an off-anchor panel than one cut off the screen.
+      const VIEWPORT_PAD = 8;
+      const GAP = 6;
+      const panelHeight = panelRef.current?.offsetHeight ?? 0;
+      const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_PAD;
+      const spaceAbove = rect.top - VIEWPORT_PAD;
+
+      let top: number;
+      if (panelHeight === 0 || panelHeight + GAP <= spaceBelow) {
+        top = rect.bottom + GAP;
+      } else if (panelHeight + GAP <= spaceAbove) {
+        top = rect.top - panelHeight - GAP;
+      } else {
+        top = Math.max(VIEWPORT_PAD, window.innerHeight - panelHeight - VIEWPORT_PAD);
+      }
+
+      setPos({ top, left: clampedLeft });
     }
     measure();
+    // Re-measure after the panel mounts so we know its real height and can
+    // flip if the initial below-position would overflow.
+    const raf = requestAnimationFrame(measure);
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
     return () => {
+      cancelAnimationFrame(raf);
       window.removeEventListener("scroll", measure, true);
       window.removeEventListener("resize", measure);
     };
