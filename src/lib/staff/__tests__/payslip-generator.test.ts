@@ -26,6 +26,7 @@ function baseInput(overrides: Partial<EmployeePayslipInput> = {}): EmployeePaysl
     hourlyWage: 0,
     petrolAllowance: 150,
     kpiAllowance: 200,
+    otAllowance: 0,
     otherAllowance: 0,
     epfEmployee: 297,
     socsoEmployee: 17.65,
@@ -244,6 +245,7 @@ describe("generateEmployeePayslipPdf", () => {
       baseInput({
         petrolAllowance: 0,
         kpiAllowance: 0,
+        otAllowance: 0,
         otherAllowance: 0,
         epfEmployee: 0,
         socsoEmployee: 0,
@@ -254,5 +256,47 @@ describe("generateEmployeePayslipPdf", () => {
       }),
     );
     expect(buf.subarray(0, 4).toString("ascii")).toBe("%PDF");
+  });
+
+  it("renders an OT row when otAllowance > 0 (Sup/Admin template)", () => {
+    const rows = buildAdditionRows(baseInput({ otAllowance: 250 }));
+    const ot = rows.find((r) => r.label === "OT");
+    expect(ot?.amount).toBe(250);
+  });
+
+  it("omits the OT row when otAllowance is 0", () => {
+    const rows = buildAdditionRows(baseInput({ otAllowance: 0 }));
+    expect(rows.find((r) => r.label === "OT")).toBeUndefined();
+  });
+
+  it("renders OT row for Temporary Store Keeper template too", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "STORE_KEEPER",
+        storeKeeperSubtype: "TEMPORARY",
+        basicPay: 0,
+        workingHours: 180,
+        hourlyWage: 6.5,
+        otAllowance: 75,
+      }),
+    );
+    const ot = rows.find((r) => r.label === "OT");
+    expect(ot?.amount).toBe(75);
+  });
+
+  it("OT row sits between KPI and ALLOWANCE in the addition order", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        kpiAllowance: 100,
+        otAllowance: 50,
+        otherAllowance: 25,
+      }),
+    );
+    const kpiIdx = rows.findIndex((r) => r.label === "KPI");
+    const otIdx = rows.findIndex((r) => r.label === "OT");
+    const otherIdx = rows.findIndex((r) => r.label === "ALLOWANCE");
+    expect(kpiIdx).toBeGreaterThanOrEqual(0);
+    expect(otIdx).toBeGreaterThan(kpiIdx);
+    expect(otherIdx).toBeGreaterThan(otIdx);
   });
 });

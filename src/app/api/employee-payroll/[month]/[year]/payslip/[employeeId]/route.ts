@@ -144,6 +144,7 @@ export async function POST(
     hourlyWage: salaryRecord.hourlyWage,
     petrolAllowance: salaryRecord.petrolAllowance,
     kpiAllowance: salaryRecord.kpiAllowance,
+    otAllowance: salaryRecord.otAllowance,
     otherAllowance: salaryRecord.otherAllowance,
     dispatcherTierBreakdowns: dispatcherData?.tierBreakdowns,
     dispatcherBonusTierBreakdowns: dispatcherData?.bonusTierBreakdowns,

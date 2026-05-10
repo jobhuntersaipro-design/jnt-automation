@@ -93,7 +93,7 @@ export function EmployeeHistoryTab({ employeeId }: EmployeeHistoryTabProps) {
       0,
     );
     const allowances = records.reduce(
-      (a, r) => a + r.kpiAllowance + r.petrolAllowance + r.otherAllowance,
+      (a, r) => a + r.kpiAllowance + r.petrolAllowance + r.otAllowance + r.otherAllowance,
       0,
     );
     const statutory = records.reduce(
@@ -456,7 +456,7 @@ function KpiCard({
 
 function HistoryRow({ record }: { record: EmployeeHistoryRecord }) {
   const basic = record.basicPay || record.workingHours * record.hourlyWage;
-  const allowances = record.kpiAllowance + record.petrolAllowance + record.otherAllowance;
+  const allowances = record.kpiAllowance + record.petrolAllowance + record.otAllowance + record.otherAllowance;
   const statutory = record.epfEmployee + record.socsoEmployee + record.eisEmployee + record.pcb;
   const deductions = record.penalty + record.advance;
 

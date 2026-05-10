@@ -19,6 +19,9 @@ export interface EmployeeSavePayload {
   payMode?: PayMode | null;
   kpiAllowance: number;
   petrolAllowance: number;
+  /** Per-month OT (overtime) amount. Treated as a regular allowance for
+   *  gross + statutory math (NOT as a bonus proxy — only KPI is). */
+  otAllowance: number;
   otherAllowance: number;
   pcb: number;
   penalty: number;
@@ -58,6 +61,7 @@ export interface EmployeeSalarySaveResult {
   payMode: PayMode | null;
   kpiAllowance: number;
   petrolAllowance: number;
+  otAllowance: number;
   otherAllowance: number;
   grossSalary: number;
   epfEmployee: number;
@@ -110,12 +114,14 @@ export function computeEmployeeSalaryForSave(
         hourlyWage,
         entry.petrolAllowance,
         entry.kpiAllowance,
+        entry.otAllowance,
         entry.otherAllowance,
       )
     : calculateSupervisorGross(
         basicPay,
         entry.petrolAllowance,
         entry.kpiAllowance,
+        entry.otAllowance,
         entry.otherAllowance,
       );
 
@@ -168,6 +174,7 @@ export function computeEmployeeSalaryForSave(
     payMode,
     kpiAllowance: entry.kpiAllowance,
     petrolAllowance: entry.petrolAllowance,
+    otAllowance: entry.otAllowance,
     otherAllowance: entry.otherAllowance,
     grossSalary: totalGross,
     epfEmployee,

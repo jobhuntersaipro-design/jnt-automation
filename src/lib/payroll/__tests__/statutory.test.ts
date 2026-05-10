@@ -6,37 +6,47 @@ import {
 } from "../statutory";
 
 describe("calculateSupervisorGross", () => {
-  it("sums basicPay + all three allowances (4-arg legacy call)", () => {
-    expect(calculateSupervisorGross(3000, 100, 200, 50)).toBe(3350);
+  it("sums basicPay + petrol + kpi + ot + other allowances", () => {
+    // basicPay 3000, petrol 100, kpi 200, ot 80, other 50 → 3430
+    expect(calculateSupervisorGross(3000, 100, 200, 80, 50)).toBe(3430);
   });
 
   it("treats omitted hourly params as zero (backward compatible)", () => {
-    // Old callers that pass only 4 args must keep working.
-    expect(calculateSupervisorGross(3000, 0, 0, 0)).toBe(3000);
+    expect(calculateSupervisorGross(3000, 0, 0, 0, 0)).toBe(3000);
   });
 
   it("adds workingHours × hourlyWage when both are provided", () => {
     // Supervisor on a monthly base who also logged 20 OT hours at RM15/hr.
-    expect(calculateSupervisorGross(3000, 100, 0, 0, 20, 15)).toBe(3400);
+    expect(calculateSupervisorGross(3000, 100, 0, 0, 0, 20, 15)).toBe(3400);
   });
 
   it("adds zero from hourly when hourlyWage is zero even with non-zero hours", () => {
-    // Info-only hours entry on a Supervisor with no hourly rate set.
-    expect(calculateSupervisorGross(3000, 0, 0, 0, 40, 0)).toBe(3000);
+    expect(calculateSupervisorGross(3000, 0, 0, 0, 0, 40, 0)).toBe(3000);
   });
 
   it("adds zero from hourly when workingHours is zero", () => {
-    expect(calculateSupervisorGross(3000, 0, 0, 0, 0, 25)).toBe(3000);
+    expect(calculateSupervisorGross(3000, 0, 0, 0, 0, 0, 25)).toBe(3000);
+  });
+
+  it("OT allowance contributes to gross like petrol/other", () => {
+    // basicPay 3000 + ot 250 → 3250 (other allowances all zero)
+    expect(calculateSupervisorGross(3000, 0, 0, 250, 0)).toBe(3250);
   });
 });
 
 describe("calculateStoreKeeperGross", () => {
   it("multiplies hours × rate and adds allowances", () => {
-    expect(calculateStoreKeeperGross(160, 10, 100, 50, 20)).toBe(1770);
+    // 160 × 10 + petrol 100 + kpi 50 + ot 30 + other 20 → 1800
+    expect(calculateStoreKeeperGross(160, 10, 100, 50, 30, 20)).toBe(1800);
   });
 
   it("returns the allowances sum when hours = 0", () => {
-    expect(calculateStoreKeeperGross(0, 10, 100, 50, 20)).toBe(170);
+    // 0 × 10 + 100 + 50 + 30 + 20 → 200
+    expect(calculateStoreKeeperGross(0, 10, 100, 50, 30, 20)).toBe(200);
+  });
+
+  it("OT allowance contributes to gross like petrol/other", () => {
+    expect(calculateStoreKeeperGross(160, 10, 0, 0, 250, 0)).toBe(1850);
   });
 });
 

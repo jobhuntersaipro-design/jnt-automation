@@ -45,6 +45,7 @@ export async function PATCH(
       hourlyWage,
       petrolAllowance,
       kpiAllowance,
+      otAllowance,
       otherAllowance,
       dispatcherId,
       epfNo,
@@ -62,6 +63,7 @@ export async function PATCH(
       hourlyWage?: number;
       petrolAllowance?: number;
       kpiAllowance?: number;
+      otAllowance?: number;
       otherAllowance?: number;
       dispatcherId?: string | null;
       epfNo?: string | null;
@@ -107,7 +109,7 @@ export async function PATCH(
     }
 
     // Validate numeric bounds
-    const numericFields = { basicPay, hourlyWage, petrolAllowance, kpiAllowance, otherAllowance };
+    const numericFields = { basicPay, hourlyWage, petrolAllowance, kpiAllowance, otAllowance, otherAllowance };
     for (const [field, val] of Object.entries(numericFields)) {
       if (val !== undefined && (typeof val !== "number" || val < 0 || val > 999999)) {
         return NextResponse.json({ error: `${field} must be between 0 and 999,999` }, { status: 400 });
@@ -158,6 +160,7 @@ export async function PATCH(
     }
     if (petrolAllowance !== undefined) updateData.petrolAllowance = petrolAllowance;
     if (kpiAllowance !== undefined) updateData.kpiAllowance = kpiAllowance;
+    if (otAllowance !== undefined) updateData.otAllowance = otAllowance;
     if (otherAllowance !== undefined) updateData.otherAllowance = otherAllowance;
     if (dispatcherId !== undefined) updateData.dispatcherId = dispatcherId;
     if (epfNo !== undefined) updateData.epfNo = epfNo?.trim() || null;

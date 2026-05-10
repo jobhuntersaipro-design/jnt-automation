@@ -17,6 +17,7 @@ export type StaffEmployee = {
   hourlyWage: number | null;
   petrolAllowance: number;
   kpiAllowance: number;
+  otAllowance: number;
   otherAllowance: number;
   epfNo: string | null;
   socsoNo: string | null;
@@ -82,6 +83,7 @@ export async function getEmployees(
     hourlyWage: e.hourlyWage,
     petrolAllowance: e.petrolAllowance,
     kpiAllowance: e.kpiAllowance,
+    otAllowance: e.otAllowance,
     otherAllowance: e.otherAllowance,
     epfNo: e.epfNo,
     socsoNo: e.socsoNo,

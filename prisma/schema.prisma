@@ -267,6 +267,7 @@ model Employee {
   basicPay        Float?
   petrolAllowance Float    @default(0)
   kpiAllowance    Float    @default(0)
+  otAllowance     Float    @default(0)
   otherAllowance  Float    @default(0)
 
   // Statutory reference numbers (for payslips)
@@ -309,6 +310,7 @@ model EmployeeSalaryRecord {
   payMode         PayMode? // null treated as HOUR
   kpiAllowance    Float    @default(0)
   petrolAllowance Float    @default(0)
+  otAllowance     Float    @default(0)
   otherAllowance  Float    @default(0)
   grossSalary     Float
 

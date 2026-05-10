@@ -80,6 +80,8 @@ export interface EmployeePayslipInput {
   hourlyWage: number;
   petrolAllowance: number;
   kpiAllowance: number;
+  /** Per-month overtime amount. Renders as an "OT" addition row. */
+  otAllowance: number;
   otherAllowance: number;
 
   dispatcherTierBreakdowns?: TierBreakdown[];
@@ -175,6 +177,7 @@ export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   }
   if (data.petrolAllowance > 0) rows.push({ label: "PETROL ALLOWANCE", amount: data.petrolAllowance });
   if (data.kpiAllowance > 0) rows.push({ label: "KPI", amount: data.kpiAllowance });
+  if (data.otAllowance > 0) rows.push({ label: "OT", amount: data.otAllowance });
   if (data.otherAllowance > 0) rows.push({ label: "ALLOWANCE", amount: data.otherAllowance });
 
   return rows;

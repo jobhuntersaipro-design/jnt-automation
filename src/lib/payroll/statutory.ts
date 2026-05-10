@@ -131,11 +131,16 @@ export function calculateNetSalary(
  * product is added on top of the monthly basic pay. This lets supervisors
  * and admins log extra hourly work (e.g. weekend OT) alongside their fixed
  * salary. Leaving them unset preserves the original basic-pay-only formula.
+ *
+ * `otAllowance` is a regular allowance (treated like petrol/other for
+ * gross + statutory math) — NOT a bonus proxy, so the KWSP p.12 bonus rule
+ * still keys off `kpiAllowance` only.
  */
 export function calculateSupervisorGross(
   basicPay: number,
   petrolAllowance: number,
   kpiAllowance: number,
+  otAllowance: number,
   otherAllowance: number,
   workingHours: number = 0,
   hourlyWage: number = 0,
@@ -145,6 +150,7 @@ export function calculateSupervisorGross(
     workingHours * hourlyWage +
     petrolAllowance +
     kpiAllowance +
+    otAllowance +
     otherAllowance
   )
 }
@@ -157,7 +163,14 @@ export function calculateStoreKeeperGross(
   hourlyWage: number,
   petrolAllowance: number,
   kpiAllowance: number,
+  otAllowance: number,
   otherAllowance: number
 ): number {
-  return workingHours * hourlyWage + petrolAllowance + kpiAllowance + otherAllowance
+  return (
+    workingHours * hourlyWage +
+    petrolAllowance +
+    kpiAllowance +
+    otAllowance +
+    otherAllowance
+  )
 }

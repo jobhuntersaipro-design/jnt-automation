@@ -59,6 +59,9 @@ interface PayrollEntry {
   hourlyWage: number
   kpiAllowance: number
   petrolAllowance: number
+  /** Per-month overtime amount. Mirrors KPI/petrol — a regular allowance
+   *  added to gross. Not treated as a bonus proxy for KWSP p.12. */
+  otAllowance: number
   otherAllowance: number
   grossSalary: number
   epfEmployee: number
@@ -81,7 +84,7 @@ interface PayrollEntry {
   isSaved: boolean
 }
 
-const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolAllowance", "kpiAllowance", "otherAllowance"])
+const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolAllowance", "kpiAllowance", "otAllowance", "otherAllowance"])
 
 /**
  * True when this row uses the units-rate (hour/day) pay model rather than
@@ -103,12 +106,14 @@ function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
         entry.hourlyWage,
         entry.petrolAllowance,
         entry.kpiAllowance,
+        entry.otAllowance,
         entry.otherAllowance,
       )
     : calculateSupervisorGross(
         entry.basicPay,
         entry.petrolAllowance,
         entry.kpiAllowance,
+        entry.otAllowance,
         entry.otherAllowance,
       )
 
@@ -309,6 +314,10 @@ export function PayrollTab() {
   const [branchOpen, setBranchOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  // Track horizontal scroll on the table wrapper so the frozen Employee
+  // column can render a subtle right-edge shadow only while content is
+  // actually scrolled past it (standard sticky-table affordance).
+  const [scrolledX, setScrolledX] = useState(false)
   const monthRef = useRef<HTMLDivElement>(null)
   const yearRef = useRef<HTMLDivElement>(null)
   const branchRef = useRef<HTMLDivElement>(null)
@@ -334,6 +343,10 @@ export function PayrollTab() {
           isActive: raw.isActive ?? true,
           // payMode default for older saved records that pre-date the column.
           payMode: raw.payMode ?? "HOUR",
+          // Coerce missing otAllowance to 0 so the OT cell always renders the
+          // "0.00" placeholder identically to KPI. Guards against stale API
+          // shapes from a dev server holding an older Prisma client cache.
+          otAllowance: raw.otAllowance ?? 0,
         }
         // Rows that use units-rate (Temp / untagged SK) keep workingHours +
         // hourlyWage. Anything else (Sup/Admin/Driver/Permanent SK) gets
@@ -498,6 +511,7 @@ export function PayrollTab() {
             payMode: isUnitsRate ? e.payMode : null,
             kpiAllowance: e.kpiAllowance,
             petrolAllowance: e.petrolAllowance,
+            otAllowance: e.otAllowance,
             otherAllowance: e.otherAllowance,
             pcb: e.pcb,
             penalty: e.hasDispatcherMatch ? e.penalty - e.dispatcherPenalty : e.penalty,
@@ -909,12 +923,21 @@ export function PayrollTab() {
           <p className="sm:hidden text-[0.7rem] text-on-surface-variant/60 pl-1">
             Swipe left to see more columns →
           </p>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
-          <table className="w-full" style={{ minWidth: 1720 }}>
+          <div
+            className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0"
+            onScroll={(e) => {
+              const next = e.currentTarget.scrollLeft > 0
+              if (next !== scrolledX) setScrolledX(next)
+            }}
+          >
+          <table className="w-full" style={{ minWidth: 1810 }}>
             <thead>
               <tr>
                 {allSaved && (
-                  <th className="pb-3 pl-3" style={{ width: 30 }}>
+                  <th
+                    className="pb-3 pl-3 sticky left-0 z-30 bg-surface-card"
+                    style={{ width: 30 }}
+                  >
                     <input
                       type="checkbox"
                       checked={selectedIds.size === displayedEntries.length && displayedEntries.length > 0}
@@ -923,12 +946,18 @@ export function PayrollTab() {
                     />
                   </th>
                 )}
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3" style={{ minWidth: 180 }}>Employee</th>
+                <th
+                  className={`text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3 sticky z-20 bg-surface-card transition-shadow duration-200 ${
+                    scrolledX ? "shadow-[6px_0_12px_-4px_rgba(25,28,29,0.18)]" : ""
+                  }`}
+                  style={{ minWidth: 180, left: allSaved ? 30 : 0 }}
+                >Employee</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Branch</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Pay</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 80 }}>Hour/Day</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Petrol</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>KPI</th>
+                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>OT</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Other</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Gross</th>
                 <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>PCB</th>
@@ -966,7 +995,7 @@ export function PayrollTab() {
                     {/* Checkbox — only for active rows; inactive rows can't be
                         bulk-selected for payslip generation. */}
                     {allSaved && (
-                      <td className="py-2.5 pl-3">
+                      <td className="py-2.5 pl-3 sticky left-0 z-20 bg-surface-card group-hover:bg-surface-hover transition-colors">
                         {inactive ? (
                           <span className="block w-3.5 h-3.5" aria-hidden />
                         ) : (
@@ -980,8 +1009,16 @@ export function PayrollTab() {
                       </td>
                     )}
 
-                    {/* Employee */}
-                    <td className="py-2.5 pl-3">
+                    {/* Employee — frozen during horizontal scroll so the user
+                        can always see whose row they're editing. The right
+                        shadow only appears once the table has been scrolled
+                        horizontally (signals "content scrolled behind"). */}
+                    <td
+                      className={`py-2.5 pl-3 sticky z-10 bg-surface-card group-hover:bg-surface-hover transition-[box-shadow,background-color] duration-200 ${
+                        scrolledX ? "shadow-[6px_0_12px_-4px_rgba(25,28,29,0.18)]" : ""
+                      }`}
+                      style={{ left: allSaved ? 30 : 0 }}
+                    >
                       <div className="flex items-center gap-2.5">
                         {(() => {
                           const target = selectAvatarTarget({
@@ -1029,7 +1066,10 @@ export function PayrollTab() {
                           )
                         })()}
                         <div className="min-w-0">
-                          <div className="text-[0.8rem] font-medium text-on-surface leading-tight truncate uppercase">
+                          <div
+                            className="text-[0.8rem] font-medium text-on-surface leading-tight uppercase whitespace-normal break-words"
+                            title={entry.name}
+                          >
                             {entry.name}
                           </div>
                           <div className="text-[0.63rem] text-on-surface-variant/50 mt-0.5 flex items-center gap-1 flex-wrap">
@@ -1159,6 +1199,17 @@ export function PayrollTab() {
                         <CalcCurrencyInput
                           value={entry.kpiAllowance}
                           onChange={(v) => updateEntry(entry.employeeId, "kpiAllowance", v)}
+                          disabled={inactive}
+                        />
+                      </div>
+                    </td>
+
+                    {/* OT — overtime allowance, mirrors KPI input behavior */}
+                    <td className="py-2.5 px-1">
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
+                        <CalcCurrencyInput
+                          value={entry.otAllowance}
+                          onChange={(v) => updateEntry(entry.employeeId, "otAllowance", v)}
                           disabled={inactive}
                         />
                       </div>

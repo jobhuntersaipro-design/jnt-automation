@@ -12,6 +12,7 @@ export interface EmployeeHistoryRecord {
   hourlyWage: number;
   kpiAllowance: number;
   petrolAllowance: number;
+  otAllowance: number;
   otherAllowance: number;
   epfEmployee: number;
   socsoEmployee: number;
@@ -61,6 +62,7 @@ export async function GET(
       hourlyWage: r.hourlyWage,
       kpiAllowance: r.kpiAllowance,
       petrolAllowance: r.petrolAllowance,
+      otAllowance: r.otAllowance,
       otherAllowance: r.otherAllowance,
       epfEmployee: r.epfEmployee,
       socsoEmployee: r.socsoEmployee,

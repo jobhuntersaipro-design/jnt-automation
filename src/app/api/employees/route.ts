@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
         hourlyWage: employee.hourlyWage,
         petrolAllowance: employee.petrolAllowance,
         kpiAllowance: employee.kpiAllowance,
+        otAllowance: employee.otAllowance,
         otherAllowance: employee.otherAllowance,
         epfNo: employee.epfNo,
         socsoNo: employee.socsoNo,

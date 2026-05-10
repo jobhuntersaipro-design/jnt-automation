@@ -24,6 +24,7 @@ function entry(overrides: Partial<EmployeeSavePayload> = {}): EmployeeSavePayloa
     hourlyWage: 0,
     kpiAllowance: 0,
     petrolAllowance: 0,
+    otAllowance: 0,
     otherAllowance: 0,
     pcb: 0,
     penalty: 0,
@@ -271,6 +272,64 @@ describe("computeEmployeeSalaryForSave — combined with dispatcher", () => {
     // combined penalty 35, advance 150
     // net = 3880 - 200 - 30 - 10 - 25 - 35 - 150 = 3430
     expect(result.netSalary).toBe(3430);
+  });
+});
+
+describe("computeEmployeeSalaryForSave — OT allowance", () => {
+  it("includes OT in gross for Sup/Admin alongside other allowances", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "SUPERVISOR" }),
+      entry({
+        basicPay: 3000,
+        petrolAllowance: 100,
+        kpiAllowance: 200,
+        otAllowance: 150,
+        otherAllowance: 50,
+      }),
+      null,
+    );
+    expect(result.otAllowance).toBe(150);
+    expect(result.grossSalary).toBe(3000 + 100 + 200 + 150 + 50);
+  });
+
+  it("includes OT in gross for Temporary Store Keeper (units-rate branch)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
+      entry({
+        workingHours: 160,
+        hourlyWage: 10,
+        petrolAllowance: 0,
+        kpiAllowance: 0,
+        otAllowance: 200,
+        otherAllowance: 0,
+      }),
+      null,
+    );
+    expect(result.otAllowance).toBe(200);
+    expect(result.grossSalary).toBe(160 * 10 + 200);
+  });
+
+  it("OT does NOT count toward the KWSP p.12 bonus rule (only KPI does)", () => {
+    // basicPay 4900 + ot 200 → gross 5100. Base wage (gross − KPI) = 5100 ≠ ≤ 5000,
+    // so the bonus rule must NOT fire even though gross crossed the 5k threshold.
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "SUPERVISOR" }),
+      entry({ basicPay: 4900, otAllowance: 200 }),
+      null,
+    );
+    // 12% rate (over 5k, no bonus rule) → ceil(5100 × 0.12) on RM100 bracket = 612
+    expect(result.epfEmployer).toBe(612);
+    expect(result.epfEmployee).toBe(561);
+  });
+
+  it("defaults to 0 otAllowance when omitted from payload (back-compat)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "SUPERVISOR" }),
+      entry({ basicPay: 3000 }),
+      null,
+    );
+    expect(result.otAllowance).toBe(0);
+    expect(result.grossSalary).toBe(3000);
   });
 });
 
