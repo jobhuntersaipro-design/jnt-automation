@@ -122,11 +122,15 @@ export async function POST(
         isEligible: false,
         dailyThreshold: 70,
         subsidyAmount: 15,
+        useFixedTotal: false,
+        fixedTotalAmount: 0,
       };
       const petrolForReprice = {
         isEligible: petrolRule.isEligible,
         dailyThreshold: petrolRule.dailyThreshold,
         subsidyAmount: petrolRule.subsidyAmount,
+        useFixedTotal: petrolRule.useFixedTotal,
+        fixedTotalAmount: petrolRule.fixedTotalAmount,
       };
 
       // No-op short-circuit: if current rules exactly match the stored
@@ -220,6 +224,8 @@ export async function POST(
                     isEligible: petrolRule.isEligible,
                     dailyThreshold: petrolRule.dailyThreshold,
                     subsidyAmount: petrolRule.subsidyAmount,
+                    useFixedTotal: petrolRule.useFixedTotal,
+                    fixedTotalAmount: petrolRule.fixedTotalAmount,
                   }
                 : undefined,
             },

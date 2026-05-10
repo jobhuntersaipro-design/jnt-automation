@@ -36,6 +36,42 @@ function validateIc(ic: string): string | null {
   return null;
 }
 
+/** 2-pill segmented control for the petrol calculation mode.
+ *  - Per Day: subsidy = qualifyingDays × per-day RM
+ *  - Total:   subsidy = single fixed RM (daily threshold ignored) */
+function PetrolModeToggle({
+  useFixedTotal,
+  onChange,
+}: {
+  useFixedTotal: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  const Pill = ({ active, label, onClick, title }: { active: boolean; label: string; onClick: () => void; title: string }) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={title}
+      className={`flex-1 px-1.5 py-[1px] text-[0.6rem] font-medium leading-none transition-colors cursor-pointer ${
+        active
+          ? "bg-[#FBC024] text-on-surface"
+          : "bg-white text-on-surface-variant/70 hover:text-on-surface"
+      }`}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <div
+      className="flex items-stretch rounded-[0.25rem] overflow-hidden ring-1 ring-outline-variant/30 mb-0.5"
+      role="radiogroup"
+      aria-label="Petrol calculation mode"
+    >
+      <Pill active={!useFixedTotal} label="Per Day" onClick={() => onChange(false)} title="Subsidy = qualifying days × per-day amount" />
+      <Pill active={useFixedTotal} label="Total" onClick={() => onChange(true)} title="Fixed monthly total — min orders ignored" />
+    </div>
+  );
+}
+
 /** Decimal input — "cents" mode auto-formats as RM (typing 521 → 5.21) with +/- buttons */
 function DecimalInput({ value, onChange, className, onClick, cents }: {
   value: number;
@@ -255,6 +291,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
   const [isEligible, setIsEligible] = useState(dispatcher.petrolRule?.isEligible ?? false);
   const [dailyThreshold, setDailyThreshold] = useState(dispatcher.petrolRule?.dailyThreshold ?? 70);
   const [subsidyAmount, setSubsidyAmount] = useState(dispatcher.petrolRule?.subsidyAmount ?? 15);
+  const [useFixedTotal, setUseFixedTotal] = useState(dispatcher.petrolRule?.useFixedTotal ?? false);
+  const [fixedTotalAmount, setFixedTotalAmount] = useState(dispatcher.petrolRule?.fixedTotalAmount ?? 0);
   const [weightTiers, setWeightTiers] = useState(
     dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
   );
@@ -272,6 +310,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     setIsEligible(dispatcher.petrolRule?.isEligible ?? false);
     setDailyThreshold(dispatcher.petrolRule?.dailyThreshold ?? 70);
     setSubsidyAmount(dispatcher.petrolRule?.subsidyAmount ?? 15);
+    setUseFixedTotal(dispatcher.petrolRule?.useFixedTotal ?? false);
+    setFixedTotalAmount(dispatcher.petrolRule?.fixedTotalAmount ?? 0);
     setWeightTiers(dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS);
     setIcError(null);
     onErrorChange(dispatcher.id, false);
@@ -285,6 +325,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       isEligible: dispatcher.petrolRule?.isEligible ?? false,
       dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
       subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
+      useFixedTotal: dispatcher.petrolRule?.useFixedTotal ?? false,
+      fixedTotalAmount: dispatcher.petrolRule?.fixedTotalAmount ?? 0,
       weightTiers: dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
     };
     setBaselineVersion((v) => v + 1);
@@ -304,6 +346,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     isEligible: dispatcher.petrolRule?.isEligible ?? false,
     dailyThreshold: dispatcher.petrolRule?.dailyThreshold ?? 70,
     subsidyAmount: dispatcher.petrolRule?.subsidyAmount ?? 15,
+    useFixedTotal: dispatcher.petrolRule?.useFixedTotal ?? false,
+    fixedTotalAmount: dispatcher.petrolRule?.fixedTotalAmount ?? 0,
     weightTiers: dispatcher.weightTiers.length === 3 ? dispatcher.weightTiers : TIER_DEFAULTS,
   });
 
@@ -322,6 +366,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     if (isEligible !== b.isEligible) return true;
     if (dailyThreshold !== b.dailyThreshold) return true;
     if (subsidyAmount !== b.subsidyAmount) return true;
+    if (useFixedTotal !== b.useFixedTotal) return true;
+    if (fixedTotalAmount !== b.fixedTotalAmount) return true;
     for (let i = 0; i < 3; i++) {
       if (b.weightTiers[i].commission !== weightTiers[i].commission) return true;
       if (b.weightTiers[i].minWeight !== weightTiers[i].minWeight) return true;
@@ -329,7 +375,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     }
     return false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [icNo, branchCode, orderThreshold, bonusTiers, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, weightTiers, baselineVersion]);
+  }, [icNo, branchCode, orderThreshold, bonusTiers, incentiveEnabled, isEligible, dailyThreshold, subsidyAmount, useFixedTotal, fixedTotalAmount, weightTiers, baselineVersion]);
 
   // Report dirty state to parent
   useEffect(() => {
@@ -358,7 +404,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         orderThreshold: incentiveEnabled ? orderThreshold : 0,
       };
       payload.bonusTiers = bonusTiers;
-      payload.petrolRule = { isEligible, dailyThreshold, subsidyAmount };
+      payload.petrolRule = { isEligible, dailyThreshold, subsidyAmount, useFixedTotal, fixedTotalAmount };
 
       const res = await fetch(`/api/staff/${dispatcher.id}/settings`, {
         method: "PATCH",
@@ -377,6 +423,8 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
         isEligible,
         dailyThreshold,
         subsidyAmount,
+        useFixedTotal,
+        fixedTotalAmount,
         weightTiers,
       };
       setBaselineVersion((v) => v + 1);
@@ -386,7 +434,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
     } finally {
       setSaving(false);
     }
-  }, [dispatcher.id, dispatcher.rawIcNo, dispatcher.branchCode, icNo, branchCode, weightTiers, incentiveEnabled, orderThreshold, bonusTiers, isEligible, dailyThreshold, subsidyAmount, onFieldSaved]);
+  }, [dispatcher.id, dispatcher.rawIcNo, dispatcher.branchCode, icNo, branchCode, weightTiers, incentiveEnabled, orderThreshold, bonusTiers, isEligible, dailyThreshold, subsidyAmount, useFixedTotal, fixedTotalAmount, onFieldSaved]);
 
   // Save on trigger (when parent Save button is clicked)
   const prevTrigger = useRef(0);
@@ -708,10 +756,15 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
       {/* ── Separator ── */}
       <div className="h-6 rounded-full" style={{ backgroundColor: "rgba(251, 192, 36, 0.2)" }} />
 
-      {/* ── Petrol: Eligible, Min Orders, Amount ── */}
+      {/* ── Petrol: Eligible, Min Orders, Amount ──
+          Two modes when eligible:
+            • Per Day (default) → Min Orders + per-day RM (existing UX)
+            • Total → Min Orders cell shows "—"; Amount cell shows the
+              fixed monthly RM. The mode toggle is a 2-pill segmented
+              control above the Amount input. */}
       <Toggle color="#FBC024" checked={isEligible} onChange={() => setIsEligible((p) => !p)} />
 
-      {isEligible ? (
+      {isEligible && !useFixedTotal ? (
         <input
           type="text"
           inputMode="numeric"
@@ -722,19 +775,29 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
           }}
           onClick={(e) => e.stopPropagation()}
           className={INPUT_CLASS}
+          title="Min orders per day to qualify"
         />
       ) : (
-        <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
+        <span
+          className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1"
+          title={!isEligible ? "Petrol disabled" : "Min orders not used in Total mode"}
+        >—</span>
       )}
 
       {isEligible ? (
-        <DecimalInput
-          value={subsidyAmount}
-          onChange={setSubsidyAmount}
-          onClick={(e) => e.stopPropagation()}
-          className={INPUT_CLASS}
-          cents
-        />
+        <div onClick={(e) => e.stopPropagation()}>
+          <PetrolModeToggle
+            useFixedTotal={useFixedTotal}
+            onChange={setUseFixedTotal}
+          />
+          <DecimalInput
+            value={useFixedTotal ? fixedTotalAmount : subsidyAmount}
+            onChange={useFixedTotal ? setFixedTotalAmount : setSubsidyAmount}
+            onClick={(e) => e.stopPropagation()}
+            className={INPUT_CLASS}
+            cents
+          />
+        </div>
       ) : (
         <span className="block text-[0.78rem] text-on-surface-variant/30 text-center py-1">—</span>
       )}

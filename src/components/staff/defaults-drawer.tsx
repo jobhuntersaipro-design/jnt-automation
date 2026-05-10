@@ -97,7 +97,7 @@ interface DefaultValues {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   incentiveRule: { orderThreshold: number };
-  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
+  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number; useFixedTotal: boolean; fixedTotalAmount: number };
 }
 
 
@@ -421,24 +421,59 @@ export function DefaultsDrawer({ checkedIds, initialValues, branchCodes, initial
               </button>
             </div>
             {values.petrolRule.isEligible ? (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[0.68rem] text-on-surface-variant mb-1">Min Orders / Day</label>
-                  <IntegerInput
-                    value={values.petrolRule.dailyThreshold}
-                    onChange={(n) => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, dailyThreshold: n } }))}
-                    className={INPUT}
-                  />
+              <div className="space-y-3">
+                {/* Mode toggle */}
+                <div className="flex items-stretch rounded-[0.375rem] overflow-hidden ring-1 ring-outline-variant/40 max-w-xs">
+                  {([false, true] as const).map((mode) => {
+                    const active = values.petrolRule.useFixedTotal === mode;
+                    return (
+                      <button
+                        key={mode ? "fixed" : "perday"}
+                        type="button"
+                        onClick={() => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, useFixedTotal: mode } }))}
+                        className={`flex-1 px-3 py-1.5 text-[0.75rem] font-medium transition-colors cursor-pointer ${
+                          active ? "bg-[#FBC024] text-on-surface" : "bg-white text-on-surface-variant/70 hover:text-on-surface"
+                        }`}
+                      >
+                        {mode ? "Fixed Total" : "Per Day"}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label className="block text-[0.68rem] text-on-surface-variant mb-1">Subsidy (RM / Day)</label>
-                  <DecimalInput
-                    value={values.petrolRule.subsidyAmount}
-                    onChange={(n) => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, subsidyAmount: n } }))}
-                    className={INPUT}
-                    cents
-                  />
-                </div>
+                {values.petrolRule.useFixedTotal ? (
+                  <div>
+                    <label className="block text-[0.68rem] text-on-surface-variant mb-1">Total Subsidy (RM / Month)</label>
+                    <DecimalInput
+                      value={values.petrolRule.fixedTotalAmount}
+                      onChange={(n) => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, fixedTotalAmount: n } }))}
+                      className={INPUT}
+                      cents
+                    />
+                    <p className="text-[0.65rem] text-on-surface-variant/60 mt-1">
+                      Min orders ignored — entire monthly amount is fixed.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-[0.68rem] text-on-surface-variant mb-1">Min Orders / Day</label>
+                      <IntegerInput
+                        value={values.petrolRule.dailyThreshold}
+                        onChange={(n) => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, dailyThreshold: n } }))}
+                        className={INPUT}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[0.68rem] text-on-surface-variant mb-1">Subsidy (RM / Day)</label>
+                      <DecimalInput
+                        value={values.petrolRule.subsidyAmount}
+                        onChange={(n) => setValues((v) => ({ ...v, petrolRule: { ...v.petrolRule, subsidyAmount: n } }))}
+                        className={INPUT}
+                        cents
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <p className="text-[0.75rem] text-on-surface-variant/50">Petrol subsidy will be off for all dispatchers.</p>

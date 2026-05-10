@@ -41,6 +41,9 @@ interface PetrolSnapshot {
   isEligible: boolean;
   dailyThreshold: number;
   subsidyAmount: number;
+  /** Optional — older snapshots predate the column. */
+  useFixedTotal?: boolean;
+  fixedTotalAmount?: number;
 }
 
 export interface HistoryRecord {
@@ -85,7 +88,7 @@ const DEFAULT_BONUS_TIERS: BonusTierSnapshotRow[] = [
   { tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
 ];
 const DEFAULT_BONUS_TIER: BonusTierSnapshot = { orderThreshold: 2000, tiers: DEFAULT_BONUS_TIERS };
-const DEFAULT_PETROL: PetrolSnapshot = { isEligible: false, dailyThreshold: 70, subsidyAmount: 15 };
+const DEFAULT_PETROL: PetrolSnapshot = { isEligible: false, dailyThreshold: 70, subsidyAmount: 15, useFixedTotal: false, fixedTotalAmount: 0 };
 
 function formatRM(value: number): string {
   return `RM ${value.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -296,6 +299,20 @@ export function HistoryMonthRow({
     }
     if (originalPetrol.subsidyAmount !== petrol.subsidyAmount) {
       diffs.push({ field: "Petrol subsidy amount", from: formatRM(originalPetrol.subsidyAmount), to: formatRM(petrol.subsidyAmount) });
+    }
+    const origUseFixedTotal = originalPetrol.useFixedTotal ?? false;
+    const currUseFixedTotal = petrol.useFixedTotal ?? false;
+    if (origUseFixedTotal !== currUseFixedTotal) {
+      diffs.push({
+        field: "Petrol mode",
+        from: origUseFixedTotal ? "Total" : "Per Day",
+        to: currUseFixedTotal ? "Total" : "Per Day",
+      });
+    }
+    const origFixedTotal = originalPetrol.fixedTotalAmount ?? 0;
+    const currFixedTotal = petrol.fixedTotalAmount ?? 0;
+    if (currUseFixedTotal && origFixedTotal !== currFixedTotal) {
+      diffs.push({ field: "Petrol fixed total", from: formatRM(origFixedTotal), to: formatRM(currFixedTotal) });
     }
     if (record.commission !== commission) {
       diffs.push({ field: "Commission", from: formatRM(record.commission), to: formatRM(commission) });
@@ -642,27 +659,67 @@ export function HistoryMonthRow({
                     />
                   </button>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[0.75rem] text-on-surface-variant w-36">Daily threshold</span>
-                  <IntField
-                    value={petrol.dailyThreshold}
-                    onChange={(v) => setPetrol((prev) => ({ ...prev, dailyThreshold: v }))}
-                    className={FIELD_CLASS}
-                  />
-                  <span className="text-[0.72rem] text-on-surface-variant">orders/day</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-[0.75rem] text-on-surface-variant w-36">Subsidy amount</span>
-                  <div className="flex items-center gap-1">
-                    <span className="text-[0.75rem] text-on-surface-variant">RM</span>
-                    <DecimalField
-                      value={petrol.subsidyAmount}
-                      onChange={(v) => setPetrol((prev) => ({ ...prev, subsidyAmount: v }))}
-                      className={FIELD_CLASS}
-                      showStepper
-                    />
+                {petrol.isEligible && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[0.75rem] text-on-surface-variant w-36">Mode</span>
+                    <div className="flex items-stretch rounded-[0.375rem] overflow-hidden ring-1 ring-outline-variant/40">
+                      {([false, true] as const).map((mode) => {
+                        const active = (petrol.useFixedTotal ?? false) === mode;
+                        return (
+                          <button
+                            key={mode ? "fixed" : "perday"}
+                            type="button"
+                            onClick={() => setPetrol((prev) => ({ ...prev, useFixedTotal: mode }))}
+                            className={`px-2.5 py-1 text-[0.72rem] font-medium transition-colors cursor-pointer ${
+                              active ? "bg-[#FBC024] text-on-surface" : "bg-white text-on-surface-variant/70 hover:text-on-surface"
+                            }`}
+                          >
+                            {mode ? "Fixed Total" : "Per Day"}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
+                {!(petrol.useFixedTotal ?? false) && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[0.75rem] text-on-surface-variant w-36">Daily threshold</span>
+                      <IntField
+                        value={petrol.dailyThreshold}
+                        onChange={(v) => setPetrol((prev) => ({ ...prev, dailyThreshold: v }))}
+                        className={FIELD_CLASS}
+                      />
+                      <span className="text-[0.72rem] text-on-surface-variant">orders/day</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[0.75rem] text-on-surface-variant w-36">Subsidy amount</span>
+                      <div className="flex items-center gap-1">
+                        <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                        <DecimalField
+                          value={petrol.subsidyAmount}
+                          onChange={(v) => setPetrol((prev) => ({ ...prev, subsidyAmount: v }))}
+                          className={FIELD_CLASS}
+                          showStepper
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+                {(petrol.useFixedTotal ?? false) && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-[0.75rem] text-on-surface-variant w-36">Total subsidy</span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[0.75rem] text-on-surface-variant">RM</span>
+                      <DecimalField
+                        value={petrol.fixedTotalAmount ?? 0}
+                        onChange={(v) => setPetrol((prev) => ({ ...prev, fixedTotalAmount: v }))}
+                        className={FIELD_CLASS}
+                        showStepper
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

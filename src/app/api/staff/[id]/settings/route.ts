@@ -144,11 +144,15 @@ export async function PATCH(
             isEligible: body.petrolRule.isEligible,
             dailyThreshold: body.petrolRule.dailyThreshold,
             subsidyAmount: body.petrolRule.subsidyAmount,
+            useFixedTotal: body.petrolRule.useFixedTotal ?? false,
+            fixedTotalAmount: body.petrolRule.fixedTotalAmount ?? 0,
           },
           update: {
             isEligible: body.petrolRule.isEligible,
             dailyThreshold: body.petrolRule.dailyThreshold,
             subsidyAmount: body.petrolRule.subsidyAmount,
+            useFixedTotal: body.petrolRule.useFixedTotal ?? false,
+            fixedTotalAmount: body.petrolRule.fixedTotalAmount ?? 0,
           },
         });
       }

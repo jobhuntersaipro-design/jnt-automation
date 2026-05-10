@@ -110,6 +110,8 @@ export async function PUT(req: NextRequest) {
       petrolEligible: petrolRule.isEligible,
       dailyThreshold: petrolRule.dailyThreshold,
       subsidyAmount: petrolRule.subsidyAmount,
+      useFixedTotal: petrolRule.useFixedTotal ?? false,
+      fixedTotalAmount: petrolRule.fixedTotalAmount ?? 0,
     };
 
     if (branchId) {

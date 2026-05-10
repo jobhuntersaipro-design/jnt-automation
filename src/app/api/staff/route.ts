@@ -115,7 +115,14 @@ export async function POST(req: NextRequest) {
     });
 
     await tx.petrolRule.create({
-      data: { dispatcherId: d.id, isEligible: pr.isEligible, dailyThreshold: pr.dailyThreshold, subsidyAmount: pr.subsidyAmount },
+      data: {
+        dispatcherId: d.id,
+        isEligible: pr.isEligible,
+        dailyThreshold: pr.dailyThreshold,
+        subsidyAmount: pr.subsidyAmount,
+        useFixedTotal: pr.useFixedTotal ?? false,
+        fixedTotalAmount: pr.fixedTotalAmount ?? 0,
+      },
     });
 
     return d;

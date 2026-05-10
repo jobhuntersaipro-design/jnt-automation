@@ -84,20 +84,26 @@ export function repriceSalary(
     };
   }
 
-  // Petrol: per-qualifying-day subsidy, based on delivery dates.
+  // Petrol: either per-qualifying-day subsidy OR fixed-total mode (skips
+  // the daily-threshold count and uses fixedTotalAmount as the entire
+  // monthly subsidy). isEligible still gates whether any petrol pays out.
   let petrolSubsidy = 0;
   let petrolQualifyingDays = 0;
-  if (petrol.isEligible && petrol.dailyThreshold > 0) {
-    const counts = new Map<string, number>();
-    for (const it of items) {
-      if (!it.deliveryDate) continue;
-      const key = it.deliveryDate.toDateString();
-      counts.set(key, (counts.get(key) ?? 0) + 1);
-    }
-    for (const count of counts.values()) {
-      if (count >= petrol.dailyThreshold) {
-        petrolQualifyingDays++;
-        petrolSubsidy += petrol.subsidyAmount;
+  if (petrol.isEligible) {
+    if (petrol.useFixedTotal) {
+      petrolSubsidy = petrol.fixedTotalAmount ?? 0;
+    } else if (petrol.dailyThreshold > 0) {
+      const counts = new Map<string, number>();
+      for (const it of items) {
+        if (!it.deliveryDate) continue;
+        const key = it.deliveryDate.toDateString();
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+      for (const count of counts.values()) {
+        if (count >= petrol.dailyThreshold) {
+          petrolQualifyingDays++;
+          petrolSubsidy += petrol.subsidyAmount;
+        }
       }
     }
   }

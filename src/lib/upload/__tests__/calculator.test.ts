@@ -327,6 +327,84 @@ describe("petrol subsidy", () => {
     const result = calculateSalary(dispatcher, rows);
     expect(result.petrolSubsidy).toBe(15);
   });
+
+  describe("fixed-total mode", () => {
+    it("uses fixedTotalAmount as the entire petrol subsidy", () => {
+      const dispatcher = makeDispatcher({
+        petrolRule: {
+          isEligible: true,
+          dailyThreshold: 70,
+          subsidyAmount: 15,
+          useFixedTotal: true,
+          fixedTotalAmount: 250,
+        },
+      });
+      // 100 deliveries on a single day — would have been 1 × 15 = RM 15 in
+      // daily-threshold mode. Fixed-total mode ignores all that.
+      const rows = makeRows(100, { deliveryDate: new Date("2026-03-15") });
+      const result = calculateSalary(dispatcher, rows);
+      expect(result.petrolSubsidy).toBe(250);
+      expect(result.petrolQualifyingDays).toBe(0);
+    });
+
+    it("returns 0 when isEligible=false even if useFixedTotal=true", () => {
+      const dispatcher = makeDispatcher({
+        petrolRule: {
+          isEligible: false,
+          dailyThreshold: 70,
+          subsidyAmount: 15,
+          useFixedTotal: true,
+          fixedTotalAmount: 250,
+        },
+      });
+      const rows = makeRows(100, { deliveryDate: new Date("2026-03-15") });
+      const result = calculateSalary(dispatcher, rows);
+      expect(result.petrolSubsidy).toBe(0);
+    });
+
+    it("ignores dailyThreshold + subsidyAmount when fixed-total is on", () => {
+      const dispatcher = makeDispatcher({
+        petrolRule: {
+          isEligible: true,
+          dailyThreshold: 1, // would normally trigger every day
+          subsidyAmount: 99,
+          useFixedTotal: true,
+          fixedTotalAmount: 100,
+        },
+      });
+      const rows = [
+        ...makeRows(3, { deliveryDate: new Date("2026-03-15") }),
+        ...makeRows(3, { deliveryDate: new Date("2026-03-16") }),
+      ];
+      const result = calculateSalary(dispatcher, rows);
+      expect(result.petrolSubsidy).toBe(100);
+    });
+
+    it("captures the new fields in petrolSnapshot", () => {
+      const dispatcher = makeDispatcher({
+        petrolRule: {
+          isEligible: true,
+          dailyThreshold: 70,
+          subsidyAmount: 15,
+          useFixedTotal: true,
+          fixedTotalAmount: 180,
+        },
+      });
+      const result = calculateSalary(dispatcher, makeRows(1));
+      expect(result.petrolSnapshot.useFixedTotal).toBe(true);
+      expect(result.petrolSnapshot.fixedTotalAmount).toBe(180);
+    });
+
+    it("untagged rules (useFixedTotal omitted) preserve daily-threshold math", () => {
+      // back-compat: existing PetrolRuleInput callers don't pass useFixedTotal.
+      const dispatcher = makeDispatcher({
+        petrolRule: { isEligible: true, dailyThreshold: 2, subsidyAmount: 15 },
+      });
+      const rows = makeRows(5, { deliveryDate: new Date("2026-03-15") });
+      const result = calculateSalary(dispatcher, rows);
+      expect(result.petrolSubsidy).toBe(15);
+    });
+  });
 });
 
 // ─── Net Salary Tests ─────────────────────────────────────────

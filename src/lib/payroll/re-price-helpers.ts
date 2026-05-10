@@ -66,10 +66,18 @@ export function rulesMatchSnapshot(current: DispatcherRules, saved: RecordSnapsh
   if (!tiersEqual(current.bonusTiers as TierRow[], bonus.tiers as TierRow[])) return false;
 
   const saveP = saved.petrolSnapshot as Partial<PetrolRuleInput>;
+  // Treat undefined fixed-total fields as their default values so an older
+  // snapshot (pre-column) compares cleanly with the current rules.
+  const savedUseFixedTotal = saveP.useFixedTotal ?? false;
+  const savedFixedTotalAmount = saveP.fixedTotalAmount ?? 0;
+  const currentUseFixedTotal = current.petrol.useFixedTotal ?? false;
+  const currentFixedTotalAmount = current.petrol.fixedTotalAmount ?? 0;
   if (
     saveP.isEligible !== current.petrol.isEligible ||
     saveP.dailyThreshold !== current.petrol.dailyThreshold ||
-    saveP.subsidyAmount !== current.petrol.subsidyAmount
+    saveP.subsidyAmount !== current.petrol.subsidyAmount ||
+    savedUseFixedTotal !== currentUseFixedTotal ||
+    savedFixedTotalAmount !== currentFixedTotalAmount
   ) {
     return false;
   }

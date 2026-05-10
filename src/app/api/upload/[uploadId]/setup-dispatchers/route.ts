@@ -12,7 +12,13 @@ interface DispatcherInput {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   incentiveRule: { orderThreshold: number };
-  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
+  petrolRule: {
+    isEligible: boolean;
+    dailyThreshold: number;
+    subsidyAmount: number;
+    useFixedTotal?: boolean;
+    fixedTotalAmount?: number;
+  };
 }
 
 /**
@@ -167,6 +173,8 @@ export async function POST(
           isEligible: d.petrolRule.isEligible,
           dailyThreshold: d.petrolRule.dailyThreshold,
           subsidyAmount: d.petrolRule.subsidyAmount,
+          useFixedTotal: d.petrolRule.useFixedTotal ?? false,
+          fixedTotalAmount: d.petrolRule.fixedTotalAmount ?? 0,
         },
       });
 

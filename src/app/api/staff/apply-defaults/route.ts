@@ -101,6 +101,8 @@ export async function POST(req: NextRequest) {
           isEligible: body.petrolRule.isEligible,
           dailyThreshold: body.petrolRule.dailyThreshold,
           subsidyAmount: body.petrolRule.subsidyAmount,
+          useFixedTotal: body.petrolRule.useFixedTotal ?? false,
+          fixedTotalAmount: body.petrolRule.fixedTotalAmount ?? 0,
         })),
       });
     }, { timeout: 30000 });

@@ -16,6 +16,8 @@ interface PetrolSnapshot {
   isEligible: boolean;
   dailyThreshold: number;
   subsidyAmount: number;
+  useFixedTotal?: boolean;
+  fixedTotalAmount?: number;
 }
 
 function commissionFor(weight: number, tiers: TierSnapshot[]): number {
@@ -149,16 +151,20 @@ export async function POST(
 
     let petrolSubsidy = 0;
     if (petrol.isEligible) {
-      const byDate = new Map<string, number>();
-      for (const li of sorted) {
-        if (li.deliveryDate) {
-          const key = li.deliveryDate.toISOString().slice(0, 10);
-          byDate.set(key, (byDate.get(key) ?? 0) + 1);
+      if (petrol.useFixedTotal) {
+        petrolSubsidy = petrol.fixedTotalAmount ?? 0;
+      } else {
+        const byDate = new Map<string, number>();
+        for (const li of sorted) {
+          if (li.deliveryDate) {
+            const key = li.deliveryDate.toISOString().slice(0, 10);
+            byDate.set(key, (byDate.get(key) ?? 0) + 1);
+          }
         }
-      }
-      for (const count of byDate.values()) {
-        if (count >= petrol.dailyThreshold) {
-          petrolSubsidy += petrol.subsidyAmount;
+        for (const count of byDate.values()) {
+          if (count >= petrol.dailyThreshold) {
+            petrolSubsidy += petrol.subsidyAmount;
+          }
         }
       }
     }

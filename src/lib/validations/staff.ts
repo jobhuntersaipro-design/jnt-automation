@@ -22,6 +22,8 @@ export const petrolRuleSchema = z.object({
   isEligible: z.boolean(),
   dailyThreshold: z.number().int().min(1),
   subsidyAmount: z.number().min(0),
+  useFixedTotal: z.boolean().optional(),
+  fixedTotalAmount: z.number().min(0).optional(),
 });
 
 export const settingsBodySchema = z.object({

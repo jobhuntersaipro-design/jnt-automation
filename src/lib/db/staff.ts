@@ -27,7 +27,7 @@ export type StaffDispatcher = {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   incentiveRule: { orderThreshold: number } | null;
-  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number } | null;
+  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number; useFixedTotal: boolean; fixedTotalAmount: number } | null;
 };
 
 export async function getDispatchers(
@@ -75,7 +75,7 @@ export async function getDispatchers(
           select: { tier: true, minWeight: true, maxWeight: true, commission: true },
           orderBy: { tier: "asc" as const },
         },
-        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
+        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true, useFixedTotal: true, fixedTotalAmount: true } },
         salaryRecords: {
           select: { month: true, year: true },
           orderBy: [{ year: "asc" }, { month: "asc" }],
@@ -179,7 +179,7 @@ export async function getStaffDispatcherById(
           select: { tier: true, minWeight: true, maxWeight: true, commission: true },
           orderBy: { tier: "asc" as const },
         },
-        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true } },
+        petrolRule: { select: { isEligible: true, dailyThreshold: true, subsidyAmount: true, useFixedTotal: true, fixedTotalAmount: true } },
         salaryRecords: {
           select: { month: true, year: true },
           orderBy: [{ year: "asc" }, { month: "asc" }],
@@ -254,7 +254,7 @@ export type DispatcherDetail = {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   incentiveRule: { orderThreshold: number } | null;
-  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number } | null;
+  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number; useFixedTotal: boolean; fixedTotalAmount: number } | null;
 };
 
 export async function getDispatcherById(
@@ -277,7 +277,7 @@ export async function getDispatcherById(
         orderBy: { tier: "asc" },
       },
       petrolRule: {
-        select: { isEligible: true, dailyThreshold: true, subsidyAmount: true },
+        select: { isEligible: true, dailyThreshold: true, subsidyAmount: true, useFixedTotal: true, fixedTotalAmount: true },
       },
     },
   });
@@ -304,7 +304,7 @@ export type AgentDefaults = {
   weightTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   bonusTiers: { tier: number; minWeight: number; maxWeight: number | null; commission: number }[];
   incentiveRule: { orderThreshold: number };
-  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number };
+  petrolRule: { isEligible: boolean; dailyThreshold: number; subsidyAmount: number; useFixedTotal: boolean; fixedTotalAmount: number };
 };
 
 const FALLBACK_DEFAULTS: AgentDefaults = {
@@ -319,7 +319,7 @@ const FALLBACK_DEFAULTS: AgentDefaults = {
     { tier: 3, minWeight: 10.01, maxWeight: null, commission: 3.3 },
   ],
   incentiveRule: { orderThreshold: 2000 },
-  petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15 },
+  petrolRule: { isEligible: true, dailyThreshold: 70, subsidyAmount: 15, useFixedTotal: false, fixedTotalAmount: 0 },
 };
 
 type AgentDefaultRow = {
@@ -329,6 +329,7 @@ type AgentDefaultRow = {
   orderThreshold: number;
   bonusTier1Commission: number; bonusTier2Commission: number; bonusTier3Commission: number;
   petrolEligible: boolean; dailyThreshold: number; subsidyAmount: number;
+  useFixedTotal: boolean; fixedTotalAmount: number;
 };
 
 /**
@@ -352,6 +353,8 @@ const FALLBACK_ROW: AgentDefaultRow = {
   petrolEligible: true,
   dailyThreshold: 70,
   subsidyAmount: 15,
+  useFixedTotal: false,
+  fixedTotalAmount: 0,
 };
 
 function rowToDefaults(d: AgentDefaultRow): AgentDefaults {
@@ -367,7 +370,7 @@ function rowToDefaults(d: AgentDefaultRow): AgentDefaults {
       { tier: 3, minWeight: d.tier3MinWeight, maxWeight: null, commission: d.bonusTier3Commission },
     ],
     incentiveRule: { orderThreshold: d.orderThreshold },
-    petrolRule: { isEligible: d.petrolEligible, dailyThreshold: d.dailyThreshold, subsidyAmount: d.subsidyAmount },
+    petrolRule: { isEligible: d.petrolEligible, dailyThreshold: d.dailyThreshold, subsidyAmount: d.subsidyAmount, useFixedTotal: d.useFixedTotal, fixedTotalAmount: d.fixedTotalAmount },
   };
 }
 
@@ -377,7 +380,7 @@ const COMPARED_FIELDS: Array<keyof AgentDefaultRow> = [
   "tier3MinWeight", "tier3Commission",
   "orderThreshold",
   "bonusTier1Commission", "bonusTier2Commission", "bonusTier3Commission",
-  "petrolEligible", "dailyThreshold", "subsidyAmount",
+  "petrolEligible", "dailyThreshold", "subsidyAmount", "useFixedTotal", "fixedTotalAmount",
 ];
 
 

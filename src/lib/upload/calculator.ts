@@ -22,6 +22,15 @@ export interface PetrolRuleInput {
   isEligible: boolean;
   dailyThreshold: number;
   subsidyAmount: number;
+  /**
+   * Fixed-total mode. When `true`, the calculator uses `fixedTotalAmount`
+   * as the entire monthly petrol subsidy and ignores the daily-threshold
+   * count. `isEligible` still gates whether any petrol is paid at all.
+   * Optional for back-compat: callers that omit it get today's daily
+   * behaviour (treated as `false`).
+   */
+  useFixedTotal?: boolean;
+  fixedTotalAmount?: number;
 }
 
 export interface DispatcherRules {
@@ -100,12 +109,19 @@ export function calculateSalary(
   let petrolSubsidy = 0;
   let petrolQualifyingDays = 0;
   if (dispatcher.petrolRule.isEligible) {
-    const byDate = groupByDate(deliveries);
-    for (const [key, dayDeliveries] of Object.entries(byDate)) {
-      if (key === "unknown") continue;
-      if (dayDeliveries.length >= dispatcher.petrolRule.dailyThreshold) {
-        petrolQualifyingDays++;
-        petrolSubsidy += dispatcher.petrolRule.subsidyAmount;
+    if (dispatcher.petrolRule.useFixedTotal) {
+      // Fixed-total mode: entire monthly subsidy is the user-entered amount.
+      // Daily-threshold + per-day amount are ignored. `petrolQualifyingDays`
+      // stays at 0 because there is no qualifying-day concept here.
+      petrolSubsidy = dispatcher.petrolRule.fixedTotalAmount ?? 0;
+    } else {
+      const byDate = groupByDate(deliveries);
+      for (const [key, dayDeliveries] of Object.entries(byDate)) {
+        if (key === "unknown") continue;
+        if (dayDeliveries.length >= dispatcher.petrolRule.dailyThreshold) {
+          petrolQualifyingDays++;
+          petrolSubsidy += dispatcher.petrolRule.subsidyAmount;
+        }
       }
     }
   }

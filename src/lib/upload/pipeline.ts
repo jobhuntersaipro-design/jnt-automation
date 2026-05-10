@@ -196,6 +196,8 @@ export async function calculateAfterConfirm(uploadId: string) {
         isEligible: d.petrolRule.isEligible,
         dailyThreshold: d.petrolRule.dailyThreshold,
         subsidyAmount: d.petrolRule.subsidyAmount,
+        useFixedTotal: d.petrolRule.useFixedTotal,
+        fixedTotalAmount: d.petrolRule.fixedTotalAmount,
       },
     };
 
@@ -328,6 +330,8 @@ export async function processUnknown(uploadId: string, unknownExtIds: string[]) 
         isEligible: d.petrolRule.isEligible,
         dailyThreshold: d.petrolRule.dailyThreshold,
         subsidyAmount: d.petrolRule.subsidyAmount,
+        useFixedTotal: d.petrolRule.useFixedTotal,
+        fixedTotalAmount: d.petrolRule.fixedTotalAmount,
       },
     };
 

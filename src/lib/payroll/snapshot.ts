@@ -123,6 +123,30 @@ export function detectChanges(
     });
   }
 
+  // Fixed-total mode: optional in PetrolRuleInput. Treat undefined as `false`
+  // so flipping a brand-new dispatcher's mode shows up as a change against an
+  // older snapshot that pre-dates the column.
+  const prevUseFixedTotal = prev.petrolSnapshot.useFixedTotal ?? false;
+  const currUseFixedTotal = current.petrolRule.useFixedTotal ?? false;
+  if (prevUseFixedTotal !== currUseFixedTotal) {
+    changes.push({
+      type: "PETROL_AMOUNT_CHANGED",
+      from: prevUseFixedTotal ? 1 : 0,
+      to: currUseFixedTotal ? 1 : 0,
+      label: currUseFixedTotal ? "Petrol mode (→ Total)" : "Petrol mode (→ Per Day)",
+    });
+  }
+  const prevFixedTotal = prev.petrolSnapshot.fixedTotalAmount ?? 0;
+  const currFixedTotal = current.petrolRule.fixedTotalAmount ?? 0;
+  if (currUseFixedTotal && prevFixedTotal !== currFixedTotal) {
+    changes.push({
+      type: "PETROL_AMOUNT_CHANGED",
+      from: prevFixedTotal,
+      to: currFixedTotal,
+      label: "Petrol fixed total",
+    });
+  }
+
   for (const tier of current.weightTiers) {
     const prevTier = prev.weightTiersSnapshot.find((t) => t.tier === tier.tier);
     if (prevTier && prevTier.commission !== tier.commission) {

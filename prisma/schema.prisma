@@ -61,6 +61,8 @@ model AgentDefault {
   petrolEligible     Boolean @default(true)
   dailyThreshold     Int     @default(70)
   subsidyAmount      Float   @default(15)
+  useFixedTotal      Boolean @default(false)
+  fixedTotalAmount   Float   @default(0)
 
   agent  Agent   @relation(fields: [agentId], references: [id], onDelete: Cascade)
   branch Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
@@ -223,12 +225,18 @@ model BonusTier {
 }
 
 model PetrolRule {
-  id             String     @id @default(cuid())
-  dispatcherId   String     @unique
-  isEligible     Boolean    @default(false)
-  dailyThreshold Int        @default(70)
-  subsidyAmount  Float      @default(15)
-  dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+  id               String     @id @default(cuid())
+  dispatcherId     String     @unique
+  isEligible       Boolean    @default(false)
+  dailyThreshold   Int        @default(70)
+  subsidyAmount    Float      @default(15)
+  // Fixed-total mode — when true, the calculator skips the daily-threshold
+  // count and uses fixedTotalAmount as the entire monthly petrol subsidy.
+  // Independent of `isEligible`: the master switch still gates whether any
+  // petrol is paid at all.
+  useFixedTotal    Boolean    @default(false)
+  fixedTotalAmount Float      @default(0)
+  dispatcher       Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
 }
 
 // ─── Employees (Supervisor / Admin / Store Keeper / Driver) ──────────

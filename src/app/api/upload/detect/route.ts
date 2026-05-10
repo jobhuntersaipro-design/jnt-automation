@@ -218,6 +218,8 @@ export async function POST(req: NextRequest) {
             isEligible: defaults.petrolRule.isEligible,
             dailyThreshold: defaults.petrolRule.dailyThreshold,
             subsidyAmount: defaults.petrolRule.subsidyAmount,
+            useFixedTotal: defaults.petrolRule.useFixedTotal ?? false,
+            fixedTotalAmount: defaults.petrolRule.fixedTotalAmount ?? 0,
           },
         });
       }
