@@ -41,6 +41,10 @@ export interface EmployeeForSave {
   type: EmployeeType;
   /** null treated as TEMPORARY behavior for back-compat with untagged rows. */
   storeKeeperSubtype?: StoreKeeperSubtype | null;
+  /** Admin subtype. Null treated as PERMANENT behaviour for back-compat with
+   *  untagged admins (preserves today's basicPay path). Reuses the same
+   *  TEMPORARY/PERMANENT enum as storeKeeperSubtype. */
+  adminSubtype?: StoreKeeperSubtype | null;
   name: string;
   branchId: string | null;
 }
@@ -82,11 +86,15 @@ export interface EmployeeSalarySaveResult {
  * gating + statutory override + dispatcher combination logic is unit-testable
  * without DB plumbing.
  *
- * Per-type editable matrix (see `context/features/payroll-edit-permissions-spec.md`):
- *   - SUPERVISOR / ADMIN / DRIVER → basicPay drives wage; workingHours and
- *     hourlyWage are forced to 0 regardless of payload.
- *   - STORE_KEEPER (Permanent) → behaves like Sup/Admin: basicPay drives
- *     wage; workingHours/hourlyWage forced to 0.
+ * Per-type editable matrix (see `context/features/payroll-edit-permissions-spec.md`
+ * + `context/features/admin-subtype-spec.md`):
+ *   - SUPERVISOR / DRIVER → basicPay drives wage; workingHours and hourlyWage
+ *     are forced to 0 regardless of payload.
+ *   - ADMIN (Permanent or untagged) → basicPay drives wage; same gating as
+ *     Sup/Driver. Untagged → Permanent behaviour (back-compat).
+ *   - ADMIN (Temporary) → workingHours × hourlyWage drives wage; mirrors
+ *     Temp Store Keeper. payMode (HOUR | DAY) is a payslip-label distinction.
+ *   - STORE_KEEPER (Permanent) → basicPay path like Sup/Admin.
  *   - STORE_KEEPER (Temporary, or untagged for back-compat) → workingHours
  *     × hourlyWage drives wage. payMode (HOUR | DAY) is a payslip-label
  *     distinction only — math is identical.
@@ -96,11 +104,15 @@ export function computeEmployeeSalaryForSave(
   entry: EmployeeSavePayload,
   dispatcherRecord: DispatcherRecordForSave | null,
 ): EmployeeSalarySaveResult {
-  // Temporary or untagged store keepers use the units-rate (hourly/daily)
-  // branch. Permanent store keepers + Sup/Admin/Driver use the basicPay
-  // branch.
+  // Units-rate branch (hourly/daily) fires for:
+  //   - STORE_KEEPER unless explicitly tagged Permanent (untagged → temp)
+  //   - ADMIN only when explicitly tagged Temporary (untagged → permanent,
+  //     preserves today's basicPay behaviour)
+  // Everyone else (Sup/Driver/Permanent SK/Permanent or untagged Admin) uses
+  // the basicPay branch.
   const isUnitsRate =
-    emp.type === "STORE_KEEPER" && emp.storeKeeperSubtype !== "PERMANENT";
+    (emp.type === "STORE_KEEPER" && emp.storeKeeperSubtype !== "PERMANENT") ||
+    (emp.type === "ADMIN" && emp.adminSubtype === "TEMPORARY");
 
   const basicPay = isUnitsRate ? 0 : entry.basicPay;
   const workingHours = isUnitsRate ? entry.workingHours : 0;

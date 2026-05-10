@@ -10,6 +10,7 @@ import {
   isValidStoreKeeperSubtype,
   validateSubtypeForType,
 } from "@/lib/staff/store-keeper-subtype";
+import { validateAdminSubtypeForType } from "@/lib/staff/admin-subtype";
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,15 +23,18 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const type = url.searchParams.get("type") as EmployeeType | null;
     const search = url.searchParams.get("search") || undefined;
+    // The `subtype` query param matches by union — both storeKeeperSubtype
+    // and adminSubtype reuse the same TEMPORARY/PERMANENT enum, so picking
+    // "Temporary" surfaces both Temp SKs and Temp Admins.
     const subtypeRaw = url.searchParams.get("subtype");
-    const storeKeeperSubtype = isValidStoreKeeperSubtype(subtypeRaw)
+    const subtype = isValidStoreKeeperSubtype(subtypeRaw)
       ? (subtypeRaw as StoreKeeperSubtype)
       : undefined;
 
     const employees = await getEmployees(agentId, {
       type: type || undefined,
       search,
-      storeKeeperSubtype,
+      subtype,
     });
 
     return NextResponse.json({ employees });
@@ -55,6 +59,7 @@ export async function POST(req: NextRequest) {
       icNo,
       type,
       storeKeeperSubtype,
+      adminSubtype,
       branchCode,
       dispatcherId,
       epfNo,
@@ -66,6 +71,7 @@ export async function POST(req: NextRequest) {
       icNo?: string;
       type?: EmployeeType;
       storeKeeperSubtype?: StoreKeeperSubtype | null;
+      adminSubtype?: StoreKeeperSubtype | null;
       branchCode?: string;
       dispatcherId?: string;
       epfNo?: string;
@@ -84,6 +90,11 @@ export async function POST(req: NextRequest) {
     const subtypeCheck = validateSubtypeForType(type, storeKeeperSubtype ?? null);
     if (!subtypeCheck.ok) {
       return NextResponse.json({ error: subtypeCheck.error }, { status: 400 });
+    }
+
+    const adminSubtypeCheck = validateAdminSubtypeForType(type, adminSubtype ?? null);
+    if (!adminSubtypeCheck.ok) {
+      return NextResponse.json({ error: adminSubtypeCheck.error }, { status: 400 });
     }
 
     if (!branchCode || !branchCode.trim()) {
@@ -118,10 +129,12 @@ export async function POST(req: NextRequest) {
     }
     const branchId = branch.id;
 
-    // Subtype only applies when type === STORE_KEEPER. Defense-in-depth even
-    // though `validateSubtypeForType` already rejected mismatches.
+    // Subtype only applies when type matches its role. Defense-in-depth even
+    // though the validators above already rejected mismatches.
     const safeSubtype: StoreKeeperSubtype | null =
       type === "STORE_KEEPER" ? (storeKeeperSubtype ?? null) : null;
+    const safeAdminSubtype: StoreKeeperSubtype | null =
+      type === "ADMIN" ? (adminSubtype ?? null) : null;
 
     const employee = await prisma.employee.create({
       data: {
@@ -132,6 +145,7 @@ export async function POST(req: NextRequest) {
         gender,
         type,
         storeKeeperSubtype: safeSubtype,
+        adminSubtype: safeAdminSubtype,
         branchId,
         dispatcherId: dispatcherId || null,
         epfNo: epfNo?.trim() || null,
@@ -161,6 +175,7 @@ export async function POST(req: NextRequest) {
         avatarUrl: employee.avatarUrl,
         type: employee.type,
         storeKeeperSubtype: employee.storeKeeperSubtype,
+        adminSubtype: employee.adminSubtype,
         branchCode: employee.branch?.code ?? null,
         basicPay: employee.basicPay,
         hourlyWage: employee.hourlyWage,

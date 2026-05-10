@@ -260,6 +260,7 @@ model Employee {
   avatarUrl   String?
   type        EmployeeType
   storeKeeperSubtype StoreKeeperSubtype?  // null unless type = STORE_KEEPER
+  adminSubtype       StoreKeeperSubtype?  // null unless type = ADMIN — TEMPORARY → hourly/daily, PERMANENT (or null) → basicPay
   branchId    String?
   isActive    Boolean      @default(true)
 

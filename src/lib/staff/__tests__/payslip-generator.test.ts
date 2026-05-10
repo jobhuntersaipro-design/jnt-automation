@@ -153,6 +153,63 @@ describe("generateEmployeePayslipPdf", () => {
     expect(rows[0].label).toBe("WAGES (160 HOUR)");
   });
 
+  it("temporary admin renders WAGES (X HOUR) by default — mirrors Temp SK", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "ADMIN",
+        adminSubtype: "TEMPORARY",
+        basicPay: 0,
+        workingHours: 168,
+        hourlyWage: 12,
+      }),
+    );
+    expect(rows[0].label).toBe("WAGES (168 HOUR)");
+    expect(rows[0].amount).toBe(168 * 12);
+  });
+
+  it("temporary admin with payMode=DAY renders WAGES (X DAY)", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "ADMIN",
+        adminSubtype: "TEMPORARY",
+        payMode: "DAY",
+        basicPay: 0,
+        workingHours: 22,
+        hourlyWage: 100,
+      }),
+    );
+    expect(rows[0].label).toBe("WAGES (22 DAY)");
+    expect(rows[0].amount).toBe(22 * 100);
+  });
+
+  it("permanent admin renders BASIC PAY (today's behaviour)", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "ADMIN",
+        adminSubtype: "PERMANENT",
+        basicPay: 4500,
+        workingHours: 0,
+        hourlyWage: 0,
+      }),
+    );
+    expect(rows.find((r) => r.label === "BASIC PAY")?.amount).toBe(4500);
+    expect(rows.find((r) => r.label.startsWith("WAGES"))).toBeUndefined();
+  });
+
+  it("untagged admin (adminSubtype=null) preserves BASIC PAY — back-compat with existing rows", () => {
+    const rows = buildAdditionRows(
+      baseInput({
+        employeeType: "ADMIN",
+        adminSubtype: null,
+        basicPay: 3500,
+        workingHours: 0,
+        hourlyWage: 0,
+      }),
+    );
+    expect(rows.find((r) => r.label === "BASIC PAY")?.amount).toBe(3500);
+    expect(rows.find((r) => r.label.startsWith("WAGES"))).toBeUndefined();
+  });
+
   it("combined dispatcher + employee template renders tier breakdown rows", async () => {
     const buf = await generateEmployeePayslipPdf(
       baseInput({

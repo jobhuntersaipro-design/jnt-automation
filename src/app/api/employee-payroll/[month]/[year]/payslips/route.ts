@@ -138,6 +138,7 @@ export async function POST(
       position: emp.type,
       employeeType: emp.type,
       storeKeeperSubtype: emp.storeKeeperSubtype,
+      adminSubtype: emp.adminSubtype,
       payMode: salaryRecord.payMode,
       month,
       year,

@@ -10,6 +10,10 @@ import { AddEmployeeButton } from "@/components/branches/add-employee-button";
 import { EmployeeAvatarView } from "@/components/staff/employee-avatar-view";
 import { prisma } from "@/lib/prisma";
 import {
+  ADMIN_SUBTYPE_LABEL,
+  ADMIN_SUBTYPE_CHIP_CLASS,
+} from "@/lib/staff/admin-subtype";
+import {
   STORE_KEEPER_SUBTYPE_LABEL,
   STORE_KEEPER_SUBTYPE_CHIP_CLASS,
 } from "@/lib/staff/store-keeper-subtype";
@@ -264,6 +268,13 @@ export default async function BranchDetailPage({
                           className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[e.storeKeeperSubtype]}`}
                         >
                           {STORE_KEEPER_SUBTYPE_LABEL[e.storeKeeperSubtype]}
+                        </span>
+                      )}
+                      {e.type === "ADMIN" && e.adminSubtype && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${ADMIN_SUBTYPE_CHIP_CLASS[e.adminSubtype]}`}
+                        >
+                          {ADMIN_SUBTYPE_LABEL[e.adminSubtype]}
                         </span>
                       )}
                     </span>

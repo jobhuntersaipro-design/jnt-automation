@@ -20,6 +20,10 @@ import {
   STORE_KEEPER_SUBTYPE_LABEL,
   STORE_KEEPER_SUBTYPE_CHIP_CLASS,
 } from "@/lib/staff/store-keeper-subtype"
+import {
+  ADMIN_SUBTYPE_LABEL,
+  ADMIN_SUBTYPE_CHIP_CLASS,
+} from "@/lib/staff/admin-subtype"
 import { formatIcInput } from "@/lib/utils/ic"
 
 const MONTHS = [
@@ -35,7 +39,9 @@ interface PayrollEntry {
   type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER"
   /** Sub-tag on STORE_KEEPER rows. Null for any other type. */
   storeKeeperSubtype: "TEMPORARY" | "PERMANENT" | null
-  /** HOUR | DAY for Temporary store keepers; ignored otherwise. */
+  /** Sub-tag on ADMIN rows. Null for any other type. */
+  adminSubtype: "TEMPORARY" | "PERMANENT" | null
+  /** HOUR | DAY for Temporary store keepers + Temporary admins; ignored otherwise. */
   payMode: EntryPayMode
   branchCode: string | null
   icNo: string | null
@@ -88,11 +94,19 @@ const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolA
 
 /**
  * True when this row uses the units-rate (hour/day) pay model rather than
- * monthly basic pay. Permanent store keepers + Sup/Admin/Driver use basicPay;
- * Temporary or untagged store keepers use units × rate.
+ * monthly basic pay. Mirrors the server-side gate in
+ * `computeEmployeeSalaryForSave`:
+ *   - STORE_KEEPER unless explicitly Permanent (untagged → temp behaviour).
+ *   - ADMIN only when explicitly Temporary (untagged → permanent / basicPay).
+ *   - Sup/Driver → always basicPay.
  */
-function usesUnitsRate(entry: Pick<PayrollEntry, "type" | "storeKeeperSubtype">): boolean {
-  return entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype !== "PERMANENT"
+function usesUnitsRate(
+  entry: Pick<PayrollEntry, "type" | "storeKeeperSubtype" | "adminSubtype">,
+): boolean {
+  return (
+    (entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype !== "PERMANENT") ||
+    (entry.type === "ADMIN" && entry.adminSubtype === "TEMPORARY")
+  )
 }
 
 function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
@@ -347,6 +361,10 @@ export function PayrollTab() {
           // "0.00" placeholder identically to KPI. Guards against stale API
           // shapes from a dev server holding an older Prisma client cache.
           otAllowance: raw.otAllowance ?? 0,
+          // adminSubtype is new — coerce missing to null so a stale API
+          // payload (older Prisma client cache) doesn't trip the
+          // `usesUnitsRate` predicate by leaving the field as `undefined`.
+          adminSubtype: raw.adminSubtype ?? null,
         }
         // Rows that use units-rate (Temp / untagged SK) keep workingHours +
         // hourlyWage. Anything else (Sup/Admin/Driver/Permanent SK) gets
@@ -1083,6 +1101,13 @@ export function PayrollTab() {
                                 {STORE_KEEPER_SUBTYPE_LABEL[entry.storeKeeperSubtype]}
                               </span>
                             )}
+                            {entry.type === "ADMIN" && entry.adminSubtype && (
+                              <span
+                                className={`px-1.5 py-0.5 rounded text-[0.58rem] font-medium ${ADMIN_SUBTYPE_CHIP_CLASS[entry.adminSubtype]}`}
+                              >
+                                {ADMIN_SUBTYPE_LABEL[entry.adminSubtype]}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -1119,7 +1144,7 @@ export function PayrollTab() {
                         <div
                           className="inline-flex items-stretch rounded-lg overflow-hidden ring-1 ring-outline-variant/30 mx-auto mt-1"
                           role="radiogroup"
-                          aria-label="Pay mode for store keeper"
+                          aria-label="Pay mode"
                           style={{ display: "flex", justifyContent: "center", width: "fit-content", marginLeft: "auto", marginRight: "auto" }}
                         >
                           {(["HOUR", "DAY"] as EntryPayMode[]).map((mode) => {

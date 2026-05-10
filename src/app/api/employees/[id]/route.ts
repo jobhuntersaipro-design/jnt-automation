@@ -9,6 +9,10 @@ import {
   resolveSubtypeUpdate,
   type EmployeeTypeName,
 } from "@/lib/staff/store-keeper-subtype";
+import {
+  validateAdminSubtypeForType,
+  resolveAdminSubtypeUpdate,
+} from "@/lib/staff/admin-subtype";
 
 export async function PATCH(
   req: NextRequest,
@@ -26,7 +30,7 @@ export async function PATCH(
     // Verify employee belongs to this agent
     const employee = await prisma.employee.findFirst({
       where: { id, agentId: agentId },
-      select: { id: true, type: true },
+      select: { id: true, type: true, storeKeeperSubtype: true, adminSubtype: true },
     });
 
     if (!employee) {
@@ -40,6 +44,7 @@ export async function PATCH(
       icNo,
       type,
       storeKeeperSubtype,
+      adminSubtype,
       branchCode,
       basicPay,
       hourlyWage,
@@ -58,6 +63,7 @@ export async function PATCH(
       icNo?: string | null;
       type?: string;
       storeKeeperSubtype?: StoreKeeperSubtype | null;
+      adminSubtype?: StoreKeeperSubtype | null;
       branchCode?: string | null;
       basicPay?: number;
       hourlyWage?: number;
@@ -108,6 +114,14 @@ export async function PATCH(
       }
     }
 
+    if (adminSubtype !== undefined) {
+      const effectiveTypeForCheck = (type ?? employee.type) as EmployeeTypeName;
+      const subtypeCheck = validateAdminSubtypeForType(effectiveTypeForCheck, adminSubtype);
+      if (!subtypeCheck.ok) {
+        return NextResponse.json({ error: subtypeCheck.error }, { status: 400 });
+      }
+    }
+
     // Validate numeric bounds
     const numericFields = { basicPay, hourlyWage, petrolAllowance, kpiAllowance, otAllowance, otherAllowance };
     for (const [field, val] of Object.entries(numericFields)) {
@@ -140,8 +154,26 @@ export async function PATCH(
       }
       updateData.branchId = branch.id;
     }
-    if (basicPay !== undefined) updateData.basicPay = effectiveType === "STORE_KEEPER" ? null : basicPay;
-    if (hourlyWage !== undefined) updateData.hourlyWage = effectiveType === "STORE_KEEPER" ? hourlyWage : null;
+    // The Employee.basicPay / Employee.hourlyWage columns are templates for
+    // the per-month payroll table — the per-month EmployeeSalaryRecord is
+    // what actually drives statutory math. We only persist these template
+    // fields when the row's effective pay model can use them. The pay model
+    // depends on subtype:
+    //   - STORE_KEEPER: hourlyWage applies (Permanent SK still has the column
+    //     templated to null because Permanent SK uses basicPay at runtime).
+    //   - ADMIN + Temporary: hourlyWage applies.
+    //   - Everyone else (Sup/Driver/Permanent SK/Permanent or untagged Admin):
+    //     basicPay applies.
+    const effectiveAdminSubtype =
+      adminSubtype !== undefined ? adminSubtype : employee.adminSubtype;
+    const effectiveStoreKeeperSubtype =
+      storeKeeperSubtype !== undefined ? storeKeeperSubtype : employee.storeKeeperSubtype;
+    const effectiveUsesUnitsRate =
+      (effectiveType === "STORE_KEEPER" && effectiveStoreKeeperSubtype !== "PERMANENT") ||
+      (effectiveType === "ADMIN" && effectiveAdminSubtype === "TEMPORARY");
+
+    if (basicPay !== undefined) updateData.basicPay = effectiveUsesUnitsRate ? null : basicPay;
+    if (hourlyWage !== undefined) updateData.hourlyWage = effectiveUsesUnitsRate ? hourlyWage : null;
 
     // Auto-clear subtype when leaving STORE_KEEPER. If the caller explicitly
     // passed a subtype value (even when staying STORE_KEEPER), persist that.
@@ -157,6 +189,17 @@ export async function PATCH(
         payloadSubtype: storeKeeperSubtype,
       });
       if (next !== undefined) updateData.storeKeeperSubtype = next;
+    }
+
+    // Symmetric auto-clear for adminSubtype when leaving ADMIN.
+    if (type !== undefined && type !== "ADMIN") {
+      updateData.adminSubtype = null;
+    } else if (adminSubtype !== undefined) {
+      const next = resolveAdminSubtypeUpdate({
+        effectiveType: effectiveType as EmployeeTypeName,
+        payloadSubtype: adminSubtype,
+      });
+      if (next !== undefined) updateData.adminSubtype = next;
     }
     if (petrolAllowance !== undefined) updateData.petrolAllowance = petrolAllowance;
     if (kpiAllowance !== undefined) updateData.kpiAllowance = kpiAllowance;

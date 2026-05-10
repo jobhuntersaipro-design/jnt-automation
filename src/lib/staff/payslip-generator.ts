@@ -64,8 +64,13 @@ export interface EmployeePayslipInput {
    */
   storeKeeperSubtype?: "TEMPORARY" | "PERMANENT" | null;
   /**
-   * Payslip line unit for Temporary store keepers. HOUR (default) → "WAGES
-   * (X HOUR)". DAY → "WAGES (X DAY)". Ignored for non-units-rate rows.
+   * Sub-tag on ADMIN. Temporary → render WAGES (X HOUR/DAY) like Temp SK.
+   * Permanent or null (untagged) → render BASIC PAY (today's behaviour).
+   */
+  adminSubtype?: "TEMPORARY" | "PERMANENT" | null;
+  /**
+   * Payslip line unit for units-rate rows (Temp SK or Temp Admin). HOUR
+   * (default) → "WAGES (X HOUR)". DAY → "WAGES (X DAY)". Ignored otherwise.
    */
   payMode?: "HOUR" | "DAY" | null;
   month: number;
@@ -137,10 +142,14 @@ function rect(
  */
 export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   const isCombined = !!data.dispatcherTierBreakdowns;
-  // Units-rate rows render "WAGES (X HOUR/DAY)". Permanent store keepers
-  // render "BASIC PAY" like Sup/Admin/Driver.
+  // Units-rate rows render "WAGES (X HOUR/DAY)". Mirror the gating used by
+  // `computeEmployeeSalaryForSave`:
+  //   - STORE_KEEPER unless explicitly Permanent (untagged → temp behaviour).
+  //   - ADMIN only when explicitly Temporary (untagged → permanent / basicPay).
+  // Everyone else renders "BASIC PAY".
   const isUnitsRate =
-    data.employeeType === "STORE_KEEPER" && data.storeKeeperSubtype !== "PERMANENT";
+    (data.employeeType === "STORE_KEEPER" && data.storeKeeperSubtype !== "PERMANENT") ||
+    (data.employeeType === "ADMIN" && data.adminSubtype === "TEMPORARY");
   const rows: Row[] = [];
 
   if (isCombined && data.dispatcherTierBreakdowns) {

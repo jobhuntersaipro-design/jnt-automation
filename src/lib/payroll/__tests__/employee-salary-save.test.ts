@@ -180,6 +180,87 @@ describe("computeEmployeeSalaryForSave — Store Keeper (Permanent)", () => {
   });
 });
 
+describe("computeEmployeeSalaryForSave — Admin subtype", () => {
+  it("Temporary Admin computes gross as units × rate + allowances (mirrors Temp SK)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      entry({
+        basicPay: 9999, // forced to 0
+        workingHours: 160,
+        hourlyWage: 12,
+        petrolAllowance: 100,
+        kpiAllowance: 50,
+      }),
+      null,
+    );
+    expect(result.basicPay).toBe(0);
+    expect(result.workingHours).toBe(160);
+    expect(result.hourlyWage).toBe(12);
+    expect(result.grossSalary).toBe(160 * 12 + 100 + 50);
+  });
+
+  it("Temporary Admin defaults payMode to HOUR when omitted", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      entry({ workingHours: 8, hourlyWage: 50 }),
+      null,
+    );
+    expect(result.payMode).toBe("HOUR");
+  });
+
+  it("Temporary Admin honours DAY payMode (label-only — math identical)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      entry({ workingHours: 22, hourlyWage: 100, payMode: "DAY" }),
+      null,
+    );
+    expect(result.payMode).toBe("DAY");
+    expect(result.grossSalary).toBe(22 * 100);
+  });
+
+  it("Permanent Admin uses basicPay path (today's behaviour)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: "PERMANENT" }),
+      entry({ basicPay: 4000, workingHours: 200, hourlyWage: 30 }),
+      null,
+    );
+    expect(result.basicPay).toBe(4000);
+    expect(result.workingHours).toBe(0);
+    expect(result.hourlyWage).toBe(0);
+    expect(result.grossSalary).toBe(4000);
+    expect(result.payMode).toBe(null);
+  });
+
+  it("Untagged Admin (adminSubtype = null) uses basicPay path — back-compat with existing rows", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: null }),
+      entry({ basicPay: 3500, workingHours: 100, hourlyWage: 40 }),
+      null,
+    );
+    expect(result.basicPay).toBe(3500);
+    expect(result.workingHours).toBe(0);
+    expect(result.hourlyWage).toBe(0);
+    expect(result.grossSalary).toBe(3500);
+  });
+
+  it("Temporary Admin combined with dispatcher record sums dispatcher gross into totalGross", () => {
+    const dispatcherRecord: DispatcherRecordForSave = {
+      baseSalary: 800,
+      bonusTierEarnings: 50,
+      petrolSubsidy: 30,
+      penalty: 0,
+      advance: 0,
+    };
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      entry({ workingHours: 160, hourlyWage: 10, petrolAllowance: 50 }),
+      dispatcherRecord,
+    );
+    // employeeGross = 160*10 + 50 = 1650; dispatcherGross = 800+50+30 = 880; total = 2530
+    expect(result.grossSalary).toBe(2530);
+  });
+});
+
 describe("computeEmployeeSalaryForSave — statutory overrides", () => {
   it("respects an explicit zero for epfEmployee (cleared by user)", () => {
     const result = computeEmployeeSalaryForSave(

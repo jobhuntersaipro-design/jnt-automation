@@ -12,6 +12,7 @@ export type StaffEmployee = {
   avatarUrl: string | null;
   type: EmployeeType;
   storeKeeperSubtype: StoreKeeperSubtype | null;
+  adminSubtype: StoreKeeperSubtype | null;
   branchCode: string | null;
   basicPay: number | null;
   hourlyWage: number | null;
@@ -36,21 +37,24 @@ export async function getEmployees(
   filters: {
     type?: EmployeeType;
     search?: string;
-    storeKeeperSubtype?: StoreKeeperSubtype;
+    /**
+     * Filter by subtype. Matches rows where either `storeKeeperSubtype` OR
+     * `adminSubtype` equals the supplied value — so picking "Temporary"
+     * surfaces both Temp SKs and Temp Admins. Does NOT auto-narrow type;
+     * pair with the `type` filter explicitly when needed.
+     */
+    subtype?: StoreKeeperSubtype;
   },
 ): Promise<StaffEmployee[]> {
-  const { type, search, storeKeeperSubtype } = filters;
-
-  // Picking a subtype implies type = STORE_KEEPER. Don't overwrite an explicit
-  // mismatched type — the API is responsible for rejecting that combo before
-  // we get here.
-  const effectiveType = storeKeeperSubtype ? "STORE_KEEPER" : type;
+  const { type, search, subtype } = filters;
 
   const employees = await prisma.employee.findMany({
     where: {
       agentId,
-      ...(effectiveType && { type: effectiveType }),
-      ...(storeKeeperSubtype && { storeKeeperSubtype }),
+      ...(type && { type }),
+      ...(subtype && {
+        OR: [{ storeKeeperSubtype: subtype }, { adminSubtype: subtype }],
+      }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: "insensitive" as const } },
@@ -78,6 +82,7 @@ export async function getEmployees(
     avatarUrl: e.avatarUrl,
     type: e.type,
     storeKeeperSubtype: e.storeKeeperSubtype,
+    adminSubtype: e.adminSubtype,
     branchCode: e.branch?.code ?? null,
     basicPay: e.basicPay,
     hourlyWage: e.hourlyWage,

@@ -15,6 +15,10 @@ import {
   STORE_KEEPER_SUBTYPE_VALUES,
   type StoreKeeperSubtype,
 } from "@/lib/staff/store-keeper-subtype";
+import {
+  ADMIN_SUBTYPE_CHIP_CLASS,
+  ADMIN_SUBTYPE_LABEL,
+} from "@/lib/staff/admin-subtype";
 import { formatIc } from "@/lib/utils/ic";
 
 const EmployeeDrawer = dynamic(
@@ -95,9 +99,16 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
     return items
       .filter((e) => {
         if (filterType && e.type !== filterType) return false;
-        // Subtype filter only narrows store-keeper rows. Picking a subtype
-        // implicitly excludes non-store-keepers since their subtype is null.
-        if (filterSubtype && e.storeKeeperSubtype !== filterSubtype) return false;
+        // Subtype filter matches by union — picking "Temporary" surfaces both
+        // Temp SKs and Temp Admins (each role stores its tag in its own
+        // column but the enum values are shared).
+        if (
+          filterSubtype &&
+          e.storeKeeperSubtype !== filterSubtype &&
+          e.adminSubtype !== filterSubtype
+        ) {
+          return false;
+        }
         if (filterStatus === "active" && !e.isActive) return false;
         if (filterStatus === "inactive" && e.isActive) return false;
         if (q && !e.name.toLowerCase().includes(q) && !e.rawIcNo.includes(q)) return false;
@@ -201,9 +212,10 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                   key={t}
                   onClick={() => {
                     setFilterType(t);
-                    // Drop the subtype filter when leaving STORE_KEEPER so we
-                    // don't end up with a filter that filters nothing visible.
-                    if (t !== "STORE_KEEPER") setFilterSubtype("");
+                    // Drop the subtype filter when narrowing to a non-subtype
+                    // role (Sup/Driver) so we don't end up with a filter that
+                    // filters nothing visible.
+                    if (t !== "STORE_KEEPER" && t !== "ADMIN") setFilterSubtype("");
                     setTypeOpen(false);
                     setPage(1);
                   }}
@@ -217,18 +229,18 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           )}
         </div>
 
-        {/* Subtype filter — only for store keeper rows. Renders when the
-            type filter is "All" or "STORE_KEEPER" AND there is at least
-            one store keeper in the dataset (avoids a dead filter). */}
-        {(filterType === "" || filterType === "STORE_KEEPER") &&
-          items.some((e) => e.type === "STORE_KEEPER") && (
+        {/* Subtype filter — applies to STORE_KEEPER + ADMIN. Renders when
+            the type filter is "All", "STORE_KEEPER", or "ADMIN" AND there's
+            at least one row in the dataset that has a subtype-bearing type. */}
+        {(filterType === "" || filterType === "STORE_KEEPER" || filterType === "ADMIN") &&
+          items.some((e) => e.type === "STORE_KEEPER" || e.type === "ADMIN") && (
           <div className="relative">
             <button
               onClick={() => setSubtypeFilterOpen((o) => !o)}
               className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-outline-variant/30 hover:border-outline-variant/60 transition-colors min-w-32 justify-between"
             >
               <span className="truncate">
-                {filterSubtype ? STORE_KEEPER_SUBTYPE_LABEL[filterSubtype] : "All Store Keepers"}
+                {filterSubtype ? STORE_KEEPER_SUBTYPE_LABEL[filterSubtype] : "All Subtypes"}
               </span>
               <ChevronDown size={12} className={`text-on-surface-variant shrink-0 transition-transform ${subtypeFilterOpen ? "rotate-180" : ""}`} />
             </button>
@@ -238,7 +250,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                   onClick={() => { setFilterSubtype(""); setSubtypeFilterOpen(false); setPage(1); }}
                   className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${!filterSubtype ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
                 >
-                  All Store Keepers
+                  All Subtypes
                   {!filterSubtype && <Check size={13} className="text-brand" />}
                 </button>
                 {STORE_KEEPER_SUBTYPE_VALUES.map((s) => (
@@ -246,9 +258,6 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                     key={s}
                     onClick={() => {
                       setFilterSubtype(s);
-                      // Picking a subtype implies STORE_KEEPER — narrow the
-                      // type filter so the chip stays consistent.
-                      setFilterType("STORE_KEEPER");
                       setSubtypeFilterOpen(false);
                       setPage(1);
                     }}
@@ -384,7 +393,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 </button>
               </div>
 
-              {/* Type chip + subtype chip (store keeper only) */}
+              {/* Type chip + subtype chip (store keeper + admin) */}
               <div className="flex flex-col items-center gap-0.5">
                 <span className={`px-2 py-0.5 rounded-lg text-[0.68rem] font-medium ${TYPE_CHIP_CLASS[emp.type]}`}>
                   {TYPE_LABEL[emp.type]}
@@ -406,6 +415,13 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                       Set subtype
                     </button>
                   )
+                )}
+                {emp.type === "ADMIN" && emp.adminSubtype && (
+                  <span
+                    className={`px-2 py-0.5 rounded-lg text-[0.6rem] font-medium ${ADMIN_SUBTYPE_CHIP_CLASS[emp.adminSubtype]}`}
+                  >
+                    {ADMIN_SUBTYPE_LABEL[emp.adminSubtype]}
+                  </span>
                 )}
               </div>
 
