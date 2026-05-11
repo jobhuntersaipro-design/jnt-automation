@@ -8,20 +8,22 @@ import { DispatcherAvatar } from "./dispatcher-avatar";
 import { EmployeeHistoryTab } from "./employee-history-tab";
 import type { StaffEmployee } from "@/lib/db/employees";
 import {
-  STORE_KEEPER_SUBTYPE_LABEL,
-  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
-  STORE_KEEPER_SUBTYPE_VALUES,
-  type StoreKeeperSubtype,
-} from "@/lib/staff/store-keeper-subtype";
-import {
-  ADMIN_SUBTYPE_LABEL,
-  ADMIN_SUBTYPE_CHIP_CLASS,
-  ADMIN_SUBTYPE_VALUES,
-  type AdminSubtype,
-} from "@/lib/staff/admin-subtype";
+  EMPLOYEE_SUBTYPE_LABEL,
+  EMPLOYEE_SUBTYPE_CHIP_CLASS,
+  EMPLOYEE_SUBTYPE_VALUES,
+  type EmployeeSubtype,
+} from "@/lib/staff/employee-subtype";
 import { formatIcInput } from "@/lib/utils/ic";
 
-type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
+type EmployeeType =
+  | "SUPERVISOR"
+  | "ADMIN"
+  | "STORE_KEEPER"
+  | "DRIVER"
+  | "MARKETING"
+  | "ASSISTANT"
+  | "QUALITY_CONTROL"
+  | "ACCOUNT_EXECUTIVE";
 
 interface EmployeeDrawerProps {
   employee?: StaffEmployee | null;
@@ -41,6 +43,10 @@ const TYPE_OPTIONS: { value: EmployeeType; label: string }[] = [
   { value: "ADMIN", label: "Admin" },
   { value: "STORE_KEEPER", label: "Store Keeper" },
   { value: "DRIVER", label: "Driver" },
+  { value: "MARKETING", label: "Marketing" },
+  { value: "ASSISTANT", label: "Assistant" },
+  { value: "QUALITY_CONTROL", label: "Quality Control" },
+  { value: "ACCOUNT_EXECUTIVE", label: "Account Executive" },
 ];
 
 const TYPE_LABEL: Record<EmployeeType, string> = {
@@ -48,6 +54,10 @@ const TYPE_LABEL: Record<EmployeeType, string> = {
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
   DRIVER: "Driver",
+  MARKETING: "Marketing",
+  ASSISTANT: "Assistant",
+  QUALITY_CONTROL: "Quality Control",
+  ACCOUNT_EXECUTIVE: "Account Executive",
 };
 
 type Gender = "MALE" | "FEMALE" | "UNKNOWN";
@@ -94,11 +104,8 @@ export function EmployeeDrawer({
   const [socsoNo, setSocsoNo] = useState(employee?.socsoNo ?? "");
   const [incomeTaxNo, setIncomeTaxNo] = useState(employee?.incomeTaxNo ?? "");
   const [type, setType] = useState<EmployeeType>(employee?.type ?? "SUPERVISOR");
-  const [storeKeeperSubtype, setStoreKeeperSubtype] = useState<StoreKeeperSubtype | null>(
-    employee?.storeKeeperSubtype ?? null,
-  );
-  const [adminSubtype, setAdminSubtype] = useState<AdminSubtype | null>(
-    employee?.adminSubtype ?? null,
+  const [subtype, setSubtype] = useState<EmployeeSubtype | null>(
+    employee?.subtype ?? null,
   );
   const [branchCode, setBranchCode] = useState(employee?.branchCode ?? initialBranchCode ?? "");
   const [localBranches, setLocalBranches] = useState(initialBranchCodes);
@@ -107,19 +114,10 @@ export function EmployeeDrawer({
   const [subtypeOpen, setSubtypeOpen] = useState(false);
   const [branchOpen, setBranchOpen] = useState(false);
 
-  // Whenever the position dropdown moves away from a subtype-bearing role,
-  // clear the relevant subtype so a stale value can't sneak through on submit.
-  // Defense-in-depth — the API also clears it server-side.
+  // Subtype is now universal — every role carries it. No auto-clear on
+  // type change; the user's previously-picked subtype carries over.
   function handleTypeChange(next: EmployeeType) {
     setType(next);
-    if (next !== "STORE_KEEPER") {
-      setStoreKeeperSubtype(null);
-      setErrors((p) => ({ ...p, storeKeeperSubtype: "" }));
-    }
-    if (next !== "ADMIN") {
-      setAdminSubtype(null);
-      setErrors((p) => ({ ...p, adminSubtype: "" }));
-    }
     setTypeOpen(false);
   }
 
@@ -182,12 +180,7 @@ export function EmployeeDrawer({
     if (!name.trim()) errs.name = "Name is required";
     if (!branchCode) errs.branchCode = "Branch is required";
     if (icNo.trim() && !/^\d{12}$/.test(icNo)) errs.icNo = "Must be 12 digits";
-    if (type === "STORE_KEEPER" && !storeKeeperSubtype) {
-      errs.storeKeeperSubtype = "Pick a subtype";
-    }
-    if (type === "ADMIN" && !adminSubtype) {
-      errs.adminSubtype = "Pick a subtype";
-    }
+    if (!subtype) errs.subtype = "Pick a subtype";
     return errs;
   }
 
@@ -203,8 +196,7 @@ export function EmployeeDrawer({
         name: name.trim(),
         icNo: icNo.trim() || null,
         type,
-        storeKeeperSubtype: type === "STORE_KEEPER" ? storeKeeperSubtype : null,
-        adminSubtype: type === "ADMIN" ? adminSubtype : null,
+        subtype,
         branchCode: branchCode || null,
         epfNo: epfNo.trim() || null,
         socsoNo: socsoNo.trim() || null,
@@ -238,8 +230,7 @@ export function EmployeeDrawer({
           rawIcNo: icNo.trim(),
           icNo: icNo.trim(),
           type,
-          storeKeeperSubtype: type === "STORE_KEEPER" ? storeKeeperSubtype : null,
-          adminSubtype: type === "ADMIN" ? adminSubtype : null,
+          subtype,
           branchCode: branchCode || null,
           isComplete: !!icNo.trim(),
           gender: employee.gender,
@@ -326,18 +317,11 @@ export function EmployeeDrawer({
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg bg-brand/10 text-brand">
                 {TYPE_LABEL[type]}
               </span>
-              {type === "STORE_KEEPER" && storeKeeperSubtype && (
+              {subtype && (
                 <span
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[storeKeeperSubtype]}`}
+                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg ${EMPLOYEE_SUBTYPE_CHIP_CLASS[subtype]}`}
                 >
-                  {STORE_KEEPER_SUBTYPE_LABEL[storeKeeperSubtype]}
-                </span>
-              )}
-              {type === "ADMIN" && adminSubtype && (
-                <span
-                  className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[0.68rem] font-medium rounded-lg ${ADMIN_SUBTYPE_CHIP_CLASS[adminSubtype]}`}
-                >
-                  {ADMIN_SUBTYPE_LABEL[adminSubtype]}
+                  {EMPLOYEE_SUBTYPE_LABEL[subtype]}
                 </span>
               )}
               {branchCode && (
@@ -428,57 +412,40 @@ export function EmployeeDrawer({
                 </div>
               </Field>
 
-              {(type === "STORE_KEEPER" || type === "ADMIN") && (() => {
-                // Unified subtype dropdown: SK and Admin reuse the same
-                // TEMPORARY/PERMANENT enum, but each role stores its value in
-                // a separate column. Wire the field to whichever column
-                // applies based on the current type.
-                const isSk = type === "STORE_KEEPER";
-                const value = isSk ? storeKeeperSubtype : adminSubtype;
-                const errorKey = isSk ? "storeKeeperSubtype" : "adminSubtype";
-                const error = errors[errorKey];
-                const setValue = (next: StoreKeeperSubtype) => {
-                  if (isSk) setStoreKeeperSubtype(next);
-                  else setAdminSubtype(next);
-                };
-                const VALUES = isSk ? STORE_KEEPER_SUBTYPE_VALUES : ADMIN_SUBTYPE_VALUES;
-                const LABEL = isSk ? STORE_KEEPER_SUBTYPE_LABEL : ADMIN_SUBTYPE_LABEL;
-                return (
-                  <Field label="Subtype" error={error}>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setSubtypeOpen((o) => !o)}
-                        className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface transition-colors cursor-pointer ${error ? "border-critical/50" : "border-outline-variant/30"}`}
-                      >
-                        <span className={value ? "text-on-surface" : "text-on-surface-variant/50"}>
-                          {value ? LABEL[value] : "Select subtype"}
-                        </span>
-                        <ChevronDown size={14} className={`text-on-surface-variant transition-transform ${subtypeOpen ? "rotate-180" : ""}`} />
-                      </button>
-                      {subtypeOpen && (
-                        <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-full py-1">
-                          {VALUES.map((s) => (
-                            <button
-                              key={s}
-                              type="button"
-                              onClick={() => {
-                                setValue(s);
-                                setSubtypeOpen(false);
-                                setErrors((p) => ({ ...p, [errorKey]: "" }));
-                              }}
-                              className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${value === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
-                            >
-                              {LABEL[s]}
-                              {value === s && <Check size={13} className="text-brand" />}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+              {/* Universal subtype dropdown — required for every type. */}
+              <Field label="Subtype" error={errors.subtype}>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSubtypeOpen((o) => !o)}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface transition-colors cursor-pointer ${errors.subtype ? "border-critical/50" : "border-outline-variant/30"}`}
+                  >
+                    <span className={subtype ? "text-on-surface" : "text-on-surface-variant/50"}>
+                      {subtype ? EMPLOYEE_SUBTYPE_LABEL[subtype] : "Select subtype"}
+                    </span>
+                    <ChevronDown size={14} className={`text-on-surface-variant transition-transform ${subtypeOpen ? "rotate-180" : ""}`} />
+                  </button>
+                  {subtypeOpen && (
+                    <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-full py-1">
+                      {EMPLOYEE_SUBTYPE_VALUES.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => {
+                            setSubtype(s);
+                            setSubtypeOpen(false);
+                            setErrors((p) => ({ ...p, subtype: "" }));
+                          }}
+                          className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.84rem] transition-colors cursor-pointer ${subtype === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                        >
+                          {EMPLOYEE_SUBTYPE_LABEL[s]}
+                          {subtype === s && <Check size={13} className="text-brand" />}
+                        </button>
+                      ))}
                     </div>
-                  </Field>
-                );
-              })()}
+                  )}
+                </div>
+              </Field>
 
               <Field label="Branch" error={errors.branchCode}>
                 <div className="relative">

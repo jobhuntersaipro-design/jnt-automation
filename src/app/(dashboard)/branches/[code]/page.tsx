@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Truck, ShieldCheck, ClipboardList, Package, Car } from "lucide-react";
+import { ArrowLeft, Truck, ShieldCheck, ClipboardList, Package, Car, Megaphone, UserCog, Search, Briefcase } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import { getBranchDetail } from "@/lib/db/branches";
@@ -10,13 +10,9 @@ import { AddEmployeeButton } from "@/components/branches/add-employee-button";
 import { EmployeeAvatarView } from "@/components/staff/employee-avatar-view";
 import { prisma } from "@/lib/prisma";
 import {
-  ADMIN_SUBTYPE_LABEL,
-  ADMIN_SUBTYPE_CHIP_CLASS,
-} from "@/lib/staff/admin-subtype";
-import {
-  STORE_KEEPER_SUBTYPE_LABEL,
-  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
-} from "@/lib/staff/store-keeper-subtype";
+  EMPLOYEE_SUBTYPE_LABEL,
+  EMPLOYEE_SUBTYPE_CHIP_CLASS,
+} from "@/lib/staff/employee-subtype";
 import { formatIc } from "@/lib/utils/ic";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +21,25 @@ export const dynamic = "force-dynamic";
 // exhaustiveness — adding a new type at the schema/union level becomes a TS
 // error here until this map is updated, preventing the "fell through to
 // Admin" bug that previously hid DRIVER rows behind the Admin label.
-const EMPLOYEE_TYPE_LABEL: Record<"SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER", string> = {
+type EmployeeTypeUnion =
+  | "SUPERVISOR"
+  | "ADMIN"
+  | "STORE_KEEPER"
+  | "DRIVER"
+  | "MARKETING"
+  | "ASSISTANT"
+  | "QUALITY_CONTROL"
+  | "ACCOUNT_EXECUTIVE";
+
+const EMPLOYEE_TYPE_LABEL: Record<EmployeeTypeUnion, string> = {
   SUPERVISOR: "Supervisor",
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
   DRIVER: "Driver",
+  MARKETING: "Marketing",
+  ASSISTANT: "Assistant",
+  QUALITY_CONTROL: "Quality Control",
+  ACCOUNT_EXECUTIVE: "Account Executive",
 };
 
 function formatRM(value: number): string {
@@ -71,6 +81,10 @@ export default async function BranchDetailPage({
   const adminCount = employees.filter((e) => e.type === "ADMIN").length;
   const storeKeeperCount = employees.filter((e) => e.type === "STORE_KEEPER").length;
   const driverCount = employees.filter((e) => e.type === "DRIVER").length;
+  const marketingCount = employees.filter((e) => e.type === "MARKETING").length;
+  const assistantCount = employees.filter((e) => e.type === "ASSISTANT").length;
+  const qualityControlCount = employees.filter((e) => e.type === "QUALITY_CONTROL").length;
+  const accountExecutiveCount = employees.filter((e) => e.type === "ACCOUNT_EXECUTIVE").length;
 
   const peopleCards: PeopleCard[] = [
     {
@@ -116,6 +130,42 @@ export default async function BranchDetailPage({
       tileBg: "bg-rose-50",
       tileFg: "text-rose-700",
       countColor: "text-rose-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Marketing",
+      count: marketingCount,
+      icon: Megaphone,
+      tileBg: "bg-pink-50",
+      tileFg: "text-pink-700",
+      countColor: "text-pink-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Assistants",
+      count: assistantCount,
+      icon: UserCog,
+      tileBg: "bg-cyan-50",
+      tileFg: "text-cyan-700",
+      countColor: "text-cyan-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Quality Control",
+      count: qualityControlCount,
+      icon: Search,
+      tileBg: "bg-slate-100",
+      tileFg: "text-slate-700",
+      countColor: "text-slate-700",
+      target: "#employees-section",
+    },
+    {
+      label: "Account Exec.",
+      count: accountExecutiveCount,
+      icon: Briefcase,
+      tileBg: "bg-violet-50",
+      tileFg: "text-violet-700",
+      countColor: "text-violet-700",
       target: "#employees-section",
     },
   ];
@@ -165,10 +215,11 @@ export default async function BranchDetailPage({
       </header>
 
       <main className="px-4 lg:px-8 pb-12 space-y-6">
-        {/* People at branch — role count cards (Dispatchers / Supervisors / Admins / Store keepers / Drivers) */}
+        {/* People at branch — role count cards: Dispatchers + 8 employee
+            types (3×3 grid on desktop fits all 9 cards without crowding). */}
         <section
           aria-label="People at branch"
-          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3"
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3"
         >
           {peopleCards.map((c) => (
             <PeopleCountCard key={c.label} card={c} />
@@ -263,18 +314,11 @@ export default async function BranchDetailPage({
                     </div>
                     <span className="inline-flex items-center gap-1.5 flex-wrap text-[0.78rem] text-on-surface-variant">
                       <span>{EMPLOYEE_TYPE_LABEL[e.type]}</span>
-                      {e.type === "STORE_KEEPER" && e.storeKeeperSubtype && (
+                      {e.subtype && (
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[e.storeKeeperSubtype]}`}
+                          className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${EMPLOYEE_SUBTYPE_CHIP_CLASS[e.subtype]}`}
                         >
-                          {STORE_KEEPER_SUBTYPE_LABEL[e.storeKeeperSubtype]}
-                        </span>
-                      )}
-                      {e.type === "ADMIN" && e.adminSubtype && (
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[0.62rem] font-medium leading-none ${ADMIN_SUBTYPE_CHIP_CLASS[e.adminSubtype]}`}
-                        >
-                          {ADMIN_SUBTYPE_LABEL[e.adminSubtype]}
+                          {EMPLOYEE_SUBTYPE_LABEL[e.subtype]}
                         </span>
                       )}
                     </span>

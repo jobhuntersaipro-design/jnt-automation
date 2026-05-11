@@ -23,6 +23,7 @@ import {
   formatRate,
 } from "../payroll/tier-counter";
 import type { TierBreakdown } from "../payroll/tier-counter";
+import { usesUnitsRate, type EmployeeTypeName } from "./employee-subtype";
 
 function formatRM(amount: number): string {
   return amount.toLocaleString("en-MY", {
@@ -57,17 +58,24 @@ export interface EmployeePayslipInput {
   employeeName: string;
   icNo: string;
   position: string;
-  employeeType: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
+  employeeType:
+    | "SUPERVISOR"
+    | "ADMIN"
+    | "STORE_KEEPER"
+    | "DRIVER"
+    | "MARKETING"
+    | "ASSISTANT"
+    | "QUALITY_CONTROL"
+    | "ACCOUNT_EXECUTIVE";
   /**
-   * Sub-tag on STORE_KEEPER. Permanent → render like Sup/Admin (BASIC PAY).
-   * Temporary or null (untagged) → render WAGES (X HOUR/DAY).
+   * Universal subtype (TEMPORARY / PERMANENT / null). Pay-model coupling:
+   *  - STORE_KEEPER unless explicitly Permanent → WAGES (X HOUR/DAY) line.
+   *  - ADMIN when explicitly Temporary → WAGES (X HOUR/DAY) line.
+   *  - Everyone else (Sup/Driver/Marketing/Assistant/QC/AE + Permanent SK
+   *    + Permanent or untagged Admin) → BASIC PAY line. Subtype is metadata
+   *    only and does not appear on the PDF.
    */
-  storeKeeperSubtype?: "TEMPORARY" | "PERMANENT" | null;
-  /**
-   * Sub-tag on ADMIN. Temporary → render WAGES (X HOUR/DAY) like Temp SK.
-   * Permanent or null (untagged) → render BASIC PAY (today's behaviour).
-   */
-  adminSubtype?: "TEMPORARY" | "PERMANENT" | null;
+  subtype?: "TEMPORARY" | "PERMANENT" | null;
   /**
    * Payslip line unit for units-rate rows (Temp SK or Temp Admin). HOUR
    * (default) → "WAGES (X HOUR)". DAY → "WAGES (X DAY)". Ignored otherwise.
@@ -116,6 +124,10 @@ const POSITION_LABEL: Record<string, string> = {
   ADMIN: "ADMIN",
   STORE_KEEPER: "STORE KEEPER",
   DRIVER: "DRIVER",
+  MARKETING: "MARKETING",
+  ASSISTANT: "ASSISTANT",
+  QUALITY_CONTROL: "QUALITY CONTROL",
+  ACCOUNT_EXECUTIVE: "ACCOUNT EXECUTIVE",
 };
 
 type Row = { label: string; amount: number };
@@ -147,9 +159,7 @@ export function buildAdditionRows(data: EmployeePayslipInput): Row[] {
   //   - STORE_KEEPER unless explicitly Permanent (untagged → temp behaviour).
   //   - ADMIN only when explicitly Temporary (untagged → permanent / basicPay).
   // Everyone else renders "BASIC PAY".
-  const isUnitsRate =
-    (data.employeeType === "STORE_KEEPER" && data.storeKeeperSubtype !== "PERMANENT") ||
-    (data.employeeType === "ADMIN" && data.adminSubtype === "TEMPORARY");
+  const isUnitsRate = usesUnitsRate(data.employeeType as EmployeeTypeName, data.subtype);
   const rows: Row[] = [];
 
   if (isCombined && data.dispatcherTierBreakdowns) {

@@ -127,7 +127,7 @@ describe("computeEmployeeSalaryForSave — Store Keeper (untagged or Temporary)"
 
   it("Temporary subtype computes gross as units × rate + allowances", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
+      emp({ type: "STORE_KEEPER", subtype: "TEMPORARY" }),
       entry({
         workingHours: 160,
         hourlyWage: 10,
@@ -143,7 +143,7 @@ describe("computeEmployeeSalaryForSave — Store Keeper (untagged or Temporary)"
   it("Temporary subtype + day mode reuses the same units × rate math (label-only change)", () => {
     // Day mode is purely a payslip-label distinction — math identical.
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
+      emp({ type: "STORE_KEEPER", subtype: "TEMPORARY" }),
       entry({ workingHours: 22, hourlyWage: 100 }),
       null,
     );
@@ -154,7 +154,7 @@ describe("computeEmployeeSalaryForSave — Store Keeper (untagged or Temporary)"
 describe("computeEmployeeSalaryForSave — Store Keeper (Permanent)", () => {
   it("forces workingHours and hourlyWage to 0 — basicPay drives gross like Sup/Admin", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "PERMANENT" }),
+      emp({ type: "STORE_KEEPER", subtype: "PERMANENT" }),
       entry({ basicPay: 3500, workingHours: 200, hourlyWage: 9, petrolAllowance: 150 }),
       null,
     );
@@ -167,7 +167,7 @@ describe("computeEmployeeSalaryForSave — Store Keeper (Permanent)", () => {
 
   it("Permanent subtype combines basicPay with allowances", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "PERMANENT" }),
+      emp({ type: "STORE_KEEPER", subtype: "PERMANENT" }),
       entry({
         basicPay: 4000,
         petrolAllowance: 200,
@@ -183,7 +183,7 @@ describe("computeEmployeeSalaryForSave — Store Keeper (Permanent)", () => {
 describe("computeEmployeeSalaryForSave — Admin subtype", () => {
   it("Temporary Admin computes gross as units × rate + allowances (mirrors Temp SK)", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      emp({ type: "ADMIN", subtype: "TEMPORARY" }),
       entry({
         basicPay: 9999, // forced to 0
         workingHours: 160,
@@ -201,7 +201,7 @@ describe("computeEmployeeSalaryForSave — Admin subtype", () => {
 
   it("Temporary Admin defaults payMode to HOUR when omitted", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      emp({ type: "ADMIN", subtype: "TEMPORARY" }),
       entry({ workingHours: 8, hourlyWage: 50 }),
       null,
     );
@@ -210,7 +210,7 @@ describe("computeEmployeeSalaryForSave — Admin subtype", () => {
 
   it("Temporary Admin honours DAY payMode (label-only — math identical)", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      emp({ type: "ADMIN", subtype: "TEMPORARY" }),
       entry({ workingHours: 22, hourlyWage: 100, payMode: "DAY" }),
       null,
     );
@@ -220,7 +220,7 @@ describe("computeEmployeeSalaryForSave — Admin subtype", () => {
 
   it("Permanent Admin uses basicPay path (today's behaviour)", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: "PERMANENT" }),
+      emp({ type: "ADMIN", subtype: "PERMANENT" }),
       entry({ basicPay: 4000, workingHours: 200, hourlyWage: 30 }),
       null,
     );
@@ -231,9 +231,9 @@ describe("computeEmployeeSalaryForSave — Admin subtype", () => {
     expect(result.payMode).toBe(null);
   });
 
-  it("Untagged Admin (adminSubtype = null) uses basicPay path — back-compat with existing rows", () => {
+  it("Untagged Admin (subtype = null) uses basicPay path — back-compat with existing rows", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: null }),
+      emp({ type: "ADMIN", subtype: null }),
       entry({ basicPay: 3500, workingHours: 100, hourlyWage: 40 }),
       null,
     );
@@ -252,7 +252,7 @@ describe("computeEmployeeSalaryForSave — Admin subtype", () => {
       advance: 0,
     };
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "ADMIN", adminSubtype: "TEMPORARY" }),
+      emp({ type: "ADMIN", subtype: "TEMPORARY" }),
       entry({ workingHours: 160, hourlyWage: 10, petrolAllowance: 50 }),
       dispatcherRecord,
     );
@@ -375,7 +375,7 @@ describe("computeEmployeeSalaryForSave — OT allowance", () => {
 
   it("includes OT in gross for Temporary Store Keeper (units-rate branch)", () => {
     const result = computeEmployeeSalaryForSave(
-      emp({ type: "STORE_KEEPER", storeKeeperSubtype: "TEMPORARY" }),
+      emp({ type: "STORE_KEEPER", subtype: "TEMPORARY" }),
       entry({
         workingHours: 160,
         hourlyWage: 10,
@@ -411,6 +411,86 @@ describe("computeEmployeeSalaryForSave — OT allowance", () => {
     );
     expect(result.otAllowance).toBe(0);
     expect(result.grossSalary).toBe(3000);
+  });
+});
+
+describe("computeEmployeeSalaryForSave — new positions (universal subtype gate)", () => {
+  // Contract: subtype = TEMPORARY on ANY role routes to the units × rate
+  // branch (hours/days × rate). PERMANENT or null on any non-SK role uses
+  // basicPay. If a future spec reverts this to metadata-only, these tests
+  // must be updated together — they are the contractual fence for the
+  // coupling decision.
+
+  it("MARKETING + null subtype routes to basicPay branch (workingHours/hourlyWage forced to 0)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "MARKETING", subtype: null }),
+      entry({ basicPay: 3500, workingHours: 8, hourlyWage: 50, petrolAllowance: 200 }),
+      null,
+    );
+    expect(result.basicPay).toBe(3500);
+    expect(result.workingHours).toBe(0);
+    expect(result.hourlyWage).toBe(0);
+    expect(result.grossSalary).toBe(3700);
+  });
+
+  it("MARKETING + TEMPORARY routes to units × rate (subtype flips pay model on every type)", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "MARKETING", subtype: "TEMPORARY" }),
+      entry({ basicPay: 9999, workingHours: 160, hourlyWage: 10, petrolAllowance: 100 }),
+      null,
+    );
+    expect(result.basicPay).toBe(0);
+    expect(result.workingHours).toBe(160);
+    expect(result.hourlyWage).toBe(10);
+    expect(result.grossSalary).toBe(160 * 10 + 100);
+    expect(result.payMode).toBe("HOUR");
+  });
+
+  it("ASSISTANT + PERMANENT uses basicPay branch", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ASSISTANT", subtype: "PERMANENT" }),
+      entry({ basicPay: 2800, kpiAllowance: 100 }),
+      null,
+    );
+    expect(result.basicPay).toBe(2800);
+    expect(result.grossSalary).toBe(2900);
+    expect(result.payMode).toBe(null);
+  });
+
+  it("QUALITY_CONTROL + TEMPORARY routes to units × rate", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "QUALITY_CONTROL", subtype: "TEMPORARY" }),
+      entry({ basicPay: 9999, workingHours: 200, hourlyWage: 25, petrolAllowance: 100, otAllowance: 50, payMode: "DAY" }),
+      null,
+    );
+    expect(result.basicPay).toBe(0);
+    expect(result.workingHours).toBe(200);
+    expect(result.hourlyWage).toBe(25);
+    expect(result.grossSalary).toBe(200 * 25 + 100 + 50);
+    expect(result.payMode).toBe("DAY");
+  });
+
+  it("ACCOUNT_EXECUTIVE + null uses basicPay branch", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ACCOUNT_EXECUTIVE", subtype: null }),
+      entry({ basicPay: 5500, kpiAllowance: 500 }),
+      null,
+    );
+    expect(result.basicPay).toBe(5500);
+    expect(result.grossSalary).toBe(6000);
+    expect(result.payMode).toBe(null);
+  });
+
+  it("ACCOUNT_EXECUTIVE + TEMPORARY routes to units × rate", () => {
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "ACCOUNT_EXECUTIVE", subtype: "TEMPORARY" }),
+      entry({ workingHours: 22, hourlyWage: 150, petrolAllowance: 50, payMode: "DAY" }),
+      null,
+    );
+    expect(result.workingHours).toBe(22);
+    expect(result.hourlyWage).toBe(150);
+    expect(result.grossSalary).toBe(22 * 150 + 50);
+    expect(result.payMode).toBe("DAY");
   });
 });
 
