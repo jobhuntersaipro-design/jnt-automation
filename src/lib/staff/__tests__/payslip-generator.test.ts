@@ -101,7 +101,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "STORE_KEEPER",
-        storeKeeperSubtype: "TEMPORARY",
+        subtype: "TEMPORARY",
         basicPay: 0,
         workingHours: 180,
         hourlyWage: 6.5,
@@ -115,7 +115,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "STORE_KEEPER",
-        storeKeeperSubtype: "TEMPORARY",
+        subtype: "TEMPORARY",
         payMode: "DAY",
         basicPay: 0,
         workingHours: 22,
@@ -130,7 +130,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "STORE_KEEPER",
-        storeKeeperSubtype: "PERMANENT",
+        subtype: "PERMANENT",
         basicPay: 4000,
         workingHours: 0,
         hourlyWage: 0,
@@ -144,7 +144,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "STORE_KEEPER",
-        storeKeeperSubtype: null,
+        subtype: null,
         basicPay: 0,
         workingHours: 160,
         hourlyWage: 8,
@@ -157,7 +157,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "ADMIN",
-        adminSubtype: "TEMPORARY",
+        subtype: "TEMPORARY",
         basicPay: 0,
         workingHours: 168,
         hourlyWage: 12,
@@ -171,7 +171,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "ADMIN",
-        adminSubtype: "TEMPORARY",
+        subtype: "TEMPORARY",
         payMode: "DAY",
         basicPay: 0,
         workingHours: 22,
@@ -186,7 +186,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "ADMIN",
-        adminSubtype: "PERMANENT",
+        subtype: "PERMANENT",
         basicPay: 4500,
         workingHours: 0,
         hourlyWage: 0,
@@ -200,7 +200,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "ADMIN",
-        adminSubtype: null,
+        subtype: null,
         basicPay: 3500,
         workingHours: 0,
         hourlyWage: 0,
@@ -330,7 +330,7 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildAdditionRows(
       baseInput({
         employeeType: "STORE_KEEPER",
-        storeKeeperSubtype: "TEMPORARY",
+        subtype: "TEMPORARY",
         basicPay: 0,
         workingHours: 180,
         hourlyWage: 6.5,

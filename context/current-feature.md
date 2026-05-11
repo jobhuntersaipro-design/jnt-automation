@@ -1,18 +1,59 @@
-# Current Feature
+# Current Feature: New Positions (Marketing / Assistant / Quality Control / Account Executive) + Universal Temporary/Permanent Subtype
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add four `EmployeeType` enum values: `MARKETING`, `ASSISTANT`, `QUALITY_CONTROL`, `ACCOUNT_EXECUTIVE`.
+- Unify the existing two subtype columns (`storeKeeperSubtype` + `adminSubtype`) into one universal `Employee.subtype` column. Backfill in the same migration so no row loses its tag.
+- Surface the Temporary/Permanent chip on **every** employee row (all 8 types) across Staff Settings list, Staff Payroll table, Employee Drawer header, and Branch Detail employee rows.
+- Preserve Store Keeper + Admin pay-model semantics byte-for-byte. The `usesUnitsRate` gate keeps reading the same column under the new universal name.
+- Extend the position dropdown in Add/Edit Employee drawer to include all 8 positions; same for the employee-list type filter.
+- Extend Branch Detail "People at branch" cards to count the 4 new role types (3×3 grid layout per §6.3 default).
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+> Spec: `context/features/positions-and-universal-subtype-spec.md`
+> Branch (when started): `feature/positions-and-universal-subtype`
+> Style: TDD (red → green → refactor)
 
+**Locked-in design decisions (AskUserQuestion 2026-05-11):**
+1. **Subtype is metadata only** for Sup/Driver/Marketing/Assistant/QC/AE — pay formula, statutory math, and payslip rendering stay on monthly basicPay regardless of subtype. Existing SK + Admin pay coupling untouched.
+2. **One universal `subtype` column** on Employee (still reusing the `StoreKeeperSubtype` Postgres enum — `TEMPORARY` / `PERMANENT`). Migration drops `storeKeeperSubtype` + `adminSubtype` after COALESCE backfill.
+3. **All 4 new positions render Template 1** on payslips (BASIC PAY row + allowances). Template 2 (WAGES X HOUR/DAY) stays exclusive to Temp SK + Temp Admin.
+4. **Required pick** on form submit — any type requires a subtype selection. Existing untagged rows render a muted "Set subtype" chip until edited.
 
+**Out of scope (explicit):**
+- No pay-model coupling for Temporary on the new roles or Sup/Driver (a future spec can revisit).
+- No subtype on Dispatcher records.
+- No new payslip template variant for the new positions.
+- No subtype-aware dashboard / chart breakdowns.
+- No `StoreKeeperSubtype` Postgres enum rename.
+
+**Risks to watch:**
+- Schema migration is multi-step (enum add + column add + UPDATE + DROP two columns) — Neon rollback branch required before `migrate deploy` against prod.
+- Pay-model gate moves from two columns to one (`emp.subtype` instead of `emp.storeKeeperSubtype` / `emp.adminSubtype`) — the SK + Admin regression tests in `employee-salary-save.test.ts` are the load-bearing safety net.
+- Forgotten field references on row objects (not symbol imports) won't be caught by the legacy shim files — grep guard in REFACTOR step.
+- People-at-branch grid needs relayout from 5-card to 9-card (Dispatchers + 8 employee roles).
+
+**Open questions (defaults applied in spec):**
+- §6.1 Subtype filter always-visible vs hidden-until-data — default: always-visible.
+- §6.3 People-at-branch 9-card layout — default: 3×3 grid.
+- §6.4 Chip palette for 4 new roles — default: pink (Marketing) / cyan (Assistant) / slate (QC) / violet (Account Executive).
+- §6.6 Single-phase vs two-phase migration — default: single-phase (drop legacy columns in same migration).
+
+**TDD plan:**
+- RED 1: `isValidEmployeeType` test asserting `MARKETING` accepted.
+- RED 2: `computeEmployeeSalaryForSave` regression tests for the 4 new types (metadata-only contract).
+- RED 3: POST `/api/employees` tests for new types + legacy-field tolerance.
+- GREEN 1–6: schema → helpers → pay-model gate rename → API validators → server-side cascading → UI wiring.
+- REFACTOR: delete legacy shim files once all imports point at `employee-subtype.ts`.
+
+**Estimate:** ~9h single-day spike.
+
+**Prod deploy checklist:** see spec §8 footer (Neon rollback branch → migrate deploy → schema verify → smoke test → drop rollback branch after 30 days).
 
 ## History
 

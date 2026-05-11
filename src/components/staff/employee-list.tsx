@@ -10,15 +10,11 @@ import { BranchChip } from "@/components/ui/branch-chip";
 import { DispatcherAvatar } from "./dispatcher-avatar";
 import { selectAvatarTarget } from "@/lib/staff/avatar-target";
 import {
-  STORE_KEEPER_SUBTYPE_LABEL,
-  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
-  STORE_KEEPER_SUBTYPE_VALUES,
-  type StoreKeeperSubtype,
-} from "@/lib/staff/store-keeper-subtype";
-import {
-  ADMIN_SUBTYPE_CHIP_CLASS,
-  ADMIN_SUBTYPE_LABEL,
-} from "@/lib/staff/admin-subtype";
+  EMPLOYEE_SUBTYPE_LABEL,
+  EMPLOYEE_SUBTYPE_CHIP_CLASS,
+  EMPLOYEE_SUBTYPE_VALUES,
+  type EmployeeSubtype,
+} from "@/lib/staff/employee-subtype";
 import { formatIc } from "@/lib/utils/ic";
 
 const EmployeeDrawer = dynamic(
@@ -26,7 +22,15 @@ const EmployeeDrawer = dynamic(
   { ssr: false },
 );
 
-type EmployeeType = "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
+type EmployeeType =
+  | "SUPERVISOR"
+  | "ADMIN"
+  | "STORE_KEEPER"
+  | "DRIVER"
+  | "MARKETING"
+  | "ASSISTANT"
+  | "QUALITY_CONTROL"
+  | "ACCOUNT_EXECUTIVE";
 type StatusFilter = "" | "active" | "inactive";
 
 const PAGE_SIZE = 20;
@@ -42,14 +46,16 @@ const TYPE_LABEL: Record<EmployeeType, string> = {
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
   DRIVER: "Driver",
+  MARKETING: "Marketing",
+  ASSISTANT: "Assistant",
+  QUALITY_CONTROL: "Quality Control",
+  ACCOUNT_EXECUTIVE: "Account Executive",
 };
 
-const TYPE_CHIP_CLASS: Record<EmployeeType, string> = {
-  SUPERVISOR: "bg-blue-50 text-blue-700",
-  ADMIN: "bg-purple-50 text-purple-700",
-  STORE_KEEPER: "bg-amber-50 text-amber-700",
-  DRIVER: "bg-rose-50 text-rose-700",
-};
+// Per design system §Colors, role chips use the brand `primary` token at
+// 10% opacity for the fill — same chip styling for all 8 roles. The chip
+// label itself differentiates, no per-role tint.
+const TYPE_CHIP_CLASS = "bg-primary/10 text-primary";
 
 function getPageNumbers(current: number, total: number): (number | "...")[] {
   const pages: (number | "...")[] = [];
@@ -79,7 +85,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
   const [items, setItems] = useState(serverData);
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState<EmployeeType | "">("");
-  const [filterSubtype, setFilterSubtype] = useState<StoreKeeperSubtype | "">("");
+  const [filterSubtype, setFilterSubtype] = useState<EmployeeSubtype | "">("");
   const [filterStatus, setFilterStatus] = useState<StatusFilter>("");
   const [typeOpen, setTypeOpen] = useState(false);
   const [subtypeFilterOpen, setSubtypeFilterOpen] = useState(false);
@@ -99,16 +105,8 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
     return items
       .filter((e) => {
         if (filterType && e.type !== filterType) return false;
-        // Subtype filter matches by union — picking "Temporary" surfaces both
-        // Temp SKs and Temp Admins (each role stores its tag in its own
-        // column but the enum values are shared).
-        if (
-          filterSubtype &&
-          e.storeKeeperSubtype !== filterSubtype &&
-          e.adminSubtype !== filterSubtype
-        ) {
-          return false;
-        }
+        // Universal subtype filter — single column, applies to every type.
+        if (filterSubtype && e.subtype !== filterSubtype) return false;
         if (filterStatus === "active" && !e.isActive) return false;
         if (filterStatus === "inactive" && e.isActive) return false;
         if (q && !e.name.toLowerCase().includes(q) && !e.rawIcNo.includes(q)) return false;
@@ -207,15 +205,11 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 All Types
                 {!filterType && <Check size={13} className="text-brand" />}
               </button>
-              {(["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"] as EmployeeType[]).map((t) => (
+              {(["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER", "MARKETING", "ASSISTANT", "QUALITY_CONTROL", "ACCOUNT_EXECUTIVE"] as EmployeeType[]).map((t) => (
                 <button
                   key={t}
                   onClick={() => {
                     setFilterType(t);
-                    // Drop the subtype filter when narrowing to a non-subtype
-                    // role (Sup/Driver) so we don't end up with a filter that
-                    // filters nothing visible.
-                    if (t !== "STORE_KEEPER" && t !== "ADMIN") setFilterSubtype("");
                     setTypeOpen(false);
                     setPage(1);
                   }}
@@ -229,48 +223,43 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           )}
         </div>
 
-        {/* Subtype filter — applies to STORE_KEEPER + ADMIN. Renders when
-            the type filter is "All", "STORE_KEEPER", or "ADMIN" AND there's
-            at least one row in the dataset that has a subtype-bearing type. */}
-        {(filterType === "" || filterType === "STORE_KEEPER" || filterType === "ADMIN") &&
-          items.some((e) => e.type === "STORE_KEEPER" || e.type === "ADMIN") && (
-          <div className="relative">
-            <button
-              onClick={() => setSubtypeFilterOpen((o) => !o)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-outline-variant/30 hover:border-outline-variant/60 transition-colors min-w-32 justify-between"
-            >
-              <span className="truncate">
-                {filterSubtype ? STORE_KEEPER_SUBTYPE_LABEL[filterSubtype] : "All Subtypes"}
-              </span>
-              <ChevronDown size={12} className={`text-on-surface-variant shrink-0 transition-transform ${subtypeFilterOpen ? "rotate-180" : ""}`} />
-            </button>
-            {subtypeFilterOpen && (
-              <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-48 py-1">
+        {/* Subtype filter — universal, always visible. */}
+        <div className="relative">
+          <button
+            onClick={() => setSubtypeFilterOpen((o) => !o)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-[0.375rem] text-[0.83rem] font-medium text-on-surface border border-outline-variant/30 hover:border-outline-variant/60 transition-colors min-w-32 justify-between"
+          >
+            <span className="truncate">
+              {filterSubtype ? EMPLOYEE_SUBTYPE_LABEL[filterSubtype] : "All Subtypes"}
+            </span>
+            <ChevronDown size={12} className={`text-on-surface-variant shrink-0 transition-transform ${subtypeFilterOpen ? "rotate-180" : ""}`} />
+          </button>
+          {subtypeFilterOpen && (
+            <div className="absolute left-0 top-full mt-1 bg-white rounded-[0.5rem] shadow-[0_12px_40px_-12px_rgba(25,28,29,0.14)] border border-outline-variant/20 z-50 w-48 py-1">
+              <button
+                onClick={() => { setFilterSubtype(""); setSubtypeFilterOpen(false); setPage(1); }}
+                className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${!filterSubtype ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+              >
+                All Subtypes
+                {!filterSubtype && <Check size={13} className="text-brand" />}
+              </button>
+              {EMPLOYEE_SUBTYPE_VALUES.map((s) => (
                 <button
-                  onClick={() => { setFilterSubtype(""); setSubtypeFilterOpen(false); setPage(1); }}
-                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${!filterSubtype ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
+                  key={s}
+                  onClick={() => {
+                    setFilterSubtype(s);
+                    setSubtypeFilterOpen(false);
+                    setPage(1);
+                  }}
+                  className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${filterSubtype === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
                 >
-                  All Subtypes
-                  {!filterSubtype && <Check size={13} className="text-brand" />}
+                  {EMPLOYEE_SUBTYPE_LABEL[s]}
+                  {filterSubtype === s && <Check size={13} className="text-brand" />}
                 </button>
-                {STORE_KEEPER_SUBTYPE_VALUES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => {
-                      setFilterSubtype(s);
-                      setSubtypeFilterOpen(false);
-                      setPage(1);
-                    }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2 text-[0.77rem] transition-colors ${filterSubtype === s ? "text-brand font-semibold bg-surface-low" : "text-on-surface-variant hover:text-on-surface hover:bg-surface-low"}`}
-                  >
-                    {STORE_KEEPER_SUBTYPE_LABEL[s]}
-                    {filterSubtype === s && <Check size={13} className="text-brand" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Status filter */}
         <div className="relative">
@@ -393,35 +382,28 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
                 </button>
               </div>
 
-              {/* Type chip + subtype chip (store keeper + admin) */}
-              <div className="flex flex-col items-center gap-0.5">
-                <span className={`px-2 py-0.5 rounded-lg text-[0.68rem] font-medium ${TYPE_CHIP_CLASS[emp.type]}`}>
+              {/* Type chip (larger, primary) + subtype chip (smaller, secondary).
+                  Size delta makes the role the dominant identifier and the
+                  subtype a subtle qualifier. */}
+              <div className="flex flex-col items-center gap-1">
+                <span className={`px-2.5 py-1 rounded-lg text-[0.75rem] font-medium ${TYPE_CHIP_CLASS}`}>
                   {TYPE_LABEL[emp.type]}
                 </span>
-                {emp.type === "STORE_KEEPER" && (
-                  emp.storeKeeperSubtype ? (
-                    <span
-                      className={`px-2 py-0.5 rounded-lg text-[0.6rem] font-medium ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[emp.storeKeeperSubtype]}`}
-                    >
-                      {STORE_KEEPER_SUBTYPE_LABEL[emp.storeKeeperSubtype]}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setDrawerEmployee(emp); }}
-                      className="px-2 py-0.5 rounded-lg text-[0.6rem] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
-                      title="Subtype not set — click to choose"
-                    >
-                      Set subtype
-                    </button>
-                  )
-                )}
-                {emp.type === "ADMIN" && emp.adminSubtype && (
+                {emp.subtype ? (
                   <span
-                    className={`px-2 py-0.5 rounded-lg text-[0.6rem] font-medium ${ADMIN_SUBTYPE_CHIP_CLASS[emp.adminSubtype]}`}
+                    className={`px-2 py-0.5 rounded-lg text-[0.6rem] font-medium ${EMPLOYEE_SUBTYPE_CHIP_CLASS[emp.subtype]}`}
                   >
-                    {ADMIN_SUBTYPE_LABEL[emp.adminSubtype]}
+                    {EMPLOYEE_SUBTYPE_LABEL[emp.subtype]}
                   </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setDrawerEmployee(emp); }}
+                    className="px-2 py-0.5 rounded-lg text-[0.6rem] font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors cursor-pointer"
+                    title="Subtype not set — click to choose"
+                  >
+                    Set subtype
+                  </button>
                 )}
               </div>
 

@@ -129,11 +129,17 @@ export type BranchDispatcherRow = {
 export type BranchEmployeeRow = {
   employeeId: string;
   name: string;
-  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER";
-  /** Sub-tag on STORE_KEEPER rows. Null for any other type. */
-  storeKeeperSubtype: "TEMPORARY" | "PERMANENT" | null;
-  /** Sub-tag on ADMIN rows. Null for any other type. */
-  adminSubtype: "TEMPORARY" | "PERMANENT" | null;
+  type:
+    | "SUPERVISOR"
+    | "ADMIN"
+    | "STORE_KEEPER"
+    | "DRIVER"
+    | "MARKETING"
+    | "ASSISTANT"
+    | "QUALITY_CONTROL"
+    | "ACCOUNT_EXECUTIVE";
+  /** Universal subtype (TEMPORARY / PERMANENT / null). Applies to every type. */
+  subtype: "TEMPORARY" | "PERMANENT" | null;
   extId: string | null;
   /** Raw 12-digit IC (or empty string if no IC set). */
   icNo: string;
@@ -203,8 +209,7 @@ export async function getBranchDetail(
         id: true,
         name: true,
         type: true,
-        storeKeeperSubtype: true,
-        adminSubtype: true,
+        subtype: true,
         extId: true,
         icNo: true,
         avatarUrl: true,
@@ -331,9 +336,8 @@ export async function getBranchDetail(
   const employeeRows: BranchEmployeeRow[] = employees.map((e) => ({
     employeeId: e.id,
     name: e.name,
-    type: e.type as "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER",
-    storeKeeperSubtype: e.storeKeeperSubtype,
-    adminSubtype: e.adminSubtype,
+    type: e.type as BranchEmployeeRow["type"],
+    subtype: e.subtype,
     extId: e.extId,
     icNo: e.icNo ?? "",
     isComplete: !!e.icNo,

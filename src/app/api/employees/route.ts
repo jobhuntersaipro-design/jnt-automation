@@ -7,10 +7,11 @@ import { getEmployees } from "@/lib/db/employees";
 import { getEffectiveAgentId } from "@/lib/impersonation";
 import type { EmployeeType, StoreKeeperSubtype } from "@/generated/prisma/client";
 import {
-  isValidStoreKeeperSubtype,
-  validateSubtypeForType,
-} from "@/lib/staff/store-keeper-subtype";
-import { validateAdminSubtypeForType } from "@/lib/staff/admin-subtype";
+  isValidEmployeeSubtype,
+  isValidEmployeeType,
+  validateEmployeeSubtype,
+  EMPLOYEE_TYPE_VALUES,
+} from "@/lib/staff/employee-subtype";
 
 export async function GET(req: NextRequest) {
   try {
@@ -23,11 +24,9 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const type = url.searchParams.get("type") as EmployeeType | null;
     const search = url.searchParams.get("search") || undefined;
-    // The `subtype` query param matches by union — both storeKeeperSubtype
-    // and adminSubtype reuse the same TEMPORARY/PERMANENT enum, so picking
-    // "Temporary" surfaces both Temp SKs and Temp Admins.
+    // Universal subtype filter — every type carries a subtype now.
     const subtypeRaw = url.searchParams.get("subtype");
-    const subtype = isValidStoreKeeperSubtype(subtypeRaw)
+    const subtype = isValidEmployeeSubtype(subtypeRaw)
       ? (subtypeRaw as StoreKeeperSubtype)
       : undefined;
 
@@ -58,8 +57,12 @@ export async function POST(req: NextRequest) {
       extId,
       icNo,
       type,
-      storeKeeperSubtype,
-      adminSubtype,
+      subtype: rawSubtype,
+      // Legacy field names — older client bundles still send these. Both
+      // resolve to the same universal `subtype` column. Take whichever is
+      // first non-null; they can't both be set under the new model.
+      storeKeeperSubtype: legacySkSubtype,
+      adminSubtype: legacyAdminSubtype,
       branchCode,
       dispatcherId,
       epfNo,
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
       extId?: string;
       icNo?: string;
       type?: EmployeeType;
+      subtype?: StoreKeeperSubtype | null;
       storeKeeperSubtype?: StoreKeeperSubtype | null;
       adminSubtype?: StoreKeeperSubtype | null;
       branchCode?: string;
@@ -79,22 +83,22 @@ export async function POST(req: NextRequest) {
       incomeTaxNo?: string;
     };
 
+    const subtype = rawSubtype ?? legacySkSubtype ?? legacyAdminSubtype ?? null;
+
     if (!name?.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    if (!type || !["SUPERVISOR", "ADMIN", "STORE_KEEPER", "DRIVER"].includes(type)) {
-      return NextResponse.json({ error: "Valid employee type is required" }, { status: 400 });
+    if (!type || !isValidEmployeeType(type)) {
+      return NextResponse.json(
+        { error: `Valid employee type is required (one of: ${EMPLOYEE_TYPE_VALUES.join(", ")})` },
+        { status: 400 },
+      );
     }
 
-    const subtypeCheck = validateSubtypeForType(type, storeKeeperSubtype ?? null);
+    const subtypeCheck = validateEmployeeSubtype(subtype);
     if (!subtypeCheck.ok) {
       return NextResponse.json({ error: subtypeCheck.error }, { status: 400 });
-    }
-
-    const adminSubtypeCheck = validateAdminSubtypeForType(type, adminSubtype ?? null);
-    if (!adminSubtypeCheck.ok) {
-      return NextResponse.json({ error: adminSubtypeCheck.error }, { status: 400 });
     }
 
     if (!branchCode || !branchCode.trim()) {
@@ -129,13 +133,6 @@ export async function POST(req: NextRequest) {
     }
     const branchId = branch.id;
 
-    // Subtype only applies when type matches its role. Defense-in-depth even
-    // though the validators above already rejected mismatches.
-    const safeSubtype: StoreKeeperSubtype | null =
-      type === "STORE_KEEPER" ? (storeKeeperSubtype ?? null) : null;
-    const safeAdminSubtype: StoreKeeperSubtype | null =
-      type === "ADMIN" ? (adminSubtype ?? null) : null;
-
     const employee = await prisma.employee.create({
       data: {
         agentId: agentId,
@@ -144,8 +141,7 @@ export async function POST(req: NextRequest) {
         icNo: safeIcNo,
         gender,
         type,
-        storeKeeperSubtype: safeSubtype,
-        adminSubtype: safeAdminSubtype,
+        subtype,
         branchId,
         dispatcherId: dispatcherId || null,
         epfNo: epfNo?.trim() || null,
@@ -174,8 +170,7 @@ export async function POST(req: NextRequest) {
         gender: employee.gender,
         avatarUrl: employee.avatarUrl,
         type: employee.type,
-        storeKeeperSubtype: employee.storeKeeperSubtype,
-        adminSubtype: employee.adminSubtype,
+        subtype: employee.subtype,
         branchCode: employee.branch?.code ?? null,
         basicPay: employee.basicPay,
         hourlyWage: employee.hourlyWage,

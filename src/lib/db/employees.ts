@@ -11,8 +11,8 @@ export type StaffEmployee = {
   gender: Gender;
   avatarUrl: string | null;
   type: EmployeeType;
-  storeKeeperSubtype: StoreKeeperSubtype | null;
-  adminSubtype: StoreKeeperSubtype | null;
+  /** Universal subtype (TEMPORARY / PERMANENT / null). Applies to every type. */
+  subtype: StoreKeeperSubtype | null;
   branchCode: string | null;
   basicPay: number | null;
   hourlyWage: number | null;
@@ -38,10 +38,9 @@ export async function getEmployees(
     type?: EmployeeType;
     search?: string;
     /**
-     * Filter by subtype. Matches rows where either `storeKeeperSubtype` OR
-     * `adminSubtype` equals the supplied value — so picking "Temporary"
-     * surfaces both Temp SKs and Temp Admins. Does NOT auto-narrow type;
-     * pair with the `type` filter explicitly when needed.
+     * Filter by universal subtype. Surfaces all rows with the matching
+     * `subtype` value across every type. Does NOT auto-narrow type; pair
+     * with the `type` filter explicitly when needed.
      */
     subtype?: StoreKeeperSubtype;
   },
@@ -52,9 +51,7 @@ export async function getEmployees(
     where: {
       agentId,
       ...(type && { type }),
-      ...(subtype && {
-        OR: [{ storeKeeperSubtype: subtype }, { adminSubtype: subtype }],
-      }),
+      ...(subtype && { subtype }),
       ...(search && {
         OR: [
           { name: { contains: search, mode: "insensitive" as const } },
@@ -81,8 +78,7 @@ export async function getEmployees(
     gender: e.gender,
     avatarUrl: e.avatarUrl,
     type: e.type,
-    storeKeeperSubtype: e.storeKeeperSubtype,
-    adminSubtype: e.adminSubtype,
+    subtype: e.subtype,
     branchCode: e.branch?.code ?? null,
     basicPay: e.basicPay,
     hourlyWage: e.hourlyWage,

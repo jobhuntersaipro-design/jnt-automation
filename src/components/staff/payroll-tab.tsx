@@ -17,13 +17,11 @@ import {
   calculateStoreKeeperGross,
 } from "@/lib/payroll/statutory"
 import {
-  STORE_KEEPER_SUBTYPE_LABEL,
-  STORE_KEEPER_SUBTYPE_CHIP_CLASS,
-} from "@/lib/staff/store-keeper-subtype"
-import {
-  ADMIN_SUBTYPE_LABEL,
-  ADMIN_SUBTYPE_CHIP_CLASS,
-} from "@/lib/staff/admin-subtype"
+  EMPLOYEE_SUBTYPE_LABEL,
+  EMPLOYEE_SUBTYPE_CHIP_CLASS,
+  usesUnitsRate as resolveUsesUnitsRate,
+  type EmployeeTypeName,
+} from "@/lib/staff/employee-subtype"
 import { formatIcInput } from "@/lib/utils/ic"
 
 const MONTHS = [
@@ -36,11 +34,17 @@ type EntryPayMode = "HOUR" | "DAY"
 interface PayrollEntry {
   employeeId: string
   name: string
-  type: "SUPERVISOR" | "ADMIN" | "STORE_KEEPER" | "DRIVER"
-  /** Sub-tag on STORE_KEEPER rows. Null for any other type. */
-  storeKeeperSubtype: "TEMPORARY" | "PERMANENT" | null
-  /** Sub-tag on ADMIN rows. Null for any other type. */
-  adminSubtype: "TEMPORARY" | "PERMANENT" | null
+  type:
+    | "SUPERVISOR"
+    | "ADMIN"
+    | "STORE_KEEPER"
+    | "DRIVER"
+    | "MARKETING"
+    | "ASSISTANT"
+    | "QUALITY_CONTROL"
+    | "ACCOUNT_EXECUTIVE"
+  /** Universal subtype (TEMPORARY / PERMANENT / null). Applies to every type. */
+  subtype: "TEMPORARY" | "PERMANENT" | null
   /** HOUR | DAY for Temporary store keepers + Temporary admins; ignored otherwise. */
   payMode: EntryPayMode
   branchCode: string | null
@@ -94,19 +98,14 @@ const GROSS_FIELDS = new Set(["basicPay", "hourlyWage", "workingHours", "petrolA
 
 /**
  * True when this row uses the units-rate (hour/day) pay model rather than
- * monthly basic pay. Mirrors the server-side gate in
- * `computeEmployeeSalaryForSave`:
- *   - STORE_KEEPER unless explicitly Permanent (untagged → temp behaviour).
- *   - ADMIN only when explicitly Temporary (untagged → permanent / basicPay).
- *   - Sup/Driver → always basicPay.
+ * monthly basic pay. Thin wrapper over the shared `usesUnitsRate` helper in
+ * `lib/staff/employee-subtype.ts` — kept as a local function so the rest
+ * of the file can keep its `PayrollEntry`-shaped call site.
  */
 function usesUnitsRate(
-  entry: Pick<PayrollEntry, "type" | "storeKeeperSubtype" | "adminSubtype">,
+  entry: Pick<PayrollEntry, "type" | "subtype">,
 ): boolean {
-  return (
-    (entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype !== "PERMANENT") ||
-    (entry.type === "ADMIN" && entry.adminSubtype === "TEMPORARY")
-  )
+  return resolveUsesUnitsRate(entry.type as EmployeeTypeName, entry.subtype)
 }
 
 function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
@@ -290,6 +289,10 @@ const TYPE_LABELS: Record<string, string> = {
   ADMIN: "Admin",
   STORE_KEEPER: "Store Keeper",
   DRIVER: "Driver",
+  MARKETING: "Marketing",
+  ASSISTANT: "Assistant",
+  QUALITY_CONTROL: "Quality Control",
+  ACCOUNT_EXECUTIVE: "Account Executive",
 }
 
 const PAGE_SIZE = 20
@@ -361,10 +364,10 @@ export function PayrollTab() {
           // "0.00" placeholder identically to KPI. Guards against stale API
           // shapes from a dev server holding an older Prisma client cache.
           otAllowance: raw.otAllowance ?? 0,
-          // adminSubtype is new — coerce missing to null so a stale API
-          // payload (older Prisma client cache) doesn't trip the
-          // `usesUnitsRate` predicate by leaving the field as `undefined`.
-          adminSubtype: raw.adminSubtype ?? null,
+          // Coerce missing subtype to null defensively — stale API payloads
+          // from before the universal-subtype migration could leave it as
+          // `undefined` and trip the `usesUnitsRate` predicate.
+          subtype: raw.subtype ?? null,
         }
         // Rows that use units-rate (Temp / untagged SK) keep workingHours +
         // hourlyWage. Anything else (Sup/Admin/Driver/Permanent SK) gets
@@ -1094,18 +1097,11 @@ export function PayrollTab() {
                             <span>
                               {TYPE_LABELS[entry.type]}{entry.hasDispatcherMatch ? " + Dispatcher" : ""}
                             </span>
-                            {entry.type === "STORE_KEEPER" && entry.storeKeeperSubtype && (
+                            {entry.subtype && (
                               <span
-                                className={`px-1.5 py-0.5 rounded text-[0.58rem] font-medium ${STORE_KEEPER_SUBTYPE_CHIP_CLASS[entry.storeKeeperSubtype]}`}
+                                className={`px-1.5 py-0.5 rounded text-[0.58rem] font-medium ${EMPLOYEE_SUBTYPE_CHIP_CLASS[entry.subtype]}`}
                               >
-                                {STORE_KEEPER_SUBTYPE_LABEL[entry.storeKeeperSubtype]}
-                              </span>
-                            )}
-                            {entry.type === "ADMIN" && entry.adminSubtype && (
-                              <span
-                                className={`px-1.5 py-0.5 rounded text-[0.58rem] font-medium ${ADMIN_SUBTYPE_CHIP_CLASS[entry.adminSubtype]}`}
-                              >
-                                {ADMIN_SUBTYPE_LABEL[entry.adminSubtype]}
+                                {EMPLOYEE_SUBTYPE_LABEL[entry.subtype]}
                               </span>
                             )}
                           </div>

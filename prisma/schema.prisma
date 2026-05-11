@@ -246,6 +246,10 @@ enum EmployeeType {
   ADMIN
   STORE_KEEPER
   DRIVER
+  MARKETING
+  ASSISTANT
+  QUALITY_CONTROL
+  ACCOUNT_EXECUTIVE
 }
 
 enum StoreKeeperSubtype {
@@ -267,8 +271,11 @@ model Employee {
   gender      Gender       @default(UNKNOWN)
   avatarUrl   String?
   type        EmployeeType
-  storeKeeperSubtype StoreKeeperSubtype?  // null unless type = STORE_KEEPER
-  adminSubtype       StoreKeeperSubtype?  // null unless type = ADMIN — TEMPORARY → hourly/daily, PERMANENT (or null) → basicPay
+  // Universal subtype tag (TEMPORARY / PERMANENT). Applies to every type.
+  // Pay-model coupling: STORE_KEEPER (any subtype except PERMANENT) and
+  // ADMIN (TEMPORARY) use hours × rate; everything else uses basicPay. The
+  // chip is metadata only for Sup/Driver/Marketing/Assistant/QC/AE.
+  subtype     StoreKeeperSubtype?
   branchId    String?
   isActive    Boolean      @default(true)
 

@@ -4,6 +4,7 @@ import {
   calculateSupervisorGross,
   calculateStoreKeeperGross,
 } from "./statutory";
+import { usesUnitsRate, type EmployeeTypeName } from "@/lib/staff/employee-subtype";
 import type {
   EmployeeType,
   StoreKeeperSubtype,
@@ -39,12 +40,16 @@ export interface EmployeeSavePayload {
 export interface EmployeeForSave {
   id: string;
   type: EmployeeType;
-  /** null treated as TEMPORARY behavior for back-compat with untagged rows. */
-  storeKeeperSubtype?: StoreKeeperSubtype | null;
-  /** Admin subtype. Null treated as PERMANENT behaviour for back-compat with
-   *  untagged admins (preserves today's basicPay path). Reuses the same
-   *  TEMPORARY/PERMANENT enum as storeKeeperSubtype. */
-  adminSubtype?: StoreKeeperSubtype | null;
+  /**
+   * Universal subtype tag. Pay-model coupling (read by `isUnitsRate` below):
+   *   - STORE_KEEPER: null/TEMPORARY → units × rate (back-compat — untagged
+   *     SKs were temp historically); PERMANENT → basicPay.
+   *   - ADMIN: TEMPORARY → units × rate; PERMANENT/null → basicPay
+   *     (back-compat — untagged admins stay on basicPay).
+   *   - Everyone else (Sup/Driver/Marketing/Assistant/QC/AE): always
+   *     basicPay regardless of subtype (metadata only).
+   */
+  subtype?: StoreKeeperSubtype | null;
   name: string;
   branchId: string | null;
 }
@@ -104,15 +109,10 @@ export function computeEmployeeSalaryForSave(
   entry: EmployeeSavePayload,
   dispatcherRecord: DispatcherRecordForSave | null,
 ): EmployeeSalarySaveResult {
-  // Units-rate branch (hourly/daily) fires for:
-  //   - STORE_KEEPER unless explicitly tagged Permanent (untagged → temp)
-  //   - ADMIN only when explicitly tagged Temporary (untagged → permanent,
-  //     preserves today's basicPay behaviour)
-  // Everyone else (Sup/Driver/Permanent SK/Permanent or untagged Admin) uses
-  // the basicPay branch.
-  const isUnitsRate =
-    (emp.type === "STORE_KEEPER" && emp.storeKeeperSubtype !== "PERMANENT") ||
-    (emp.type === "ADMIN" && emp.adminSubtype === "TEMPORARY");
+  // Pay-model gate via shared helper (see `lib/staff/employee-subtype.ts`).
+  // TEMPORARY on any role → units × rate; PERMANENT on any role → basicPay;
+  // null falls back to per-type defaults (untagged SK → temp, others → basicPay).
+  const isUnitsRate = usesUnitsRate(emp.type as EmployeeTypeName, emp.subtype);
 
   const basicPay = isUnitsRate ? 0 : entry.basicPay;
   const workingHours = isUnitsRate ? entry.workingHours : 0;
