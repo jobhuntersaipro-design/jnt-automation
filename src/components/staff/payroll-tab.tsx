@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { ChevronDown, Check, Loader2, FileText, Download, X, AlertTriangle, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react"
+import { ChevronDown, ChevronsUpDown, Check, Loader2, FileText, Download, X, AlertTriangle, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react"
 import { toast } from "sonner"
 import { useClickOutside } from "@/lib/hooks/use-click-outside"
 import { PayrollSummaryCards } from "./payroll-summary-cards"
@@ -297,6 +297,105 @@ const TYPE_LABELS: Record<string, string> = {
 
 const PAGE_SIZE = 20
 
+// ── Sorting ────────────────────────────────────────────────────────────────
+//
+// 16 sortable columns. The "pay" virtual field maps to whichever pay value the
+// row actually displays (hourlyWage for units-rate rows, basicPay for the rest)
+// so the sort matches what the user sees in the cell.
+type SortField =
+  | "name"
+  | "branchCode"
+  | "pay"
+  | "workingHours"
+  | "petrolAllowance"
+  | "kpiAllowance"
+  | "otAllowance"
+  | "otherAllowance"
+  | "grossSalary"
+  | "pcb"
+  | "penalty"
+  | "epfEmployee"
+  | "socsoEmployee"
+  | "eisEmployee"
+  | "netSalary"
+  | "isActive"
+
+type SortDirection = "asc" | "desc"
+type SortState = { field: SortField; direction: SortDirection }
+
+/**
+ * Clickable header that drives the table sort.
+ *
+ * Visual state:
+ *  - Unsorted → faded `ChevronsUpDown` icon (hint that the column is sortable)
+ *  - Sorted   → `ChevronDown` tinted `primary`, rotated 180° on ascending so
+ *               the icon physically flips between asc/desc with a 200 ms tween
+ *
+ * The `<th>` retains layout responsibilities (min-width, sticky positioning,
+ * shadow). Typography lives here so all 16 headers share one source of truth.
+ */
+function SortHeader({
+  field,
+  current,
+  onSort,
+  align = "center",
+  accent = "default",
+  children,
+}: {
+  field: SortField
+  current: SortState | null
+  onSort: (field: SortField) => void
+  align?: "left" | "center"
+  /** "primary" subtly tints the unsorted header (used for the Net column to
+   *  keep its existing emphasis from before the sort feature shipped). */
+  accent?: "default" | "primary"
+  children: React.ReactNode
+}) {
+  const active = current?.field === field
+  const direction = active ? current!.direction : null
+
+  const inactiveText =
+    accent === "primary"
+      ? "text-primary/80 hover:text-primary"
+      : "text-on-surface-variant hover:text-on-surface"
+  const inactiveIcon =
+    accent === "primary"
+      ? "text-primary/30 group-hover:text-primary/60"
+      : "text-on-surface-variant/30 group-hover:text-on-surface-variant/60"
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      className={`group flex w-full items-center gap-1 select-none cursor-pointer text-[0.7rem] font-semibold uppercase tracking-[0.05em] transition-colors focus:outline-none focus-visible:text-primary ${
+        align === "left" ? "justify-start" : "justify-center"
+      } ${active ? "text-primary" : inactiveText}`}
+    >
+      <span className="leading-tight">{children}</span>
+      {active ? (
+        <ChevronDown
+          size={12}
+          aria-hidden
+          className={`shrink-0 text-primary transition-transform duration-200 ${
+            direction === "asc" ? "rotate-180" : ""
+          }`}
+        />
+      ) : (
+        <ChevronsUpDown
+          size={12}
+          aria-hidden
+          className={`shrink-0 transition-colors ${inactiveIcon}`}
+        />
+      )}
+    </button>
+  )
+}
+
+function ariaSortFor(field: SortField, sort: SortState | null): "ascending" | "descending" | "none" {
+  if (sort?.field !== field) return "none"
+  return sort.direction === "asc" ? "ascending" : "descending"
+}
+
 /**
  * Mirrors the helper used on /staff?tab=settings — produces a compact page
  * list like [1, "...", 4, 5, 6, "...", 12] so navigation stays one row even
@@ -331,6 +430,10 @@ export function PayrollTab() {
   const [branchOpen, setBranchOpen] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+  // 3-state sort cycle: unsorted → asc → desc → unsorted. Clicking a
+  // different column always starts the new column ascending. Default null
+  // preserves whatever order the API returned (alphabetical by name).
+  const [sort, setSort] = useState<SortState | null>(null)
   // Track horizontal scroll on the table wrapper so the frozen Employee
   // column can render a subtle right-edge shadow only while content is
   // actually scrolled past it (standard sticky-table affordance).
@@ -501,11 +604,69 @@ export function PayrollTab() {
     })
   }, [entries, branchFilter, search])
 
-  const totalPages = Math.max(1, Math.ceil(displayedEntries.length / PAGE_SIZE))
+  // Sort the filtered set. Stable secondary sort on name so equal values
+  // (e.g. several rows with petrol = 0) keep a predictable order. Null
+  // branch codes and inactive-only fields sort to the bottom regardless
+  // of direction so they don't dominate either end of the list.
+  const sortedEntries = useMemo(() => {
+    if (!sort) return displayedEntries
+    const { field, direction } = sort
+    const factor = direction === "asc" ? 1 : -1
+    const getValue = (e: PayrollEntry): number | string | null => {
+      switch (field) {
+        case "name":
+          return e.name.toLowerCase()
+        case "branchCode":
+          return e.branchCode ? e.branchCode.toLowerCase() : null
+        case "pay":
+          // Match what the cell shows: hourly rate for units-rate rows,
+          // monthly basic pay for everyone else.
+          return usesUnitsRate(e) ? e.hourlyWage : e.basicPay
+        case "workingHours":
+          // Only units-rate rows actually use this; others render an em-dash
+          // and should sort to the bottom regardless of direction.
+          return usesUnitsRate(e) ? e.workingHours : null
+        case "isActive":
+          return e.isActive ? 1 : 0
+        default:
+          return e[field] as number
+      }
+    }
+
+    return [...displayedEntries].sort((a, b) => {
+      const av = getValue(a)
+      const bv = getValue(b)
+      // Null values pinned to the bottom in both directions — keeps the
+      // top of the list filled with sortable content.
+      if (av === null && bv === null) return a.name.localeCompare(b.name)
+      if (av === null) return 1
+      if (bv === null) return -1
+      let diff = 0
+      if (typeof av === "string" && typeof bv === "string") {
+        diff = av.localeCompare(bv) * factor
+      } else if (typeof av === "number" && typeof bv === "number") {
+        diff = (av - bv) * factor
+      }
+      if (diff !== 0) return diff
+      return a.name.localeCompare(b.name)
+    })
+  }, [displayedEntries, sort])
+
+  // 3-state cycle: asc → desc → cleared. Cleared returns to the API's
+  // natural ordering (alphabetical by name).
+  const toggleSort = useCallback((field: SortField) => {
+    setSort((current) => {
+      if (!current || current.field !== field) return { field, direction: "asc" }
+      if (current.direction === "asc") return { field, direction: "desc" }
+      return null
+    })
+  }, [])
+
+  const totalPages = Math.max(1, Math.ceil(sortedEntries.length / PAGE_SIZE))
   const safePage = Math.min(page, totalPages)
   const pagedEntries = useMemo(
-    () => displayedEntries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [displayedEntries, safePage],
+    () => sortedEntries.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
+    [sortedEntries, safePage],
   )
 
   const handleSave = async () => {
@@ -639,8 +800,10 @@ export function PayrollTab() {
 
   // Clear selection when month/year/branch filter changes
   useEffect(() => { setSelectedIds(new Set()) }, [month, year, branchFilter])
-  // Reset to first page whenever the displayed set could meaningfully shrink.
-  useEffect(() => { setPage(1) }, [month, year, branchFilter, search])
+  // Reset to first page whenever the displayed set could meaningfully shrink
+  // or be reordered — keeps the user looking at "the top" after a filter or
+  // sort change instead of stranded mid-table on a now-empty page.
+  useEffect(() => { setPage(1) }, [month, year, branchFilter, search, sort])
 
   // Active entries only — the bulk-select header, "all saved?" hint, and
   // "select all" affordance ignore inactive rows since their payslip
@@ -968,39 +1131,79 @@ export function PayrollTab() {
                   </th>
                 )}
                 <th
-                  className={`text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-left pl-3 sticky z-20 bg-surface-card transition-shadow duration-200 ${
+                  aria-sort={ariaSortFor("name", sort)}
+                  className={`pb-3 pl-3 sticky z-20 bg-surface-card transition-shadow duration-200 ${
                     scrolledX ? "shadow-[6px_0_12px_-4px_rgba(25,28,29,0.18)]" : ""
                   }`}
                   style={{ minWidth: 180, left: allSaved ? 30 : 0 }}
-                >Employee</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Branch</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Pay</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 80 }}>Hour/Day</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Petrol</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>KPI</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>OT</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Other</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 100 }}>Gross</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>PCB</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 90 }}>Penalty</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
-                  <div>EPF</div>
-                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
+                >
+                  <SortHeader field="name" current={sort} onSort={toggleSort} align="left">
+                    Employee
+                  </SortHeader>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
-                  <div>SOCSO</div>
-                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
+                <th aria-sort={ariaSortFor("branchCode", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="branchCode" current={sort} onSort={toggleSort}>Branch</SortHeader>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 95 }}>
-                  <div>EIS</div>
-                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70">Employer</div>
+                <th aria-sort={ariaSortFor("pay", sort)} className="pb-3" style={{ minWidth: 100 }}>
+                  <SortHeader field="pay" current={sort} onSort={toggleSort}>Pay</SortHeader>
                 </th>
-                <th className="text-[0.7rem] font-semibold text-primary uppercase tracking-[0.05em] pb-3 text-center" style={{ minWidth: 110 }}>Net</th>
-                <th className="text-[0.7rem] font-semibold text-on-surface-variant uppercase tracking-[0.05em] pb-3 text-center" style={{ width: 90 }}>Status</th>
+                <th aria-sort={ariaSortFor("workingHours", sort)} className="pb-3" style={{ minWidth: 80 }}>
+                  <SortHeader field="workingHours" current={sort} onSort={toggleSort}>Hour/Day</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("petrolAllowance", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="petrolAllowance" current={sort} onSort={toggleSort}>Petrol</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("kpiAllowance", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="kpiAllowance" current={sort} onSort={toggleSort}>KPI</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("otAllowance", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="otAllowance" current={sort} onSort={toggleSort}>OT</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("otherAllowance", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="otherAllowance" current={sort} onSort={toggleSort}>Other</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("grossSalary", sort)} className="pb-3" style={{ minWidth: 100 }}>
+                  <SortHeader field="grossSalary" current={sort} onSort={toggleSort}>Gross</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("pcb", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="pcb" current={sort} onSort={toggleSort}>PCB</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("penalty", sort)} className="pb-3" style={{ minWidth: 90 }}>
+                  <SortHeader field="penalty" current={sort} onSort={toggleSort}>Penalty</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("epfEmployee", sort)} className="pb-3" style={{ minWidth: 95 }}>
+                  <SortHeader field="epfEmployee" current={sort} onSort={toggleSort}>EPF</SortHeader>
+                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Employer</div>
+                </th>
+                <th aria-sort={ariaSortFor("socsoEmployee", sort)} className="pb-3" style={{ minWidth: 95 }}>
+                  <SortHeader field="socsoEmployee" current={sort} onSort={toggleSort}>SOCSO</SortHeader>
+                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Employer</div>
+                </th>
+                <th aria-sort={ariaSortFor("eisEmployee", sort)} className="pb-3" style={{ minWidth: 95 }}>
+                  <SortHeader field="eisEmployee" current={sort} onSort={toggleSort}>EIS</SortHeader>
+                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Employer</div>
+                </th>
+                <th aria-sort={ariaSortFor("netSalary", sort)} className="pb-3" style={{ minWidth: 110 }}>
+                  <SortHeader field="netSalary" current={sort} onSort={toggleSort} accent="primary">Net</SortHeader>
+                </th>
+                <th aria-sort={ariaSortFor("isActive", sort)} className="pb-3" style={{ width: 90 }}>
+                  <SortHeader field="isActive" current={sort} onSort={toggleSort}>Status</SortHeader>
+                </th>
                 <th className="pb-3" style={{ width: 150 }}></th>
               </tr>
             </thead>
-            <tbody>
+            {/*
+              Subtle fade-in on sort change. Keying tbody by the active sort
+              state forces a re-mount and re-runs the `animate-in` keyframe,
+              giving the reorder a soft transition instead of an instant jump.
+              Page changes also remount so paginating feels equally smooth.
+              Inputs aren't focused at this moment (the user just clicked a
+              header or page chip), so we don't lose any in-progress edits.
+            */}
+            <tbody
+              key={`${sort ? `${sort.field}-${sort.direction}` : "none"}-p${safePage}`}
+              className="animate-in fade-in duration-200"
+            >
               {pagedEntries.map((entry) => {
                 const isUnitsRate = usesUnitsRate(entry)
                 const isReady = isUnitsRate ? entry.workingHours > 0 : true
