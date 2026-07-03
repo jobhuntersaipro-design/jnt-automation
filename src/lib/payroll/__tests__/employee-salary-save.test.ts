@@ -288,6 +288,7 @@ describe("computeEmployeeSalaryForSave — statutory overrides", () => {
         basicPay: 5000,
         epfEmployee: 100,
         socsoEmployee: 25,
+        socsoLindung: 18,
         eisEmployee: 7,
         epfEmployer: 110,
         socsoEmployer: 50,
@@ -297,10 +298,22 @@ describe("computeEmployeeSalaryForSave — statutory overrides", () => {
     );
     expect(result.epfEmployee).toBe(100);
     expect(result.socsoEmployee).toBe(25);
+    expect(result.socsoLindung).toBe(18);
     expect(result.eisEmployee).toBe(7);
     expect(result.epfEmployer).toBe(110);
     expect(result.socsoEmployer).toBe(50);
     expect(result.eisEmployer).toBe(8);
+  });
+
+  it("auto-computes socsoLindung from the bracket when not overridden", () => {
+    // basicPay 1700 → gross 1700 → bracket 1,600–1,700: contribution 8.25, lindung 12.35
+    const result = computeEmployeeSalaryForSave(
+      emp({ type: "SUPERVISOR" }),
+      entry({ basicPay: 1700 }),
+      null,
+    );
+    expect(result.socsoEmployee).toBe(8.25);
+    expect(result.socsoLindung).toBe(12.35);
   });
 });
 
@@ -335,7 +348,7 @@ describe("computeEmployeeSalaryForSave — combined with dispatcher", () => {
     expect(result.advance).toBe(150);
   });
 
-  it("net salary subtracts EPF/SOCSO/EIS/PCB/penalty/advance from totalGross", () => {
+  it("net salary subtracts EPF/SOCSO/SOCSO Lindung/EIS/PCB/penalty/advance from totalGross", () => {
     const result = computeEmployeeSalaryForSave(
       emp({ type: "SUPERVISOR" }),
       entry({
@@ -345,14 +358,15 @@ describe("computeEmployeeSalaryForSave — combined with dispatcher", () => {
         advance: 50,
         epfEmployee: 200,
         socsoEmployee: 30,
+        socsoLindung: 20,
         eisEmployee: 10,
       }),
       dispatcherRecord,
     );
     // gross = 3000 + 880 (dispatcher) = 3880
     // combined penalty 35, advance 150
-    // net = 3880 - 200 - 30 - 10 - 25 - 35 - 150 = 3430
-    expect(result.netSalary).toBe(3430);
+    // net = 3880 - 200 - 30 - 20 (lindung) - 10 - 25 - 35 - 150 = 3410
+    expect(result.netSalary).toBe(3410);
   });
 });
 

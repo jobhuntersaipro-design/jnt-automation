@@ -2,15 +2,20 @@
 
 ## Status
 
-Complete
+In Progress
 
 ## Goals
 
-<!-- Bullet points of what success looks like -->
+- Add SOCSO **Lindung 24 Jam** (First Category → Employee Share → Non-Employment Injury / SKBBK) as a new value in the `/staff` Payroll tab SOCSO column.
+- The existing employee SOCSO value = **Contribution** (Invalidity share); Lindung 24 Jam is a **separate** value from the same bracket lookup.
+- Lindung 24 Jam is **deducted from the employee's net salary** (employee total SOCSO = Contribution + Lindung 24 Jam), matching PERKESO's actual employee share and the reference "Total Amount".
+- Reflect the Lindung 24 Jam amount on the generated **payslip PDFs** too.
 
 ## Notes
 
-<!-- Additional context, constraints, or details from spec -->
+- Source: PERKESO "New Contribution Rate Including SKBBK" table (65 brackets, cap RM6,000). Non-Employment Injury employee-share column supplies the Lindung values.
+- New DB column `EmployeeSalaryRecord.socsoLindung Float @default(0)` (migration required). Existing saved months keep their stored net until re-saved (socsoLindung defaults to 0 for old rows).
+- Field name across the stack: `socsoLindung`.
 
 ## History
 

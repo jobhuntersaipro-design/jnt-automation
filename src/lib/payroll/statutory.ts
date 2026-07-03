@@ -5,6 +5,12 @@ export interface StatutoryResult {
   epfEmployee: number
   epfEmployer: number
   socsoEmployee: number
+  /**
+   * Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam" / SKBBK).
+   * Deducted from the employee alongside `socsoEmployee` — total employee
+   * SOCSO = socsoEmployee + socsoLindung.
+   */
+  socsoLindung: number
   socsoEmployer: number
   eisEmployee: number
   eisEmployer: number
@@ -56,6 +62,7 @@ export function calculateStatutory(
       epfEmployee: 0,
       epfEmployer: 0,
       socsoEmployee: 0,
+      socsoLindung: 0,
       socsoEmployer: 0,
       eisEmployee: 0,
       eisEmployer: 0,
@@ -96,6 +103,7 @@ export function calculateStatutory(
     epfEmployee,
     epfEmployer,
     socsoEmployee: socso.employee,
+    socsoLindung: socso.lindung,
     socsoEmployer: socso.employer,
     eisEmployee: eis.employee,
     eisEmployer: eis.employer,
@@ -117,6 +125,7 @@ export function calculateNetSalary(
     grossSalary -
     statutory.epfEmployee -
     statutory.socsoEmployee -
+    statutory.socsoLindung -
     statutory.eisEmployee -
     pcb -
     penalty -

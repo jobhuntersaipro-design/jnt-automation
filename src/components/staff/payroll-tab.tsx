@@ -77,6 +77,9 @@ interface PayrollEntry {
   epfEmployee: number
   epfEmployer: number
   socsoEmployee: number
+  /** Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam" / SKBBK).
+   *  Deducted from net alongside socsoEmployee. */
+  socsoLindung: number
   socsoEmployer: number
   eisEmployee: number
   eisEmployer: number
@@ -144,7 +147,7 @@ function recalcEntry(entry: PayrollEntry, changedField: string): PayrollEntry {
   // statutory/deduction values were edited (the rule only depends on gross + KPI).
   const baseWageWithoutBonus = Math.max(0, totalGross - entry.kpiAllowance)
   const epfBonusRuleApplied = totalGross > 5000 && baseWageWithoutBonus <= 5000
-  const net = totalGross - entry.epfEmployee - entry.socsoEmployee - entry.eisEmployee - entry.pcb - entry.penalty - entry.advance
+  const net = totalGross - entry.epfEmployee - entry.socsoEmployee - entry.socsoLindung - entry.eisEmployee - entry.pcb - entry.penalty - entry.advance
   return { ...entry, grossSalary: totalGross, epfBonusRuleApplied, netSalary: net }
 }
 
@@ -467,6 +470,9 @@ export function PayrollTab() {
           // "0.00" placeholder identically to KPI. Guards against stale API
           // shapes from a dev server holding an older Prisma client cache.
           otAllowance: raw.otAllowance ?? 0,
+          // Coerce missing socsoLindung to 0 — records saved before the
+          // Lindung 24 Jam column existed won't ship the field.
+          socsoLindung: raw.socsoLindung ?? 0,
           // Coerce missing subtype to null defensively — stale API payloads
           // from before the universal-subtype migration could leave it as
           // `undefined` and trip the `usesUnitsRate` predicate.
@@ -703,6 +709,7 @@ export function PayrollTab() {
             // server-side from gross, overwriting any cleared value.
             epfEmployee: e.epfEmployee,
             socsoEmployee: e.socsoEmployee,
+            socsoLindung: e.socsoLindung,
             eisEmployee: e.eisEmployee,
             epfEmployer: e.epfEmployer,
             socsoEmployer: e.socsoEmployer,
@@ -750,13 +757,14 @@ export function PayrollTab() {
           gross: acc.gross + e.grossSalary,
           epfEmployee: acc.epfEmployee + e.epfEmployee,
           socsoEmployee: acc.socsoEmployee + e.socsoEmployee,
+          socsoLindung: acc.socsoLindung + e.socsoLindung,
           eisEmployee: acc.eisEmployee + e.eisEmployee,
           net: acc.net + e.netSalary,
           epfEmployer: acc.epfEmployer + e.epfEmployer,
           socsoEmployer: acc.socsoEmployer + e.socsoEmployer,
           eisEmployer: acc.eisEmployer + e.eisEmployer,
         }),
-        { gross: 0, epfEmployee: 0, socsoEmployee: 0, eisEmployee: 0, net: 0, epfEmployer: 0, socsoEmployer: 0, eisEmployer: 0 }
+        { gross: 0, epfEmployee: 0, socsoEmployee: 0, socsoLindung: 0, eisEmployee: 0, net: 0, epfEmployer: 0, socsoEmployer: 0, eisEmployer: 0 }
       )
   }, [displayedEntries])
 
@@ -1114,7 +1122,7 @@ export function PayrollTab() {
               if (next !== scrolledX) setScrolledX(next)
             }}
           >
-          <table className="w-full" style={{ minWidth: 1810 }}>
+          <table className="w-full" style={{ minWidth: 1825 }}>
             <thead>
               <tr>
                 {allSaved && (
@@ -1175,9 +1183,9 @@ export function PayrollTab() {
                   <SortHeader field="epfEmployee" current={sort} onSort={toggleSort}>EPF</SortHeader>
                   <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Employer</div>
                 </th>
-                <th aria-sort={ariaSortFor("socsoEmployee", sort)} className="pb-3" style={{ minWidth: 95 }}>
+                <th aria-sort={ariaSortFor("socsoEmployee", sort)} className="pb-3" style={{ minWidth: 108 }}>
                   <SortHeader field="socsoEmployee" current={sort} onSort={toggleSort}>SOCSO</SortHeader>
-                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Employer</div>
+                  <div className="text-[0.6rem] font-normal normal-case tracking-normal text-on-surface-variant/70 text-center mt-0.5">Sort by contribution</div>
                 </th>
                 <th aria-sort={ariaSortFor("eisEmployee", sort)} className="pb-3" style={{ minWidth: 95 }}>
                   <SortHeader field="eisEmployee" current={sort} onSort={toggleSort}>EIS</SortHeader>
@@ -1291,7 +1299,7 @@ export function PayrollTab() {
                         })()}
                         <div className="min-w-0">
                           <div
-                            className="text-[0.8rem] font-medium text-on-surface leading-tight uppercase whitespace-normal break-words"
+                            className="text-[0.8rem] font-medium text-on-surface leading-tight uppercase whitespace-normal wrap-break-word"
                             title={entry.name}
                           >
                             {entry.name}
@@ -1526,7 +1534,11 @@ export function PayrollTab() {
                       )}
                     </td>
 
-                    {/* SOCSO */}
+                    {/* SOCSO — three stacked values:
+                        1) Employee Contribution (Invalidity share)
+                        2) Employee Lindung 24 Jam (Non-Employment Injury / SKBBK)
+                        3) Employer share (light)
+                        Both employee values are deducted from net. */}
                     <td className="py-2.5 px-1">
                       <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all">
                         <CalcCurrencyInput
@@ -1535,6 +1547,19 @@ export function PayrollTab() {
                           disabled={inactive}
                         />
                       </div>
+                      <div className="text-[0.5rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                        Contribution
+                      </div>
+                      <div className="border border-dashed border-outline-variant/40 rounded px-2 py-1 hover:border-outline-variant/80 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
+                        <CalcCurrencyInput
+                          value={entry.socsoLindung}
+                          onChange={(v) => updateEntry(entry.employeeId, "socsoLindung", v)}
+                          disabled={inactive}
+                        />
+                      </div>
+                      <div className="text-[0.5rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                        Lindung 24 Jam
+                      </div>
                       <div className="border border-dashed border-outline-variant/30 rounded px-2 py-0.5 hover:border-outline-variant/60 hover:bg-surface-hover/40 focus-within:border-solid focus-within:border-primary focus-within:bg-primary/10 focus-within:ring-2 focus-within:ring-primary/25 focus-within:shadow-sm transition-all mt-0.5">
                         <CalcCurrencyInput
                           value={entry.socsoEmployer}
@@ -1542,6 +1567,9 @@ export function PayrollTab() {
                           light
                           disabled={inactive}
                         />
+                      </div>
+                      <div className="text-[0.5rem] text-on-surface-variant/50 text-center leading-tight mt-0.5">
+                        Employer
                       </div>
                     </td>
 

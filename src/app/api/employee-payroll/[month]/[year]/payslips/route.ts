@@ -159,6 +159,7 @@ export async function POST(
       dispatcherAdvance: dispatcherData?.advance,
       epfEmployee: salaryRecord.epfEmployee,
       socsoEmployee: salaryRecord.socsoEmployee,
+      socsoLindung: salaryRecord.socsoLindung,
       eisEmployee: salaryRecord.eisEmployee,
       pcb: salaryRecord.pcb,
       penalty: salaryRecord.penalty,

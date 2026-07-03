@@ -106,6 +106,8 @@ export interface EmployeePayslipInput {
 
   epfEmployee: number;
   socsoEmployee: number;
+  /** Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam" / SKBBK). */
+  socsoLindung: number;
   eisEmployee: number;
   pcb: number;
   penalty: number;
@@ -217,6 +219,7 @@ export function buildDeductionRows(data: EmployeePayslipInput): Row[] {
   const rows: Row[] = [];
   if (data.epfEmployee > 0) rows.push({ label: "EMPLOYEE EPF (KWSP)", amount: data.epfEmployee });
   if (data.socsoEmployee > 0) rows.push({ label: "EMPLOYEE SOCSO(PERKESO)", amount: data.socsoEmployee });
+  if (data.socsoLindung > 0) rows.push({ label: "SOCSO LINDUNG 24 JAM (SKBBK)", amount: data.socsoLindung });
   if (data.eisEmployee > 0) rows.push({ label: "EMPLOYMENT INSURANCE SCHEME (EIS)", amount: data.eisEmployee });
   if (data.pcb > 0) rows.push({ label: "PCB", amount: data.pcb });
 

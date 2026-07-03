@@ -30,6 +30,7 @@ function baseInput(overrides: Partial<EmployeePayslipInput> = {}): EmployeePaysl
     otherAllowance: 0,
     epfEmployee: 297,
     socsoEmployee: 17.65,
+    socsoLindung: 0,
     eisEmployee: 6.75,
     pcb: 0,
     penalty: 0,
@@ -281,6 +282,17 @@ describe("generateEmployeePayslipPdf", () => {
     const rows = buildDeductionRows(input);
     expect(rows.find((r) => r.label === "Penalty")).toBeUndefined();
     expect(rows.find((r) => r.label === "Penalty (Dispatcher)")?.amount).toBe(30);
+  });
+
+  it("adds a SOCSO Lindung 24 Jam deduction row when socsoLindung > 0", () => {
+    const rows = buildDeductionRows(baseInput({ socsoEmployee: 8.25, socsoLindung: 12.35 }));
+    expect(rows.find((r) => r.label === "EMPLOYEE SOCSO(PERKESO)")?.amount).toBe(8.25);
+    expect(rows.find((r) => r.label === "SOCSO LINDUNG 24 JAM (SKBBK)")?.amount).toBe(12.35);
+  });
+
+  it("omits the Lindung 24 Jam row when socsoLindung is zero", () => {
+    const rows = buildDeductionRows(baseInput({ socsoLindung: 0 }));
+    expect(rows.find((r) => r.label === "SOCSO LINDUNG 24 JAM (SKBBK)")).toBeUndefined();
   });
 
   it("addition rows — combined template includes tier rows before BASIC PAY", () => {

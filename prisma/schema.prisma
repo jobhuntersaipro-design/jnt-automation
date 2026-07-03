@@ -333,6 +333,10 @@ model EmployeeSalaryRecord {
   // Statutory (employee share)
   epfEmployee   Float
   socsoEmployee Float
+  // Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam" / SKBBK).
+  // Deducted from net alongside socsoEmployee. Defaults 0 for records saved
+  // before this column existed — those keep their stored net until re-saved.
+  socsoLindung  Float @default(0)
   eisEmployee   Float
   pcb           Float @default(0) // manual
 

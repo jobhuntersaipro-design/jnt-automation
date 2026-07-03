@@ -31,6 +31,8 @@ export interface EmployeeSavePayload {
   // When omitted, fall back to auto-calc from totalGross.
   epfEmployee?: number;
   socsoEmployee?: number;
+  /** Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam"). */
+  socsoLindung?: number;
   eisEmployee?: number;
   epfEmployer?: number;
   socsoEmployer?: number;
@@ -76,6 +78,7 @@ export interface EmployeeSalarySaveResult {
   epfEmployee: number;
   epfEmployer: number;
   socsoEmployee: number;
+  socsoLindung: number;
   socsoEmployer: number;
   eisEmployee: number;
   eisEmployer: number;
@@ -152,6 +155,7 @@ export function computeEmployeeSalaryForSave(
   // manually clears EPF can't save zero — server would silently overwrite.
   const epfEmployee = entry.epfEmployee ?? computed.epfEmployee;
   const socsoEmployee = entry.socsoEmployee ?? computed.socsoEmployee;
+  const socsoLindung = entry.socsoLindung ?? computed.socsoLindung;
   const eisEmployee = entry.eisEmployee ?? computed.eisEmployee;
   const epfEmployer = entry.epfEmployer ?? computed.epfEmployer;
   const socsoEmployer = entry.socsoEmployer ?? computed.socsoEmployer;
@@ -168,6 +172,7 @@ export function computeEmployeeSalaryForSave(
     {
       epfEmployee,
       socsoEmployee,
+      socsoLindung,
       eisEmployee,
       epfEmployer,
       socsoEmployer,
@@ -192,6 +197,7 @@ export function computeEmployeeSalaryForSave(
     epfEmployee,
     epfEmployer,
     socsoEmployee,
+    socsoLindung,
     socsoEmployer,
     eisEmployee,
     eisEmployer,

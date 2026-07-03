@@ -112,6 +112,7 @@ export async function GET(
           epfEmployee: saved.epfEmployee,
           epfEmployer: saved.epfEmployer,
           socsoEmployee: saved.socsoEmployee,
+          socsoLindung: saved.socsoLindung,
           socsoEmployer: saved.socsoEmployer,
           eisEmployee: saved.eisEmployee,
           eisEmployer: saved.eisEmployer,
