@@ -105,7 +105,7 @@ export function PayoutPerBranch({
   const allHidden = branches.length > 0 && visibleBranches.length === 0;
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       <div className="shrink-0">
         <div className="flex items-start justify-between gap-3">
           <div>

@@ -122,7 +122,7 @@ function DispatcherTable({
   const sorted = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
@@ -152,7 +152,7 @@ function DispatcherTable({
       {/* Table */}
       <div className="flex flex-col overflow-x-auto">
         {/* Column headers */}
-        <div className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2">
+        <div className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2 min-w-230">
           {COLUMNS.map(({ key, label }) => (
             <button
               key={key}
@@ -177,7 +177,7 @@ function DispatcherTable({
               data-dispatcher-id={d.id}
               data-dispatcher-name={d.name}
               aria-label={`Open salary history for ${d.name}`}
-              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40"
+              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40 min-w-230"
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">

@@ -43,8 +43,8 @@ function Delta({ current, prev, invert = false }: { current: number; prev: numbe
   const sign = up ? "+" : "";
 
   return (
-    <div className={`flex items-center gap-1 text-[0.96rem] font-medium ${color}`}>
-      <Icon size={13} strokeWidth={2} />
+    <div className={`flex items-center gap-1 text-[0.8rem] sm:text-[0.92rem] font-medium ${color}`}>
+      <Icon size={13} strokeWidth={2} className="shrink-0" />
       <span>{sign}{pct.toFixed(1)}% vs last period</span>
     </div>
   );
@@ -60,12 +60,12 @@ function StatCard({
   subtitle: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
       <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
-      <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
+      <p className="text-[0.78rem] sm:text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
         {label}
       </p>
-      <p className="tabular-nums text-[2.4rem] leading-none font-heading font-semibold pl-2 text-on-surface">
+      <p className="tabular-nums text-[1.55rem] sm:text-[2.4rem] leading-none font-heading font-semibold pl-2 text-on-surface">
         {value}
       </p>
       <div className="pl-2">{subtitle}</div>
@@ -78,9 +78,9 @@ function TotalPeopleCard({ data }: { data: SummaryStats }) {
   const staffEmpty = data.totalStaff === 0;
   const total = data.totalDispatchers + data.totalStaff;
   return (
-    <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
       <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
-      <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
+      <p className="text-[0.78rem] sm:text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
         Total People
       </p>
       <div className="pl-2 flex flex-col gap-1">
@@ -123,9 +123,9 @@ function AvgMonthlySalaryCard({ data }: { data: SummaryStats }) {
   const prevCombined = data.prev.avgMonthlySalary.dispatcher + data.prev.avgMonthlySalary.staff;
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-5 flex flex-col gap-2 justify-center relative overflow-hidden">
       <div className="absolute left-0 top-4 bottom-4 w-1 bg-brand rounded-r-full" />
-      <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
+      <p className="text-[0.78rem] sm:text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
         Avg Monthly Salary
       </p>
       <div className="pl-2 flex flex-col gap-1">
@@ -162,15 +162,15 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {/* Hero card */}
       <div
-        className="rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden"
+        className="rounded-[0.75rem] p-4 sm:p-5 flex flex-col gap-2 justify-center relative overflow-hidden"
         style={{ background: "linear-gradient(135deg, #0040a1, #0056d2)" }}
       >
-        <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-white/70">
+        <p className="text-[0.78rem] sm:text-[0.84rem] font-medium uppercase tracking-[0.05em] text-white/70">
           Total Net Payout
         </p>
         <p
-          className="tabular-nums font-heading font-bold text-white leading-none"
-          style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}
+          className="tabular-nums font-heading font-bold text-white leading-none text-[1.55rem] sm:text-[2.4rem]"
+          style={{ letterSpacing: "-0.02em" }}
         >
           RM {fmtRM(data.totalNetPayout)}
         </p>
