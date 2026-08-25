@@ -124,9 +124,12 @@ export function DispatcherStaffBreakdown({ data }: { data: RoleBreakdownPoint[] 
             <CartesianGrid stroke={CHART_COLORS.grid} vertical={false} />
             <XAxis
               dataKey="month"
-              tick={{ fill: CHART_COLORS.axisText, fontSize: tickFontSize }}
+              // dy clears the dual y-axis "RM 0" labels, which otherwise sit on the
+              // same baseline and clipped the first/last month by a few px on mobile.
+              tick={{ fill: CHART_COLORS.axisText, fontSize: tickFontSize, dy: 4 }}
               axisLine={{ stroke: CHART_COLORS.grid }}
               tickLine={false}
+              padding={{ left: isNarrow ? 8 : 0, right: isNarrow ? 8 : 0 }}
             />
             <YAxis
               yAxisId="dispatcher"

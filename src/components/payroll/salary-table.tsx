@@ -167,7 +167,7 @@ function EditableCell({
       onKeyDown={handleKeyDown}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-center rounded-md border bg-surface transition-all cursor-text ${
+      className={`w-20 px-2 py-1 text-base sm:text-[0.82rem] tabular-nums text-center rounded-md border bg-surface transition-all cursor-text ${
         focused
           ? "border-brand outline-none ring-2 ring-brand/30 bg-brand/5 text-brand font-semibold shadow-sm"
           : "border-outline-variant/30 hover:border-outline-variant/60 hover:bg-surface-hover/40"
@@ -736,7 +736,7 @@ export function SalaryTable({
             placeholder="Search by name or ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40"
+            className="w-full pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40"
           />
         </div>
         <div className="flex items-center gap-1.5 flex-wrap">

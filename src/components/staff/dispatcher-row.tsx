@@ -269,7 +269,7 @@ interface DispatcherRowProps {
 }
 
 const INPUT_CLASS =
-  "w-full px-1.5 py-1 text-[0.78rem] tabular-nums text-center bg-transparent border border-dashed border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/50 hover:bg-brand/5 focus:border-brand/40 focus:border-solid focus:bg-white focus:outline-none transition-all";
+  "w-full px-1.5 py-1 text-base sm:text-[0.78rem] tabular-nums text-center bg-transparent border border-dashed border-transparent rounded-[0.25rem] text-on-surface hover:border-outline-variant/50 hover:bg-brand/5 focus:border-brand/40 focus:border-solid focus:bg-white focus:outline-none transition-all";
 
 export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, isNew, isChecked, onCheck, onPin, onDelete, onFieldSaved, onAvatarChange, onAcknowledge, onErrorChange, onOpenDrawer, onDirtyChange }: DispatcherRowProps) {
   const [avatarUrl, setAvatarUrl] = useState(dispatcher.avatarUrl);
@@ -634,7 +634,7 @@ export function DispatcherRow({ dispatcher, dataVersion, defaults, saveTrigger, 
                     value={tier.minWeight}
                     disabled
                     readOnly
-                    className="w-full px-2 py-1 text-[0.78rem] tabular-nums bg-surface-low border border-outline-variant/30 rounded-lg text-on-surface text-center opacity-40"
+                    className="w-full px-2 py-1 text-base sm:text-[0.78rem] tabular-nums bg-surface-low border border-outline-variant/30 rounded-lg text-on-surface text-center opacity-40"
                   />
                 ) : (
                   <DecimalInput

@@ -244,7 +244,7 @@ function CalcCurrencyInput({
       placeholder="0.00"
       title={fullValue}
       onKeyDown={handleKey}
-      className={`peer w-full min-w-0 bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : "cursor-text"} ${light ? "text-[0.7rem] text-on-surface-variant/70" : "text-[0.8rem]"}`}
+      className={`peer w-full min-w-0 bg-transparent text-center tabular-nums placeholder:text-on-surface-variant/40 focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : "cursor-text"} ${light ? "text-base sm:text-[0.7rem] text-on-surface-variant/70" : "text-base sm:text-[0.8rem]"}`}
     />
   )
 }
@@ -270,7 +270,7 @@ function HoursInput({
       tabIndex={disabled ? -1 : undefined}
       value={display}
       placeholder="0"
-      className={`w-full bg-transparent text-center text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 caret-primary focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : ""}`}
+      className={`w-full bg-transparent text-center text-base sm:text-[0.8rem] tabular-nums placeholder:text-on-surface-variant/40 caret-primary focus:outline-none focus:text-primary focus:font-semibold ${disabled ? "cursor-not-allowed pointer-events-none" : ""}`}
       onFocus={() => { if (!disabled) setEditing(value > 0 ? value.toString() : "") }}
       onChange={(e) => { if (!disabled) setEditing(e.target.value.replace(/[^\d.]/g, "")) }}
       onBlur={() => {
@@ -962,7 +962,7 @@ export function PayrollTab() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
           {/* Month selector */}
           <div ref={monthRef} className="relative">
             <button
@@ -1060,14 +1060,14 @@ export function PayrollTab() {
 
           {/* Search — same shape + behaviour as the Settings tab so users
               don't have to learn two patterns. Filters by name or IC. */}
-          <div className="relative">
+          <div className="relative flex-1 min-w-40 sm:flex-none sm:w-52">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
             <input
               type="text"
               placeholder="Search name or IC..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-52 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
+              className="pl-8 pr-3 py-1.5 text-base sm:text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-full border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
             />
           </div>
         </div>
@@ -1761,7 +1761,7 @@ export function PayrollTab() {
               placeholder="YYMMDD-PB-####"
               maxLength={14}
               autoFocus
-              className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 tabular-nums mb-4"
+              className="w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 tabular-nums mb-4"
               onKeyDown={(e) => { if (e.key === "Enter") handleSaveIc() }}
             />
             <div className="flex justify-end gap-2">

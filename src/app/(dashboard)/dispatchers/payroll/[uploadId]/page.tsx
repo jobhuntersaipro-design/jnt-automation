@@ -17,7 +17,7 @@ export default async function DispatcherPayrollDetailPage({
   if (!data) redirect("/dispatchers?tab=payroll");
 
   return (
-    <main className="flex-1 overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
+    <main className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
       <SalaryTable
         uploadId={data.upload.id}
         branchCode={data.upload.branchCode}

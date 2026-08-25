@@ -199,7 +199,7 @@ function StaffTab({ dispatchers }: { dispatchers: AgentView["dispatchers"] }) {
         placeholder="Search by name, ID, or branch..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="px-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-72"
+        className="px-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-72"
       />
 
       <div className="bg-surface-card rounded-lg border border-outline-variant/15 overflow-hidden">

@@ -194,9 +194,9 @@ export default async function DashboardPage({
   const branchCodes = allBranches.map((b: { code: string }) => b.code);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto">
       {/* Top bar */}
-      <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
+      <header className="sticky top-14 lg:top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-6">
           <div className="shrink-0">
             <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">

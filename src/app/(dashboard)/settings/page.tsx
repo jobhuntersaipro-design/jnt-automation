@@ -32,7 +32,7 @@ export default async function SettingsPage() {
   const connectedProviders = accounts.map((a) => a.provider);
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto">
       <div className="max-w-2xl mx-auto py-6 lg:py-10 px-4 lg:px-6">
         <h1 className="font-manrope font-semibold text-2xl text-on-surface mb-8">
           Settings

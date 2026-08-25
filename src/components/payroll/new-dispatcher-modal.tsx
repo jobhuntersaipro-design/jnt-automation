@@ -230,7 +230,7 @@ export function NewDispatcherModal({
                         value={formatIcInput(form.icNo)}
                         onChange={(e) => updateForm(d.extId, "icNo", e.target.value.replace(/\D/g, "").slice(0, 12))}
                         placeholder="YYMMDD-PB-####"
-                        className="w-full px-3 py-2 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface placeholder:text-on-surface-variant/40 tabular-nums"
+                        className="w-full px-3 py-2 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface placeholder:text-on-surface-variant/40 tabular-nums"
                       />
                       {form.icNo.length > 0 && form.icNo.length !== 12 && (
                         <p className="text-[0.75rem] text-critical mt-1">
@@ -262,7 +262,7 @@ export function NewDispatcherModal({
                                 step={0.1}
                                 value={tier.value}
                                 onChange={(e) => updateForm(d.extId, tier.field, Number(e.target.value))}
-                                className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
+                                className="w-full px-2 py-1.5 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
                               />
                             </div>
                           </div>
@@ -285,7 +285,7 @@ export function NewDispatcherModal({
                             min={0}
                             value={form.incentiveThreshold}
                             onChange={(e) => updateForm(d.extId, "incentiveThreshold", Number(e.target.value))}
-                            className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
+                            className="w-full px-2 py-1.5 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
                           />
                         </div>
                         <div className="grid grid-cols-3 gap-2">
@@ -301,7 +301,7 @@ export function NewDispatcherModal({
                                 value={form[key]}
                                 onChange={(e) => updateForm(d.extId, key, e.target.value)}
                                 placeholder="Required"
-                                className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums placeholder:text-on-surface-variant/40"
+                                className="w-full px-2 py-1.5 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums placeholder:text-on-surface-variant/40"
                               />
                             </div>
                           ))}
@@ -343,7 +343,7 @@ export function NewDispatcherModal({
                               min={0}
                               value={form.petrolThreshold}
                               onChange={(e) => updateForm(d.extId, "petrolThreshold", Number(e.target.value))}
-                              className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
+                              className="w-full px-2 py-1.5 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
                             />
                           </div>
                           <div>
@@ -358,7 +358,7 @@ export function NewDispatcherModal({
                                 step={1}
                                 value={form.petrolAmount}
                                 onChange={(e) => updateForm(d.extId, "petrolAmount", Number(e.target.value))}
-                                className="w-full px-2 py-1.5 text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
+                                className="w-full px-2 py-1.5 text-base sm:text-[0.85rem] bg-surface-card border border-outline-variant/30 rounded-md focus:outline-none focus:border-brand text-on-surface tabular-nums"
                               />
                             </div>
                           </div>

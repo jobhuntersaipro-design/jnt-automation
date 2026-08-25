@@ -22,7 +22,7 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         <div className="text-[0.7rem] font-medium uppercase tracking-[0.05em] text-white/70">
           Total Net Payout
         </div>
-        <div className="text-[1.5rem] font-bold tabular-nums mt-1 tracking-tight">
+        <div className="text-[clamp(1.25rem,6vw,1.5rem)] font-bold tabular-nums mt-1 tracking-tight">
           RM {formatRM(totals.net)}
         </div>
       </div>
@@ -32,7 +32,7 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         <div className="text-[0.7rem] font-medium text-on-surface-variant uppercase tracking-[0.05em]">
           Total Gross
         </div>
-        <div className="text-[1.1rem] font-bold text-on-surface tabular-nums mt-1">
+        <div className="text-[clamp(0.95rem,4.2vw,1.1rem)] font-bold text-on-surface tabular-nums mt-1">
           RM {formatRM(totals.gross)}
         </div>
       </div>
@@ -42,7 +42,7 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         <div className="text-[0.7rem] font-medium text-on-surface-variant uppercase tracking-[0.05em]">
           EPF (Employee)
         </div>
-        <div className="text-[1.1rem] font-bold text-on-surface tabular-nums mt-1">
+        <div className="text-[clamp(0.95rem,4.2vw,1.1rem)] font-bold text-on-surface tabular-nums mt-1">
           RM {formatRM(totals.epfEmployee)}
         </div>
       </div>
@@ -52,7 +52,7 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         <div className="text-[0.7rem] font-medium text-on-surface-variant uppercase tracking-[0.05em]">
           SOCSO (Employee)
         </div>
-        <div className="text-[1.1rem] font-bold text-on-surface tabular-nums mt-1">
+        <div className="text-[clamp(0.95rem,4.2vw,1.1rem)] font-bold text-on-surface tabular-nums mt-1">
           RM {formatRM(totals.socsoEmployee)}
         </div>
       </div>
@@ -62,7 +62,7 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         <div className="text-[0.7rem] font-medium text-on-surface-variant uppercase tracking-[0.05em]">
           EIS (Employee)
         </div>
-        <div className="text-[1.1rem] font-bold text-on-surface tabular-nums mt-1">
+        <div className="text-[clamp(0.95rem,4.2vw,1.1rem)] font-bold text-on-surface tabular-nums mt-1">
           RM {formatRM(totals.eisEmployee)}
         </div>
       </div>

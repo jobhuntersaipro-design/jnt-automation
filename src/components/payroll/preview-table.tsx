@@ -79,7 +79,7 @@ function CalcInput({
       onKeyDown={handleKeyDown}
       onBlur={handleBlur}
       onFocus={() => setFocused(true)}
-      className={`w-20 px-2 py-1 text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-colors cursor-text ${
+      className={`w-20 px-2 py-1 text-base sm:text-[0.82rem] tabular-nums text-right rounded-md border bg-surface transition-colors cursor-text ${
         focused
           ? "border-brand outline-none ring-1 ring-brand/30"
           : "border-outline-variant/30"

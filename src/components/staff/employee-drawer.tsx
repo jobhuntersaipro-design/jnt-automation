@@ -380,7 +380,7 @@ export function EmployeeDrawer({
                   value={name}
                   onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
                   placeholder="Enter employee name"
-                  className={`w-full px-3 py-2 text-[0.84rem] border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors bg-white ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
+                  className={`w-full px-3 py-2 text-base sm:text-[0.84rem] border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors bg-white ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
                 />
               </Field>
 
@@ -485,7 +485,7 @@ export function EmployeeDrawer({
                                 if (e.key === "Escape") { setShowAddBranch(false); setNewBranchCode(""); }
                               }}
                               placeholder="e.g. PHG1234"
-                              className="flex-1 px-2 py-1 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                              className="flex-1 px-2 py-1 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                             />
                             <button
                               type="button"
@@ -522,7 +522,7 @@ export function EmployeeDrawer({
                   onChange={(e) => { setIcNo(e.target.value.replace(/\D/g, "").slice(0, 12)); setErrors((p) => ({ ...p, icNo: "" })); }}
                   placeholder="YYMMDD-PB-####"
                   maxLength={14}
-                  className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
+                  className={`w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
                 />
               </Field>
 
@@ -533,7 +533,7 @@ export function EmployeeDrawer({
                     value={epfNo}
                     onChange={(e) => setEpfNo(e.target.value)}
                     placeholder="EPF number"
-                    className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+                    className="w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
                   />
                 </Field>
               )}
@@ -544,7 +544,7 @@ export function EmployeeDrawer({
                   value={socsoNo}
                   onChange={(e) => setSocsoNo(e.target.value)}
                   placeholder="SOCSO number"
-                  className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+                  className="w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
                 />
               </Field>
 
@@ -555,7 +555,7 @@ export function EmployeeDrawer({
                     value={incomeTaxNo}
                     onChange={(e) => setIncomeTaxNo(e.target.value)}
                     placeholder="Income tax number"
-                    className="w-full px-3 py-2 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
+                    className="w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors"
                   />
                 </Field>
               )}

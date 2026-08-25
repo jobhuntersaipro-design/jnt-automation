@@ -69,7 +69,7 @@ function ResetPasswordForm() {
   }
 
   const inputClass =
-    "w-full border border-outline-variant rounded-md px-3 py-2 pr-10 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+    "w-full border border-outline-variant rounded-md px-3 py-2 pr-10 text-base sm:text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3">

@@ -11,7 +11,7 @@ export default async function AdminPage() {
   const agents = await getAllAgents();
 
   return (
-    <main className="flex-1 overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
+    <main className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
       <div className="max-w-5xl mx-auto">
         <h1 className="text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
           Admin Panel

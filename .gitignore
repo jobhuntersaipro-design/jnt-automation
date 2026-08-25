@@ -62,3 +62,6 @@ next-env.d.ts
 
 # Lighthouse CI working dir (reports are committed under docs/perf/)
 /.lighthouseci/
+
+# Local mobile-audit screenshots (evidence only; measurements live in the spec)
+/docs/audit-results/mobile-375/

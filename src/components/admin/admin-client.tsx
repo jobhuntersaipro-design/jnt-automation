@@ -68,7 +68,7 @@ export function AdminClient({ initialAgents }: { initialAgents: AdminAgent[] }) 
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-64"
+            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-64"
           />
         </div>
         <div className="flex gap-1">
@@ -232,7 +232,7 @@ function AgentRow({
                 min={1}
                 value={maxBranchesInput}
                 onChange={(e) => setMaxBranchesInput(e.target.value)}
-                className="w-14 px-2 py-0.5 text-[0.78rem] border border-outline-variant rounded text-on-surface text-center"
+                className="w-14 px-2 py-0.5 text-base sm:text-[0.78rem] border border-outline-variant rounded text-on-surface text-center"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSaveMaxBranches();
@@ -593,7 +593,7 @@ function AddBranchInline({
         value={code}
         onChange={(e) => setCode(e.target.value)}
         placeholder="PHG123"
-        className="w-20 px-2 py-0.5 text-[0.72rem] border border-outline-variant rounded text-on-surface uppercase"
+        className="w-20 px-2 py-0.5 text-base sm:text-[0.72rem] border border-outline-variant rounded text-on-surface uppercase"
         autoFocus
         onKeyDown={(e) => {
           if (e.key === "Enter") handleAdd();
