@@ -371,9 +371,9 @@ export function DispatchersClient({
   const issueCount = errorIds.size + newlyAddedIds.size;
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto">
       {/* Header */}
-      <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
+      <header className="sticky top-14 lg:top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
           <div className="shrink-0">
             <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">Dispatchers</h1>
@@ -516,7 +516,7 @@ export function DispatchersClient({
               placeholder="Search name or ID..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
+              className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-base sm:text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
             />
           </div>
 

@@ -462,7 +462,7 @@ export function PayrollHistory({ records, branchCodes }: PayrollHistoryProps) {
           placeholder="Search by branch or month..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="px-3 py-1.5 text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 flex-1 min-w-32 sm:flex-none sm:w-52"
+          className="px-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 flex-1 min-w-32 sm:flex-none sm:w-52"
         />
 
         <div className="ml-auto text-[0.78rem] text-on-surface-variant/70 tabular-nums whitespace-nowrap">

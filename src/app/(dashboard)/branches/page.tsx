@@ -26,8 +26,8 @@ export default async function BranchesPage() {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto">
-      <header className="sticky top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
+    <div className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto">
+      <header className="sticky top-14 lg:top-0 z-10 px-4 lg:px-8 pt-4 lg:pt-5 pb-3 lg:pb-4 bg-surface/80 backdrop-blur-md">
         <h1 className="font-heading font-bold text-[1.2rem] lg:text-[1.36rem] text-on-surface tracking-tight">
           Branches
         </h1>

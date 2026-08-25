@@ -143,7 +143,7 @@ export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, 
               value={name}
               onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: "" })); }}
               placeholder="Enter dispatcher name"
-              className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
+              className={`w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.name ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.name && <p className="text-[0.68rem] text-critical mt-1">{errors.name}</p>}
           </div>
@@ -158,7 +158,7 @@ export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, 
               value={extId}
               onChange={(e) => { setExtId(e.target.value); setErrors((p) => ({ ...p, extId: "" })); }}
               placeholder="Enter dispatcher ID"
-              className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.extId ? "border-critical/50" : "border-outline-variant/30"}`}
+              className={`w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors ${errors.extId ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.extId && <p className="text-[0.68rem] text-critical mt-1">{errors.extId}</p>}
           </div>
@@ -174,7 +174,7 @@ export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, 
               onChange={(e) => { setIcNo(e.target.value.replace(/\D/g, "").slice(0, 12)); setErrors((p) => ({ ...p, icNo: "" })); }}
               placeholder="YYMMDD-PB-####"
               maxLength={14}
-              className={`w-full px-3 py-2 text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
+              className={`w-full px-3 py-2 text-base sm:text-[0.84rem] bg-white border rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40 transition-colors tabular-nums ${errors.icNo ? "border-critical/50" : "border-outline-variant/30"}`}
             />
             {errors.icNo && <p className="text-[0.68rem] text-critical mt-1">{errors.icNo}</p>}
           </div>
@@ -223,7 +223,7 @@ export function AddDispatcherDrawer({ branchCodes: initialBranchCodes, onClose, 
                             if (e.key === "Escape") { setShowAddBranch(false); setNewBranchCode(""); }
                           }}
                           placeholder="e.g. PHG1234"
-                          className="flex-1 px-2 py-1 text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
+                          className="flex-1 px-2 py-1 text-base sm:text-[0.84rem] bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-1 focus:ring-brand/40"
                         />
                         <button
                           type="button"

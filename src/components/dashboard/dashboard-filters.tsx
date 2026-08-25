@@ -154,7 +154,7 @@ export function DashboardFilters({ branchCodes }: DashboardFiltersProps) {
           />
         </div>
       )}
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-[0.71rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant whitespace-nowrap">
         Filter By
       </span>

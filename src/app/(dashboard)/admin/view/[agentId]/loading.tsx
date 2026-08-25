@@ -6,7 +6,7 @@ function Skeleton({ className }: { className?: string }) {
 
 export default function AgentViewLoading() {
   return (
-    <div className="flex-1 overflow-y-auto relative">
+    <div className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto relative">
       <div className="fixed top-0 left-0 right-0 h-0.75 bg-brand/10 overflow-hidden z-50">
         <div className="absolute h-full bg-brand" style={{ animation: "progress-indeterminate-1 2s infinite ease-in-out" }} />
         <div className="absolute h-full bg-brand/60" style={{ animation: "progress-indeterminate-2 2s 0.5s infinite ease-in-out" }} />

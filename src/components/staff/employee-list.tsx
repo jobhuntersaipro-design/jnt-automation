@@ -187,7 +187,7 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 mt-4">
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-4">
         <div className="relative">
           <button
             onClick={() => setTypeOpen((o) => !o)}
@@ -286,18 +286,18 @@ export function EmployeeList({ employees: serverData, branchCodes, onBranchAdded
           )}
         </div>
 
-        <div className="relative">
+        <div className="relative flex-1 min-w-40 sm:flex-none sm:w-52">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           <input
             type="text"
             placeholder="Search name or IC..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="pl-8 pr-3 py-1.5 text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-52 border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
+            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.83rem] bg-white rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-full border border-outline-variant/30 hover:border-outline-variant/60 transition-shadow"
           />
         </div>
 
-        <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase whitespace-nowrap ml-auto">
+        <span className="text-[0.72rem] font-medium tracking-[0.05em] text-on-surface-variant uppercase whitespace-nowrap w-full sm:w-auto sm:ml-auto">
           Showing {filtered.length} of {items.length} employees
         </span>
       </div>

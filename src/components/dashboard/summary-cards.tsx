@@ -65,7 +65,7 @@ function StatCard({
       <p className="text-[0.84rem] font-medium uppercase tracking-[0.05em] text-on-surface-variant pl-2">
         {label}
       </p>
-      <p className="tabular-nums text-[2.4rem] leading-none font-heading font-semibold pl-2 text-on-surface">
+      <p className="tabular-nums text-[clamp(1.6rem,8vw,2.4rem)] leading-none font-heading font-semibold pl-2 text-on-surface">
         {value}
       </p>
       <div className="pl-2">{subtitle}</div>
@@ -159,7 +159,7 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
   const prevLabel = getPrevPeriodLabel(filters);
   return (
     <div className="flex flex-col gap-2">
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {/* Hero card */}
       <div
         className="rounded-[0.75rem] p-5 flex flex-col gap-2 justify-center relative overflow-hidden"
@@ -169,8 +169,8 @@ export function SummaryCards({ data, filters }: { data: SummaryStats; filters: F
           Total Net Payout
         </p>
         <p
-          className="tabular-nums font-heading font-bold text-white leading-none"
-          style={{ fontSize: "2.4rem", letterSpacing: "-0.02em" }}
+          className="tabular-nums font-heading font-bold text-white leading-none text-[clamp(1.6rem,8vw,2.4rem)]"
+          style={{ letterSpacing: "-0.02em" }}
         >
           RM {fmtRM(data.totalNetPayout)}
         </p>

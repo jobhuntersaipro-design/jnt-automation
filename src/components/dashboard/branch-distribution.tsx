@@ -8,6 +8,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  LabelList,
 } from "recharts";
 import type { BranchPoint } from "@/lib/db/overview";
 import { getBranchColor } from "@/lib/branch-colors";
@@ -115,6 +116,38 @@ function CustomXTick({
   );
 }
 
+/**
+ * Y-axis tick for the narrow/horizontal layout. Branch codes sit on the category
+ * axis where there is room for the full code, so nothing has to be truncated or
+ * rotated the way it did when 10 codes shared a ~29px-per-branch X axis.
+ */
+function CustomYTick({
+  x,
+  y,
+  payload,
+  data,
+}: {
+  x?: string | number;
+  y?: string | number;
+  payload?: { value: string };
+  data: BranchPoint[];
+}) {
+  if (!payload) return null;
+  const branch = data.find((b) => branchLabel(b.name) === payload.value);
+  return (
+    <g transform={`translate(${Number(x)}, ${Number(y)})`}>
+      <text x={-6} y={-1} textAnchor="end" fill="#424654" fontSize={11} fontWeight={600}>
+        {payload.value}
+      </text>
+      {branch && (
+        <text x={-6} y={11} textAnchor="end" fill="#424654" fontSize={10} opacity={0.6}>
+          {branch.peopleCount} {branch.peopleCount === 1 ? "person" : "people"}
+        </text>
+      )}
+    </g>
+  );
+}
+
 export function BranchDistribution({ data }: { data: BranchPoint[] }) {
   const { ref: chartRef, width: cw, height: ch } = useContainerSize();
   const [metric, setMetric] = useState<Metric>("netPayout");
@@ -125,6 +158,14 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
     .map((b) => ({ ...b, name: branchLabel(b.name) }));
 
   const domain = yDomain(chartData.map((b) => b[metric]));
+
+  // Below ~480px a vertical bar per branch leaves ~29px of X axis per label while
+  // the codes need ~47px, so 10 branches collide into an unreadable smear. The
+  // horizontal layout puts the codes on the category axis instead, which is also
+  // what project-overview.md specifies for this chart.
+  const isHorizontal = cw > 0 && cw < 480;
+  const HORIZONTAL_ROW = 34;
+  const horizontalHeight = chartData.length * HORIZONTAL_ROW + 24;
 
   return (
     <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
@@ -157,11 +198,64 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
       </div>
 
       {/* Chart */}
-      <div ref={chartRef} style={{ height: "250px", width: "100%" }}>
+      <div
+        ref={chartRef}
+        style={{ height: isHorizontal ? `${horizontalHeight}px` : "250px", width: "100%" }}
+      >
         {chartData.length === 0 ? (
           <div className="flex items-center justify-center h-full text-on-surface-variant text-[0.9rem]">
             No branch data available
           </div>
+        ) : cw > 0 && isHorizontal ? (
+          <BarChart
+            width={cw}
+            height={horizontalHeight}
+            data={chartData}
+            layout="vertical"
+            margin={{ top: 4, right: 64, bottom: 4, left: 0 }}
+            barSize={16}
+          >
+            <XAxis type="number" domain={domain} hide />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={74}
+              axisLine={false}
+              tickLine={false}
+              interval={0}
+              tick={(props) => <CustomYTick {...props} data={data} />}
+            />
+            <Tooltip
+              content={(props) => (
+                <TooltipContent
+                  active={props.active}
+                  payload={(props.payload as unknown) as Array<{ value: number }>}
+                  label={props.label as string}
+                  metric={metric}
+                />
+              )}
+              cursor={false}
+            />
+            <Bar
+              dataKey={metric}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              shape={(props: any) => {
+                const { x, y, width, height, payload } = props;
+                if (!height || width <= 0) return <g />;
+                const r = Math.min(4, width);
+                const path = `M${x},${y} L${x + width - r},${y} Q${x + width},${y} ${x + width},${y + r} L${x + width},${y + height - r} Q${x + width},${y + height} ${x + width - r},${y + height} L${x},${y + height} Z`;
+                return <path d={path} fill={getBranchColor(payload?.name).hexSolid} />;
+              }}
+            >
+              <LabelList
+                dataKey={metric}
+                position="right"
+                offset={6}
+                formatter={(v) => fmtValue(Number(v), metric)}
+                style={{ fill: "#424654", fontSize: 10, fontVariantNumeric: "tabular-nums" }}
+              />
+            </Bar>
+          </BarChart>
         ) : cw > 0 && ch > 0 ? (() => {
           const isNarrow = cw < 480;
           return (

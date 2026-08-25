@@ -161,7 +161,7 @@ export function DefaultsDrawer({ checkedIds, initialValues, branchCodes, initial
   }, [branchCode]);
 
   const INPUT =
-    "w-full px-2.5 py-1.5 text-[0.84rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40";
+    "w-full px-2.5 py-1.5 text-base sm:text-[0.84rem] tabular-nums bg-white border border-outline-variant/30 rounded-[0.375rem] text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-brand/40";
 
   function setTierField(index: number, field: "minWeight" | "maxWeight" | "commission", raw: string) {
     setValues((prev) => ({

@@ -185,7 +185,7 @@ function ProfileSection({
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. ST XIANG ENTERPRISE"
-            className="w-full border border-outline-variant rounded-md px-3 py-2 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+            className="w-full border border-outline-variant rounded-md px-3 py-2 text-base sm:text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
         <div className="flex justify-end">
@@ -287,7 +287,7 @@ function CompanySection({
   }
 
   const inputClass =
-    "w-full border border-outline-variant rounded-md px-3 py-2 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+    "w-full border border-outline-variant rounded-md px-3 py-2 text-base sm:text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
 
   return (
     <section>
@@ -439,7 +439,7 @@ function SecuritySection({
   }
 
   const inputClass =
-    "w-full border border-outline-variant rounded-md px-3 py-2 pr-10 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
+    "w-full border border-outline-variant rounded-md px-3 py-2 pr-10 text-base sm:text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors";
 
   return (
     <section>
@@ -640,7 +640,7 @@ function DangerZoneSection() {
                 value={confirmText}
                 onChange={(e) => setConfirmText(e.target.value)}
                 placeholder='Type "DELETE"'
-                className="flex-1 border border-critical/30 rounded-md px-3 py-2 text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-critical/30 focus:border-critical transition-colors"
+                className="flex-1 border border-critical/30 rounded-md px-3 py-2 text-base sm:text-sm text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-critical/30 focus:border-critical transition-colors"
               />
               <button
                 onClick={handleDelete}

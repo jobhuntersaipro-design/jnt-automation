@@ -373,7 +373,7 @@ export function MonthDetailClient({
                 setSearch(e.target.value);
                 setPage(0);
               }}
-              className="w-full pl-8 pr-3 py-1.5 text-[0.82rem] bg-surface border border-outline-variant/20 rounded-md outline-none focus:border-brand/40"
+              className="w-full pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface border border-outline-variant/20 rounded-md outline-none focus:border-brand/40"
             />
           </div>
         </div>

@@ -279,7 +279,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
   }, [duplicatePrompt, removeUpload]);
 
   return (
-    <main className="flex-1 overflow-y-auto px-4 lg:px-8 py-6 lg:py-8">
+    <main className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto px-4 lg:px-8 py-6 lg:py-8">
       <div className="max-w-[90rem] mx-auto flex flex-col gap-8 lg:gap-10">
         {/* Page header */}
         <div>

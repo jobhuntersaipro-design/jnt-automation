@@ -24,14 +24,14 @@ export default async function DashboardLayout({
   const isImpersonating = effective?.impersonating ?? false;
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="flex flex-col min-h-dvh lg:h-dvh lg:overflow-hidden bg-surface">
       <BfcacheFix />
       <WelcomeToast />
       {isImpersonating && (
         <ImpersonationBanner agentName={effective!.impersonatedName!} />
       )}
       {/* Top nav */}
-      <header className="h-14 lg:h-16 shrink-0 flex items-center px-4 lg:px-16 bg-surface-dim relative">
+      <header className="h-14 lg:h-16 shrink-0 flex items-center px-4 lg:px-16 bg-surface-dim sticky top-0 z-40 lg:relative lg:top-auto">
         <MobileNav
           isSuperAdmin={session?.user?.isSuperAdmin ?? false}
           impersonating={isImpersonating}
@@ -75,7 +75,7 @@ export default async function DashboardLayout({
       </header>
 
       {/* Main content — flex so children can fill and scroll */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-w-0 overflow-x-clip lg:overflow-hidden">
         {children}
       </div>
 

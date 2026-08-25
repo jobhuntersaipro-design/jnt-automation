@@ -143,7 +143,7 @@ function DispatcherTable({
             placeholder="Search..."
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-36 transition-shadow"
+            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.84rem] bg-surface-low rounded-[0.375rem] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-1 focus:ring-brand/40 w-36 transition-shadow"
           />
           </div>
         </div>
@@ -152,7 +152,7 @@ function DispatcherTable({
       {/* Table */}
       <div className="flex flex-col overflow-x-auto">
         {/* Column headers */}
-        <div className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 px-2 pb-2">
+        <div className={`${ROW_GRID} px-2 pb-2`}>
           {COLUMNS.map(({ key, label }) => (
             <button
               key={key}
@@ -177,7 +177,7 @@ function DispatcherTable({
               data-dispatcher-id={d.id}
               data-dispatcher-name={d.name}
               aria-label={`Open salary history for ${d.name}`}
-              className="grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40"
+              className={`${ROW_GRID} items-center px-2 py-[0.9rem] rounded-lg hover:bg-surface-hover transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand/40`}
             >
               {/* Dispatcher */}
               <div className="flex items-center gap-2 min-w-0 pl-10">
@@ -269,6 +269,16 @@ function DispatcherTable({
     </div>
   );
 }
+
+/**
+ * Header and data rows must share one grid string *including* a min-width floor.
+ * Without it the rows' `min-w-0` cells let the `fr` tracks collapse below their
+ * content (the name column resolved to 40px — just its padding — so the avatar
+ * spilled over the branch chip and the name/ID block rendered at zero width),
+ * while the header kept its min-content widths, so the two also disagreed.
+ */
+const ROW_GRID =
+  "grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 min-w-[760px]";
 
 export function TopDispatchers({ data, action }: { data: DispatcherRow[]; action?: React.ReactNode }) {
   return (
