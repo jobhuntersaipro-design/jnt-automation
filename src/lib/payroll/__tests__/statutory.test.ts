@@ -3,7 +3,9 @@ import {
   calculateSupervisorGross,
   calculateStoreKeeperGross,
   calculateStatutory,
+  calculateNetSalary,
 } from "../statutory";
+import { lookupSocso } from "../socso-table";
 
 describe("calculateSupervisorGross", () => {
   it("sums basicPay + petrol + kpi + ot + other allowances", () => {
@@ -132,5 +134,55 @@ describe("calculateStatutory — EPF (KWSP Jadual Ketiga, 1 Oct 2025, Part A)", 
   it("returns zero for non-positive gross", () => {
     expect(calculateStatutory(0).epfEmployer).toBe(0);
     expect(calculateStatutory(-50).epfEmployee).toBe(0);
+  });
+});
+
+describe("SOCSO — First Category incl. SKBBK (Lindung 24 Jam)", () => {
+  it("lookupSocso returns invalidity, lindung, and employer shares for the RM1,700 bracket", () => {
+    // Bracket "exceed RM1,600 but do not exceed RM1,700":
+    // employer 28.85 / invalidity 8.25 / non-employment injury 12.35.
+    const r = lookupSocso(1700);
+    expect(r.employer).toBe(28.85);
+    expect(r.employee).toBe(8.25);
+    expect(r.lindung).toBe(12.35);
+  });
+
+  it("lookupSocso caps at the RM6,000 bracket", () => {
+    const r = lookupSocso(9999);
+    expect(r.employee).toBe(29.75);
+    expect(r.lindung).toBe(44.65);
+    expect(r.employer).toBe(104.15);
+  });
+
+  it("lookupSocso returns all zeros for non-positive gross", () => {
+    expect(lookupSocso(0)).toEqual({ employee: 0, lindung: 0, employer: 0 });
+  });
+
+  it("calculateStatutory surfaces socsoLindung from the bracket", () => {
+    const r = calculateStatutory(1700);
+    expect(r.socsoEmployee).toBe(8.25);
+    expect(r.socsoLindung).toBe(12.35);
+    expect(r.socsoEmployer).toBe(28.85);
+  });
+
+  it("socsoLindung is zero for non-positive gross", () => {
+    expect(calculateStatutory(0).socsoLindung).toBe(0);
+  });
+});
+
+describe("calculateNetSalary — deducts both SOCSO components", () => {
+  it("subtracts EPF + SOCSO contribution + SOCSO Lindung + EIS + pcb/penalty/advance", () => {
+    const statutory = {
+      epfEmployee: 100,
+      epfEmployer: 130,
+      socsoEmployee: 8.25,
+      socsoLindung: 12.35,
+      socsoEmployer: 28.85,
+      eisEmployee: 5,
+      eisEmployer: 5,
+      epfBonusRuleApplied: false,
+    };
+    // 2000 - 100 - 8.25 - 12.35 - 5 - 0 - 0 - 0 = 1874.4
+    expect(calculateNetSalary(2000, statutory, 0, 0, 0)).toBeCloseTo(1874.4, 2);
   });
 });

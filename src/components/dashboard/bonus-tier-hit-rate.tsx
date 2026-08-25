@@ -57,7 +57,7 @@ export function BonusTierHitRate({ data }: { data: HitRatePoint[] }) {
   const yMax = Math.ceil(maxRate + pad);
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-4 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 shrink-0">
         <div>
           <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">

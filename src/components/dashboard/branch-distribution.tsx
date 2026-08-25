@@ -168,9 +168,9 @@ export function BranchDistribution({ data }: { data: BranchPoint[] }) {
   const horizontalHeight = chartData.length * HORIZONTAL_ROW + 24;
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant h-full">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 shrink-0">
         <div>
           <h2 className="font-heading font-semibold text-[1.2rem] text-on-surface">
             Branch Distribution

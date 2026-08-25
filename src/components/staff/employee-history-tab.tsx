@@ -97,7 +97,7 @@ export function EmployeeHistoryTab({ employeeId }: EmployeeHistoryTabProps) {
       0,
     );
     const statutory = records.reduce(
-      (a, r) => a + r.epfEmployee + r.socsoEmployee + r.eisEmployee + r.pcb,
+      (a, r) => a + r.epfEmployee + r.socsoEmployee + r.socsoLindung + r.eisEmployee + r.pcb,
       0,
     );
     const total = basic + allowances;
@@ -163,7 +163,7 @@ export function EmployeeHistoryTab({ employeeId }: EmployeeHistoryTabProps) {
   return (
     <div className="space-y-4">
       {/* Hero: Lifetime Earnings */}
-      <div className="rounded-xl bg-gradient-to-br from-brand to-brand-container p-4 text-white">
+      <div className="rounded-xl bg-linear-to-br from-brand to-brand-container p-4 text-white">
         <div className="flex items-center gap-2">
           <TrendingUp className="w-4 h-4 text-white/70" />
           <p className="text-[0.7rem] uppercase tracking-wider text-white/70 font-medium">
@@ -295,7 +295,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 px-3 py-2 text-[0.78rem] font-medium border-b-2 transition-colors -mb-[1px] cursor-pointer ${
+      className={`inline-flex items-center gap-1.5 px-3 py-2 text-[0.78rem] font-medium border-b-2 transition-colors -mb-px cursor-pointer ${
         active
           ? "text-brand border-brand"
           : "text-on-surface-variant border-transparent hover:text-on-surface hover:border-outline-variant/40"
@@ -457,7 +457,7 @@ function KpiCard({
 function HistoryRow({ record }: { record: EmployeeHistoryRecord }) {
   const basic = record.basicPay || record.workingHours * record.hourlyWage;
   const allowances = record.kpiAllowance + record.petrolAllowance + record.otAllowance + record.otherAllowance;
-  const statutory = record.epfEmployee + record.socsoEmployee + record.eisEmployee + record.pcb;
+  const statutory = record.epfEmployee + record.socsoEmployee + record.socsoLindung + record.eisEmployee + record.pcb;
   const deductions = record.penalty + record.advance;
 
   return (

@@ -16,6 +16,8 @@ export interface EmployeeHistoryRecord {
   otherAllowance: number;
   epfEmployee: number;
   socsoEmployee: number;
+  /** Employee SOCSO Non-Employment Injury share ("Lindung 24 Jam"). */
+  socsoLindung: number;
   eisEmployee: number;
   pcb: number;
   epfEmployer: number;
@@ -66,6 +68,7 @@ export async function GET(
       otherAllowance: r.otherAllowance,
       epfEmployee: r.epfEmployee,
       socsoEmployee: r.socsoEmployee,
+      socsoLindung: r.socsoLindung,
       eisEmployee: r.eisEmployee,
       pcb: r.pcb,
       epfEmployer: r.epfEmployer,

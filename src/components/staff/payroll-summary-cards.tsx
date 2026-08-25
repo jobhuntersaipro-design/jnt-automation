@@ -9,6 +9,8 @@ interface PayrollSummaryCardsProps {
     gross: number
     epfEmployee: number
     socsoEmployee: number
+    /** Employee SOCSO Lindung 24 Jam (Non-Employment Injury) share. */
+    socsoLindung: number
     eisEmployee: number
     net: number
   }
@@ -47,13 +49,16 @@ export function PayrollSummaryCards({ totals }: PayrollSummaryCardsProps) {
         </div>
       </div>
 
-      {/* SOCSO */}
+      {/* SOCSO — total employee share = Contribution + Lindung 24 Jam */}
       <div className="bg-white rounded-xl p-4 border border-outline-variant/20">
         <div className="text-[0.7rem] font-medium text-on-surface-variant uppercase tracking-[0.05em]">
           SOCSO (Employee)
         </div>
         <div className="text-[clamp(0.95rem,4.2vw,1.1rem)] font-bold text-on-surface tabular-nums mt-1">
-          RM {formatRM(totals.socsoEmployee)}
+          RM {formatRM(totals.socsoEmployee + totals.socsoLindung)}
+        </div>
+        <div className="text-[0.6rem] text-on-surface-variant/60 tabular-nums mt-0.5">
+          Contribution RM {formatRM(totals.socsoEmployee)} · Lindung RM {formatRM(totals.socsoLindung)}
         </div>
       </div>
 

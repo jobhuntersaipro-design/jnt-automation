@@ -122,7 +122,7 @@ function DispatcherTable({
   const sorted = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
-    <div className="bg-white rounded-[0.75rem] p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
+    <div className="bg-white rounded-[0.75rem] p-4 sm:p-6 flex flex-col gap-5 shadow-[0_12px_40px_-12px_rgba(25,28,29,0.08)] border-l-4 border-on-surface-variant">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div>
@@ -278,7 +278,7 @@ function DispatcherTable({
  * while the header kept its min-content widths, so the two also disagreed.
  */
 const ROW_GRID =
-  "grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 min-w-[760px]";
+  "grid grid-cols-[2.5fr_1fr_0.8fr_1fr_1fr_1fr_1fr_1fr] gap-x-2 min-w-230";
 
 export function TopDispatchers({ data, action }: { data: DispatcherRow[]; action?: React.ReactNode }) {
   return (
