@@ -60,15 +60,15 @@ export function AdminClient({ initialAgents }: { initialAgents: AdminAgent[] }) 
   return (
     <div className="flex flex-col gap-6">
       {/* Filter bar */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-40 sm:flex-none">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
           <input
             type="text"
             placeholder="Search by name or email..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-64"
+            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-full sm:w-64"
           />
         </div>
         <div className="flex gap-1">
@@ -204,9 +204,9 @@ function AgentRow({
   return (
     <div className="bg-surface-card rounded-lg border border-outline-variant/15 overflow-hidden">
       {/* Summary row */}
-      <div className="flex items-center gap-4 px-5 py-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-5 py-4">
         {/* Name + email */}
-        <div className="flex-1 min-w-0">
+        <div className="basis-full sm:basis-auto sm:flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-[0.9rem] font-semibold text-on-surface truncate">
               {agent.name}
@@ -266,7 +266,7 @@ function AgentRow({
         </div>
 
         {/* Member since */}
-        <span className="text-[0.75rem] text-on-surface-variant/60 shrink-0 w-20 text-right">
+        <span className="text-[0.75rem] text-on-surface-variant/60 shrink-0 sm:w-20 sm:text-right">
           {memberSince}
         </span>
 
@@ -315,7 +315,7 @@ function AgentRow({
       </div>
 
       {/* Branch codes + add branch */}
-      <div className="flex flex-wrap items-center gap-1.5 px-5 pb-3">
+      <div className="flex flex-wrap items-center gap-1.5 px-4 sm:px-5 pb-3">
         {agent.branches.map((code) => (
           <span
             key={code}
@@ -435,7 +435,7 @@ function PaymentHistory({ agentId }: { agentId: string }) {
               </span>
               <button
                 onClick={() => handleDelete(r.id)}
-                className="p-1 text-on-surface-variant/30 hover:text-critical rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                className="p-1 text-on-surface-variant/30 hover:text-critical rounded sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               >
                 <Trash2 size={13} />
               </button>
@@ -690,7 +690,7 @@ function AddAccountForm({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="flex flex-col gap-1">
           <label className="text-[0.68rem] font-medium text-on-surface-variant uppercase tracking-wider">
             Email *
