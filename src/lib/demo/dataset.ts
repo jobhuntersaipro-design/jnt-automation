@@ -9,7 +9,6 @@ import type { EmployeeType, StoreKeeperSubtype } from "@/generated/prisma/client
  * salary calculator.
  */
 
-export const DEMO_BRANCH_CODE = "DEMO01";
 export const DEMO_MONTHS = 6;
 
 const DISPATCHERS = [
@@ -36,6 +35,48 @@ const EMPLOYEES: {
   { name: "KUMAR A/L SELVAM", icNo: "990130085433", type: "STORE_KEEPER", subtype: "TEMPORARY", basicPay: 0, hourlyWage: 9, petrolAllowance: 0, kpiAllowance: 0 },
   { name: "FARAH NADIA BINTI YUSOF", icNo: "940505146626", type: "DRIVER", subtype: "PERMANENT", basicPay: 2600, hourlyWage: 0, petrolAllowance: 200, kpiAllowance: 0 },
 ];
+
+/**
+ * Extra sample branches (DEMO02+): same roles, pay and petrol mix as DEMO01
+ * with different people and volumes, so multi-branch charts have something
+ * to compare. IC last digit matches gender (odd = male, even = female).
+ */
+const EXTRA_BRANCHES: { volume: number; dispatchers: [string, string][]; employees: [string, string][] }[] = [
+  {
+    volume: 0.85,
+    dispatchers: [
+      ["MOHD AMIRUL BIN ISMAIL", "920415035117"], ["SITI AMINAH BINTI RAHMAN", "960203146248"],
+      ["WONG KAH HO", "890728105539"], ["MUHAMMAD FIRDAUS BIN YAHYA", "970911016451"],
+      ["NURUL IZZAH BINTI SALLEH", "940622085262"], ["SURESH A/L RAMASAMY", "900117145573"],
+    ],
+    employees: [["LEE CHOON HOCK", "850309105185"], ["NOR AZLINA BINTI ZAKARIA", "930504036296"], ["AZRUL BIN HAMDAN", "000812146307"], ["MOHD RIDZUAN BIN AZIZ", "910130085419"]],
+  },
+  {
+    volume: 1.1,
+    dispatchers: [
+      ["AHMAD ZAKI BIN OTHMAN", "930826065621"], ["CHONG MEI YEE", "950317106732"],
+      ["MOHD HAFIZ BIN JAMALUDIN", "880402035843"], ["NUR SYAFIQAH BINTI ROSLAN", "990519146954"],
+      ["KHAIRUL ANUAR BIN MAT", "910905015065"], ["VIJAY A/L KRISHNAN", "870614085177"],
+    ],
+    employees: [["NG SIEW LAN", "860923105288"], ["FAIZAL BIN ABDULLAH", "920707145399"], ["HAZWAN BIN SULAIMAN", "980225036411"], ["ROSMAH BINTI ISA", "900411065522"]],
+  },
+  {
+    volume: 0.7,
+    dispatchers: [
+      ["SHAHRUL NIZAM BIN HASHIM", "940129035631"], ["TEOH JIA HUI", "970605106742"],
+      ["MUHAMMAD AFIQ BIN RAZALI", "960318145853"], ["AINUL MARDHIAH BINTI SAID", "930810086964"],
+      ["IZZAT BIN KAMARUDDIN", "990206015075"], ["DANIEL A/L JOSEPH", "920724145187"],
+    ],
+    employees: [["GOH BOON KIAT", "880516105291"], ["SALMAH BINTI YUNUS", "910830036302"], ["ZULKIFLI BIN DAUD", "010104146413"], ["NORHAYATI BINTI MOHD", "950219085524"]],
+  },
+];
+
+/** Branch code for sample branch `index` (0 → DEMO01). */
+export function demoBranchCode(index: number): string {
+  return `DEMO${String(index + 1).padStart(2, "0")}`;
+}
+
+export const MAX_DEMO_BRANCHES = EXTRA_BRANCHES.length + 1;
 
 export interface DemoDispatcherMonth {
   year: number;
@@ -67,6 +108,7 @@ export type DemoEmployee = (typeof EMPLOYEES)[number] & {
 };
 
 export interface DemoDataset {
+  code: string;
   months: { year: number; month: number }[];
   dispatchers: DemoDispatcher[];
   employees: DemoEmployee[];
@@ -97,14 +139,22 @@ function randomWeight(rand: () => number): number {
   return Math.round(kg * 100) / 100;
 }
 
-export function buildDemoDataset(now: Date): DemoDataset {
-  const rand = mulberry32(379);
+export function buildDemoDataset(now: Date, branch = 0): DemoDataset {
+  if (branch < 0 || branch >= MAX_DEMO_BRANCHES) throw new Error(`No sample branch ${branch}`);
+  const code = demoBranchCode(branch);
+  const extra = branch > 0 ? EXTRA_BRANCHES[branch - 1] : null;
+  const rand = mulberry32(379 + branch);
   const months = lastCompleteMonths(now, DEMO_MONTHS);
   const pick = (chance: number, min: number, max: number, step: number) =>
     rand() < chance ? Math.round((min + rand() * (max - min)) / step) * step : 0;
 
-  const dispatchers = DISPATCHERS.map((d, di) => ({
-    extId: `${DEMO_BRANCH_CODE}${String(di + 1).padStart(3, "0")}`,
+  const people = DISPATCHERS.map((d, di) => {
+    const [name, icNo] = extra ? extra.dispatchers[di] : [d.name, d.icNo];
+    return { ...d, name, icNo, dailyAvg: d.dailyAvg * (extra?.volume ?? 1) };
+  });
+
+  const dispatchers = people.map((d, di) => ({
+    extId: `${code}${String(di + 1).padStart(3, "0")}`,
     name: d.name,
     icNo: d.icNo,
     petrolEligible: d.petrol,
@@ -119,10 +169,10 @@ export function buildDemoDataset(now: Date): DemoDataset {
         const count = Math.max(0, Math.round(avg + (rand() - 0.5) * 24));
         for (let p = 0; p < count; p++) {
           rows.push({
-            waybillNumber: `DM${String(year).slice(2)}${String(month).padStart(2, "0")}${di + 1}${String(rows.length + 1).padStart(5, "0")}`,
-            branchName: DEMO_BRANCH_CODE,
+            waybillNumber: `DM${branch || ""}${String(year).slice(2)}${String(month).padStart(2, "0")}${di + 1}${String(rows.length + 1).padStart(5, "0")}`,
+            branchName: code,
             deliveryDate: date,
-            dispatcherId: `${DEMO_BRANCH_CODE}${String(di + 1).padStart(3, "0")}`,
+            dispatcherId: `${code}${String(di + 1).padStart(3, "0")}`,
             dispatcherName: d.name,
             billingWeight: randomWeight(rand),
           });
@@ -134,7 +184,8 @@ export function buildDemoDataset(now: Date): DemoDataset {
 
   const employees = EMPLOYEES.map((e, ei) => ({
     ...e,
-    extId: `${DEMO_BRANCH_CODE}E${ei + 1}`,
+    ...(extra && { name: extra.employees[ei][0], icNo: extra.employees[ei][1] }),
+    extId: `${code}E${ei + 1}`,
     months: months.map(({ year, month }) => ({
       year,
       month,
@@ -144,5 +195,5 @@ export function buildDemoDataset(now: Date): DemoDataset {
     })),
   }));
 
-  return { months, dispatchers, employees };
+  return { code, months, dispatchers, employees };
 }

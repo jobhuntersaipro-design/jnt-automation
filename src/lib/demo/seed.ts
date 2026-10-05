@@ -6,7 +6,7 @@ import { calculateSalary } from "@/lib/upload/calculator";
 import { computeEmployeeSalaryForSave } from "@/lib/payroll/employee-salary-save";
 import { normalizeName } from "@/lib/dispatcher-identity/normalize-name";
 import { deriveGender } from "@/lib/utils/gender";
-import { buildDemoDataset, DEMO_BRANCH_CODE } from "./dataset";
+import { buildDemoDataset, type DemoDataset } from "./dataset";
 
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -17,29 +17,38 @@ const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep
  */
 export async function ensureDemoData(agentId: string, now = new Date()): Promise<void> {
   if ((await prisma.branch.count({ where: { agentId } })) > 0) return;
+  await addDemoBranch(agentId, 0, now);
+}
 
+/**
+ * Add sample branch `index` (0 = DEMO01, 1 = DEMO02, ...) with 6 months of
+ * payroll. Returns false when the agent already has that branch. A failed
+ * write rolls back just this branch.
+ */
+export async function addDemoBranch(agentId: string, index: number, now = new Date()): Promise<boolean> {
+  const data = buildDemoDataset(now, index);
   let branchId: string;
   try {
     ({ id: branchId } = await prisma.branch.create({
-      data: { agentId, code: DEMO_BRANCH_CODE, isDemo: true },
+      data: { agentId, code: data.code, isDemo: true },
       select: { id: true },
     }));
   } catch (err) {
-    // Concurrent sign-in already created it.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return;
+    // Already exists (e.g. a concurrent first sign-in created it).
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return false;
     throw err;
   }
 
   try {
-    await writeDemo(agentId, branchId, now);
+    await writeDemo(agentId, branchId, data);
   } catch (err) {
-    await removeDemoData(agentId);
+    await prisma.$transaction(deleteBranchesOps(agentId, [branchId]));
     throw err;
   }
+  return true;
 }
 
-async function writeDemo(agentId: string, branchId: string, now: Date) {
-  const data = buildDemoDataset(now);
+async function writeDemo(agentId: string, branchId: string, data: DemoDataset) {
   const defs = await getAgentDefaults(agentId, branchId);
 
   const dispatchers = await Promise.all(
@@ -69,7 +78,7 @@ async function writeDemo(agentId: string, branchId: string, now: Date) {
   const uploads = await prisma.upload.createManyAndReturn({
     data: data.months.map(({ year, month }) => ({
       branchId,
-      fileName: `${DEMO_BRANCH_CODE} ${MONTH_ABBR[month - 1]} ${year} (sample).xlsx`,
+      fileName: `${data.code} ${MONTH_ABBR[month - 1]} ${year} (sample).xlsx`,
       r2Key: "demo/sample",
       month,
       year,
@@ -186,15 +195,21 @@ export async function removeDemoData(agentId: string): Promise<boolean> {
   if (ids.length === 0) return false;
 
   await prisma.$transaction([
+    ...deleteBranchesOps(agentId, ids),
+    prisma.agent.update({ where: { id: agentId }, data: { hasSeenTutorial: true } }),
+  ]);
+  revalidateTag("overview", { expire: 0 });
+  return true;
+}
+
+function deleteBranchesOps(agentId: string, ids: string[]) {
+  return [
     // SalaryRecord → Dispatcher is RESTRICT, so records go before the branch
     // cascade removes dispatchers. Line items cascade from records.
     prisma.salaryRecord.deleteMany({ where: { upload: { branchId: { in: ids } } } }),
     // Employee → Branch is SET NULL; delete explicitly (salary records cascade).
     prisma.employee.deleteMany({ where: { agentId, branchId: { in: ids } } }),
     // Cascades dispatchers (+ rules, assignments), uploads, branch defaults.
-    prisma.branch.deleteMany({ where: { id: { in: ids } } }),
-    prisma.agent.update({ where: { id: agentId }, data: { hasSeenTutorial: true } }),
-  ]);
-  revalidateTag("overview", { expire: 0 });
-  return true;
+    prisma.branch.deleteMany({ where: { agentId, id: { in: ids } } }),
+  ];
 }

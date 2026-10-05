@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildDemoDataset, lastCompleteMonths, DEMO_BRANCH_CODE } from "../dataset";
+import { buildDemoDataset, lastCompleteMonths, MAX_DEMO_BRANCHES } from "../dataset";
 import { calculateSalary } from "@/lib/upload/calculator";
 
 const NOW = new Date(2026, 9, 5); // 5 Oct 2026
@@ -42,7 +42,7 @@ describe("demo dataset", () => {
     let petrolDays = 0;
     for (const d of data.dispatchers) {
       for (const m of d.months) {
-        expect(m.rows.every((r) => r.branchName === DEMO_BRANCH_CODE && r.deliveryDate!.getMonth() + 1 === m.month)).toBe(true);
+        expect(m.rows.every((r) => r.branchName === data.code && r.deliveryDate!.getMonth() + 1 === m.month)).toBe(true);
         expect(new Set(m.rows.map((r) => r.waybillNumber)).size).toBe(m.rows.length);
         const result = calculateSalary(
           { dispatcherId: d.extId, extId: d.extId, ...RULES, petrolRule: { isEligible: d.petrolEligible, dailyThreshold: 70, subsidyAmount: 15 } },
@@ -57,5 +57,17 @@ describe("demo dataset", () => {
     // The sample should demonstrate both bonus tiers and petrol subsidy.
     expect(bonusHit).toBe(true);
     expect(petrolDays).toBeGreaterThan(0);
+  });
+
+  it("builds distinct extra branches (DEMO02+) with their own people and waybills", () => {
+    const sets = Array.from({ length: MAX_DEMO_BRANCHES }, (_, b) => buildDemoDataset(NOW, b));
+    expect(sets.map((d) => d.code)).toEqual(["DEMO01", "DEMO02", "DEMO03", "DEMO04"]);
+    const names = sets.flatMap((d) => [...d.dispatchers, ...d.employees].map((p) => p.name));
+    expect(new Set(names).size).toBe(names.length);
+    const waybills = sets.flatMap((d) => d.dispatchers.flatMap((x) => x.months.flatMap((m) => m.rows.map((r) => r.waybillNumber))));
+    expect(new Set(waybills).size).toBe(waybills.length);
+    // Well-formed 12-digit MyKad numbers (gender is derived from the last digit).
+    for (const d of sets.slice(1)) expect(d.dispatchers.every((x) => /^\d{12}$/.test(x.icNo))).toBe(true);
+    expect(() => buildDemoDataset(NOW, MAX_DEMO_BRANCHES)).toThrow();
   });
 });
