@@ -293,7 +293,9 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
 
         {/* Upload section */}
         <section className="flex flex-col gap-4">
-          <UploadZone onFilesSelected={handleFilesSelected} />
+          <div data-tour="upload-zone">
+            <UploadZone onFilesSelected={handleFilesSelected} />
+          </div>
 
           <ActiveUploadList
             uploads={activeUploads}
@@ -345,7 +347,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         <div className="h-px bg-outline-variant/20" />
 
         {/* Payroll History */}
-        <section ref={historyRef}>
+        <section ref={historyRef} data-tour="payroll-history">
           <h2 className="text-[1.1rem] font-semibold text-on-surface mb-4 font-(family-name:--font-manrope)">
             Payroll History
           </h2>

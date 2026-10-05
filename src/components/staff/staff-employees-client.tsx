@@ -38,7 +38,7 @@ export function StaffEmployeesClient({ employees, branchCodes: initialBranchCode
           </div>
         </div>
         {/* Tab Switcher */}
-        <div className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
+        <div data-tour="staff-tabs" className="flex items-center gap-1 mt-3 bg-surface-dim/50 rounded-[0.375rem] p-0.5 w-fit">
           <button
             onClick={() => switchTab("payroll")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${

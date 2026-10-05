@@ -12,7 +12,7 @@ export async function getAllAgents() {
       maxBranches: true,
       avatarUrl: true,
       createdAt: true,
-      _count: { select: { branches: true } },
+      _count: { select: { branches: { where: { isDemo: false } } } },
       branches: { select: { code: true }, orderBy: { code: "asc" } },
     },
     orderBy: { createdAt: "desc" },

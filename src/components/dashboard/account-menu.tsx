@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Settings, LogOut, ChevronDown } from "lucide-react";
+import { Settings, LogOut, ChevronDown, Compass } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { UserAvatar } from "@/components/ui/avatar";
 import Link from "next/link";
+import { startTour } from "@/components/onboarding/product-tour";
 
 interface AccountMenuProps {
   name: string;
@@ -54,6 +55,16 @@ export function AccountMenu({
             <Settings size={13} />
             Settings
           </Link>
+          <button
+            onClick={() => {
+              setOpen(false);
+              startTour();
+            }}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors"
+          >
+            <Compass size={13} />
+            Take the tour
+          </button>
           <div className="border-t border-outline-variant/20 my-1" />
           <button
             onClick={() => signOut({ redirectTo: "/auth/login?logged_out=1" })}

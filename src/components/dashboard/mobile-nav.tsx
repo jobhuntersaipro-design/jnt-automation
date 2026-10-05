@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Menu, X, Settings, LogOut } from "lucide-react";
+import { Menu, X, Settings, LogOut, Compass } from "lucide-react";
+import { startTour } from "@/components/onboarding/product-tour";
 import { signOut } from "next-auth/react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -86,6 +87,16 @@ export function MobileNav({ isSuperAdmin, impersonating, userName, userImage }: 
               <Settings size={16} />
               Settings
             </Link>
+            <button
+              onClick={() => {
+                setOpen(false);
+                startTour();
+              }}
+              className="px-6 py-3 text-[0.95rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-hover transition-colors flex items-center gap-3 text-left cursor-pointer"
+            >
+              <Compass size={16} />
+              Take the tour
+            </button>
             <button
               onClick={() => {
                 setOpen(false);

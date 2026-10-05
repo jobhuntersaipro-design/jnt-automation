@@ -8,6 +8,7 @@ import { getAgentDefaults } from "@/lib/db/staff";
 import { createNotification } from "@/lib/db/notifications";
 import { dispatchWorker } from "@/lib/upload/dispatch-worker";
 import { normalizeName } from "@/lib/dispatcher-identity/normalize-name";
+import { removeDemoData } from "@/lib/demo/seed";
 
 /**
  * POST /api/upload/detect
@@ -94,6 +95,10 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
+
+  // First real upload replaces the onboarding sample data. Must run before
+  // dispatcher matching so real people are never merged into demo records.
+  if (await removeDemoData(agentId)) lap("removed demo data");
 
   const [month, year] = topDate.split("-").map(Number);
   lap(`detected branch=${detectedBranch} ${year}-${String(month).padStart(2, "0")}`);

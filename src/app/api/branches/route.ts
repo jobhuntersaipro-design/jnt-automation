@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     });
 
     const branchCount = await prisma.branch.count({
-      where: { agentId: session.user.id },
+      where: { agentId: session.user.id, isDemo: false },
     });
 
     if (agent && branchCount >= agent.maxBranches) {

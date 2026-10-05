@@ -158,7 +158,7 @@ function AvgMonthlySalaryCard({ data }: { data: SummaryStats }) {
 export function SummaryCards({ data, filters }: { data: SummaryStats; filters: Filters }) {
   const prevLabel = getPrevPeriodLabel(filters);
   return (
-    <div className="flex flex-col gap-2">
+    <div data-tour="overview-summary" className="flex flex-col gap-2">
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
       {/* Hero card */}
       <div

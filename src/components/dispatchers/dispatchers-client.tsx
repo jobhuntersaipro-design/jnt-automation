@@ -456,6 +456,7 @@ export function DispatchersClient({
             Payroll
           </button>
           <button
+            data-tour="dispatchers-settings-tab"
             onClick={() => switchTab("settings")}
             className={`px-4 py-1.5 text-[0.84rem] font-medium rounded-lg transition-colors ${
               activeTab === "settings"

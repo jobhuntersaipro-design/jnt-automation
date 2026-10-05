@@ -17,6 +17,9 @@ model Agent {
   isApproved   Boolean        @default(false)
   isSuperAdmin Boolean        @default(false)
   maxBranches  Int            @default(1)
+  // Onboarding tour. False only for agents created after the onboarding
+  // migration — gates the first-sign-in demo seed + auto-started tour.
+  hasSeenTutorial Boolean     @default(false)
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
@@ -114,6 +117,7 @@ model Branch {
   id          String                 @id @default(cuid())
   agentId     String
   code        String                 // raw branch code from J&T data e.g. "PHG379"
+  isDemo      Boolean                @default(false) // onboarding sample data — see src/lib/demo
   dispatchers Dispatcher[]
   assignments DispatcherAssignment[]
   employees   Employee[]

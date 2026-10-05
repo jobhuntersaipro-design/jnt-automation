@@ -53,8 +53,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         if (profilePic) token.picture = profilePic;
         const agent = await prisma.agent.findUnique({
           where: { id: user.id },
-          select: { isApproved: true, isSuperAdmin: true, name: true },
+          select: { isApproved: true, isSuperAdmin: true, name: true, hasSeenTutorial: true },
         });
+        // First approved sign-in: load onboarding sample data before the
+        // dashboard renders (pages fetch in parallel with the layout, so it
+        // can't happen there). Never blocks sign-in on failure.
+        if (agent?.isApproved && !agent.hasSeenTutorial) {
+          const { ensureDemoData } = await import("@/lib/demo/seed");
+          await ensureDemoData(user.id).catch((err) =>
+            console.error("[onboarding] demo seed failed", err),
+          );
+        }
         token.isApproved = agent?.isApproved ?? false;
         token.isSuperAdmin = agent?.isSuperAdmin ?? false;
         if (agent?.name) token.name = agent.name;

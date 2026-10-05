@@ -10,6 +10,9 @@ import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { getEffectiveAgentId } from "@/lib/impersonation";
+import { prisma } from "@/lib/prisma";
+import { DemoBanner } from "@/components/onboarding/demo-banner";
+import { ProductTour } from "@/components/onboarding/product-tour";
 
 export default async function DashboardLayout({
   children,
@@ -22,6 +25,16 @@ export default async function DashboardLayout({
 
   const effective = await getEffectiveAgentId();
   const isImpersonating = effective?.impersonating ?? false;
+  const onboarding = effective
+    ? await prisma.agent.findUnique({
+        where: { id: effective.agentId },
+        select: {
+          hasSeenTutorial: true,
+          branches: { where: { isDemo: true }, select: { id: true }, take: 1 },
+        },
+      })
+    : null;
+  const hasDemo = (onboarding?.branches.length ?? 0) > 0;
 
   return (
     <div className="flex flex-col min-h-dvh lg:h-dvh lg:overflow-hidden bg-surface">
@@ -73,6 +86,12 @@ export default async function DashboardLayout({
           </div>
         </div>
       </header>
+
+      {hasDemo && <DemoBanner />}
+      <ProductTour
+        autoStart={!isImpersonating && onboarding?.hasSeenTutorial === false}
+        hasDemo={hasDemo}
+      />
 
       {/* Main content — flex so children can fill and scroll */}
       <div className="flex-1 flex min-w-0 overflow-x-clip lg:overflow-hidden">
