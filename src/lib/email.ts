@@ -137,13 +137,13 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
 
   const html = wrapInTemplate(`
       <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
-        Your account has been approved
+        Your account is active
       </h2>
       <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
         Hi ${agentName},
       </p>
       <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
-        Great news — your EasyStaff account has been reviewed and approved. You can now log in and start managing your dispatchers and payroll.
+        Your EasyStaff account is active. You can log in and carry on managing your dispatchers and payroll.
       </p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
         <tr>
@@ -165,13 +165,13 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
   await send(resend, {
     from: FROM,
     to: agentEmail,
-    subject: "Your EasyStaff account has been approved",
+    subject: "Your EasyStaff account is active",
     html,
     text: [
       `Hi ${agentName},`,
       "",
-      "Great news — your EasyStaff account has been reviewed and approved.",
-      "You can now log in and start managing your dispatchers and payroll.",
+      "Your EasyStaff account is active.",
+      "You can log in and carry on managing your dispatchers and payroll.",
       "",
       `Log in here: ${loginUrl}`,
       "",

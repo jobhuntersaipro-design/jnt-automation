@@ -49,9 +49,9 @@ export function AgentViewClient({ data }: { data: AgentView }) {
         <span className={`px-3 py-1 text-[0.75rem] font-medium rounded-md ${
           agent.isApproved
             ? "bg-emerald-50 text-emerald-700"
-            : "bg-amber-50 text-amber-700"
+            : "bg-red-50 text-critical"
         }`}>
-          {agent.isApproved ? "Approved" : "Pending"}
+          {agent.isApproved ? "Approved" : "Disabled"}
         </span>
       </div>
 
