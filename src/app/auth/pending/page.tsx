@@ -19,10 +19,10 @@ export default function PendingPage() {
       <p className="text-xs text-on-surface-variant">
         Questions? Email us at{" "}
         <a
-          href="mailto:help@easystaff.top"
+          href="mailto:onboarding@kim-brothers.com"
           className="text-primary hover:underline"
         >
-          help@easystaff.top
+          onboarding@kim-brothers.com
         </a>
       </p>
       <Link

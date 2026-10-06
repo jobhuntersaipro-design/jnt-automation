@@ -2,6 +2,8 @@ import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://easystaff.top";
+const SUPPORT_EMAIL = "onboarding@kim-brothers.com";
+const FROM = process.env.EMAIL_FROM ?? `EasyStaff <${SUPPORT_EMAIL}>`;
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) return null;
@@ -42,7 +44,7 @@ function wrapInTemplate(body: string): string {
         &copy; ${new Date().getFullYear()} EasyStaff &middot; J&amp;T Express Salary Automation
       </p>
       <p style="margin:6px 0 0;font-size:12px;color:#424654;">
-        Need help? Contact <a href="mailto:help@easystaff.top" style="color:#0056D2;text-decoration:none;">help@easystaff.top</a>
+        Need help? Contact <a href="mailto:${SUPPORT_EMAIL}" style="color:#0056D2;text-decoration:none;">${SUPPORT_EMAIL}</a>
       </p>
     </td>
   </tr>
@@ -97,7 +99,7 @@ export async function sendPasswordResetEmail(
   `);
 
   await resend.emails.send({
-    from: "EasyStaff <help@easystaff.top>",
+    from: FROM,
     to: agentEmail,
     subject: "Reset your password — EasyStaff",
     html,
@@ -151,7 +153,7 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
   `);
 
   await resend.emails.send({
-    from: "EasyStaff <help@easystaff.top>",
+    from: FROM,
     to: agentEmail,
     subject: "Your EasyStaff account has been approved",
     html,
@@ -163,7 +165,7 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
       "",
       `Log in here: ${loginUrl}`,
       "",
-      "If you have any questions, contact help@easystaff.top",
+      `If you have any questions, contact ${SUPPORT_EMAIL}`,
     ].join("\n"),
   });
 }
@@ -253,7 +255,7 @@ export async function sendNewSignupNotification(
     `);
 
     await resend.emails.send({
-      from: "EasyStaff <help@easystaff.top>",
+      from: FROM,
       to,
       subject: `New signup — ${displayName} (${agentEmail})`,
       html,

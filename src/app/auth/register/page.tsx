@@ -47,7 +47,7 @@ export default function RegisterPage() {
     setLoading(false);
 
     if (!res.ok) {
-      toast.error(data.error ?? "Something went wrong. Please contact support at help@easystaff.top");
+      toast.error(data.error ?? "Something went wrong. Please contact support at onboarding@kim-brothers.com");
       return;
     }
 
