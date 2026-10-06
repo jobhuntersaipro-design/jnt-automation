@@ -22,7 +22,7 @@ function toAdapterUser(agent: {
 export const agentAdapter: Adapter = {
   async createUser({ name, email }) {
     const agent = await prisma.agent.create({
-      data: { name: name ?? "", email, password: null },
+      data: { name: name ?? "", email, password: null, isApproved: true },
     });
     // Only OAuth signups reach createUser (credentials register directly).
     await sendNewSignupNotification(agent.email, agent.name, "google");

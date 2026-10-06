@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   if (existing) {
     await bcrypt.hash(password, 12); // equalize timing with real registration path
     return NextResponse.json(
-      { message: "Registration successful. Awaiting approval." },
+      { message: "Registration successful." },
       { status: 201 }
     );
   }
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         name,
         email,
         password: hashedPassword,
-        isApproved: false,
+        isApproved: true,
         isSuperAdmin: false,
       },
     });
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
     await sendNewSignupNotification(email, name, "email");
 
     return NextResponse.json(
-      { message: "Registration successful. Awaiting approval." },
+      { message: "Registration successful." },
       { status: 201 }
     );
   } catch {

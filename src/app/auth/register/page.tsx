@@ -44,14 +44,26 @@ export default function RegisterPage() {
     });
 
     const data = await res.json();
-    setLoading(false);
 
     if (!res.ok) {
+      setLoading(false);
       toast.error(data.error ?? "Something went wrong. Please contact support at onboarding@kim-brothers.com");
       return;
     }
 
-    router.push("/auth/pending");
+    // New accounts are approved on signup, so sign straight in.
+    const result = await signIn("credentials", {
+      email: form.email.trim().toLowerCase(),
+      password: form.password,
+      redirect: false,
+    }).catch(() => null);
+    setLoading(false);
+
+    if (result?.ok && !result.error) {
+      router.push("/dashboard?welcome=1");
+    } else {
+      router.push("/auth/login");
+    }
   }
 
   const inputClass =
@@ -65,7 +77,7 @@ export default function RegisterPage() {
           Create an account
         </h1>
         <p className="text-sm text-on-surface-variant mt-1">
-          You&apos;ll need approval before accessing the app
+          Get started with EasyStaff
         </p>
       </div>
 

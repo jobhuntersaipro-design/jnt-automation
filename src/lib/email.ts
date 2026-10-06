@@ -208,7 +208,7 @@ async function getSignupNotifyRecipients(): Promise<string[]> {
 export type SignupMethod = "email" | "google";
 
 /**
- * Tell the superadmin a new agent signed up and is waiting for approval.
+ * Tell the superadmin a new agent signed up (accounts are auto-approved).
  * Covers both email/password registration and first-time Google sign-in.
  * Never throws — a failed notification must not break signup.
  */
@@ -237,10 +237,10 @@ export async function sendNewSignupNotification(
 
     const html = wrapInTemplate(`
       <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
-        New signup awaiting approval
+        New signup
       </h2>
       <p style="margin:0 0 20px;font-size:15px;color:#424654;line-height:1.6;">
-        A new agent has signed up for EasyStaff and can't use the app until you approve them.
+        A new agent has signed up for EasyStaff. Their account is approved automatically.
       </p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;padding:12px 16px;background-color:#f3f4f5;border-radius:6px;width:100%;">
         ${row("Name", displayName)}
@@ -252,7 +252,7 @@ export async function sendNewSignupNotification(
         <tr>
           <td style="background-color:#0056D2;border-radius:6px;">
             <a href="${adminUrl}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
-              Review in Admin
+              View in Admin
             </a>
           </td>
         </tr>
@@ -268,14 +268,14 @@ export async function sendNewSignupNotification(
       subject: `New signup — ${displayName} (${agentEmail})`,
       html,
       text: [
-        "A new agent has signed up and is awaiting approval.",
+        "A new agent has signed up. Their account is approved automatically.",
         "",
         `Name: ${displayName}`,
         `Email: ${agentEmail}`,
         `Signed up with: ${methodLabel}`,
         `Signed up at: ${registeredAt}`,
         "",
-        `Review and approve: ${adminUrl}`,
+        `View in Admin: ${adminUrl}`,
       ].join("\n"),
     });
   } catch (err) {
