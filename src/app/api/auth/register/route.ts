@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { sendNewSignupNotification } from "@/lib/email";
+import { sendNewSignupNotification, sendWelcomeEmail } from "@/lib/email";
 import { normalizePhone } from "@/lib/billing";
 import { registerLimiter, extractIp } from "@/lib/rate-limit";
 
@@ -96,7 +96,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    await sendNewSignupNotification(email, name, "email", phone);
+    await Promise.all([
+      sendNewSignupNotification(email, name, "email", phone),
+      sendWelcomeEmail(email, name),
+    ]);
 
     return NextResponse.json(
       { message: "Registration successful." },

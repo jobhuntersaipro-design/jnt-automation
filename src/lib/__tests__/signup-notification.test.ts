@@ -12,7 +12,7 @@ vi.mock("@/lib/prisma", () => ({
   prisma: { agent: { findMany: (...args: unknown[]) => findMany(...args) } },
 }));
 
-import { sendNewSignupNotification } from "@/lib/email";
+import { sendNewSignupNotification, sendWelcomeEmail } from "@/lib/email";
 
 describe("sendNewSignupNotification", () => {
   beforeEach(() => {
@@ -90,6 +90,46 @@ describe("sendNewSignupNotification", () => {
     await expect(
       sendNewSignupNotification("x@y.com", "A", "email"),
     ).resolves.toBeUndefined();
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+});
+
+describe("sendWelcomeEmail", () => {
+  beforeEach(() => {
+    send.mockReset().mockResolvedValue({ data: { id: "msg_1" }, error: null });
+    process.env.RESEND_API_KEY = "re_test";
+  });
+
+  afterEach(() => {
+    delete process.env.RESEND_API_KEY;
+  });
+
+  it("emails the new agent with their trial end date and help address", async () => {
+    await sendWelcomeEmail("new@agent.com", "Ahmad Bin Ali", new Date("2026-10-06T04:00:00Z"));
+
+    expect(send).toHaveBeenCalledTimes(1);
+    const arg = send.mock.calls[0][0];
+    expect(arg.to).toBe("new@agent.com");
+    expect(arg.replyTo).toBe("jobhunters.ai.pro@gmail.com");
+    expect(arg.subject).toContain("5 November 2026");
+    expect(arg.html).toContain("Welcome to EasyStaff, Ahmad!");
+    expect(arg.text).toContain("RM 150 per branch per month");
+    expect(arg.text).toContain("jobhunters.ai.pro@gmail.com");
+  });
+
+  it("escapes the name and falls back when it's empty", async () => {
+    await sendWelcomeEmail("x@y.com", "<b>Hi</b>");
+    expect(send.mock.calls[0][0].html).toContain("&lt;b&gt;Hi&lt;/b&gt;");
+
+    await sendWelcomeEmail("x@y.com", "");
+    expect(send.mock.calls[1][0].html).toContain("Welcome to EasyStaff, there!");
+  });
+
+  it("never throws when sending fails", async () => {
+    send.mockResolvedValue({ data: null, error: { name: "validation_error", message: "nope" } });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    await expect(sendWelcomeEmail("x@y.com", "A")).resolves.toBeUndefined();
     expect(err).toHaveBeenCalled();
     err.mockRestore();
   });
