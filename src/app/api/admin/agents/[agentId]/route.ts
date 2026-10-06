@@ -22,7 +22,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },
 ) {
-  if (!(await requireSuperAdmin())) {
+  const session = await requireSuperAdmin();
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -55,7 +56,10 @@ export async function PATCH(
   if (typeof data.adminNotes === "string") data.adminNotes = data.adminNotes.trim() || null;
 
   try {
-    const result = await updateAgentProfile(agentId, data);
+    const result = await updateAgentProfile(agentId, data, {
+      changedBy: "admin",
+      actorEmail: session.user.email ?? null,
+    });
     return NextResponse.json(result);
   } catch {
     return NextResponse.json({ error: "Agent not found" }, { status: 404 });

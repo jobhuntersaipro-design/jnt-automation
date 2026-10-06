@@ -23,6 +23,8 @@ import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 import { AgentDrawer, type BillingActions } from "./agent-drawer";
 import {
   BILLING_CHIP,
+  describeLimitChange,
+  limitChangeActor,
   formatDate,
   formatMonth,
   formatRM,
@@ -362,6 +364,16 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
                         <span className="px-1.5 py-0.5 text-[0.68rem] text-on-surface-variant/70">+{agent.branches.length - 3}</span>
                       )}
                     </div>
+                    {agent.limitChanges[0] && (
+                      <button
+                        onClick={() => setOpenId(agent.id)}
+                        title={`${agent.limitChanges.length} limit change${agent.limitChanges.length === 1 ? "" : "s"} — open history`}
+                        className="mt-1 block text-left text-[0.68rem] text-on-surface-variant/70 hover:text-brand whitespace-nowrap"
+                      >
+                        {describeLimitChange(agent.limitChanges[0])} · {limitChangeActor(agent.limitChanges[0])} ·{" "}
+                        {formatDate(agent.limitChanges[0].createdAt)}
+                      </button>
+                    )}
                   </td>
                   <td className="px-2.5 py-3 whitespace-nowrap">{formatDate(agent.createdAt)}</td>
                   <td className="px-2.5 py-3 whitespace-nowrap">

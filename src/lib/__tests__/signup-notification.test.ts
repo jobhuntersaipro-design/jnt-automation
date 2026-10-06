@@ -36,6 +36,7 @@ describe("sendNewSignupNotification", () => {
     const arg = send.mock.calls[0][0];
     expect(arg.to).toEqual(["a@x.com", "b@x.com"]);
     expect(arg.from).toBe("EasyStaff <onboarding@kim-brothers.com>");
+    expect(arg.replyTo).toBe("jobhunters.ai.pro@gmail.com");
     expect(arg.subject).toContain("new@agent.com");
     expect(arg.text).toContain("Signed up with: Email & password");
     expect(arg.text).toContain("/admin");

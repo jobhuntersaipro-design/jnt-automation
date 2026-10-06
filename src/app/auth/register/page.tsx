@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function RegisterPage() {
 
     if (!res.ok) {
       setLoading(false);
-      toast.error(data.error ?? "Something went wrong. Please contact support at onboarding@kim-brothers.com");
+      toast.error(data.error ?? `Something went wrong. Please contact support at ${SUPPORT_EMAIL}`);
       return;
     }
 

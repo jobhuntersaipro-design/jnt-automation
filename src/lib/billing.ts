@@ -4,6 +4,8 @@
  * branch limit × PRICE_PER_BRANCH.
  */
 
+import { SUPPORT_EMAIL } from "@/lib/support";
+
 export const TRIAL_DAYS = 30;
 export const PRICE_PER_BRANCH = 150;
 export const INVOICE_DUE_DAYS = 7;
@@ -82,7 +84,7 @@ export function planLimitError(requested: number, branchesInUse: number): string
     return `You're using ${branchesInUse} branch${branchesInUse === 1 ? "" : "es"}, so the limit can't go below ${branchesInUse}.`;
   }
   if (requested > SELF_SERVE_MAX_BRANCHES) {
-    return `For more than ${SELF_SERVE_MAX_BRANCHES} branches, contact onboarding@kim-brothers.com.`;
+    return `For more than ${SELF_SERVE_MAX_BRANCHES} branches, contact ${SUPPORT_EMAIL}.`;
   }
   return null;
 }

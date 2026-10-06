@@ -8,6 +8,16 @@ import {
 import type { AdminAgent } from "@/lib/db/admin";
 
 export type AdminInvoice = AdminAgent["invoices"][number];
+export type LimitChange = AdminAgent["limitChanges"][number];
+
+/** "↑ 3 → 5" / "↓ 5 → 3" */
+export function describeLimitChange(c: LimitChange) {
+  return `${c.toLimit > c.fromLimit ? "↑" : "↓"} ${c.fromLimit} → ${c.toLimit}`;
+}
+
+export function limitChangeActor(c: LimitChange) {
+  return c.changedBy === "agent" ? "by agent" : "by admin";
+}
 
 const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 

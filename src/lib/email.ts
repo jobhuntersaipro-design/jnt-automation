@@ -1,9 +1,10 @@
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://easystaff.top";
-const SUPPORT_EMAIL = "onboarding@kim-brothers.com";
-const FROM = process.env.EMAIL_FROM ?? `EasyStaff <${SUPPORT_EMAIL}>`;
+// Sending address must be on the Resend-verified domain; replies go to support.
+const FROM = process.env.EMAIL_FROM ?? "EasyStaff <onboarding@kim-brothers.com>";
 
 function getResend() {
   if (!process.env.RESEND_API_KEY) return null;
@@ -14,7 +15,7 @@ type SendPayload = Parameters<Resend["emails"]["send"]>[0];
 
 /** Resend returns API errors (unverified domain, bad key) instead of throwing. */
 async function send(resend: Resend, payload: SendPayload) {
-  const { error } = await resend.emails.send(payload);
+  const { error } = await resend.emails.send({ replyTo: SUPPORT_EMAIL, ...payload });
   if (error) throw new Error(`Resend ${error.name}: ${error.message}`);
 }
 

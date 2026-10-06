@@ -6,7 +6,16 @@ import { Download, Loader2, Plus, Send, Trash2, X, Check, Undo2 } from "lucide-r
 import { toast } from "sonner";
 import type { AdminAgent } from "@/lib/db/admin";
 import { billableMonths, firstBillableMonth, type YearMonth } from "@/lib/billing";
-import { BILLING_CHIP, formatDate, formatMonth, formatRM, monthBill, trialInfo } from "./admin-shared";
+import {
+  BILLING_CHIP,
+  describeLimitChange,
+  formatDate,
+  formatMonth,
+  formatRM,
+  limitChangeActor,
+  monthBill,
+  trialInfo,
+} from "./admin-shared";
 
 export interface BillingActions {
   markPaid: (agent: AdminAgent, ym: YearMonth, paid: boolean) => void;
@@ -151,6 +160,28 @@ export function AgentDrawer({
             </section>
           )}
 
+          <section className="flex flex-col gap-2">
+            <h3 className="text-[0.85rem] font-semibold text-on-surface">Branch limit history</h3>
+            {agent.limitChanges.length === 0 ? (
+              <p className="text-[0.8rem] text-on-surface-variant/60">No changes yet — still at {agent.maxBranches}.</p>
+            ) : (
+              agent.limitChanges.map((c, i) => (
+                <div key={`${c.createdAt}-${i}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1">
+                  <span className="w-40 text-[0.78rem] text-on-surface-variant tabular-nums whitespace-nowrap">
+                    {new Date(c.createdAt).toLocaleString("en-MY", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </span>
+                  <span className={`text-[0.82rem] font-medium tabular-nums ${c.toLimit > c.fromLimit ? "text-emerald-700" : "text-amber-700"}`}>
+                    {describeLimitChange(c)}
+                  </span>
+                  <span className="text-[0.75rem] text-on-surface-variant">
+                    {limitChangeActor(c)}
+                    {c.actorEmail && c.actorEmail !== agent.email ? ` (${c.actorEmail})` : ""}
+                  </span>
+                </div>
+              ))
+            )}
+          </section>
+
           <PaymentHistory agentId={agent.id} />
         </div>
       </div>
@@ -190,7 +221,20 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return toast.error(data.error || "Failed to save");
 
-    onUpdate({ name: data.name, phone: data.phone, maxBranches: data.maxBranches, adminNotes: data.adminNotes });
+    const limitChanges =
+      data.maxBranches !== agent.maxBranches
+        ? [
+            {
+              fromLimit: agent.maxBranches,
+              toLimit: data.maxBranches,
+              changedBy: "admin" as const,
+              actorEmail: null,
+              createdAt: new Date().toISOString(),
+            },
+            ...agent.limitChanges,
+          ]
+        : agent.limitChanges;
+    onUpdate({ name: data.name, phone: data.phone, maxBranches: data.maxBranches, adminNotes: data.adminNotes, limitChanges });
     setPhone(data.phone ?? "");
     setNotes(data.adminNotes ?? "");
     toast.success("Saved");

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Clock } from "lucide-react";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function PendingPage() {
   return (
@@ -19,10 +20,10 @@ export default function PendingPage() {
       <p className="text-xs text-on-surface-variant">
         Questions? Email us at{" "}
         <a
-          href="mailto:onboarding@kim-brothers.com"
+          href={`mailto:${SUPPORT_EMAIL}`}
           className="text-primary hover:underline"
         >
-          onboarding@kim-brothers.com
+          {SUPPORT_EMAIL}
         </a>
       </p>
       <Link

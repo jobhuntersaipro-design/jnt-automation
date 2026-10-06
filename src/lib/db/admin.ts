@@ -19,6 +19,11 @@ export async function getAllAgents() {
         select: { year: true, month: true, amount: true, branchCount: true, sentAt: true, paidAt: true },
         orderBy: [{ year: "desc" }, { month: "desc" }],
       },
+      branchLimitChanges: {
+        select: { fromLimit: true, toLimit: true, changedBy: true, actorEmail: true, createdAt: true },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -37,6 +42,13 @@ export async function getAllAgents() {
     branchCount: a.branches.filter((b) => !b.isDemo).length,
     branches: a.branches.filter((b) => !b.isDemo).map((b) => b.code),
     hasDemo: a.branches.some((b) => b.isDemo),
+    limitChanges: a.branchLimitChanges.map((c) => ({
+      fromLimit: c.fromLimit,
+      toLimit: c.toLimit,
+      changedBy: c.changedBy as "agent" | "admin",
+      actorEmail: c.actorEmail,
+      createdAt: c.createdAt.toISOString(),
+    })),
     invoices: a.invoices.map((i) => ({
       year: i.year,
       month: i.month,
@@ -76,14 +88,35 @@ export async function toggleAgentApproval(agentId: string, isApproved: boolean) 
   return { id: agent.id, isApproved: agent.isApproved };
 }
 
-// Update the admin-editable profile fields
+export type LimitActor = { changedBy: "agent" | "admin"; actorEmail: string | null };
+
+/**
+ * Set an agent's branch limit and log the change. Returns the previous
+ * limit, or null when nothing changed (no log row is written).
+ */
+export async function setBranchLimit(agentId: string, toLimit: number, actor: LimitActor) {
+  return prisma.$transaction(async (tx) => {
+    const current = await tx.agent.findUniqueOrThrow({ where: { id: agentId }, select: { maxBranches: true } });
+    if (current.maxBranches === toLimit) return null;
+    await tx.agent.update({ where: { id: agentId }, data: { maxBranches: toLimit } });
+    await tx.branchLimitChange.create({
+      data: { agentId, fromLimit: current.maxBranches, toLimit, ...actor },
+    });
+    return current.maxBranches;
+  });
+}
+
+// Update the admin-editable profile fields; branch-limit changes are logged.
 export async function updateAgentProfile(
   agentId: string,
   data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number },
+  actor: LimitActor,
 ) {
+  const { maxBranches, ...rest } = data;
+  if (maxBranches !== undefined) await setBranchLimit(agentId, maxBranches, actor);
   return prisma.agent.update({
     where: { id: agentId },
-    data,
+    data: rest,
     select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true },
   });
 }

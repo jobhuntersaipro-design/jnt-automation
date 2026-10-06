@@ -1,5 +1,6 @@
 import PDFDocument from "pdfkit";
 import { INVOICE_DUE_DAYS, invoiceNumber, type YearMonth } from "@/lib/billing";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -45,7 +46,7 @@ export function monthLabel({ year, month }: YearMonth): string {
 export function paymentDetails(): string[] {
   const raw = process.env.INVOICE_PAYMENT_DETAILS?.trim();
   if (raw) return raw.split(/\\n|\n/).map((l) => l.trim()).filter(Boolean);
-  return ["Please contact onboarding@kim-brothers.com for payment details."];
+  return [`Please contact ${SUPPORT_EMAIL} for payment details.`];
 }
 
 export async function generateInvoicePdf(input: InvoicePdfInput): Promise<Buffer> {
@@ -63,7 +64,7 @@ export async function generateInvoicePdf(input: InvoicePdfInput): Promise<Buffer
 
   // Header
   doc.fillColor(BRAND).font("Helvetica-Bold").fontSize(22).text("EasyStaff", MARGIN, MARGIN);
-  doc.fillColor(MUTED).font("Helvetica").fontSize(9).text("onboarding@kim-brothers.com", MARGIN, MARGIN + 28);
+  doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(SUPPORT_EMAIL, MARGIN, MARGIN + 28);
   doc.fillColor(TEXT).font("Helvetica-Bold").fontSize(22).text("INVOICE", MARGIN, MARGIN, { width: WIDTH, align: "right" });
 
   const meta: [string, string][] = [

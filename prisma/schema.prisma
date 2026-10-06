@@ -26,6 +26,7 @@ model Agent {
   defaults              AgentDefault[]
   paymentRecords        PaymentRecord[]
   invoices              Invoice[]
+  branchLimitChanges    BranchLimitChange[]
   notifications         Notification[]
   employees             Employee[]
   dispatchers           Dispatcher[]
@@ -480,6 +481,20 @@ model Invoice {
 
   @@unique([agentId, year, month])
   @@index([agentId])
+}
+
+// Audit log of branch-limit changes, by the agent (Settings → Plan) or an admin.
+model BranchLimitChange {
+  id         String   @id @default(cuid())
+  agentId    String
+  fromLimit  Int
+  toLimit    Int
+  changedBy  String   // "agent" | "admin"
+  actorEmail String?
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([agentId, createdAt])
 }
 
 // ─── Notifications ───────────────────────────────────────────

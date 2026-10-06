@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { setBranchLimit } from "@/lib/db/admin";
 import { planLimitError } from "@/lib/billing";
 import { sendPlanChangeNotification } from "@/lib/email";
 
@@ -27,9 +28,9 @@ export async function PATCH(req: NextRequest) {
   const error = planLimitError(requested, branchesInUse);
   if (error) return NextResponse.json({ error }, { status: 400 });
 
-  if (requested !== agent.maxBranches) {
-    await prisma.agent.update({ where: { id: agentId }, data: { maxBranches: requested } });
-    await sendPlanChangeNotification(agent.email, agent.name, agent.maxBranches, requested);
+  const previous = await setBranchLimit(agentId, requested, { changedBy: "agent", actorEmail: agent.email });
+  if (previous !== null) {
+    await sendPlanChangeNotification(agent.email, agent.name, previous, requested);
   }
 
   return NextResponse.json({ maxBranches: requested });
