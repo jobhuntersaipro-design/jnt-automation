@@ -20,7 +20,7 @@ export default async function SettingsPage() {
       createdAt: true,
       maxBranches: true,
       isSuperAdmin: true,
-      invoices: { select: { year: true, month: true, amount: true, paidAt: true } },
+      invoices: { select: { year: true, month: true, branchCount: true, amount: true, paidAt: true } },
       _count: { select: { branches: { where: { isDemo: false } } } },
     },
   });

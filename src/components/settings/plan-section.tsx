@@ -17,6 +17,7 @@ import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-d
 import { formatDate, formatMonth, formatRM, trialInfo } from "@/components/admin/admin-shared";
 
 export interface PlanInvoice extends YearMonth {
+  branchCount: number;
   amount: number;
   paidAt: string | null;
 }
@@ -161,11 +162,18 @@ export function PlanSection({
               const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
               const status = billingStatus({ createdAt, isSuperAdmin }, invoices, ym);
               if (status !== "paid" && status !== "unpaid") return null;
-              const amount = inv?.paidAt ? inv.amount : maxBranches * PRICE_PER_BRANCH;
+              // Same rule as the invoice PDF: paid months keep their snapshot, open months bill the current limit.
+              const limit = inv?.paidAt ? inv.branchCount : maxBranches;
+              const amount = inv?.paidAt ? inv.amount : limit * PRICE_PER_BRANCH;
               return (
                 <div key={`${ym.year}-${ym.month}`} className="flex items-center gap-3 py-1.5">
                   <span className="w-20 text-sm text-on-surface">{formatMonth(ym)}</span>
-                  <span className="w-24 text-sm tabular-nums text-on-surface">{formatRM(amount)}</span>
+                  <span className="w-28 flex flex-col">
+                    <span className="text-sm tabular-nums text-on-surface">{formatRM(amount)}</span>
+                    <span className="text-xs tabular-nums text-on-surface-variant">
+                      {limit} branch{limit === 1 ? "" : "es"} × RM {PRICE_PER_BRANCH}
+                    </span>
+                  </span>
                   <span
                     className={`px-2 py-0.5 text-[0.7rem] font-semibold rounded ${
                       status === "paid" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
