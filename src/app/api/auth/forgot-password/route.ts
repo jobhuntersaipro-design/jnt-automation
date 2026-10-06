@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
   const baseUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const resetUrl = `${baseUrl}/auth/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
 
-  await sendPasswordResetEmail(email, agent.name, resetUrl);
+  // Same response either way so a send failure can't reveal the account exists.
+  await sendPasswordResetEmail(email, agent.name, resetUrl).catch((err) =>
+    console.error("[email] password reset send failed", err),
+  );
 
   return NextResponse.json({ message: "If an account exists, a reset link has been sent." });
 }

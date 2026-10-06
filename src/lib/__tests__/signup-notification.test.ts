@@ -16,7 +16,7 @@ import { sendNewSignupNotification } from "@/lib/email";
 
 describe("sendNewSignupNotification", () => {
   beforeEach(() => {
-    send.mockReset().mockResolvedValue({ id: "msg_1" });
+    send.mockReset().mockResolvedValue({ data: { id: "msg_1" }, error: null });
     findMany.mockReset().mockResolvedValue([]);
     process.env.RESEND_API_KEY = "re_test";
     delete process.env.NOTIFY_EMAIL;
@@ -66,6 +66,19 @@ describe("sendNewSignupNotification", () => {
     process.env.RESEND_API_KEY = "re_test";
     await sendNewSignupNotification("x@y.com", "A", "email");
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it("logs Resend's returned error (it doesn't throw on API errors)", async () => {
+    process.env.NOTIFY_EMAIL = "a@x.com";
+    send.mockResolvedValue({
+      data: null,
+      error: { name: "validation_error", message: "domain is not verified" },
+    });
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await sendNewSignupNotification("x@y.com", "A", "email");
+    expect(String(err.mock.calls[0][1])).toContain("domain is not verified");
+    err.mockRestore();
   });
 
   it("never throws when sending fails", async () => {

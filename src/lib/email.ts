@@ -10,6 +10,14 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
+type SendPayload = Parameters<Resend["emails"]["send"]>[0];
+
+/** Resend returns API errors (unverified domain, bad key) instead of throwing. */
+async function send(resend: Resend, payload: SendPayload) {
+  const { error } = await resend.emails.send(payload);
+  if (error) throw new Error(`Resend ${error.name}: ${error.message}`);
+}
+
 /**
  * Wraps email body content in a branded HTML template.
  */
@@ -98,7 +106,7 @@ export async function sendPasswordResetEmail(
       </p>
   `);
 
-  await resend.emails.send({
+  await send(resend, {
     from: FROM,
     to: agentEmail,
     subject: "Reset your password — EasyStaff",
@@ -152,7 +160,7 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
       </p>
   `);
 
-  await resend.emails.send({
+  await send(resend, {
     from: FROM,
     to: agentEmail,
     subject: "Your EasyStaff account has been approved",
@@ -254,7 +262,7 @@ export async function sendNewSignupNotification(
       </p>
     `);
 
-    await resend.emails.send({
+    await send(resend, {
       from: FROM,
       to,
       subject: `New signup — ${displayName} (${agentEmail})`,
