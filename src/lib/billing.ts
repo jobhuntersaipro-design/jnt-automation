@@ -31,6 +31,11 @@ export function trialEndDate(createdAt: Date | string): Date {
   return d;
 }
 
+/** Whole days left in the trial, rounded up; 0 or less once it has ended. */
+export function trialDaysLeft(createdAt: Date | string, now: Date = new Date()): number {
+  return Math.ceil((trialEndDate(createdAt).getTime() - now.getTime()) / 86_400_000);
+}
+
 export function isInTrial(createdAt: Date | string, now: Date = new Date()): boolean {
   return now < trialEndDate(createdAt);
 }

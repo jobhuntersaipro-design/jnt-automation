@@ -13,6 +13,7 @@ import { getEffectiveAgentId } from "@/lib/impersonation";
 import { prisma } from "@/lib/prisma";
 import { DemoBanner } from "@/components/onboarding/demo-banner";
 import { ProductTour } from "@/components/onboarding/product-tour";
+import { TrialChip } from "@/components/dashboard/trial-chip";
 
 export default async function DashboardLayout({
   children,
@@ -30,6 +31,8 @@ export default async function DashboardLayout({
         where: { id: effective.agentId },
         select: {
           hasSeenTutorial: true,
+          isSuperAdmin: true,
+          createdAt: true,
           branches: { where: { isDemo: true }, select: { id: true }, take: 1 },
         },
       })
@@ -70,6 +73,7 @@ export default async function DashboardLayout({
 
         {/* Right side — icons + user */}
         <div className="ml-auto flex items-center gap-2 shrink-0">
+          {onboarding && !onboarding.isSuperAdmin && <TrialChip createdAt={onboarding.createdAt} />}
           <div className="relative">
             <NotificationBell />
             <BulkJobsIndicator />

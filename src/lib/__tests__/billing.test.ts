@@ -8,6 +8,7 @@ import {
   isInTrial,
   normalizePhone,
   planLimitError,
+  trialDaysLeft,
   trialEndDate,
   whatsappLink,
 } from "@/lib/billing";
@@ -17,6 +18,12 @@ const signup = "2026-10-06T04:00:00.000Z";
 describe("trial", () => {
   it("ends 30 days after signup", () => {
     expect(trialEndDate(signup).toISOString()).toBe("2026-11-05T04:00:00.000Z");
+  });
+
+  it("counts whole days left, rounding up", () => {
+    expect(trialDaysLeft(signup, new Date("2026-10-06T04:00:00Z"))).toBe(30);
+    expect(trialDaysLeft(signup, new Date("2026-11-04T05:00:00Z"))).toBe(1);
+    expect(trialDaysLeft(signup, new Date("2026-11-05T04:00:00Z"))).toBe(0);
   });
 
   it("is active until the end date", () => {
