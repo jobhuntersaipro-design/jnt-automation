@@ -23,6 +23,7 @@ export async function POST(
 
   const agent = await getInvoiceAgent(session.user.id);
   if (!agent) return NextResponse.json({ error: "Account not found" }, { status: 404 });
+  if (!agent.onlinePayment) return NextResponse.json({ error: "Online payment isn't available yet" }, { status: 403 });
 
   const existing = await prisma.invoice.findMany({
     where: { agentId: agent.id, year, month },

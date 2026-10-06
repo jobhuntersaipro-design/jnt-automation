@@ -104,6 +104,7 @@ export function AgentDrawer({
                   {agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150 = {formatRM(agent.maxBranches * 150)}/month
                 </span>
               </div>
+              <OnlinePaymentToggle agent={agent} onUpdate={onUpdate} />
               {months.length === 0 ? (
                 <p className="text-[0.8rem] text-on-surface-variant/70">
                   Free trial — first invoice is for {formatMonth(firstBillableMonth(agent.createdAt))}.
@@ -451,5 +452,53 @@ function PaymentForm({ onSubmit }: { onSubmit: (d: { amount: number; date: strin
         {saving ? "Saving…" : "Add payment"}
       </button>
     </form>
+  );
+}
+
+/** Admin opt-in per agent: automatic monthly invoices + reminders, and Billplz Pay now. */
+function OnlinePaymentToggle({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Partial<AdminAgent>) => void }) {
+  const [saving, setSaving] = useState(false);
+  const on = agent.onlinePayment;
+
+  async function toggle() {
+    setSaving(true);
+    const res = await fetch(`/api/admin/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ onlinePayment: !on }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) {
+      toast.error(data.error || "Couldn't update online payment");
+      return;
+    }
+    onUpdate({ onlinePayment: data.onlinePayment });
+    toast.success(`Online payment ${data.onlinePayment ? "on" : "off"} for ${agent.name || agent.email}`);
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 p-3 rounded-md bg-surface-low">
+      <div className="min-w-0">
+        <p className="text-[0.8rem] font-medium text-on-surface">Online payment</p>
+        <p className="text-[0.72rem] text-on-surface-variant">
+          {on
+            ? "Invoices and due-date reminders are emailed automatically, with a Pay now link. Pay now shows in their Settings."
+            : "Off — no automatic invoices or Pay now. Send invoices manually below."}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={saving}
+        role="switch"
+        aria-checked={on}
+        aria-label="Online payment"
+        className="relative w-9 h-5 mt-0.5 rounded-full transition-colors shrink-0 disabled:opacity-50"
+        style={{ backgroundColor: on ? "#12B981" : "rgba(195, 198, 214, 0.4)" }}
+      >
+        <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${on ? "translate-x-4" : ""}`} />
+      </button>
+    </div>
   );
 }

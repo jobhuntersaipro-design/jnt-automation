@@ -15,7 +15,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 /** Billplz link for an unpaid invoice; reuses the bill unless the amount changed. */
 export async function paymentLinkFor(agent: InvoiceAgent, inv: Invoice): Promise<string | null> {
-  if (inv.paidAt || !billplzConfigured()) return null;
+  if (inv.paidAt || !agent.onlinePayment || !billplzConfigured()) return null;
   if (inv.billplzBillId && inv.billplzUrl && inv.billplzAmount === inv.amount) return inv.billplzUrl;
   if (inv.billplzBillId) {
     // Retire the old bill so it can't be paid at the stale amount.
@@ -95,14 +95,17 @@ export async function markBillPaid(billId: string, paidAmountCents: number) {
   }
 }
 
-/** Daily job: send this month's invoice once the trial is over, then one reminder when it's due. */
+/**
+ * Daily job: send this month's invoice once the trial is over, then one
+ * reminder when it's due. Only for agents the admin switched online payment on for.
+ */
 export async function runBillingJob(now: Date = new Date()) {
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth() + 1;
   const agents = await prisma.agent.findMany({
-    where: { isSuperAdmin: false, isApproved: true, branches: { some: { isDemo: false } } },
+    where: { isSuperAdmin: false, isApproved: true, onlinePayment: true, branches: { some: { isDemo: false } } },
     select: {
-      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true,
+      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, onlinePayment: true,
       companyRegistrationNo: true, companyAddress: true, createdAt: true,
       invoices: { where: { year, month } },
     },

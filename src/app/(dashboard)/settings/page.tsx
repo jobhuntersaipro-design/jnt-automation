@@ -20,6 +20,7 @@ export default async function SettingsPage() {
       stampImageUrl: true,
       createdAt: true,
       maxBranches: true,
+      onlinePayment: true,
       isSuperAdmin: true,
       invoices: { select: { year: true, month: true, branchCount: true, amount: true, paidAt: true } },
       _count: { select: { branches: { where: { isDemo: false } } } },
@@ -57,7 +58,7 @@ export default async function SettingsPage() {
             branchesInUse: agent._count.branches,
             createdAt: agent.createdAt.toISOString(),
             isSuperAdmin: agent.isSuperAdmin,
-            payOnline: billplzConfigured(),
+            payOnline: agent.onlinePayment && billplzConfigured(),
             invoices: agent.invoices.map((i) => ({ ...i, paidAt: i.paidAt?.toISOString() ?? null })),
           }}
         />

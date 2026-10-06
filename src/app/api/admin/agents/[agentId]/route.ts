@@ -10,6 +10,7 @@ const profileSchema = z
     phone: z.string().max(30).nullable().optional(),
     adminNotes: z.string().max(2000).nullable().optional(),
     maxBranches: z.number().int().min(1).max(1000).optional(),
+    onlinePayment: z.boolean().optional(),
   })
   .strict();
 

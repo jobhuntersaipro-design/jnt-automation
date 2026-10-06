@@ -17,6 +17,7 @@ model Agent {
   isApproved   Boolean        @default(false)
   isSuperAdmin Boolean        @default(false)
   maxBranches  Int            @default(1)
+  onlinePayment Boolean  @default(false) // admin opt-in: auto invoices + Billplz Pay now
   // Onboarding tour. False only for agents created after the onboarding
   // migration — gates the first-sign-in demo seed + auto-started tour.
   hasSeenTutorial Boolean     @default(false)

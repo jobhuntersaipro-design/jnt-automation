@@ -12,6 +12,7 @@ export async function getAllAgents() {
       isApproved: true,
       isSuperAdmin: true,
       maxBranches: true,
+      onlinePayment: true,
       avatarUrl: true,
       createdAt: true,
       branches: { select: { code: true, isDemo: true }, orderBy: { code: "asc" } },
@@ -37,6 +38,7 @@ export async function getAllAgents() {
     isApproved: a.isApproved,
     isSuperAdmin: a.isSuperAdmin,
     maxBranches: a.maxBranches,
+    onlinePayment: a.onlinePayment,
     avatarUrl: a.avatarUrl,
     createdAt: a.createdAt.toISOString(),
     branchCount: a.branches.filter((b) => !b.isDemo).length,
@@ -109,7 +111,7 @@ export async function setBranchLimit(agentId: string, toLimit: number, actor: Li
 // Update the admin-editable profile fields; branch-limit changes are logged.
 export async function updateAgentProfile(
   agentId: string,
-  data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number },
+  data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number; onlinePayment?: boolean },
   actor: LimitActor,
 ) {
   const { maxBranches, ...rest } = data;
@@ -117,7 +119,7 @@ export async function updateAgentProfile(
   return prisma.agent.update({
     where: { id: agentId },
     data: rest,
-    select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true },
+    select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true, onlinePayment: true },
   });
 }
 
@@ -153,6 +155,7 @@ const INVOICE_AGENT_SELECT = {
   phone: true,
   isSuperAdmin: true,
   maxBranches: true,
+  onlinePayment: true,
   companyRegistrationNo: true,
   companyAddress: true,
   createdAt: true,
