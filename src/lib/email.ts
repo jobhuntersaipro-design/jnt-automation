@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { prisma } from "@/lib/prisma";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://easystaff.top";
 
@@ -165,4 +166,109 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
       "If you have any questions, contact help@easystaff.top",
     ].join("\n"),
   });
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
+ * Who hears about new signups: `NOTIFY_EMAIL` (comma-separated allowed),
+ * otherwise every superadmin on file.
+ */
+async function getSignupNotifyRecipients(): Promise<string[]> {
+  const fromEnv = (process.env.NOTIFY_EMAIL ?? "")
+    .split(",")
+    .map((e) => e.trim())
+    .filter(Boolean);
+  if (fromEnv.length > 0) return fromEnv;
+
+  const admins = await prisma.agent.findMany({
+    where: { isSuperAdmin: true },
+    select: { email: true },
+  });
+  return admins.map((a) => a.email);
+}
+
+export type SignupMethod = "email" | "google";
+
+/**
+ * Tell the superadmin a new agent signed up and is waiting for approval.
+ * Covers both email/password registration and first-time Google sign-in.
+ * Never throws — a failed notification must not break signup.
+ */
+export async function sendNewSignupNotification(
+  agentEmail: string,
+  agentName: string,
+  method: SignupMethod,
+) {
+  try {
+    const resend = getResend();
+    if (!resend) return;
+
+    const to = await getSignupNotifyRecipients();
+    if (to.length === 0) return;
+
+    const adminUrl = `${APP_URL}/admin`;
+    const methodLabel = method === "google" ? "Google" : "Email & password";
+    const registeredAt = new Date().toISOString();
+    const displayName = agentName || "(no name)";
+
+    const row = (label: string, value: string) => `
+        <tr>
+          <td style="padding:6px 16px 6px 0;font-size:13px;color:#424654;white-space:nowrap;">${label}</td>
+          <td style="padding:6px 0;font-size:14px;color:#191c1d;font-weight:600;">${escapeHtml(value)}</td>
+        </tr>`;
+
+    const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
+        New signup awaiting approval
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#424654;line-height:1.6;">
+        A new agent has signed up for EasyStaff and can't use the app until you approve them.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;padding:12px 16px;background-color:#f3f4f5;border-radius:6px;width:100%;">
+        ${row("Name", displayName)}
+        ${row("Email", agentEmail)}
+        ${row("Signed up with", methodLabel)}
+        ${row("Signed up at", registeredAt)}
+      </table>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 20px;">
+        <tr>
+          <td style="background-color:#0056D2;border-radius:6px;">
+            <a href="${adminUrl}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+              Review in Admin
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0;font-size:13px;color:#424654;line-height:1.5;">
+        Or open <a href="${adminUrl}" style="color:#0056D2;text-decoration:none;">${adminUrl}</a>
+      </p>
+    `);
+
+    await resend.emails.send({
+      from: "EasyStaff <help@easystaff.top>",
+      to,
+      subject: `New signup — ${displayName} (${agentEmail})`,
+      html,
+      text: [
+        "A new agent has signed up and is awaiting approval.",
+        "",
+        `Name: ${displayName}`,
+        `Email: ${agentEmail}`,
+        `Signed up with: ${methodLabel}`,
+        `Signed up at: ${registeredAt}`,
+        "",
+        `Review and approve: ${adminUrl}`,
+      ].join("\n"),
+    });
+  } catch (err) {
+    console.error("[email] new signup notification failed", err);
+  }
 }

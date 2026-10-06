@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
-import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
+import { sendNewSignupNotification } from "@/lib/email";
 import { registerLimiter, extractIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -85,28 +85,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Notify superadmin
-    const notifyEmail = process.env.NOTIFY_EMAIL;
-    if (notifyEmail && process.env.RESEND_API_KEY) {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      await resend.emails.send({
-        from: "EasyStaff <help@easystaff.top>",
-        to: notifyEmail,
-        subject: `New Agent Registration — ${name}`,
-        text: [
-          "A new agent has registered and is awaiting approval.",
-          "",
-          `Name: ${name}`,
-          `Email: ${email}`,
-          `Registered at: ${new Date().toISOString()}`,
-          "",
-          "Approve via Prisma Studio:",
-          "1. Open npx prisma studio",
-          "2. Find the Agent row with this email",
-          "3. Set isApproved = true",
-        ].join("\n"),
-      });
-    }
+    await sendNewSignupNotification(email, name, "email");
 
     return NextResponse.json(
       { message: "Registration successful. Awaiting approval." },

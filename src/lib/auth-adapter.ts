@@ -4,6 +4,7 @@
  */
 import type { Adapter, AdapterAccount, AdapterUser } from "@auth/core/adapters";
 import { prisma } from "@/lib/prisma";
+import { sendNewSignupNotification } from "@/lib/email";
 
 function toAdapterUser(agent: {
   id: string;
@@ -23,6 +24,8 @@ export const agentAdapter: Adapter = {
     const agent = await prisma.agent.create({
       data: { name: name ?? "", email, password: null },
     });
+    // Only OAuth signups reach createUser (credentials register directly).
+    await sendNewSignupNotification(agent.email, agent.name, "google");
     return toAdapterUser(agent);
   },
 
