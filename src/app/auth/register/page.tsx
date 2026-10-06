@@ -13,6 +13,7 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     name: "",
     email: "",
+    phone: "",
     password: "",
     confirmPassword: "",
   });
@@ -138,6 +139,22 @@ export default function RegisterPage() {
             onChange={handleChange}
             required
             placeholder="you@example.com"
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">
+            WhatsApp number
+          </label>
+          <input
+            type="tel"
+            name="phone"
+            value={form.phone}
+            onChange={handleChange}
+            required
+            autoComplete="tel"
+            inputMode="tel"
+            placeholder="012-345 6789"
             className={inputClass}
           />
         </div>

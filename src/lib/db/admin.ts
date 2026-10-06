@@ -1,19 +1,24 @@
 import { prisma } from "@/lib/prisma";
 
-// Get all agents with branch counts and payment records
+// Get all agents with branches, contact details and invoices
 export async function getAllAgents() {
   const agents = await prisma.agent.findMany({
     select: {
       id: true,
       name: true,
       email: true,
+      phone: true,
+      adminNotes: true,
       isApproved: true,
       isSuperAdmin: true,
       maxBranches: true,
       avatarUrl: true,
       createdAt: true,
-      _count: { select: { branches: { where: { isDemo: false } } } },
-      branches: { select: { code: true }, orderBy: { code: "asc" } },
+      branches: { select: { code: true, isDemo: true }, orderBy: { code: "asc" } },
+      invoices: {
+        select: { year: true, month: true, amount: true, branchCount: true, sentAt: true, paidAt: true },
+        orderBy: [{ year: "desc" }, { month: "desc" }],
+      },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -22,13 +27,24 @@ export async function getAllAgents() {
     id: a.id,
     name: a.name,
     email: a.email,
+    phone: a.phone,
+    adminNotes: a.adminNotes,
     isApproved: a.isApproved,
     isSuperAdmin: a.isSuperAdmin,
     maxBranches: a.maxBranches,
     avatarUrl: a.avatarUrl,
     createdAt: a.createdAt.toISOString(),
-    branchCount: a._count.branches,
-    branches: a.branches.map((b) => b.code),
+    branchCount: a.branches.filter((b) => !b.isDemo).length,
+    branches: a.branches.filter((b) => !b.isDemo).map((b) => b.code),
+    hasDemo: a.branches.some((b) => b.isDemo),
+    invoices: a.invoices.map((i) => ({
+      year: i.year,
+      month: i.month,
+      amount: i.amount,
+      branchCount: i.branchCount,
+      sentAt: i.sentAt?.toISOString() ?? null,
+      paidAt: i.paidAt?.toISOString() ?? null,
+    })),
   }));
 }
 
@@ -60,12 +76,65 @@ export async function toggleAgentApproval(agentId: string, isApproved: boolean) 
   return { id: agent.id, isApproved: agent.isApproved };
 }
 
-// Update agent maxBranches
-export async function updateMaxBranches(agentId: string, maxBranches: number) {
+// Update the admin-editable profile fields
+export async function updateAgentProfile(
+  agentId: string,
+  data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number },
+) {
   return prisma.agent.update({
     where: { id: agentId },
-    data: { maxBranches },
-    select: { id: true, maxBranches: true },
+    data,
+    select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true },
+  });
+}
+
+// Delete an agent and everything they own (all relations cascade)
+export async function deleteAgent(agentId: string) {
+  return prisma.agent.delete({ where: { id: agentId } });
+}
+
+// ─── Invoices ──────────────────────────────────────────────
+
+const INVOICE_AGENT_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phone: true,
+  isSuperAdmin: true,
+  maxBranches: true,
+  companyRegistrationNo: true,
+  companyAddress: true,
+  createdAt: true,
+} as const;
+
+export async function getInvoiceAgent(agentId: string) {
+  return prisma.agent.findUnique({ where: { id: agentId }, select: INVOICE_AGENT_SELECT });
+}
+
+export async function getInvoice(agentId: string, year: number, month: number) {
+  return prisma.invoice.findUnique({ where: { agentId_year_month: { agentId, year, month } } });
+}
+
+/**
+ * Create or refresh a month's invoice. An unpaid invoice re-snapshots the
+ * branch limit; a paid one keeps the amount it was paid at.
+ */
+export async function upsertInvoice(
+  agentId: string,
+  year: number,
+  month: number,
+  branchCount: number,
+  unitPrice: number,
+  patch: { sentAt?: Date; paidAt?: Date | null },
+) {
+  const existing = await getInvoice(agentId, year, month);
+  const pricing = existing?.paidAt && patch.paidAt !== null
+    ? {}
+    : { branchCount, unitPrice, amount: branchCount * unitPrice };
+  return prisma.invoice.upsert({
+    where: { agentId_year_month: { agentId, year, month } },
+    create: { agentId, year, month, branchCount, unitPrice, amount: branchCount * unitPrice, ...patch },
+    update: { ...pricing, ...patch },
   });
 }
 
@@ -92,6 +161,7 @@ export async function createAgent(data: {
   password: string;
   isApproved: boolean;
   maxBranches: number;
+  phone?: string;
   companyRegistrationNo?: string;
   companyAddress?: string;
 }) {

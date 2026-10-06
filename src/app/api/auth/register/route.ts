@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendNewSignupNotification } from "@/lib/email";
+import { normalizePhone } from "@/lib/billing";
 import { registerLimiter, extractIp } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
@@ -22,9 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name: rawName, email: rawEmail, password, confirmPassword } = body as {
+  const { name: rawName, email: rawEmail, phone: rawPhone, password, confirmPassword } = body as {
     name?: string;
     email?: string;
+    phone?: string;
     password?: string;
     confirmPassword?: string;
   };
@@ -36,6 +38,14 @@ export async function POST(req: NextRequest) {
   if (!name || !email || !password || !confirmPassword) {
     return NextResponse.json(
       { error: "Name, email, password, and confirmPassword are required." },
+      { status: 400 }
+    );
+  }
+
+  const phone = typeof rawPhone === "string" ? normalizePhone(rawPhone) : null;
+  if (!phone) {
+    return NextResponse.json(
+      { error: "Please enter a valid WhatsApp number." },
       { status: 400 }
     );
   }
@@ -79,13 +89,14 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         email,
+        phone,
         password: hashedPassword,
         isApproved: true,
         isSuperAdmin: false,
       },
     });
 
-    await sendNewSignupNotification(email, name, "email");
+    await sendNewSignupNotification(email, name, "email", phone);
 
     return NextResponse.json(
       { message: "Registration successful." },

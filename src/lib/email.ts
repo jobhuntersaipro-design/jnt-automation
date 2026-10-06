@@ -216,6 +216,7 @@ export async function sendNewSignupNotification(
   agentEmail: string,
   agentName: string,
   method: SignupMethod,
+  phone?: string | null,
 ) {
   try {
     const resend = getResend();
@@ -245,6 +246,7 @@ export async function sendNewSignupNotification(
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;padding:12px 16px;background-color:#f3f4f5;border-radius:6px;width:100%;">
         ${row("Name", displayName)}
         ${row("Email", agentEmail)}
+        ${phone ? row("WhatsApp", phone) : ""}
         ${row("Signed up with", methodLabel)}
         ${row("Signed up at", registeredAt)}
       </table>
@@ -272,6 +274,7 @@ export async function sendNewSignupNotification(
         "",
         `Name: ${displayName}`,
         `Email: ${agentEmail}`,
+        ...(phone ? [`WhatsApp: ${phone}`] : []),
         `Signed up with: ${methodLabel}`,
         `Signed up at: ${registeredAt}`,
         "",
@@ -281,4 +284,62 @@ export async function sendNewSignupNotification(
   } catch (err) {
     console.error("[email] new signup notification failed", err);
   }
+}
+
+function formatRMText(n: number): string {
+  return n.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+/** Monthly subscription invoice with the PDF attached. Throws on failure. */
+export async function sendInvoiceEmail(input: {
+  to: string;
+  name: string;
+  year: number;
+  month: number;
+  amount: number;
+  branchCount: number;
+  invoiceNo: string;
+  paid: boolean;
+  pdf: Buffer;
+  filename: string;
+}) {
+  const resend = getResend();
+  if (!resend) throw new Error("RESEND_API_KEY is not set");
+
+  const period = `${MONTH_NAMES[input.month - 1]} ${input.year}`;
+  const amount = `RM ${formatRMText(input.amount)}`;
+  const summary = input.paid
+    ? `This is your receipt for ${period}. Payment of ${amount} has been received — thank you.`
+    : `Your EasyStaff invoice for ${period} is ready. The amount due is ${amount} (${input.branchCount} branch${input.branchCount === 1 ? "" : "es"} × RM 150.00).`;
+
+  const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
+        ${input.paid ? "Payment received" : "Your invoice"} · ${period}
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#424654;line-height:1.6;">Hi ${escapeHtml(input.name)},</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">${summary}</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#424654;">Invoice no: <strong style="color:#191c1d;">${input.invoiceNo}</strong></p>
+      <p style="margin:0 0 24px;font-size:13px;color:#424654;">The invoice is attached as a PDF, with payment details inside.</p>
+  `);
+
+  await send(resend, {
+    from: FROM,
+    to: input.to,
+    subject: `${input.paid ? "Receipt" : "Invoice"} ${input.invoiceNo} — EasyStaff ${period}`,
+    html,
+    text: [
+      `Hi ${input.name},`,
+      "",
+      summary,
+      `Invoice no: ${input.invoiceNo}`,
+      "",
+      "The invoice is attached as a PDF, with payment details inside.",
+    ].join("\n"),
+    attachments: [{ filename: input.filename, content: input.pdf }],
+  });
 }

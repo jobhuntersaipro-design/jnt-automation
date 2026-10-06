@@ -25,6 +25,7 @@ model Agent {
   sessions     Session[]
   defaults              AgentDefault[]
   paymentRecords        PaymentRecord[]
+  invoices              Invoice[]
   notifications         Notification[]
   employees             Employee[]
   dispatchers           Dispatcher[]
@@ -32,6 +33,8 @@ model Agent {
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
   stampImageUrl            String?    // R2 URL for company stamp on payslips
+  phone                    String?    // WhatsApp number, collected at signup
+  adminNotes               String?    // superadmin-only notes
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
 }
@@ -456,6 +459,26 @@ model PaymentRecord {
   agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
+  @@index([agentId])
+}
+
+// Monthly subscription invoice (branch limit × price). One row per agent per
+// month, created when the invoice is sent or the month is marked paid.
+model Invoice {
+  id          String    @id @default(cuid())
+  agentId     String
+  year        Int
+  month       Int       // 1–12
+  branchCount Int
+  unitPrice   Float
+  amount      Float
+  sentAt      DateTime?
+  paidAt      DateTime? // null = unpaid
+  agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([agentId, year, month])
   @@index([agentId])
 }
 

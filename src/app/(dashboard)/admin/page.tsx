@@ -12,14 +12,14 @@ export default async function AdminPage() {
 
   return (
     <main className="flex-1 min-w-0 overflow-x-clip lg:overflow-y-auto px-4 lg:px-16 py-6 lg:py-8">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-[90rem] mx-auto">
         <h1 className="text-[1.6rem] font-bold text-on-surface tracking-tight font-(family-name:--font-manrope)">
           Admin Panel
         </h1>
         <p className="text-[0.85rem] text-on-surface-variant mt-0.5 mb-8">
-          Manage agents, approvals, and payment records.
+          Manage accounts, approvals, billing and invoices.
         </p>
-        <AdminClient initialAgents={agents} />
+        <AdminClient initialAgents={agents} currentUserId={session.user.id} />
       </div>
     </main>
   );

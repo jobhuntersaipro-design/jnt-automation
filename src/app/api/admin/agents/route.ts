@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getAllAgents, createAgent } from "@/lib/db/admin";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { normalizePhone } from "@/lib/billing";
 
 export async function GET() {
   const session = await auth();
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { email, name, password, isApproved, maxBranches, companyRegistrationNo, companyAddress } = body;
+  const { email, name, password, isApproved, maxBranches, phone, companyRegistrationNo, companyAddress } = body;
 
   const inputSchema = z.object({
     email: z.string().email("Invalid email address").max(255),
@@ -33,6 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: validated.error.issues[0].message }, { status: 400 });
   }
 
+  const normalizedPhone = typeof phone === "string" && phone.trim() ? normalizePhone(phone) : undefined;
+  if (normalizedPhone === null) {
+    return NextResponse.json({ error: "Invalid WhatsApp number" }, { status: 400 });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
     const agent = await createAgent({
@@ -41,6 +47,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       isApproved: isApproved ?? true,
       maxBranches: maxBranches ?? 1,
+      phone: normalizedPhone,
       companyRegistrationNo: companyRegistrationNo?.trim() || undefined,
       companyAddress: companyAddress?.trim() || undefined,
     });

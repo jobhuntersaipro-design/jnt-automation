@@ -1,619 +1,527 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search, ChevronDown, ChevronRight, Plus, Trash2, X, Eye, LogIn } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Check,
+  Eye,
+  LogIn,
+  MessageCircle,
+  Plus,
+  Search,
+  Send,
+  Trash2,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { AdminAgent } from "@/lib/db/admin";
+import { monthKey, whatsappLink, type BillingStatus, type YearMonth } from "@/lib/billing";
+import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
+import { AgentDrawer, type BillingActions } from "./agent-drawer";
+import {
+  BILLING_CHIP,
+  formatDate,
+  formatMonth,
+  formatRM,
+  monthBill,
+  trialInfo,
+  type AdminInvoice,
+} from "./admin-shared";
 
-interface PaymentRecord {
-  id: string;
-  amount: number;
-  date: string;
-  notes: string | null;
-  period: string | null;
-  createdAt: string;
+type StatusFilter = "all" | "approved" | "pending";
+type BillingFilter = "all" | BillingStatus;
+type SortKey = "name" | "email" | "branches" | "joined" | "trial" | "billing" | "status";
+
+const BILLING_ORDER: Record<BillingStatus, number> = { unpaid: 0, paid: 1, trial: 2, exempt: 3 };
+
+function currentMonth(): YearMonth {
+  const now = new Date();
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
 }
 
-function formatRM(amount: number) {
-  return amount.toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+/** The current month plus the 11 before it, newest first. */
+function monthOptions(): YearMonth[] {
+  const k = monthKey(currentMonth());
+  return Array.from({ length: 12 }, (_, i) => ({ year: Math.floor((k - i) / 12), month: ((k - i) % 12) + 1 }));
 }
 
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-MY", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-export function AdminClient({ initialAgents }: { initialAgents: AdminAgent[] }) {
+export function AdminClient({ initialAgents, currentUserId }: { initialAgents: AdminAgent[]; currentUserId: string }) {
   const [agents, setAgents] = useState(initialAgents);
   const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<"all" | "approved" | "pending">("all");
-  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [billingFilter, setBillingFilter] = useState<BillingFilter>("all");
+  const [month, setMonth] = useState<YearMonth>(currentMonth);
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "joined", dir: "desc" });
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
   const [showAddAccount, setShowAddAccount] = useState(false);
 
+  const updateAgent = useCallback((id: string, updates: Partial<AdminAgent>) => {
+    setAgents((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
+  }, []);
+
+  const putInvoice = useCallback((id: string, inv: AdminInvoice) => {
+    setAgents((prev) =>
+      prev.map((a) =>
+        a.id === id
+          ? { ...a, invoices: [inv, ...a.invoices.filter((i) => i.year !== inv.year || i.month !== inv.month)] }
+          : a,
+      ),
+    );
+  }, []);
+
   const handleAgentCreated = useCallback(async () => {
-    // Refresh agent list from server
     const res = await fetch("/api/admin/agents");
-    if (res.ok) {
-      const data = await res.json();
-      setAgents(data);
-    }
+    if (res.ok) setAgents(await res.json());
     setShowAddAccount(false);
   }, []);
 
-  const filtered = agents.filter((a) => {
-    if (filterStatus === "approved" && !a.isApproved) return false;
-    if (filterStatus === "pending" && a.isApproved) return false;
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      return (
-        a.name.toLowerCase().includes(q) ||
-        a.email.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  /* ─── Actions (all behind a confirmation) ─── */
 
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Filter bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-40 sm:flex-none">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search by name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-full sm:w-64"
-          />
-        </div>
-        <div className="flex gap-1">
-          {(["all", "approved", "pending"] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className={`px-3 py-1.5 text-[0.78rem] font-medium rounded-md transition-colors capitalize ${
-                filterStatus === status
-                  ? "bg-brand text-white"
-                  : "text-on-surface-variant hover:bg-surface-hover"
-              }`}
-            >
-              {status}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[0.75rem] text-on-surface-variant/60">
-            {filtered.length} agent{filtered.length !== 1 ? "s" : ""}
-          </span>
-          <button
-            onClick={() => setShowAddAccount(!showAddAccount)}
-            className="flex items-center gap-1 px-3 py-1.5 text-[0.78rem] font-medium text-white bg-brand rounded-md hover:opacity-90 transition-opacity"
-          >
-            <Plus size={14} />
-            Add Account
-          </button>
-        </div>
-      </div>
+  const requestStatusChange = useCallback((agent: AdminAgent, isApproved: boolean) => {
+    setConfirm({
+      title: isApproved ? "Approve this account?" : "Set this account to pending?",
+      body: isApproved ? (
+        <>
+          <strong className="text-on-surface">{agent.name || agent.email}</strong> will be able to sign in and use
+          EasyStaff. They&apos;ll get an approval email.
+        </>
+      ) : (
+        <>
+          <strong className="text-on-surface">{agent.name || agent.email}</strong> will lose access straight away and
+          see the &ldquo;awaiting approval&rdquo; page until you approve them again. Their data is kept.
+        </>
+      ),
+      confirmLabel: isApproved ? "Approve" : "Set to pending",
+      tone: isApproved ? "primary" : "danger",
+      onConfirm: async () => {
+        const res = await fetch(`/api/admin/agents/${agent.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isApproved }),
+        });
+        if (!res.ok) {
+          toast.error("Failed to update status");
+          return false;
+        }
+        updateAgent(agent.id, { isApproved });
+        toast.success(isApproved ? "Account approved" : "Access revoked");
+      },
+    });
+  }, [updateAgent]);
 
-      {showAddAccount && (
-        <AddAccountForm onCreated={handleAgentCreated} onCancel={() => setShowAddAccount(false)} />
-      )}
+  const requestDelete = useCallback((agent: AdminAgent) => {
+    setConfirm({
+      title: "Delete this account?",
+      body: (
+        <>
+          This permanently deletes <strong className="text-on-surface">{agent.name || agent.email}</strong> and all of
+          their branches, dispatchers, staff, uploads, payroll records and invoices. This can&apos;t be undone.
+        </>
+      ),
+      confirmLabel: "Delete account",
+      tone: "danger",
+      requireText: agent.email,
+      onConfirm: async () => {
+        const res = await fetch(`/api/admin/agents/${agent.id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          toast.error(data.error || "Failed to delete account");
+          return false;
+        }
+        setAgents((prev) => prev.filter((a) => a.id !== agent.id));
+        setOpenId((id) => (id === agent.id ? null : id));
+        toast.success("Account deleted");
+      },
+    });
+  }, []);
 
-      {/* Agent list */}
-      <div className="flex flex-col gap-3">
-        {filtered.map((agent) => (
-          <AgentRow
-            key={agent.id}
-            agent={agent}
-            isExpanded={expandedAgent === agent.id}
-            onToggle={() => setExpandedAgent(expandedAgent === agent.id ? null : agent.id)}
-            onUpdate={(updates) =>
-              setAgents((prev) =>
-                prev.map((a) => (a.id === agent.id ? { ...a, ...updates } : a))
-              )
-            }
-          />
-        ))}
-        {filtered.length === 0 && (
-          <p className="text-[0.85rem] text-on-surface-variant/60 text-center py-8">
-            No agents found.
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
+  const billing: BillingActions = useMemo(() => ({
+    markPaid: (agent, ym, paid) => {
+      const bill = monthBill(agent, ym);
+      setConfirm({
+        title: paid ? `Mark ${formatMonth(ym)} as paid?` : `Mark ${formatMonth(ym)} as unpaid?`,
+        body: paid ? (
+          <>
+            Record <strong className="text-on-surface">{formatRM(bill.amount)}</strong> from{" "}
+            <strong className="text-on-surface">{agent.name || agent.email}</strong> for {formatMonth(ym)}.
+          </>
+        ) : (
+          <>Clears the payment recorded for {formatMonth(ym)}. The amount will follow their current branch limit again.</>
+        ),
+        confirmLabel: paid ? "Mark paid" : "Mark unpaid",
+        tone: paid ? "primary" : "danger",
+        onConfirm: async () => {
+          const res = await fetch(`/api/admin/agents/${agent.id}/invoices/${ym.year}/${ym.month}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ paid }),
+          });
+          if (!res.ok) {
+            toast.error("Failed to update payment");
+            return false;
+          }
+          putInvoice(agent.id, await res.json());
+          toast.success(paid ? "Marked as paid" : "Marked as unpaid");
+        },
+      });
+    },
+    sendInvoice: (agent, ym) => {
+      const bill = monthBill(agent, ym);
+      const paid = bill.status === "paid";
+      setConfirm({
+        title: paid ? `Email ${formatMonth(ym)} receipt?` : `Send ${formatMonth(ym)} invoice?`,
+        body: (
+          <>
+            Emails a PDF {paid ? "receipt" : "invoice"} for <strong className="text-on-surface">{formatRM(bill.amount)}</strong>
+            {!paid && <> ({agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150)</>} to{" "}
+            <strong className="text-on-surface">{agent.email}</strong>.
+            {bill.invoice?.sentAt && <> It was already sent on {formatDate(bill.invoice.sentAt)}.</>}
+          </>
+        ),
+        confirmLabel: paid ? "Send receipt" : "Send invoice",
+        onConfirm: async () => {
+          const res = await fetch(`/api/admin/agents/${agent.id}/invoices/${ym.year}/${ym.month}`, { method: "POST" });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            toast.error(data.error || "Failed to send invoice");
+            return false;
+          }
+          putInvoice(agent.id, data);
+          toast.success(`Invoice sent to ${agent.email}`);
+        },
+      });
+    },
+  }), [putInvoice]);
 
-/* ─── Agent Row ─────────────────────────────────────────── */
-
-function AgentRow({
-  agent,
-  isExpanded,
-  onToggle,
-  onUpdate,
-}: {
-  agent: AdminAgent;
-  isExpanded: boolean;
-  onToggle: () => void;
-  onUpdate: (updates: Partial<AdminAgent>) => void;
-}) {
-  const [togglingApproval, setTogglingApproval] = useState(false);
-  const [editingBranches, setEditingBranches] = useState(false);
-  const [maxBranchesInput, setMaxBranchesInput] = useState(String(agent.maxBranches));
-
-  const handleImpersonate = useCallback(async () => {
+  const handleImpersonate = useCallback(async (agentId: string) => {
     await fetch("/api/admin/impersonate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ agentId: agent.id }),
+      body: JSON.stringify({ agentId }),
     });
     // Hard navigation to bust Router Cache — all pages must re-render with new agentId
     window.location.href = "/dashboard";
-  }, [agent.id]);
-
-  const handleToggleApproval = useCallback(async () => {
-    setTogglingApproval(true);
-    const res = await fetch(`/api/admin/agents/${agent.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isApproved: !agent.isApproved }),
-    });
-    setTogglingApproval(false);
-
-    if (!res.ok) {
-      toast.error("Failed to update approval");
-      return;
-    }
-    onUpdate({ isApproved: !agent.isApproved });
-    toast.success(agent.isApproved ? "Access revoked" : "Agent approved");
-  }, [agent.id, agent.isApproved, onUpdate]);
-
-  const handleSaveMaxBranches = useCallback(async () => {
-    const val = parseInt(maxBranchesInput, 10);
-    if (isNaN(val) || val < 1) {
-      toast.error("Must be at least 1");
-      return;
-    }
-
-    const res = await fetch(`/api/admin/agents/${agent.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ maxBranches: val }),
-    });
-
-    if (!res.ok) {
-      toast.error("Failed to update");
-      return;
-    }
-
-    onUpdate({ maxBranches: val });
-    setEditingBranches(false);
-    toast.success("Branch limit updated");
-  }, [agent.id, maxBranchesInput, onUpdate]);
-
-  const memberSince = new Date(agent.createdAt).toLocaleDateString("en-MY", {
-    month: "short",
-    year: "numeric",
-  });
-
-  return (
-    <div className="bg-surface-card rounded-lg border border-outline-variant/15 overflow-hidden">
-      {/* Summary row */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 sm:px-5 py-4">
-        {/* Name + email */}
-        <div className="basis-full sm:basis-auto sm:flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="text-[0.9rem] font-semibold text-on-surface truncate">
-              {agent.name}
-            </p>
-            {agent.isSuperAdmin && (
-              <span className="px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider bg-brand/10 text-brand rounded">
-                Admin
-              </span>
-            )}
-          </div>
-          <p className="text-[0.78rem] text-on-surface-variant truncate">{agent.email}</p>
-        </div>
-
-        {/* Branches */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[0.78rem] text-on-surface-variant">
-            {agent.branchCount}/{editingBranches ? "" : agent.maxBranches} branches
-          </span>
-          {editingBranches ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                min={1}
-                value={maxBranchesInput}
-                onChange={(e) => setMaxBranchesInput(e.target.value)}
-                className="w-14 px-2 py-0.5 text-base sm:text-[0.78rem] border border-outline-variant rounded text-on-surface text-center"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveMaxBranches();
-                  if (e.key === "Escape") setEditingBranches(false);
-                }}
-              />
-              <button
-                onClick={handleSaveMaxBranches}
-                className="text-[0.72rem] font-medium text-brand hover:text-brand/80"
-              >
-                Save
-              </button>
-              <button
-                onClick={() => {
-                  setEditingBranches(false);
-                  setMaxBranchesInput(String(agent.maxBranches));
-                }}
-                className="text-[0.72rem] text-on-surface-variant hover:text-on-surface"
-              >
-                Cancel
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setEditingBranches(true)}
-              className="text-[0.68rem] font-medium text-brand hover:text-brand/80"
-            >
-              Edit
-            </button>
-          )}
-        </div>
-
-        {/* Member since */}
-        <span className="text-[0.75rem] text-on-surface-variant/60 shrink-0 sm:w-20 sm:text-right">
-          {memberSince}
-        </span>
-
-        {/* Approval toggle */}
-        {!agent.isSuperAdmin && (
-          <button
-            onClick={handleToggleApproval}
-            disabled={togglingApproval}
-            className={`px-3 py-1 text-[0.75rem] font-medium rounded-md transition-colors shrink-0 ${
-              agent.isApproved
-                ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-            } disabled:opacity-50`}
-          >
-            {agent.isApproved ? "Approved" : "Pending"}
-          </button>
-        )}
-
-        {/* View */}
-        <Link
-          href={`/admin/view/${agent.id}`}
-          className="flex items-center gap-1 px-2.5 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded-md transition-colors shrink-0"
-        >
-          <Eye size={12} />
-          View
-        </Link>
-
-        {/* Impersonate */}
-        {!agent.isSuperAdmin && (
-          <button
-            onClick={handleImpersonate}
-            className="flex items-center gap-1 px-2.5 py-1 text-[0.72rem] font-medium text-amber-600 hover:bg-amber-50 rounded-md transition-colors shrink-0"
-          >
-            <LogIn size={12} />
-            Sign in
-          </button>
-        )}
-
-        {/* Expand */}
-        <button
-          onClick={onToggle}
-          className="p-1.5 text-on-surface-variant hover:text-on-surface rounded-md hover:bg-surface-hover transition-colors"
-        >
-          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-        </button>
-      </div>
-
-      {/* Branch codes + add branch */}
-      <div className="flex flex-wrap items-center gap-1.5 px-4 sm:px-5 pb-3">
-        {agent.branches.map((code) => (
-          <span
-            key={code}
-            className="px-2 py-0.5 text-[0.72rem] font-medium text-on-surface-variant bg-surface-low rounded"
-          >
-            {code}
-          </span>
-        ))}
-        <AddBranchInline
-          agentId={agent.id}
-          onAdded={(code) => onUpdate({ branches: [...agent.branches, code], branchCount: agent.branchCount + 1 })}
-        />
-      </div>
-
-      {/* Expanded: Payment history */}
-      {isExpanded && (
-        <div className="border-t border-outline-variant/15 px-5 py-4">
-          <PaymentHistory agentId={agent.id} />
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Payment History ───────────────────────────────────── */
-
-function PaymentHistory({ agentId }: { agentId: string }) {
-  const [records, setRecords] = useState<PaymentRecord[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-
-  // Load on mount
-  useState(() => {
-    fetch(`/api/admin/payments?agentId=${agentId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setRecords(data);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  });
-
-  const handleAddPayment = useCallback(
-    async (data: { amount: number; date: string; notes: string; period: string }) => {
-      const res = await fetch("/api/admin/payments", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId, ...data }),
-      });
-
-      if (!res.ok) {
-        toast.error("Failed to add payment");
-        return;
-      }
-
-      const record = await res.json();
-      setRecords((prev) => (prev ? [record, ...prev] : [record]));
-      setShowForm(false);
-      toast.success("Payment recorded");
-    },
-    [agentId],
-  );
-
-  const handleDelete = useCallback(async (paymentId: string) => {
-    const res = await fetch(`/api/admin/payments/${paymentId}`, {
-      method: "DELETE",
-    });
-
-    if (!res.ok) {
-      toast.error("Failed to delete");
-      return;
-    }
-
-    setRecords((prev) => (prev ? prev.filter((r) => r.id !== paymentId) : null));
-    toast.success("Payment deleted");
   }, []);
 
-  if (loading) {
-    return <p className="text-[0.82rem] text-on-surface-variant/60">Loading payments...</p>;
-  }
+  /* ─── Filter + sort ─── */
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-[0.82rem] font-semibold text-on-surface">Payment History</h4>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1 px-2.5 py-1 text-[0.75rem] font-medium text-brand hover:bg-brand/5 rounded-md transition-colors"
-        >
-          {showForm ? <X size={12} /> : <Plus size={12} />}
-          {showForm ? "Cancel" : "Add Payment"}
-        </button>
-      </div>
+  const rows = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const list = agents
+      .map((agent) => ({ agent, bill: monthBill(agent, month), trialEnd: trialInfo(agent.createdAt).end }))
+      .filter(({ agent, bill }) => {
+        if (statusFilter === "approved" && !agent.isApproved) return false;
+        if (statusFilter === "pending" && agent.isApproved) return false;
+        if (billingFilter !== "all" && bill.status !== billingFilter) return false;
+        if (!q) return true;
+        return [agent.name, agent.email, agent.phone, agent.adminNotes, ...agent.branches]
+          .some((v) => v?.toLowerCase().includes(q));
+      });
 
-      {showForm && (
-        <PaymentForm onSubmit={handleAddPayment} />
-      )}
-
-      {records && records.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          {records.map((r) => (
-            <div
-              key={r.id}
-              className="flex items-center gap-3 px-3 py-2 rounded-md hover:bg-surface-hover transition-colors group"
-            >
-              <span className="text-[0.82rem] font-medium text-on-surface tabular-nums w-28">
-                RM {formatRM(r.amount)}
-              </span>
-              <span className="text-[0.78rem] text-on-surface-variant w-24">
-                {formatDate(r.date)}
-              </span>
-              <span className="text-[0.78rem] text-on-surface-variant flex-1 truncate">
-                {r.period || "—"}
-              </span>
-              <span className="text-[0.75rem] text-on-surface-variant/50 flex-1 truncate">
-                {r.notes || ""}
-              </span>
-              <button
-                onClick={() => handleDelete(r.id)}
-                className="p-1 text-on-surface-variant/30 hover:text-critical rounded sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-              >
-                <Trash2 size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="text-[0.78rem] text-on-surface-variant/50">No payment records yet.</p>
-      )}
-    </div>
-  );
-}
-
-/* ─── Payment Form ──────────────────────────────────────── */
-
-function PaymentForm({
-  onSubmit,
-}: {
-  onSubmit: (data: { amount: number; date: string; notes: string; period: string }) => void;
-}) {
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [period, setPeriod] = useState("");
-  const [notes, setNotes] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const val = parseFloat(amount);
-    if (isNaN(val) || val <= 0) {
-      toast.error("Enter a valid amount");
-      return;
-    }
-    setSaving(true);
-    await onSubmit({ amount: val, date, notes, period });
-    setSaving(false);
-  };
-
-  const inputClass =
-    "px-2.5 py-1.5 text-[0.82rem] border border-outline-variant/30 rounded-md text-on-surface bg-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:border-brand/40";
-
-  return (
-    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-2 p-3 bg-surface-low rounded-md">
-      <div className="flex flex-col gap-0.5">
-        <label className="text-[0.65rem] font-medium text-on-surface-variant uppercase tracking-wider">
-          Amount (RM)
-        </label>
-        <input
-          type="number"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
-          className={inputClass + " w-28"}
-          required
-        />
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <label className="text-[0.65rem] font-medium text-on-surface-variant uppercase tracking-wider">
-          Date
-        </label>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className={inputClass + " w-36"}
-          required
-        />
-      </div>
-      <div className="flex flex-col gap-0.5">
-        <label className="text-[0.65rem] font-medium text-on-surface-variant uppercase tracking-wider">
-          Period
-        </label>
-        <input
-          type="text"
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          placeholder="e.g. Mar 2026 – Feb 2027"
-          className={inputClass + " w-52"}
-        />
-      </div>
-      <div className="flex flex-col gap-0.5 flex-1">
-        <label className="text-[0.65rem] font-medium text-on-surface-variant uppercase tracking-wider">
-          Notes
-        </label>
-        <input
-          type="text"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Optional notes"
-          className={inputClass}
-        />
-      </div>
-      <button
-        type="submit"
-        disabled={saving}
-        className="px-4 py-1.5 text-[0.78rem] font-medium text-white bg-brand rounded-md hover:opacity-90 transition-opacity disabled:opacity-50"
-      >
-        {saving ? "Saving..." : "Add"}
-      </button>
-    </form>
-  );
-}
-
-/* ─── Add Branch Inline ─────────────────────────────────── */
-
-function AddBranchInline({
-  agentId,
-  onAdded,
-}: {
-  agentId: string;
-  onAdded: (code: string) => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [code, setCode] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  async function handleAdd() {
-    if (!code.trim()) return;
-    setSaving(true);
-    const res = await fetch(`/api/admin/agents/${agentId}/branches`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: code.trim() }),
+    const dir = sort.dir === "asc" ? 1 : -1;
+    const value = (r: (typeof list)[number]): string | number => {
+      switch (sort.key) {
+        case "name": return r.agent.name.toLowerCase();
+        case "email": return r.agent.email.toLowerCase();
+        case "branches": return r.agent.maxBranches;
+        case "joined": return r.agent.createdAt;
+        case "trial": return r.trialEnd.getTime();
+        case "billing": return BILLING_ORDER[r.bill.status];
+        case "status": return r.agent.isApproved ? 1 : 0;
+      }
+    };
+    return list.sort((a, b) => {
+      const va = value(a);
+      const vb = value(b);
+      return va < vb ? -dir : va > vb ? dir : 0;
     });
-    setSaving(false);
+  }, [agents, search, statusFilter, billingFilter, month, sort]);
 
-    if (!res.ok) {
-      const data = await res.json();
-      toast.error(data.error || "Failed to add branch");
-      return;
+  const totals = useMemo(() => {
+    const t = { paid: 0, paidCount: 0, unpaid: 0, unpaidCount: 0, trialCount: 0 };
+    for (const agent of agents) {
+      const bill = monthBill(agent, month);
+      if (bill.status === "paid") { t.paid += bill.amount; t.paidCount++; }
+      if (bill.status === "unpaid") { t.unpaid += bill.amount; t.unpaidCount++; }
+      if (bill.status === "trial") t.trialCount++;
     }
+    return t;
+  }, [agents, month]);
 
-    onAdded(code.trim().toUpperCase());
-    setCode("");
-    setEditing(false);
-    toast.success("Branch added");
-  }
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "joined" ? "desc" : "asc" }));
 
-  if (!editing) {
-    return (
-      <button
-        onClick={() => setEditing(true)}
-        className="px-2 py-0.5 text-[0.72rem] font-medium text-brand border border-dashed border-brand/30 rounded hover:bg-brand/5 transition-colors"
-      >
-        + Branch
-      </button>
-    );
-  }
+  const openAgent = agents.find((a) => a.id === openId) ?? null;
+  const monthLabel = formatMonth(month);
 
   return (
-    <div className="flex items-center gap-1">
-      <input
-        type="text"
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        placeholder="PHG123"
-        className="w-20 px-2 py-0.5 text-base sm:text-[0.72rem] border border-outline-variant rounded text-on-surface uppercase"
-        autoFocus
-        onKeyDown={(e) => {
-          if (e.key === "Enter") handleAdd();
-          if (e.key === "Escape") { setEditing(false); setCode(""); }
-        }}
-      />
-      <button
-        onClick={handleAdd}
-        disabled={saving || !code.trim()}
-        className="text-[0.68rem] font-medium text-brand hover:text-brand/80 disabled:opacity-50"
-      >
-        {saving ? "..." : "Add"}
-      </button>
-      <button
-        onClick={() => { setEditing(false); setCode(""); }}
-        className="text-[0.68rem] text-on-surface-variant hover:text-on-surface"
-      >
-        Cancel
-      </button>
+    <div className="flex flex-col gap-5">
+      {/* Month summary */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <SummaryCard label={`Paid · ${monthLabel}`} value={formatRM(totals.paid)} sub={`${totals.paidCount} account${totals.paidCount === 1 ? "" : "s"}`} tone="text-emerald-700" onClick={() => setBillingFilter("paid")} />
+        <SummaryCard label={`Unpaid · ${monthLabel}`} value={formatRM(totals.unpaid)} sub={`${totals.unpaidCount} account${totals.unpaidCount === 1 ? "" : "s"}`} tone="text-critical" onClick={() => setBillingFilter("unpaid")} />
+        <SummaryCard label="In free trial" value={String(totals.trialCount)} sub={`during ${monthLabel}`} tone="text-brand" onClick={() => setBillingFilter("trial")} />
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-48 sm:flex-none">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant pointer-events-none" />
+          <input
+            type="text"
+            placeholder="Search name, email, WhatsApp, branch, notes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-full sm:w-80"
+          />
+        </div>
+        <Select label="Status" value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} options={[["all", "All statuses"], ["approved", "Approved"], ["pending", "Pending"]]} />
+        <Select label="Billing" value={billingFilter} onChange={(v) => setBillingFilter(v as BillingFilter)} options={[["all", "All billing"], ["unpaid", "Unpaid"], ["paid", "Paid"], ["trial", "In trial"]]} />
+        <Select
+          label="Billing month"
+          value={`${month.year}-${month.month}`}
+          onChange={(v) => { const [y, m] = v.split("-").map(Number); setMonth({ year: y, month: m }); }}
+          options={monthOptions().map((ym) => [`${ym.year}-${ym.month}`, formatMonth(ym)] as [string, string])}
+        />
+        {(search || statusFilter !== "all" || billingFilter !== "all") && (
+          <button
+            onClick={() => { setSearch(""); setStatusFilter("all"); setBillingFilter("all"); }}
+            className="flex items-center gap-1 px-2 py-1.5 text-[0.75rem] text-on-surface-variant hover:text-on-surface"
+          >
+            <X size={12} /> Clear
+          </button>
+        )}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[0.75rem] text-on-surface-variant/70">
+            {rows.length} of {agents.length} account{agents.length === 1 ? "" : "s"}
+          </span>
+          <button
+            onClick={() => setShowAddAccount(!showAddAccount)}
+            className="flex items-center gap-1 px-3 py-1.5 text-[0.78rem] font-medium text-white bg-brand rounded-md hover:opacity-90"
+          >
+            <Plus size={14} /> Add Account
+          </button>
+        </div>
+      </div>
+
+      {showAddAccount && <AddAccountForm onCreated={handleAgentCreated} onCancel={() => setShowAddAccount(false)} />}
+
+      {/* Table */}
+      <div className="bg-surface-card rounded-lg border border-outline-variant/15 overflow-x-auto">
+        <table className="w-full min-w-[1280px] text-left">
+          <thead>
+            <tr className="text-[0.68rem] font-semibold uppercase tracking-wider text-on-surface-variant bg-surface-low">
+              <Th label="Name" k="name" sort={sort} onSort={toggleSort} />
+              <Th label="Email" k="email" sort={sort} onSort={toggleSort} />
+              <th className="px-2.5 py-2.5">WhatsApp</th>
+              <Th label="Branches" k="branches" sort={sort} onSort={toggleSort} />
+              <Th label="Joined" k="joined" sort={sort} onSort={toggleSort} />
+              <Th label="Trial ends" k="trial" sort={sort} onSort={toggleSort} />
+              <Th label={`Bill · ${monthLabel}`} k="billing" sort={sort} onSort={toggleSort} />
+              <Th label="Status" k="status" sort={sort} onSort={toggleSort} />
+              <th className="px-2.5 py-2.5">Notes</th>
+              <th className="px-2.5 py-2.5 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ agent, bill, trialEnd }) => {
+              const trial = trialInfo(agent.createdAt);
+              const chip = BILLING_CHIP[bill.status];
+              const billable = bill.status === "paid" || bill.status === "unpaid";
+              return (
+                <tr key={agent.id} className="text-[0.8rem] text-on-surface-variant hover:bg-surface-low transition-colors align-top">
+                  <td className="px-2.5 py-3 min-w-36">
+                    <button onClick={() => setOpenId(agent.id)} className="text-left font-semibold text-on-surface hover:text-brand">
+                      {agent.name || "—"}
+                    </button>
+                    {agent.isSuperAdmin && (
+                      <span className="ml-1.5 px-1.5 py-0.5 text-[0.58rem] font-bold uppercase tracking-wider bg-brand/10 text-brand rounded">Admin</span>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-3 max-w-52 truncate" title={agent.email}>{agent.email}</td>
+                  <td className="px-2.5 py-3 whitespace-nowrap">
+                    {agent.phone ? (
+                      <a href={whatsappLink(agent.phone)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-emerald-700 hover:underline">
+                        <MessageCircle size={12} /> {agent.phone}
+                      </a>
+                    ) : (
+                      <span className="text-on-surface-variant/40">—</span>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <div className="tabular-nums text-on-surface">{agent.branchCount}/{agent.maxBranches}</div>
+                    <div className="flex flex-wrap gap-1 mt-1 max-w-44">
+                      {agent.branches.slice(0, 3).map((code) => (
+                        <span key={code} className="px-1.5 py-0.5 text-[0.68rem] font-medium bg-surface-low rounded">{code}</span>
+                      ))}
+                      {agent.branches.length > 3 && (
+                        <span className="px-1.5 py-0.5 text-[0.68rem] text-on-surface-variant/70">+{agent.branches.length - 3}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-2.5 py-3 whitespace-nowrap">{formatDate(agent.createdAt)}</td>
+                  <td className="px-2.5 py-3 whitespace-nowrap">
+                    {agent.isSuperAdmin ? (
+                      <span className="text-on-surface-variant/40">—</span>
+                    ) : (
+                      <>
+                        <div className={trial.active ? "text-on-surface" : ""}>{formatDate(trialEnd)}</div>
+                        <div className="text-[0.7rem] text-on-surface-variant/70">
+                          {trial.active ? `${trial.daysLeft} day${trial.daysLeft === 1 ? "" : "s"} left` : "Ended"}
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 text-[0.7rem] font-semibold rounded ${chip.className}`}>{chip.label}</span>
+                      {billable && <span className="tabular-nums text-on-surface">{formatRM(bill.amount)}</span>}
+                    </div>
+                    {billable && (
+                      <div className="flex items-center gap-2 mt-1.5">
+                        {bill.status === "unpaid" && (
+                          <button onClick={() => billing.markPaid(agent, month, true)} className="inline-flex items-center gap-0.5 text-[0.7rem] font-medium text-emerald-700 hover:underline">
+                            <Check size={11} /> Mark paid
+                          </button>
+                        )}
+                        <button onClick={() => billing.sendInvoice(agent, month)} className="inline-flex items-center gap-0.5 text-[0.7rem] font-medium text-brand hover:underline">
+                          <Send size={11} /> {bill.invoice?.sentAt ? "Resend" : bill.status === "paid" ? "Receipt" : "Send invoice"}
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-3">
+                    {agent.isSuperAdmin ? (
+                      <span className="text-[0.75rem] text-on-surface-variant/60">Superadmin</span>
+                    ) : (
+                      <select
+                        aria-label={`Status for ${agent.email}`}
+                        value={agent.isApproved ? "approved" : "pending"}
+                        onChange={(e) => requestStatusChange(agent, e.target.value === "approved")}
+                        className={`px-2 py-1 text-base sm:text-[0.75rem] font-medium rounded-md border-0 cursor-pointer outline-none focus:ring-2 focus:ring-brand/30 ${
+                          agent.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                        }`}
+                      >
+                        <option value="approved">Approved</option>
+                        <option value="pending">Pending</option>
+                      </select>
+                    )}
+                  </td>
+                  <td className="px-2.5 py-3 max-w-40">
+                    <button
+                      onClick={() => setOpenId(agent.id)}
+                      title={agent.adminNotes ?? "Add notes"}
+                      className="block w-full text-left truncate hover:text-on-surface"
+                    >
+                      {agent.adminNotes || <span className="text-on-surface-variant/40">Add notes</span>}
+                    </button>
+                  </td>
+                  <td className="px-2.5 py-3">
+                    <div className="flex items-center justify-end gap-0.5 whitespace-nowrap">
+                      <IconLink href={`/admin/view/${agent.id}`} label="View data"><Eye size={14} /></IconLink>
+                      {!agent.isSuperAdmin && (
+                        <IconButton label="Sign in as this account" onClick={() => handleImpersonate(agent.id)} className="text-amber-600 hover:bg-amber-50">
+                          <LogIn size={14} />
+                        </IconButton>
+                      )}
+                      <button
+                        onClick={() => setOpenId(agent.id)}
+                        className="px-2 py-1 text-[0.72rem] font-medium text-brand hover:bg-brand/5 rounded-md"
+                      >
+                        Manage
+                      </button>
+                      {!agent.isSuperAdmin && agent.id !== currentUserId && (
+                        <IconButton label="Delete account" onClick={() => requestDelete(agent)} className="text-on-surface-variant/60 hover:text-critical hover:bg-red-50">
+                          <Trash2 size={14} />
+                        </IconButton>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={10} className="px-3 py-10 text-center text-[0.85rem] text-on-surface-variant/60">
+                  No accounts match these filters.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {openAgent && (
+        <AgentDrawer
+          key={openAgent.id}
+          agent={openAgent}
+          onClose={() => setOpenId(null)}
+          onUpdate={(u) => updateAgent(openAgent.id, u)}
+          billing={billing}
+        />
+      )}
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </div>
+  );
+}
+
+/* ─── Small pieces ──────────────────────────────────────── */
+
+function SummaryCard({ label, value, sub, tone, onClick }: { label: string; value: string; sub: string; tone: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} className="text-left bg-surface-card rounded-lg border border-outline-variant/15 px-4 py-3 hover:bg-surface-low transition-colors">
+      <p className="text-[0.68rem] font-semibold uppercase tracking-wider text-on-surface-variant">{label}</p>
+      <p className={`text-[1.25rem] font-bold tabular-nums mt-0.5 ${tone}`}>{value}</p>
+      <p className="text-[0.72rem] text-on-surface-variant/70">{sub}</p>
+    </button>
+  );
+}
+
+function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  return (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="px-2.5 py-1.5 text-base sm:text-[0.8rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface outline-none focus:border-brand/40 cursor-pointer"
+    >
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>{l}</option>
+      ))}
+    </select>
+  );
+}
+
+function Th({ label, k, sort, onSort }: { label: string; k: SortKey; sort: { key: SortKey; dir: "asc" | "desc" }; onSort: (k: SortKey) => void }) {
+  const active = sort.key === k;
+  const Icon = !active ? ArrowUpDown : sort.dir === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <th className="px-2.5 py-2.5" aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}>
+      <button onClick={() => onSort(k)} className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-on-surface ${active ? "text-on-surface" : ""}`}>
+        {label}
+        <Icon size={11} className={active ? "" : "opacity-40"} />
+      </button>
+    </th>
+  );
+}
+
+function IconButton({ label, onClick, className, children }: { label: string; onClick: () => void; className: string; children: React.ReactNode }) {
+  return (
+    <button onClick={onClick} title={label} aria-label={label} className={`p-1.5 rounded-md transition-colors ${className}`}>
+      {children}
+    </button>
+  );
+}
+
+function IconLink({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} title={label} aria-label={label} className="p-1.5 rounded-md text-brand hover:bg-brand/5 transition-colors">
+      {children}
+    </Link>
   );
 }
 
@@ -629,6 +537,7 @@ function AddAccountForm({
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [maxBranches, setMaxBranches] = useState("1");
   const [regNo, setRegNo] = useState("");
   const [address, setAddress] = useState("");
@@ -655,6 +564,7 @@ function AddAccountForm({
         password,
         isApproved: true,
         maxBranches: parseInt(maxBranches, 10) || 1,
+        phone: phone.trim() || undefined,
         companyRegistrationNo: regNo.trim() || undefined,
         companyAddress: address.trim() || undefined,
       }),
@@ -706,13 +616,13 @@ function AddAccountForm({
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-[0.68rem] font-medium text-on-surface-variant uppercase tracking-wider">
-            Company Name *
+            Full Name *
           </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Company Sdn Bhd"
+            placeholder="Full name"
             className={inputClass}
             required
           />
@@ -728,6 +638,18 @@ function AddAccountForm({
             placeholder="Min. 8 characters"
             className={inputClass}
             required
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-[0.68rem] font-medium text-on-surface-variant uppercase tracking-wider">
+            WhatsApp
+          </label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="012-345 6789"
+            className={inputClass}
           />
         </div>
         <div className="flex flex-col gap-1">
