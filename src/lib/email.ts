@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { prisma } from "@/lib/prisma";
 import { SUPPORT_EMAIL } from "@/lib/support";
+import { PRICE_PER_BRANCH, TRIAL_DAYS, trialEndDate } from "@/lib/billing";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://easystaff.top";
 // Sending address must be on the Resend-verified domain; replies go to support.
@@ -136,13 +137,13 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
 
   const html = wrapInTemplate(`
       <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
-        Your account has been approved
+        Your account is active
       </h2>
       <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
         Hi ${agentName},
       </p>
       <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
-        Great news — your EasyStaff account has been reviewed and approved. You can now log in and start managing your dispatchers and payroll.
+        Your EasyStaff account is active. You can log in and carry on managing your dispatchers and payroll.
       </p>
       <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
         <tr>
@@ -164,13 +165,13 @@ export async function sendApprovalEmail(agentEmail: string, agentName: string) {
   await send(resend, {
     from: FROM,
     to: agentEmail,
-    subject: "Your EasyStaff account has been approved",
+    subject: "Your EasyStaff account is active",
     html,
     text: [
       `Hi ${agentName},`,
       "",
-      "Great news — your EasyStaff account has been reviewed and approved.",
-      "You can now log in and start managing your dispatchers and payroll.",
+      "Your EasyStaff account is active.",
+      "You can log in and carry on managing your dispatchers and payroll.",
       "",
       `Log in here: ${loginUrl}`,
       "",
@@ -403,5 +404,99 @@ export async function sendPlanChangeNotification(
     });
   } catch (err) {
     console.error("[email] plan change notification failed", err);
+  }
+}
+
+const WELCOME_STEPS: [string, string][] = [
+  ["Take the quick tour", "Your account opens with sample payroll data, so you can click around and see how everything works before adding your own."],
+  ["Upload your J&amp;T delivery file", "Go to Dispatchers &rarr; Payroll and drop in the monthly Excel export. The branch and month are detected automatically, and the sample data is cleared on your first real upload."],
+  ["Check dispatcher rates", "Weight-tier rates, bonus and petrol subsidy come pre-filled with defaults. Adjust them per dispatcher under Dispatchers &rarr; Settings."],
+  ["Confirm and download payslips", "Review the salaries, confirm the month and download payslip PDFs. Add supervisors, admins and store keepers under Staff for EPF, SOCSO and EIS."],
+];
+
+/** Welcome + getting-started email for a new agent. Never throws. */
+export async function sendWelcomeEmail(agentEmail: string, agentName: string, signedUpAt: Date = new Date()) {
+  try {
+    const resend = getResend();
+    if (!resend) return;
+
+    const dashboardUrl = `${APP_URL}/dashboard`;
+    const planUrl = `${APP_URL}/settings#plan`;
+    const trialEnds = trialEndDate(signedUpAt).toLocaleDateString("en-MY", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+    const firstName = (agentName || "").trim().split(/\s+/)[0] || "there";
+
+    const steps = WELCOME_STEPS.map(
+      ([title, text], i) => `
+        <tr>
+          <td style="vertical-align:top;padding:0 14px 18px 0;">
+            <div style="width:26px;height:26px;border-radius:13px;background-color:#0056D2;color:#ffffff;font-size:13px;font-weight:700;line-height:26px;text-align:center;">${i + 1}</div>
+          </td>
+          <td style="vertical-align:top;padding:0 0 18px;">
+            <p style="margin:0 0 2px;font-size:15px;font-weight:600;color:#191c1d;">${title}</p>
+            <p style="margin:0;font-size:14px;color:#424654;line-height:1.55;">${text}</p>
+          </td>
+        </tr>`,
+    ).join("");
+
+    const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:22px;font-weight:700;color:#191c1d;">
+        Welcome to EasyStaff, ${escapeHtml(firstName)}!
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#424654;line-height:1.6;">
+        Your account is ready. EasyStaff turns your monthly J&amp;T delivery data into dispatcher salaries and payslips in minutes.
+      </p>
+      <p style="margin:0 0 28px;padding:14px 16px;font-size:14px;color:#191c1d;line-height:1.5;background-color:#f3f4f5;border-left:3px solid #0056D2;border-radius:4px;">
+        Your <strong>${TRIAL_DAYS}-day free trial</strong> runs until <strong>${trialEnds}</strong>. No payment details needed.
+      </p>
+      <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#424654;text-transform:uppercase;letter-spacing:0.05em;">Get started in 4 steps</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 12px;width:100%;">${steps}</table>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+        <tr>
+          <td style="background-color:#0056D2;border-radius:6px;">
+            <a href="${dashboardUrl}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+              Open EasyStaff
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0 0 10px;font-size:14px;color:#424654;line-height:1.6;">
+        After your trial, EasyStaff is <strong>RM ${PRICE_PER_BRANCH} per branch per month</strong>. You can change your branch limit any time in
+        <a href="${planUrl}" style="color:#0056D2;text-decoration:none;">Settings &rarr; Plan &amp; billing</a>.
+      </p>
+      <p style="margin:0;font-size:14px;color:#424654;line-height:1.6;">
+        Questions or need help setting up? Just reply to this email or write to
+        <a href="mailto:${SUPPORT_EMAIL}" style="color:#0056D2;text-decoration:none;">${SUPPORT_EMAIL}</a>.
+      </p>
+    `);
+
+    await send(resend, {
+      from: FROM,
+      to: agentEmail,
+      subject: `Welcome to EasyStaff — your free trial runs until ${trialEnds}`,
+      html,
+      text: [
+        `Hi ${firstName},`,
+        "",
+        "Welcome to EasyStaff! Your account is ready.",
+        `Your ${TRIAL_DAYS}-day free trial runs until ${trialEnds}. No payment details needed.`,
+        "",
+        "Get started in 4 steps:",
+        "1. Take the quick tour — your account opens with sample payroll data.",
+        "2. Upload your J&T delivery file under Dispatchers → Payroll. The branch and month are detected automatically.",
+        "3. Check dispatcher rates (weight tiers, bonus, petrol subsidy) under Dispatchers → Settings.",
+        "4. Confirm the month and download payslips. Add staff under Staff for EPF, SOCSO and EIS.",
+        "",
+        `Open EasyStaff: ${dashboardUrl}`,
+        "",
+        `After your trial: RM ${PRICE_PER_BRANCH} per branch per month. Change your branch limit in Settings → Plan & billing (${planUrl}).`,
+        `Need help? Reply to this email or write to ${SUPPORT_EMAIL}.`,
+      ].join("\n"),
+    });
+  } catch (err) {
+    console.error("[email] welcome email failed", err);
   }
 }

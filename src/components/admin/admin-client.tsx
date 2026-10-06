@@ -33,7 +33,7 @@ import {
   type AdminInvoice,
 } from "./admin-shared";
 
-type StatusFilter = "all" | "approved" | "pending";
+type StatusFilter = "all" | "approved" | "disabled";
 type BillingFilter = "all" | BillingStatus;
 type SortKey = "name" | "email" | "branches" | "joined" | "trial" | "billing" | "status";
 
@@ -85,19 +85,20 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
 
   const requestStatusChange = useCallback((agent: AdminAgent, isApproved: boolean) => {
     setConfirm({
-      title: isApproved ? "Approve this account?" : "Set this account to pending?",
+      title: isApproved ? "Re-enable this account?" : "Disable this account?",
       body: isApproved ? (
         <>
           <strong className="text-on-surface">{agent.name || agent.email}</strong> will be able to sign in and use
-          EasyStaff. They&apos;ll get an approval email.
+          EasyStaff again. They&apos;ll get an email saying their account is active.
         </>
       ) : (
         <>
-          <strong className="text-on-surface">{agent.name || agent.email}</strong> will lose access straight away and
-          see the &ldquo;awaiting approval&rdquo; page until you approve them again. Their data is kept.
+          <strong className="text-on-surface">{agent.name || agent.email}</strong> will lose access within a minute and
+          see an &ldquo;account disabled&rdquo; page asking them to contact you about payment. Their data is kept and
+          comes back when you re-enable them.
         </>
       ),
-      confirmLabel: isApproved ? "Approve" : "Set to pending",
+      confirmLabel: isApproved ? "Re-enable" : "Disable account",
       tone: isApproved ? "primary" : "danger",
       onConfirm: async () => {
         const res = await fetch(`/api/admin/agents/${agent.id}`, {
@@ -110,7 +111,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
           return false;
         }
         updateAgent(agent.id, { isApproved });
-        toast.success(isApproved ? "Account approved" : "Access revoked");
+        toast.success(isApproved ? "Account re-enabled" : "Account disabled");
       },
     });
   }, [updateAgent]);
@@ -217,7 +218,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
       .map((agent) => ({ agent, bill: monthBill(agent, month), trialEnd: trialInfo(agent.createdAt).end }))
       .filter(({ agent, bill }) => {
         if (statusFilter === "approved" && !agent.isApproved) return false;
-        if (statusFilter === "pending" && agent.isApproved) return false;
+        if (statusFilter === "disabled" && agent.isApproved) return false;
         if (billingFilter !== "all" && bill.status !== billingFilter) return false;
         if (!q) return true;
         return [agent.name, agent.email, agent.phone, agent.adminNotes, ...agent.branches]
@@ -281,7 +282,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
             className="pl-8 pr-3 py-1.5 text-base sm:text-[0.82rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface placeholder:text-on-surface-variant/50 outline-none focus:border-brand/40 w-full sm:w-80"
           />
         </div>
-        <Select label="Status" value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} options={[["all", "All statuses"], ["approved", "Approved"], ["pending", "Pending"]]} />
+        <Select label="Status" value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} options={[["all", "All statuses"], ["approved", "Approved"], ["disabled", "Disabled"]]} />
         <Select label="Billing" value={billingFilter} onChange={(v) => setBillingFilter(v as BillingFilter)} options={[["all", "All billing"], ["unpaid", "Unpaid"], ["paid", "Paid"], ["trial", "In trial"]]} />
         <Select
           label="Billing month"
@@ -412,14 +413,14 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
                     ) : (
                       <select
                         aria-label={`Status for ${agent.email}`}
-                        value={agent.isApproved ? "approved" : "pending"}
+                        value={agent.isApproved ? "approved" : "disabled"}
                         onChange={(e) => requestStatusChange(agent, e.target.value === "approved")}
                         className={`px-2 py-1 text-base sm:text-[0.75rem] font-medium rounded-md border-0 cursor-pointer outline-none focus:ring-2 focus:ring-brand/30 ${
-                          agent.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+                          agent.isApproved ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-critical"
                         }`}
                       >
                         <option value="approved">Approved</option>
-                        <option value="pending">Pending</option>
+                        <option value="disabled">Disabled</option>
                       </select>
                     )}
                   </td>

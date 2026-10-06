@@ -1,5 +1,4 @@
 import type { NextAuthConfig } from "next-auth";
-import { NextResponse } from "next/server";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 
@@ -14,13 +13,10 @@ export const authConfig = {
     signIn: "/auth/login",
   },
   callbacks: {
-    authorized({ auth, request }) {
-      const user = auth?.user as { isApproved?: boolean } | undefined;
-      if (!user) return false; // not authenticated → redirect to signIn
-      if (!user.isApproved) {
-        return NextResponse.redirect(new URL("/auth/pending", request.url));
-      }
-      return true;
+    authorized({ auth }) {
+      // Signed in? Approval is enforced by the dashboard layout, which sees a
+      // fresh flag; the edge proxy only has the cookie's cached copy.
+      return Boolean(auth?.user);
     },
     session({ session, token }) {
       (session.user as { isApproved?: boolean }).isApproved =

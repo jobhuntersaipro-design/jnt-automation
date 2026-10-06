@@ -5,6 +5,8 @@ import { authConfig } from "@/auth.config";
 import { agentAdapter } from "@/lib/auth-adapter";
 import { prisma } from "@/lib/prisma";
 
+const ACCESS_RECHECK_MS = 60_000;
+
 class PendingApprovalError extends CredentialsSignin {
   code = "pending_approval" as const;
 }
@@ -42,7 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
     async signIn() {
       // Credentials: PendingApprovalError thrown in authorize
-      // OAuth: always allow sign-in — proxy gates on isApproved
+      // OAuth: always allow sign-in — the dashboard layout gates on isApproved
       return true;
     },
 
@@ -66,7 +68,18 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
         token.isApproved = agent?.isApproved ?? false;
         token.isSuperAdmin = agent?.isSuperAdmin ?? false;
+        token.checkedAt = Date.now();
         if (agent?.name) token.name = agent.name;
+      } else if (token.id && Date.now() - ((token.checkedAt as number | undefined) ?? 0) > ACCESS_RECHECK_MS) {
+        // Disabling an account (or deleting it) takes effect within a minute,
+        // without waiting for the user to sign in again.
+        const agent = await prisma.agent.findUnique({
+          where: { id: token.id as string },
+          select: { isApproved: true, isSuperAdmin: true },
+        });
+        token.isApproved = agent?.isApproved ?? false;
+        token.isSuperAdmin = agent?.isSuperAdmin ?? false;
+        token.checkedAt = Date.now();
       }
       // Allow session updates (e.g. after name change in Settings)
       if (trigger === "update" && updateData) {

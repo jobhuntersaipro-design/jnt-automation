@@ -121,9 +121,27 @@ export async function updateAgentProfile(
   });
 }
 
-// Delete an agent and everything they own (all relations cascade)
+/**
+ * Delete an agent and everything they own. SalaryRecord → Dispatcher has no
+ * cascade, so salary records (and their line items) go first; everything else
+ * cascades from Agent.
+ */
 export async function deleteAgent(agentId: string) {
-  return prisma.agent.delete({ where: { id: agentId } });
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.salaryRecord.deleteMany({
+        where: {
+          OR: [
+            { dispatcher: { agentId } },
+            { dispatcher: { branch: { agentId } } },
+            { upload: { branch: { agentId } } },
+          ],
+        },
+      });
+      await tx.agent.delete({ where: { id: agentId } });
+    },
+    { timeout: 60_000 },
+  );
 }
 
 // ─── Invoices ──────────────────────────────────────────────

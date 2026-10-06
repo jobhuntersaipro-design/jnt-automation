@@ -89,7 +89,8 @@ export async function DELETE(
   try {
     await deleteAgent(agentId);
     return NextResponse.json({ success: true });
-  } catch {
-    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+  } catch (err) {
+    console.error("[admin] delete agent failed", agentId, err);
+    return NextResponse.json({ error: "Couldn't delete this account. Please try again." }, { status: 500 });
   }
 }
