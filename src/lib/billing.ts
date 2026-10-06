@@ -82,6 +82,23 @@ export function billingStatus(
   return inv?.paidAt ? "paid" : "unpaid";
 }
 
+/**
+ * What the daily billing job owes an agent for the current month: the invoice
+ * once their trial is over, then one reminder when it falls due.
+ */
+export function invoiceAction(
+  agent: { createdAt: Date | string; isSuperAdmin: boolean },
+  invoice: (InvoiceLike & { sentAt: string | Date | null; remindedAt: string | Date | null }) | null,
+  now: Date = new Date(),
+): "send" | "remind" | null {
+  const ym = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+  if (isInTrial(agent.createdAt, now)) return null;
+  if (billingStatus(agent, invoice ? [invoice] : [], ym) !== "unpaid") return null;
+  if (!invoice?.sentAt) return "send";
+  const due = new Date(invoice.sentAt).getTime() + INVOICE_DUE_DAYS * 86_400_000;
+  return !invoice.remindedAt && now.getTime() >= due ? "remind" : null;
+}
+
 /** Why an agent can't set this branch limit, or null if they can. */
 export function planLimitError(requested: number, branchesInUse: number): string | null {
   if (!Number.isInteger(requested) || requested < 1) return "Branch limit must be at least 1.";

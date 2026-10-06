@@ -3,6 +3,7 @@ import {
   billableMonths,
   billingStatus,
   firstBillableMonth,
+  invoiceAction,
   invoiceAmount,
   invoiceNumber,
   isInTrial,
@@ -127,5 +128,30 @@ describe("phone", () => {
   it("links local numbers with the Malaysian country code", () => {
     expect(whatsappLink("0123456789")).toBe("https://wa.me/60123456789");
     expect(whatsappLink("+60123456789")).toBe("https://wa.me/60123456789");
+  });
+});
+
+describe("invoiceAction (daily billing job)", () => {
+  const agent = { createdAt: "2026-09-01T00:00:00.000Z", isSuperAdmin: false }; // trial ends 1 Oct
+  const oct = (day: number) => new Date(Date.UTC(2026, 9, day, 1));
+  const inv = (sentAt: string | null, extra: Partial<{ paidAt: string; remindedAt: string }> = {}) => ({
+    year: 2026, month: 10, sentAt, paidAt: null, remindedAt: null, ...extra,
+  });
+
+  it("does nothing during the trial or for admins", () => {
+    expect(invoiceAction({ ...agent, createdAt: "2026-10-01T00:00:00.000Z" }, null, oct(10))).toBeNull();
+    expect(invoiceAction({ ...agent, isSuperAdmin: true }, null, oct(10))).toBeNull();
+  });
+  it("sends once the trial is over and nothing was sent", () => {
+    expect(invoiceAction(agent, null, oct(2))).toBe("send");
+  });
+  it("reminds once, on or after the due date", () => {
+    const sent = "2026-10-02T01:00:00.000Z";
+    expect(invoiceAction(agent, inv(sent), oct(8))).toBeNull();
+    expect(invoiceAction(agent, inv(sent), oct(9))).toBe("remind");
+    expect(invoiceAction(agent, inv(sent, { remindedAt: "2026-10-09T01:00:00.000Z" }), oct(12))).toBeNull();
+  });
+  it("skips paid months", () => {
+    expect(invoiceAction(agent, inv(null, { paidAt: "2026-10-02T00:00:00.000Z" }), oct(3))).toBeNull();
   });
 });

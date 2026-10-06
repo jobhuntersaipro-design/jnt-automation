@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInvoiceAgent, upsertInvoice } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, invoiceNumber, isValidYearMonth } from "@/lib/billing";
+import { PRICE_PER_BRANCH, isValidYearMonth } from "@/lib/billing";
 import { pdfResponseInit, renderAgentInvoice } from "@/lib/invoice-render";
-import { sendInvoiceEmail } from "@/lib/email";
+import { sendAgentInvoice } from "@/lib/invoice-billing";
+import { deleteBill } from "@/lib/billplz";
+import { prisma } from "@/lib/prisma";
 
 type Params = { params: Promise<{ agentId: string; year: string; month: string }> };
 
@@ -43,39 +45,30 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   const inv = await upsertInvoice(r.agent.id, r.year, r.month, r.agent.maxBranches, PRICE_PER_BRANCH, {
     paidAt: body.paid ? new Date() : null,
   });
+  if (body.paid && inv.billplzBillId) {
+    // Paid outside Billplz (e.g. bank transfer): cancel the open bill so it can't be paid twice.
+    await deleteBill(inv.billplzBillId)
+      .then(() => prisma.invoice.update({
+        where: { id: inv.id },
+        data: { billplzBillId: null, billplzUrl: null, billplzAmount: null },
+      }))
+      .catch((err) => console.error("[billplz] cancel bill failed", err));
+  }
   return NextResponse.json(serialize(inv));
 }
 
-// Email the invoice PDF to the agent
+// Email the invoice PDF (with a Billplz pay link when unpaid) to the agent
 export async function POST(_req: NextRequest, ctx: Params) {
   const r = await load(ctx);
   if ("error" in r) return r.error;
-
-  // Record the send first so the PDF's issue date matches the email.
-  const sentAt = new Date();
-  const inv = await upsertInvoice(r.agent.id, r.year, r.month, r.agent.maxBranches, PRICE_PER_BRANCH, { sentAt });
-  const { pdf, filename } = await renderAgentInvoice(r.agent, r.year, r.month);
-
   try {
-    await sendInvoiceEmail({
-      to: r.agent.email,
-      name: r.agent.name,
-      year: r.year,
-      month: r.month,
-      amount: inv.amount,
-      branchCount: inv.branchCount,
-      invoiceNo: invoiceNumber(r.agent.id, r),
-      paid: Boolean(inv.paidAt),
-      pdf,
-      filename,
-    });
+    const inv = await sendAgentInvoice(r.agent, r.year, r.month);
+    return NextResponse.json(serialize(inv));
   } catch (err) {
     console.error("[invoice] send failed", err);
     const message = err instanceof Error ? err.message : "Failed to send invoice";
     return NextResponse.json({ error: message }, { status: 502 });
   }
-
-  return NextResponse.json(serialize(inv));
 }
 
 function serialize(inv: Awaited<ReturnType<typeof upsertInvoice>>) {

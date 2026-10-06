@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { SettingsClient } from "@/components/settings/settings-client";
+import { billplzConfigured } from "@/lib/billplz";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -56,6 +57,7 @@ export default async function SettingsPage() {
             branchesInUse: agent._count.branches,
             createdAt: agent.createdAt.toISOString(),
             isSuperAdmin: agent.isSuperAdmin,
+            payOnline: billplzConfigured(),
             invoices: agent.invoices.map((i) => ({ ...i, paidAt: i.paidAt?.toISOString() ?? null })),
           }}
         />

@@ -306,6 +306,10 @@ export async function sendInvoiceEmail(input: {
   branchCount: number;
   invoiceNo: string;
   paid: boolean;
+  /** Due-date reminder for an unpaid invoice. */
+  reminder?: boolean;
+  /** Online payment link (Billplz); omitted when online payment is off. */
+  payUrl?: string | null;
   pdf: Buffer;
   filename: string;
 }) {
@@ -314,16 +318,33 @@ export async function sendInvoiceEmail(input: {
 
   const period = `${MONTH_NAMES[input.month - 1]} ${input.year}`;
   const amount = `RM ${formatRMText(input.amount)}`;
+  const branches = `${input.branchCount} branch${input.branchCount === 1 ? "" : "es"} × RM 150.00`;
   const summary = input.paid
     ? `This is your receipt for ${period}. Payment of ${amount} has been received — thank you.`
-    : `Your EasyStaff invoice for ${period} is ready. The amount due is ${amount} (${input.branchCount} branch${input.branchCount === 1 ? "" : "es"} × RM 150.00).`;
+    : input.reminder
+      ? `A reminder that your EasyStaff invoice for ${period} is now due. The amount due is ${amount} (${branches}).`
+      : `Your EasyStaff invoice for ${period} is ready. The amount due is ${amount} (${branches}).`;
+  const payUrl = input.paid ? null : input.payUrl;
+  const payButton = payUrl
+    ? `
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+        <tr>
+          <td style="background-color:#0056D2;border-radius:6px;">
+            <a href="${escapeHtml(payUrl)}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+              Pay ${amount} now
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0 0 24px;font-size:13px;color:#424654;">Pay by FPX online banking, DuitNow or card. You'll get a receipt once it's paid.</p>`
+    : "";
 
   const html = wrapInTemplate(`
       <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
-        ${input.paid ? "Payment received" : "Your invoice"} · ${period}
+        ${input.paid ? "Payment received" : input.reminder ? "Payment reminder" : "Your invoice"} · ${period}
       </h2>
       <p style="margin:0 0 16px;font-size:15px;color:#424654;line-height:1.6;">Hi ${escapeHtml(input.name)},</p>
-      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">${summary}</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">${summary}</p>${payButton}
       <p style="margin:0 0 4px;font-size:13px;color:#424654;">Invoice no: <strong style="color:#191c1d;">${input.invoiceNo}</strong></p>
       <p style="margin:0 0 24px;font-size:13px;color:#424654;">The invoice is attached as a PDF, with payment details inside.</p>
   `);
@@ -331,13 +352,14 @@ export async function sendInvoiceEmail(input: {
   await send(resend, {
     from: FROM,
     to: input.to,
-    subject: `${input.paid ? "Receipt" : "Invoice"} ${input.invoiceNo} — EasyStaff ${period}`,
+    subject: `${input.paid ? "Receipt" : input.reminder ? "Reminder: invoice" : "Invoice"} ${input.invoiceNo} — EasyStaff ${period}`,
     html,
     text: [
       `Hi ${input.name},`,
       "",
       summary,
       `Invoice no: ${input.invoiceNo}`,
+      ...(payUrl ? ["", `Pay online: ${payUrl}`] : []),
       "",
       "The invoice is attached as a PDF, with payment details inside.",
     ].join("\n"),

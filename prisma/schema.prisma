@@ -475,6 +475,11 @@ model Invoice {
   amount      Float
   sentAt      DateTime?
   paidAt      DateTime? // null = unpaid
+  remindedAt  DateTime? // due-date reminder sent
+  // Billplz bill for online payment; replaced when the amount changes
+  billplzBillId String?   @unique
+  billplzUrl    String?
+  billplzAmount Float?
   agent       Agent     @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

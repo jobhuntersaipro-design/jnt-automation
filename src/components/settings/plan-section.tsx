@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Download, Minus, Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { CreditCard, Download, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
   PRICE_PER_BRANCH,
@@ -29,15 +29,42 @@ export function PlanSection({
   branchesInUse,
   createdAt,
   isSuperAdmin,
+  payOnline,
   invoices,
 }: {
   initialMaxBranches: number;
   branchesInUse: number;
   createdAt: string;
   isSuperAdmin: boolean;
+  /** Billplz is configured, so due months get a Pay now button. */
+  payOnline: boolean;
   invoices: PlanInvoice[];
 }) {
   const [maxBranches, setMaxBranches] = useState(initialMaxBranches);
+  const [paying, setPaying] = useState<string | null>(null);
+
+  // Billplz redirects back here with billplz[paid]; the callback does the actual marking.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const paid = params.get("billplz[paid]");
+    if (paid === null) return;
+    if (paid === "true") toast.success("Payment received — thank you. Your receipt is on its way by email.");
+    else toast.error("Payment wasn't completed. You can try again any time.");
+    window.history.replaceState(null, "", "/settings#plan");
+    document.getElementById("plan")?.scrollIntoView();
+  }, []);
+
+  async function pay(ym: YearMonth) {
+    setPaying(`${ym.year}-${ym.month}`);
+    const res = await fetch(`/api/settings/invoices/${ym.year}/${ym.month}/pay`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.url) {
+      window.location.assign(data.url);
+      return;
+    }
+    toast.error(data.error || "Couldn't start the payment");
+    setPaying(null);
+  }
   const [draft, setDraft] = useState(initialMaxBranches);
   const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
@@ -166,11 +193,11 @@ export function PlanSection({
               const limit = inv?.paidAt ? inv.branchCount : maxBranches;
               const amount = inv?.paidAt ? inv.amount : limit * PRICE_PER_BRANCH;
               return (
-                <div key={`${ym.year}-${ym.month}`} className="flex items-center gap-3 py-1.5">
+                <div key={`${ym.year}-${ym.month}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-1.5">
                   <span className="w-20 text-sm text-on-surface">{formatMonth(ym)}</span>
-                  <span className="w-28 flex flex-col">
+                  <span className="w-32 flex flex-col">
                     <span className="text-sm tabular-nums text-on-surface">{formatRM(amount)}</span>
-                    <span className="text-xs tabular-nums text-on-surface-variant">
+                    <span className="text-xs tabular-nums text-on-surface-variant whitespace-nowrap">
                       {limit} branch{limit === 1 ? "" : "es"} × RM {PRICE_PER_BRANCH}
                     </span>
                   </span>
@@ -181,12 +208,24 @@ export function PlanSection({
                   >
                     {status === "paid" ? "Paid" : "Due"}
                   </span>
-                  <a
-                    href={`/api/settings/invoices/${ym.year}/${ym.month}`}
-                    className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    <Download size={12} /> PDF
-                  </a>
+                  <div className="ml-auto flex items-center gap-3">
+                    {status === "unpaid" && payOnline && (
+                      <button
+                        onClick={() => pay(ym)}
+                        disabled={paying !== null}
+                        className="inline-flex items-center gap-1.5 bg-primary text-white rounded-md px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+                      >
+                        {paying === `${ym.year}-${ym.month}` ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />}
+                        Pay now
+                      </button>
+                    )}
+                    <a
+                      href={`/api/settings/invoices/${ym.year}/${ym.month}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                    >
+                      <Download size={12} /> PDF
+                    </a>
+                  </div>
                 </div>
               );
             })}
