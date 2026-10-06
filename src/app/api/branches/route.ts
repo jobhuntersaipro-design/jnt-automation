@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (agent && branchCount >= agent.maxBranches) {
-      return NextResponse.json({ error: `Branch limit reached (${agent.maxBranches})` }, { status: 403 });
+      return NextResponse.json({ error: `Branch limit reached (${agent.maxBranches}). Increase it in Settings → Plan & billing.` }, { status: 403 });
     }
 
     const branch = await prisma.branch.create({

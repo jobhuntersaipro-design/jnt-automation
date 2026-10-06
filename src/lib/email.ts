@@ -343,3 +343,42 @@ export async function sendInvoiceEmail(input: {
     attachments: [{ filename: input.filename, content: input.pdf }],
   });
 }
+
+/** Tell the superadmin an agent changed their own branch limit. Never throws. */
+export async function sendPlanChangeNotification(
+  agentEmail: string,
+  agentName: string,
+  from: number,
+  to: number,
+) {
+  try {
+    const resend = getResend();
+    if (!resend) return;
+    const recipients = await getSignupNotifyRecipients();
+    if (recipients.length === 0) return;
+
+    const direction = to > from ? "increased" : "reduced";
+    const monthly = `RM ${formatRMText(to * 150)}`;
+    const adminUrl = `${APP_URL}/admin`;
+    const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
+        Branch limit ${direction}
+      </h2>
+      <p style="margin:0 0 20px;font-size:15px;color:#424654;line-height:1.6;">
+        <strong style="color:#191c1d;">${escapeHtml(agentName || agentEmail)}</strong> (${escapeHtml(agentEmail)})
+        changed their branch limit from <strong>${from}</strong> to <strong>${to}</strong>.
+        Their plan is now ${monthly}/month.
+      </p>
+      <a href="${adminUrl}" style="color:#0056D2;text-decoration:none;font-size:14px;">Open Admin</a>
+    `);
+    await send(resend, {
+      from: FROM,
+      to: recipients,
+      subject: `Branch limit ${direction}: ${agentName || agentEmail} (${from} → ${to})`,
+      html,
+      text: `${agentName || agentEmail} (${agentEmail}) changed their branch limit from ${from} to ${to}. Plan is now ${monthly}/month.\n\n${adminUrl}`,
+    });
+  } catch (err) {
+    console.error("[email] plan change notification failed", err);
+  }
+}

@@ -7,6 +7,8 @@
 export const TRIAL_DAYS = 30;
 export const PRICE_PER_BRANCH = 150;
 export const INVOICE_DUE_DAYS = 7;
+/** Highest branch limit an agent can set themselves; admins can go higher. */
+export const SELF_SERVE_MAX_BRANCHES = 50;
 /** Billing was first tracked in the app this month; earlier months were settled outside it. */
 export const BILLING_TRACKING_START: YearMonth = { year: 2026, month: 10 };
 
@@ -71,6 +73,18 @@ export function billingStatus(
   if (monthKey(ym) < monthKey(BILLING_TRACKING_START)) return "exempt";
   const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
   return inv?.paidAt ? "paid" : "unpaid";
+}
+
+/** Why an agent can't set this branch limit, or null if they can. */
+export function planLimitError(requested: number, branchesInUse: number): string | null {
+  if (!Number.isInteger(requested) || requested < 1) return "Branch limit must be at least 1.";
+  if (requested < branchesInUse) {
+    return `You're using ${branchesInUse} branch${branchesInUse === 1 ? "" : "es"}, so the limit can't go below ${branchesInUse}.`;
+  }
+  if (requested > SELF_SERVE_MAX_BRANCHES) {
+    return `For more than ${SELF_SERVE_MAX_BRANCHES} branches, contact onboarding@kim-brothers.com.`;
+  }
+  return null;
 }
 
 export function invoiceAmount(branchCount: number): number {

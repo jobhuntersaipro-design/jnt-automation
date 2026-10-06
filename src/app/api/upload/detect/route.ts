@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
 
     if (agent && agent._count.branches >= agent.maxBranches) {
       return NextResponse.json(
-        { error: "You've reached your branch limit. Contact support to upgrade." },
+        { error: `You've reached your branch limit (${agent.maxBranches}). Increase it in Settings → Plan & billing, then upload again.` },
         { status: 403 },
       );
     }

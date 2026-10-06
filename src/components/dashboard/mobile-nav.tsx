@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Menu, X, Settings, LogOut, Compass } from "lucide-react";
+import { Menu, X, Settings, CreditCard, LogOut, Compass } from "lucide-react";
 import { startTour } from "@/components/onboarding/product-tour";
 import { signOut } from "next-auth/react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
@@ -86,6 +86,14 @@ export function MobileNav({ isSuperAdmin, impersonating, userName, userImage }: 
             >
               <Settings size={16} />
               Settings
+            </Link>
+            <Link
+              href="/settings#plan"
+              onClick={() => setOpen(false)}
+              className="px-6 py-3 text-[0.95rem] font-medium text-on-surface-variant hover:text-on-surface hover:bg-surface-hover transition-colors flex items-center gap-3"
+            >
+              <CreditCard size={16} />
+              Plan &amp; billing
             </Link>
             <button
               onClick={() => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Settings, LogOut, ChevronDown, Compass } from "lucide-react";
+import { Settings, LogOut, ChevronDown, Compass, CreditCard } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { useClickOutside } from "@/lib/hooks/use-click-outside";
 import { UserAvatar } from "@/components/ui/avatar";
@@ -54,6 +54,14 @@ export function AccountMenu({
           >
             <Settings size={13} />
             Settings
+          </Link>
+          <Link
+            href="/settings#plan"
+            onClick={() => setOpen(false)}
+            className="w-full flex items-center gap-2 px-3.5 py-2 text-[0.77rem] text-on-surface-variant hover:text-on-surface hover:bg-surface-low transition-colors"
+          >
+            <CreditCard size={13} />
+            Plan &amp; billing
           </Link>
           <button
             onClick={() => {

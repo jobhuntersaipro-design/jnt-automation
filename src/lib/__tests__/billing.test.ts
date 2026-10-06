@@ -7,6 +7,7 @@ import {
   invoiceNumber,
   isInTrial,
   normalizePhone,
+  planLimitError,
   trialEndDate,
   whatsappLink,
 } from "@/lib/billing";
@@ -91,6 +92,21 @@ describe("invoice helpers", () => {
 
   it("builds a stable invoice number", () => {
     expect(invoiceNumber("cmabc123xyz789", { year: 2026, month: 3 })).toBe("INV-202603-XYZ789");
+  });
+});
+
+describe("planLimitError", () => {
+  it("accepts limits between branches in use and the self-serve cap", () => {
+    expect(planLimitError(3, 2)).toBeNull();
+    expect(planLimitError(2, 2)).toBeNull();
+    expect(planLimitError(50, 0)).toBeNull();
+  });
+
+  it("rejects going below branches in use, zero, fractions and above the cap", () => {
+    expect(planLimitError(1, 2)).toContain("can't go below 2");
+    expect(planLimitError(0, 0)).toContain("at least 1");
+    expect(planLimitError(1.5, 0)).toContain("at least 1");
+    expect(planLimitError(51, 0)).toContain("contact");
   });
 });
 

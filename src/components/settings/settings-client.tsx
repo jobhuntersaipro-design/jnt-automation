@@ -5,6 +5,7 @@ import { signIn, signOut } from "next-auth/react";
 import { Eye, EyeOff, Trash2, Upload, X, Camera } from "lucide-react";
 import { toast } from "sonner";
 import { UserAvatar } from "@/components/ui/avatar";
+import { PlanSection } from "./plan-section";
 
 interface SettingsClientProps {
   name: string;
@@ -16,6 +17,7 @@ interface SettingsClientProps {
   companyAddress: string | null;
   stampImageUrl: string | null;
   memberSince: string;
+  plan: React.ComponentProps<typeof PlanSection>;
 }
 
 export function SettingsClient({
@@ -28,10 +30,12 @@ export function SettingsClient({
   companyAddress,
   stampImageUrl,
   memberSince,
+  plan,
 }: SettingsClientProps) {
   return (
     <div className="flex flex-col gap-10">
       <ProfileSection initialName={initialName} email={email} imageUrl={imageUrl} memberSince={memberSince} />
+      <PlanSection {...plan} />
       <CompanySection
         initialRegNo={companyRegistrationNo}
         initialAddress={companyAddress}
