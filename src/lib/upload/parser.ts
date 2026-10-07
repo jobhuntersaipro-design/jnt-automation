@@ -1,3 +1,4 @@
+import { Readable } from "node:stream";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
@@ -12,13 +13,31 @@ export interface ParsedRow {
   billingWeight: number;
 }
 
+/** One worksheet's parsed rows plus what sheet selection needs to know. */
+interface SheetResult {
+  name: string;
+  order: number; // position in the workbook's sheet list
+  isDataSheet: boolean;
+  rows: ParsedRow[];
+}
+
+/** Fields the streaming reader sets at runtime that exceljs's typings leave out. */
+type NamedWorksheetReader = ExcelJS.stream.xlsx.WorksheetReader & { name?: string };
+interface WorkbookReaderModel {
+  model?: { sheets?: { name: string }[] };
+}
+
+// The J&T data sheet. Matched case-sensitively, like ExcelJS's getWorksheet.
+const PREFERRED_SHEET = "sheet1";
+
 /**
  * Download an Excel file from R2 and parse delivery rows.
  *
  * Columns: A = Waybill, K = Branch, L = Delivery Date,
  *          M = Dispatcher ID, N = Dispatcher Name, Q = Billing Weight
  *
- * The file may contain 60+ sheets — we always target "sheet1" (fallback: first sheet).
+ * The file may contain 60+ sheets — we target "sheet1", falling back to the
+ * first sheet with a waybill header.
  *
  * @param onProgress optional callback invoked with the running row count
  *                   as parsing proceeds. Called at most every 1000 rows to
@@ -40,66 +59,14 @@ export async function parseExcelFromR2(
 }
 
 /**
- * Rewrite any duplicate case-insensitive sheet names in an xlsx buffer
- * before handing it to exceljs. J&T exports sometimes contain both
- * "Sheet1" (cover) and "sheet1" (data), which exceljs rejects with
- * "Worksheet name already exists: sheet1" during load.
- *
- * Returns the original buffer unchanged when there is no collision.
- */
-async function sanitizeWorkbookSheetNames(buffer: Uint8Array): Promise<Uint8Array> {
-  const zip = await JSZip.loadAsync(buffer);
-  const wbFile = zip.file("xl/workbook.xml");
-  if (!wbFile) return buffer;
-
-  const wbXml = await wbFile.async("string");
-  const sheetTagRe = /<sheet\b[^>]*\/>/g;
-  const tags = wbXml.match(sheetTagRe);
-  if (!tags || tags.length < 2) return buffer;
-
-  // Check for collisions
-  const seen = new Map<string, number>();
-  let hasCollision = false;
-  for (const tag of tags) {
-    const nameMatch = tag.match(/\bname="([^"]*)"/);
-    if (!nameMatch) continue;
-    const lower = nameMatch[1].toLowerCase();
-    const count = seen.get(lower) ?? 0;
-    if (count > 0) hasCollision = true;
-    seen.set(lower, count + 1);
-  }
-
-  if (!hasCollision) return buffer;
-
-  // Rewrite each tag, appending _dupN to later occurrences of case-insensitive matches
-  const usedNames = new Set<string>();
-  const newXml = wbXml.replace(sheetTagRe, (tag) => {
-    const nameMatch = tag.match(/\bname="([^"]*)"/);
-    if (!nameMatch) return tag;
-    const original = nameMatch[1];
-    const lower = original.toLowerCase();
-    if (!usedNames.has(lower)) {
-      usedNames.add(lower);
-      return tag;
-    }
-    // Find a non-colliding rename — _dup1, _dup2, etc.
-    let suffix = 1;
-    let candidate = `${original}_dup${suffix}`;
-    while (usedNames.has(candidate.toLowerCase())) {
-      suffix++;
-      candidate = `${original}_dup${suffix}`;
-    }
-    usedNames.add(candidate.toLowerCase());
-    return tag.replace(`name="${original}"`, `name="${candidate}"`);
-  });
-
-  zip.file("xl/workbook.xml", newXml);
-  return zip.generateAsync({ type: "uint8array" });
-}
-
-/**
  * Parse an Excel buffer into delivery rows.
  * Exported separately so tests can call it without R2.
+ *
+ * Streams the workbook row by row instead of loading it whole: a month of
+ * J&T data (~200k rows, 165 MB of sheet XML) needs ~2.5 GB as a full
+ * workbook, more than a 2 GB Vercel function has. The streaming reader
+ * also builds no workbook model, so duplicate sheet names ("Sheet1" next
+ * to "sheet1" in some J&T exports) can't break the load.
  *
  * @param onProgress optional callback for running row counts. Fired every
  *                   ~1000 valid rows and once at end-of-parse.
@@ -108,69 +75,140 @@ export async function parseExcelBuffer(
   buffer: Uint8Array,
   onProgress?: (rowsParsed: number) => void,
 ): Promise<ParsedRow[]> {
-  const sanitized = await sanitizeWorkbookSheetNames(buffer);
-
-  const workbook = new ExcelJS.Workbook();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await workbook.xlsx.load(sanitized as any);
-
-  // Prefer the lowercase "sheet1" (the J&T data sheet); fall back to first
-  // non-empty worksheet if it's missing or empty.
-  let ws = workbook.getWorksheet("sheet1") ?? workbook.worksheets[0];
-  // If the preferred sheet is near-empty (cover sheet only), pick the first
-  // worksheet with a header row we recognise.
-  const isDataSheet = (sheet: ExcelJS.Worksheet) => {
-    const header = sheet.getRow(1);
-    const a = String(header.getCell(1).value ?? "").toLowerCase();
-    return a.includes("waybill") && sheet.rowCount > 1;
-  };
-  if (ws && !isDataSheet(ws)) {
-    const better = workbook.worksheets.find(isDataSheet);
-    if (better) ws = better;
+  try {
+    return await parseXlsxStream(buffer, onProgress);
+  } catch {
+    // The streaming reader stops early on zips whose entries are stored
+    // uncompressed (some exporters write them that way) and then fails.
+    // Re-compress and try once more; a file that isn't a zip at all throws
+    // JSZip's error here.
+    const zip = await JSZip.loadAsync(buffer);
+    const repacked = await zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+    return parseXlsxStream(repacked, onProgress);
   }
-  if (!ws) throw new Error("No worksheet found in file");
+}
 
+async function parseXlsxStream(
+  buffer: Uint8Array,
+  onProgress?: (rowsParsed: number) => void,
+): Promise<ParsedRow[]> {
+  // Readable.from emits a Buffer as one chunk, but would iterate a plain
+  // Uint8Array byte by byte. Wrap without copying.
+  const input = Readable.from(
+    Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+  );
+  const reader = new ExcelJS.stream.xlsx.WorkbookReader(input, {
+    sharedStrings: "cache",
+    styles: "cache", // needed to turn date-formatted numbers into Dates
+    hyperlinks: "ignore",
+    worksheets: "emit",
+    entries: "ignore",
+  });
+
+  let candidates: SheetResult[] = [];
+  let seen = 0;
+  for await (const ws of reader) {
+    const name = (ws as NamedWorksheetReader).name ?? "";
+    const order = sheetOrder(reader, name, seen++);
+    const sheet = await readSheet(ws, name, order, onProgress);
+    candidates = keepCandidates([...candidates, sheet]);
+  }
+
+  const chosen = pickSheet(candidates);
+  if (!chosen) throw new Error("No worksheet found in file");
+
+  if (onProgress) onProgress(chosen.rows.length);
+  return chosen.rows;
+}
+
+/** Position of a sheet in workbook.xml; falls back to the order it streamed in. */
+function sheetOrder(
+  reader: ExcelJS.stream.xlsx.WorkbookReader,
+  name: string,
+  fallback: number,
+): number {
+  const sheets = (reader as unknown as WorkbookReaderModel).model?.sheets;
+  const index = sheets?.findIndex((s) => s.name === name) ?? -1;
+  return index >= 0 ? index : fallback;
+}
+
+async function readSheet(
+  ws: ExcelJS.stream.xlsx.WorksheetReader,
+  name: string,
+  order: number,
+  onProgress?: (rowsParsed: number) => void,
+): Promise<SheetResult> {
   const rows: ParsedRow[] = [];
+  let hasWaybillHeader = false;
+  let hasBodyRows = false;
 
-  ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    // Skip header row
-    if (rowNumber === 1) return;
+  for await (const row of ws) {
+    if (row.number === 1) {
+      hasWaybillHeader = cellToString(row.getCell(1)).toLowerCase().includes("waybill");
+      continue;
+    }
+    hasBodyRows = true;
 
-    const dispatcherId = cellToString(row.getCell(13)); // Column M
-    if (!dispatcherId) return; // skip rows without dispatcher ID
-
-    const waybillNumber = cellToString(row.getCell(1)); // Column A
-    if (!waybillNumber) return;
-    // Sub-parcel rows (e.g. "680030939458201-02") have no weight and are
-    // billed under the parent waybill — exclude from order counts.
-    if (waybillNumber.includes("-")) return;
-
-    // Skip rows whose billing-weight cell is blank — those parcels weren't
-    // weighed and should not contribute to commission or order counts.
-    const weightCell = row.getCell(17); // Column Q
-    if (isEmptyCell(weightCell)) return;
-
-    const branchName = cellToString(row.getCell(11)); // Column K
-    const deliveryDate = cellToDate(row.getCell(12)); // Column L
-    const dispatcherName = cellToString(row.getCell(14)); // Column N
-    const billingWeight = cellToWeight(weightCell);
-
-    rows.push({
-      waybillNumber,
-      branchName,
-      deliveryDate,
-      dispatcherId,
-      dispatcherName,
-      billingWeight,
-    });
+    const parsed = parseRow(row);
+    if (!parsed) continue;
+    rows.push(parsed);
 
     if (onProgress && rows.length % 1000 === 0) {
       onProgress(rows.length);
     }
-  });
+  }
 
-  if (onProgress) onProgress(rows.length);
-  return rows;
+  return { name, order, isDataSheet: hasWaybillHeader && hasBodyRows, rows };
+}
+
+function parseRow(row: ExcelJS.Row): ParsedRow | null {
+  const dispatcherId = cellToString(row.getCell(13)); // Column M
+  if (!dispatcherId) return null; // skip rows without dispatcher ID
+
+  const waybillNumber = cellToString(row.getCell(1)); // Column A
+  if (!waybillNumber) return null;
+  // Sub-parcel rows (e.g. "680030939458201-02") have no weight and are
+  // billed under the parent waybill — exclude from order counts.
+  if (waybillNumber.includes("-")) return null;
+
+  // Skip rows whose billing-weight cell is blank — those parcels weren't
+  // weighed and should not contribute to commission or order counts.
+  const weightCell = row.getCell(17); // Column Q
+  if (isEmptyCell(weightCell)) return null;
+
+  return {
+    waybillNumber,
+    branchName: cellToString(row.getCell(11)), // Column K
+    deliveryDate: cellToDate(row.getCell(12)), // Column L
+    dispatcherId,
+    dispatcherName: cellToString(row.getCell(14)), // Column N
+    billingWeight: cellToWeight(weightCell),
+  };
+}
+
+/**
+ * "sheet1" if it holds data, otherwise the first data sheet in workbook
+ * order, otherwise "sheet1" (or the first sheet) as-is.
+ */
+function pickSheet(sheets: SheetResult[]): SheetResult | undefined {
+  const byOrder = [...sheets].sort((a, b) => a.order - b.order);
+  const preferred = sheets.find((s) => s.name === PREFERRED_SHEET) ?? byOrder[0];
+  if (preferred?.isDataSheet) return preferred;
+  return byOrder.find((s) => s.isDataSheet) ?? preferred;
+}
+
+/**
+ * Drop sheets that pickSheet can no longer choose, whatever streams in
+ * later, so at most three sheets' rows are held in memory.
+ */
+function keepCandidates(sheets: SheetResult[]): SheetResult[] {
+  const byOrder = [...sheets].sort((a, b) => a.order - b.order);
+  const keep = new Set([
+    sheets.find((s) => s.name === PREFERRED_SHEET),
+    byOrder[0],
+    byOrder.find((s) => s.isDataSheet),
+  ]);
+  return sheets.filter((s) => keep.has(s));
 }
 
 function cellToString(cell: ExcelJS.Cell): string {

@@ -239,3 +239,49 @@ describe("parseExcelBuffer — case-insensitive sheet-name collision", () => {
     expect(rows[0].waybillNumber).toBe("WB500");
   });
 });
+
+describe("parseExcelBuffer — file variants", () => {
+  const row = {
+    waybill: "WB700",
+    branch: "PHG379",
+    date: new Date("2026-03-15T07:00:00Z"),
+    dispId: "PHG379-07",
+    dispName: "EVE",
+    weight: 2.5,
+  };
+
+  it("parses workbooks whose zip entries are stored uncompressed", async () => {
+    const JSZip = (await import("jszip")).default;
+    const zip = await JSZip.loadAsync(await buildWorkbook(["sheet1"], "sheet1", [row]));
+    const stored = await zip.generateAsync({ type: "uint8array", compression: "STORE" });
+
+    const rows = await parseExcelBuffer(stored);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].waybillNumber).toBe("WB700");
+    expect(rows[0].deliveryDate).toBeInstanceOf(Date);
+  });
+
+  it("prefers 'sheet1' when several sheets hold data", async () => {
+    const wb = new ExcelJS.Workbook();
+    for (const [name, waybill] of [["other", "WB-OTHER"], ["sheet1", "WB800"]]) {
+      const ws = wb.addWorksheet(name);
+      ws.getRow(1).getCell(1).value = "Waybill Number";
+      const r = ws.getRow(2);
+      r.getCell(1).value = waybill.replace("-", "");
+      r.getCell(11).value = row.branch;
+      r.getCell(12).value = row.date;
+      r.getCell(13).value = row.dispId;
+      r.getCell(14).value = row.dispName;
+      r.getCell(17).value = row.weight;
+    }
+    const buf = new Uint8Array(await wb.xlsx.writeBuffer());
+
+    const rows = await parseExcelBuffer(buf);
+    expect(rows.map((r) => r.waybillNumber)).toEqual(["WB800"]);
+  });
+
+  it("rejects a file that is not an xlsx", async () => {
+    const notXlsx = new TextEncoder().encode("Waybill Number,Dispatcher ID\nWB1,D1\n");
+    await expect(parseExcelBuffer(notXlsx)).rejects.toThrow();
+  });
+});
