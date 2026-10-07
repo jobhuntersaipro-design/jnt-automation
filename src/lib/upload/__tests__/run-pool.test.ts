@@ -53,3 +53,25 @@ describe("runPool", () => {
     expect(indices).toEqual([0, 1, 2]);
   });
 });
+
+describe("runPool with a lazy iterable", () => {
+  it("pulls items only as workers free up, and keeps order", async () => {
+    let pulled = 0;
+    let maxAhead = 0;
+    let finished = 0;
+    function* items() {
+      for (let i = 0; i < 10; i++) {
+        pulled++;
+        maxAhead = Math.max(maxAhead, pulled - finished);
+        yield i;
+      }
+    }
+    const out = await runPool(items(), 3, async (n) => {
+      await new Promise((r) => setTimeout(r, (n % 3) * 5));
+      finished++;
+      return n * 2;
+    });
+    expect(out).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+    expect(maxAhead).toBeLessThanOrEqual(3);
+  });
+});

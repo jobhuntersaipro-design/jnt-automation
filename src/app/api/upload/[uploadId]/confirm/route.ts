@@ -3,8 +3,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { verifyUploadOwnership, updateUploadStatus } from "@/lib/db/upload";
 import { getPreviewData, deletePreviewData } from "@/lib/upload/pipeline";
-import { parseExcelFromR2 } from "@/lib/upload/parser";
-import { priceLineItems } from "@/lib/upload/calculator";
+import { parseExcelFromR2, type ParsedRow } from "@/lib/upload/parser";
 import type {
   BonusTierSnapshot,
   BonusTierInput,
@@ -18,6 +17,11 @@ import {
   throttledProgressWriter,
 } from "@/lib/upload/progress";
 import { runPool } from "@/lib/upload/run-pool";
+import {
+  groupRowsByExtId,
+  lineItemBatches,
+  type LineItemSource,
+} from "@/lib/upload/line-item-batches";
 
 export async function POST(
   _req: NextRequest,
@@ -70,9 +74,11 @@ export async function POST(
   });
 
   try {
-    // 1. Re-parse Excel (needed because raw rows aren't stored in KV)
+    // 1. Re-parse Excel (needed because raw rows aren't stored in KV), then
+    //    group by dispatcher extId. Rows of dispatchers not in the preview
+    //    are dropped with the parser's array.
     const writeParseProgress = throttledProgressWriter(uploadId, 500);
-    const rows = await parseExcelFromR2(fullUpload.r2Key, (rowsParsed) => {
+    let rows: ParsedRow[] | null = await parseExcelFromR2(fullUpload.r2Key, (rowsParsed) => {
       writeParseProgress({
         stage: "parse",
         stageLabel: "Re-parsing Excel for line items",
@@ -80,16 +86,14 @@ export async function POST(
         startedAt,
       });
     });
+    const rowsParsed = rows.length;
+    const rowsByExtId = groupRowsByExtId(
+      rows,
+      preview.results.map((r) => r.extId),
+    );
+    rows = null;
 
-    // 2. Pre-group rows by dispatcher extId ONCE (O(n))
-    const rowsByExtId = new Map<string, typeof rows>();
-    for (const row of rows) {
-      const existing = rowsByExtId.get(row.dispatcherId);
-      if (existing) existing.push(row);
-      else rowsByExtId.set(row.dispatcherId, [row]);
-    }
-
-    // 3. Build salary record rows from preview results
+    // 2. Build salary record rows from preview results
     const salaryRecordData = preview.results.map((result) => ({
       dispatcherId: result.dispatcherId,
       uploadId,
@@ -108,31 +112,18 @@ export async function POST(
       petrolSnapshot: JSON.parse(JSON.stringify(result.petrolSnapshot)),
     }));
 
-    // 4. Build all line items upfront so we know total count. Pricing mirrors
-    //    the calculator's stable-sort + threshold-split rules so `isBonusTier`
-    //    agrees with the preview's baseSalary/bonusTierEarnings totals.
-    const lineItemsByDispatcher = new Map<string, { waybillNumber: string; weight: number; commission: number; deliveryDate: Date | null; isBonusTier: boolean }[]>();
+    // 3. One line item per parsed row, so the total is known before pricing.
     let totalLineItems = 0;
     for (const result of preview.results) {
-      const dispatcherRows = rowsByExtId.get(result.extId) ?? [];
-      const weightTiers = result.weightTiersSnapshot as WeightTierInput[];
-      const bonusTierSnapshot = result.bonusTierSnapshot as BonusTierSnapshot;
-      const items = priceLineItems(
-        dispatcherRows,
-        weightTiers,
-        bonusTierSnapshot.tiers as BonusTierInput[],
-        bonusTierSnapshot.orderThreshold,
-      );
-      lineItemsByDispatcher.set(result.dispatcherId, items);
-      totalLineItems += items.length;
+      totalLineItems += rowsByExtId.get(result.extId)?.length ?? 0;
     }
 
-    // 5. Save salary records in one round-trip (createManyAndReturn — Prisma 7).
+    // 4. Save salary records in one round-trip (createManyAndReturn — Prisma 7).
     //    Also delete any prior records for this upload in a short transaction.
     await setProgress(uploadId, {
       stage: "save",
       stageLabel: "Saving salary records",
-      rowsParsed: rows.length,
+      rowsParsed,
       dispatchersProcessed: 0,
       totalDispatchers: salaryRecordData.length,
       lineItemsInserted: 0,
@@ -149,60 +140,58 @@ export async function POST(
     }, { timeout: 30_000 });
 
     const recordIdByDispatcher = new Map(created.map((r) => [r.dispatcherId, r.id]));
+    const resultByDispatcher = new Map(preview.results.map((r) => [r.dispatcherId, r]));
 
-    // 6. Build flat line item list with salaryRecordId
-    const allLineItems: {
-      salaryRecordId: string;
-      waybillNumber: string;
-      weight: number;
-      commission: number;
-      deliveryDate: Date | null;
-      isBonusTier: boolean;
-    }[] = [];
-    for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
-      const items = lineItemsByDispatcher.get(dispatcherId);
-      if (items) {
-        for (const li of items) {
-          allLineItems.push({ salaryRecordId, ...li });
-        }
+    // 5. Price and insert line items one batch at a time. Pricing mirrors
+    //    the calculator's stable-sort + threshold-split rules so `isBonusTier`
+    //    agrees with the preview's baseSalary/bonusTierEarnings totals.
+    function* sources(): Generator<LineItemSource> {
+      for (const [dispatcherId, salaryRecordId] of recordIdByDispatcher) {
+        const result = resultByDispatcher.get(dispatcherId);
+        if (!result) continue;
+        const bonusTierSnapshot = result.bonusTierSnapshot as BonusTierSnapshot;
+        yield {
+          salaryRecordId,
+          rows: rowsByExtId.get(result.extId) ?? [],
+          weightTiers: result.weightTiersSnapshot as WeightTierInput[],
+          bonusTiers: bonusTierSnapshot.tiers as BonusTierInput[],
+          orderThreshold: bonusTierSnapshot.orderThreshold,
+        };
       }
     }
 
-    // 7. Insert line items in parallel chunks with live progress reporting.
-    //    5000-row chunks keep us well under the Postgres param limit
-    //    (~65k / 5 fields ≈ 13k rows max per statement) and stream to KV
-    //    frequently enough for the UI to animate.
-    const CHUNK_SIZE = 5000;
+    // Batches stay small because Prisma keeps its last 100 debug log calls
+    // (logging off or not), and one of them holds each createMany's query
+    // plan, which embeds every row. With 5000-row batches the retained plans
+    // alone came to ~400 MB and a 194k-parcel month peaked at 1.7 GB RSS;
+    // 500-row batches hold ~20 MB and the same month peaks at ~850 MB.
+    const BATCH_SIZE = 500;
     const CONCURRENCY = 4;
-    const chunks: typeof allLineItems[] = [];
-    for (let i = 0; i < allLineItems.length; i += CHUNK_SIZE) {
-      chunks.push(allLineItems.slice(i, i + CHUNK_SIZE));
-    }
 
     let inserted = 0;
     await setProgress(uploadId, {
       stage: "save",
       stageLabel: "Saving line items",
-      rowsParsed: rows.length,
+      rowsParsed,
       lineItemsInserted: 0,
       totalLineItems,
       startedAt,
     });
 
-    await runPool(chunks, CONCURRENCY, async (chunk) => {
-      await prisma.salaryLineItem.createMany({ data: chunk });
-      inserted += chunk.length;
+    await runPool(lineItemBatches(sources(), BATCH_SIZE), CONCURRENCY, async (batch) => {
+      await prisma.salaryLineItem.createMany({ data: batch });
+      inserted += batch.length;
       await setProgress(uploadId, {
         stage: "save",
         stageLabel: "Saving line items",
-        rowsParsed: rows.length,
+        rowsParsed,
         lineItemsInserted: inserted,
         totalLineItems,
         startedAt,
       });
     });
 
-    // 8. Mark SAVED + cleanup
+    // 6. Mark SAVED + cleanup
     await updateUploadStatus(uploadId, "SAVED");
     await deletePreviewData(uploadId);
     await clearProgress(uploadId);
