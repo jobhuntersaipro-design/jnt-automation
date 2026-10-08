@@ -90,6 +90,20 @@
   gap: var(--space-4);
 }
 
+/* Main column plus a 24rem side column on wide screens. */
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+@media (min-width: 72rem) {
+  .split {
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    align-items: start;
+  }
+}
+
 .muted {
   margin: 0;
   color: var(--text-muted);

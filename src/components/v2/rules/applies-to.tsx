@@ -11,7 +11,7 @@ import type { Employment } from "@/lib/v2/pay/config";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
 import { addAssignment, removeAssignment } from "@/lib/v2/rules/actions";
 import type { RuleView } from "@/lib/v2/rules/data";
-import { monthLabel, scopeLabel } from "./labels";
+import { monthLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 
 const WHO = ["everyone", "ft", "pt", "outlet", "outlet_ft", "outlet_pt", "dispatcher"] as const;

@@ -72,6 +72,22 @@
   margin-left: auto;
 }
 
+/* Narrow screens: logo and account on one row, the nav as a full-width strip under them. */
+@media (max-width: 47.99rem) {
+  .header {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--header-height);
+    padding-top: var(--space-2);
+  }
+
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+    padding-bottom: var(--space-2);
+  }
+}
+
 .banner {
   display: flex;
   align-items: center;

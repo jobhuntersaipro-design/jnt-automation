@@ -8,7 +8,7 @@ import { DecimalInput } from "@/components/v2/decimal-input";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { configProblems, VEHICLES, type RuleConfig, type Vehicle } from "@/lib/v2/pay/config";
 import { computeRule, UNIT_LETTER } from "@/lib/v2/pay/engine";
-import { rangeLabels, vehicleLabel } from "./labels";
+import { rangeLabels, vehicleLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 

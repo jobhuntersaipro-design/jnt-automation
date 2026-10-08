@@ -1,11 +1,18 @@
 import type { I18n } from "@/lib/i18n/core";
-import { boundRanges, type Employment, type RuleConfig, type Vehicle } from "@/lib/v2/pay/config";
+import { boundRanges, EMPLOYMENTS, VEHICLES, type Employment, type RuleConfig, type Vehicle } from "@/lib/v2/pay/config";
 import { periodMonth, periodYear, type Period } from "@/lib/v2/pay/resolve";
 
 export const monthLabel = (i18n: I18n, p: Period) => i18n.month(periodYear(p), periodMonth(p));
 
 export const vehicleLabel = (i18n: I18n, v: Vehicle) => i18n.t(`vehicle.${v.toLowerCase() as Lowercase<Vehicle>}`);
 export const employmentLabel = (i18n: I18n, e: Employment) => i18n.t(e === "FULL_TIME" ? "employment.ft" : "employment.pt");
+
+/** Every vehicle × FT/PT pair, for one select that sets a whole dispatcher profile. */
+export const PROFILES = VEHICLES.flatMap((vehicle) => EMPLOYMENTS.map((employment) => ({ key: `${vehicle}:${employment}`, vehicle, employment })));
+export const profileKey = (p: { vehicle: Vehicle; employment: Employment }) => `${p.vehicle}:${p.employment}`;
+/** "Bike · Part-time". */
+export const profileLabel = (i18n: I18n, p: { vehicle: Vehicle; employment: Employment }) =>
+  i18n.t("profile.option", { vehicle: vehicleLabel(i18n, p.vehicle), employment: employmentLabel(i18n, p.employment) });
 
 /** "Everyone", "Part-time", "KUL4602 · Part-time", "Ahmad Faiz". */
 export function scopeLabel(i18n: I18n, a: { branchCode: string | null; dispatcherName: string | null; employment: Employment | null }) {

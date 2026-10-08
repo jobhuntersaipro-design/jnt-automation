@@ -8,7 +8,7 @@ import { Switch } from "@/components/arc/switch/switch";
 import { DecimalInput } from "@/components/v2/decimal-input";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { addBound, removeBound, setBound, setByVehicle, UNITS, VEHICLES, type RuleConfig, type Unit } from "@/lib/v2/pay/config";
-import { rangeLabels, vehicleLabel } from "./labels";
+import { rangeLabels, vehicleLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 

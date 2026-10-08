@@ -23,7 +23,7 @@ import { AppliesTo } from "./applies-to";
 import { ConfigEditor } from "./config-editor";
 import { History } from "./history";
 import { ImportDialog } from "./import-dialog";
-import { monthLabel } from "./labels";
+import { monthLabel } from "../labels";
 import { Simulator } from "./simulator";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
@@ -146,7 +146,7 @@ export function RuleEditor({ rule, version, outlets, dispatchers, audit, thisMon
         {dirty && <p className={ui.help}>{t("rule.unsavedHint")}</p>}
       </nav>
 
-      <div className={styles.layout}>
+      <div className={ui.split}>
         <div className={ui.stack}>
           <section className={ui.card} aria-labelledby="editor-title">
             <div className={styles.cardHead}>

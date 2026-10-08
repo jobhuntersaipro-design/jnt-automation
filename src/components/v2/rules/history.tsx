@@ -3,7 +3,7 @@
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { Employment } from "@/lib/v2/pay/config";
 import type { AuditView } from "@/lib/v2/rules/data";
-import { monthLabel, scopeLabel } from "./labels";
+import { monthLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 
 /** Who changed this rule, what and when, in the viewer's language. */

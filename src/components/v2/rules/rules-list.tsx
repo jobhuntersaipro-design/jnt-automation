@@ -14,7 +14,7 @@ import { KINDS, type Kind } from "@/lib/v2/pay/config";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
 import { createRule } from "@/lib/v2/rules/actions";
 import type { RuleView } from "@/lib/v2/rules/data";
-import { configSummary, monthLabel, scopeLabel } from "./labels";
+import { configSummary, monthLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 

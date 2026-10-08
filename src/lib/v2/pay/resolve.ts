@@ -27,6 +27,15 @@ export function periodFromInput(value: string): Period | null {
   return month >= 1 && month <= 12 ? toPeriod(Number(m[1]), month) : null;
 }
 
+/** A real month between 2000 and 2999. */
+export const isPeriod = (p: number) => Number.isInteger(p) && p >= 200001 && p <= 299912 && periodMonth(p) >= 1 && periodMonth(p) <= 12;
+
+/** A `?month=202611` search param, or null. */
+export function periodFromParam(value: string | string[] | undefined): Period | null {
+  const p = Number(value);
+  return typeof value === "string" && isPeriod(p) ? p : null;
+}
+
 export interface AssignmentRow {
   id: string;
   kind: Kind;
@@ -59,8 +68,8 @@ function matches(a: AssignmentRow, ctx: Context) {
 }
 
 /** The winning assignment per kind: most specific, then the latest effective month, then the newest. */
-export function pickAssignments(assignments: AssignmentRow[], ctx: Context): Map<Kind, AssignmentRow> {
-  const best = new Map<Kind, AssignmentRow>();
+export function pickAssignments<T extends AssignmentRow>(assignments: T[], ctx: Context): Map<Kind, T> {
+  const best = new Map<Kind, T>();
   for (const a of assignments) {
     if (!matches(a, ctx)) continue;
     const current = best.get(a.kind);

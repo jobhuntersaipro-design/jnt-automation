@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { EMPLOYMENTS, KINDS, parseConfig, type Employment, type Kind } from "@/lib/v2/pay/config";
 import { MAX_FILE_BYTES, parseCsv } from "@/lib/v2/pay/rate-card-io";
+import { isPeriod } from "@/lib/v2/pay/resolve";
 import { capRows, readCsvText, readXlsx, type Sheet } from "@/lib/v2/pay/sheet";
 import { TEMPLATES } from "@/lib/v2/pay/templates";
 import { v2Session, type ActionResult } from "@/lib/v2/session";
@@ -13,7 +14,7 @@ import { v2Session, type ActionResult } from "@/lib/v2/session";
 // Mutations behind the v2 rule screens. Each one checks the caller is a v2 account,
 // touches only that account's rows, and leaves an audit entry.
 
-const period = z.number().int().refine((p) => p >= 200001 && p <= 299912 && p % 100 >= 1 && p % 100 <= 12);
+const period = z.number().refine(isPeriod);
 const name = z.string().trim().min(1).max(80);
 
 type Detail = Record<string, string | number | boolean | null>;

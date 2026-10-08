@@ -11,7 +11,12 @@ import styles from "./shell.module.css";
 export function NavLinks({ items }: { items: { href: string; label: string }[] }) {
   const pathname = usePathname();
   return items.map((item) => (
-    <Link key={item.href} href={item.href} className={styles.navLink} aria-current={pathname === item.href ? "page" : undefined}>
+    <Link
+      key={item.href}
+      href={item.href}
+      className={styles.navLink}
+      aria-current={pathname === item.href || (item.href !== "/app" && pathname.startsWith(`${item.href}/`)) ? "page" : undefined}
+    >
       {item.label}
     </Link>
   ));

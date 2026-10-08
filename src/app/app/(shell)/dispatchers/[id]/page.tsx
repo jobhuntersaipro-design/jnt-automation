@@ -1,0 +1,53 @@
+import { notFound } from "next/navigation";
+import { DispatcherDetail, type ResolvedView } from "@/components/v2/people/dispatcher-detail";
+import { getDispatcher, listAssignments, listRuleOptions, ratesFrom } from "@/lib/v2/people/data";
+import { inForce, periodFromParam, periodOf, pickAssignments } from "@/lib/v2/pay/resolve";
+import { v2Session } from "@/lib/v2/session";
+
+export default async function DispatcherPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ month?: string; outlet?: string }>;
+}) {
+  const s = await v2Session();
+  if (!s) notFound();
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const period = periodFromParam(query.month) ?? periodOf(new Date());
+  const [dispatcher, assignments, ruleOptions] = await Promise.all([getDispatcher(s.agentId, id), listAssignments(s.agentId), listRuleOptions(s.agentId)]);
+  if (!dispatcher) notFound();
+
+  // Pay is worked out per outlet run; show the outlet asked for, else the first one.
+  const outletId = dispatcher.outlets.find((o) => o.id === query.outlet)?.id ?? dispatcher.outlets[0].id;
+  const profile = inForce(dispatcher.profiles, period);
+  const picked = pickAssignments(assignments, { period, branchId: outletId, dispatcherId: dispatcher.id, employment: profile?.employment ?? null });
+  const resolved: ResolvedView[] = [...picked.values()].map((a) => ({
+    kind: a.kind,
+    ruleId: a.ruleId,
+    ruleName: a.ruleName,
+    self: a.dispatcherId !== null,
+    branchCode: a.branchCode,
+    employment: a.employment,
+    effectiveFrom: a.effectiveFrom,
+    hasRates: ratesFrom(a, period) !== null,
+  }));
+  const overrides = assignments
+    .filter((a) => a.dispatcherId === dispatcher.id)
+    .sort((a, b) => a.effectiveFrom - b.effectiveFrom)
+    .map((a) => ({ id: a.id, ruleName: a.ruleName, kind: a.kind, effectiveFrom: a.effectiveFrom }));
+
+  return (
+    <DispatcherDetail
+      key={`${period}:${outletId}`}
+      dispatcher={dispatcher}
+      profiles={dispatcher.profiles}
+      period={period}
+      outletId={outletId}
+      hasProfile={profile !== null}
+      resolved={resolved}
+      overrides={overrides}
+      ruleOptions={ruleOptions}
+    />
+  );
+}

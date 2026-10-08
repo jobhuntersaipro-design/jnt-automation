@@ -14,4 +14,4 @@ export async function v2Session(): Promise<{ agentId: string; actor: string | nu
   return { agentId: v2.agentId, actor: session?.user?.email ?? null };
 }
 
-export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: MessageKey };
+export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: MessageKey; vars?: Record<string, string | number> };
