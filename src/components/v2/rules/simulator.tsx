@@ -83,7 +83,7 @@ export function Simulator({ config }: { config: RuleConfig }) {
                 <span className={styles.rangeText}>
                   {config.valueType === "flat"
                     ? i18n.money(g.cents / 100)
-                    : t("sim.line", { units: i18n.number(g.units), rate: i18n.money(g.rate), amount: i18n.money(g.cents / 100) })}
+                    : t("sim.line", { units: i18n.number(g.units), rate: i18n.rate(g.rate), amount: i18n.money(g.cents / 100) })}
                 </span>
               </li>
             ))}

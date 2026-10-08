@@ -29,6 +29,8 @@ interface DataTableProps<T extends Row> {
   rowLabel: (row: T) => string;
   searchKeys: (keyof T & string)[];
   onEdit?: (row: T, key: keyof T & string, value: number) => void;
+  /** Makes the first column a button that opens the row (a detail view). */
+  onOpen?: (row: T) => void;
   exportName: string;
 }
 
@@ -38,7 +40,7 @@ interface DataTableProps<T extends Row> {
  */
 // ponytail: renders every row. A sort of 300 rows costs ~8ms in React plus ~70ms of
 // browser re-layout (headless, 4 cores); virtualise the rows if an account reaches thousands.
-export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, searchKeys, onEdit, exportName }: DataTableProps<T>) {
+export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, searchKeys, onEdit, onOpen, exportName }: DataTableProps<T>) {
   const i18n = useI18n();
   const { t, tp } = i18n;
   const [query, setQuery] = useState("");
@@ -97,7 +99,7 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
           </thead>
           <tbody>
             {visible.map((row) => (
-              <TableRow key={rowKey(row)} row={row} columns={columns} label={rowLabel(row)} onEdit={onEdit} i18n={i18n} />
+              <TableRow key={rowKey(row)} row={row} columns={columns} label={rowLabel(row)} onEdit={onEdit} onOpen={onOpen} i18n={i18n} />
             ))}
           </tbody>
           {hasTotals && visible.length > 0 && (
@@ -130,12 +132,14 @@ const TableRow = memo(function TableRow<T extends Row>({
   columns,
   label,
   onEdit,
+  onOpen,
   i18n,
 }: {
   row: T;
   columns: Column<T>[];
   label: string;
   onEdit?: (row: T, key: keyof T & string, value: number) => void;
+  onOpen?: (row: T) => void;
   i18n: I18n;
 }) {
   return (
@@ -152,6 +156,10 @@ const TableRow = memo(function TableRow<T extends Row>({
                 label={i18n.t("table.editValue", { column: col.header, name: label })}
                 onCommit={(value) => onEdit(row, col.key, value)}
               />
+            ) : index === 0 && onOpen ? (
+              <button type="button" className={styles.open} onClick={() => onOpen(row)}>
+                {formatCell(i18n, col, row[col.key])}
+              </button>
             ) : (
               formatCell(i18n, col, row[col.key])
             )}
@@ -165,6 +173,7 @@ const TableRow = memo(function TableRow<T extends Row>({
   columns: Column<T>[];
   label: string;
   onEdit?: (row: T, key: keyof T & string, value: number) => void;
+  onOpen?: (row: T) => void;
   i18n: I18n;
 }) => React.ReactElement;
 

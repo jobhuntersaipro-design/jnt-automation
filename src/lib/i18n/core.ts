@@ -39,6 +39,7 @@ export function createI18n(locale: Locale, messages: Messages) {
   const plural = new Intl.PluralRules(tag);
   const numberFmt = new Intl.NumberFormat(tag);
   const moneyFmt = new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const rateFmt = new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
 
   function t(key: MessageKey, vars?: TranslateVars): string {
     const text = messages[key] ?? key;
@@ -59,6 +60,8 @@ export function createI18n(locale: Locale, messages: Messages) {
     number: (n: number) => numberFmt.format(n),
     /** Always RM, in both languages. */
     money: (n: number) => `RM ${moneyFmt.format(n)}`,
+    /** A per-parcel rate: up to 4 decimals, so RM 0.1234 isn't shown as RM 0.12. */
+    rate: (n: number) => `RM ${rateFmt.format(n)}`,
     date: (d: Date, opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" }) =>
       new Intl.DateTimeFormat(tag, opts).format(d),
     month: (year: number, month: number) =>

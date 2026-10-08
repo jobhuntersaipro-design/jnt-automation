@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { EMPLOYMENTS, VEHICLES } from "@/lib/v2/pay/config";
 import { isPeriod } from "@/lib/v2/pay/resolve";
+import { ensureOutlet } from "@/lib/v2/people/outlet";
 import { v2Session, type ActionResult } from "@/lib/v2/session";
 
 // Mutations behind the v2 outlet and dispatcher screens. Each one checks the caller is a
@@ -17,23 +18,12 @@ export async function createOutlet(input: { code: string }): Promise<ActionResul
   if (!s) return { ok: false, error: "error.forbidden" };
   const code = outletCode.safeParse(input.code);
   if (!code.success) return { ok: false, error: "outlets.err.code" };
-  const [agent, count, existing] = await Promise.all([
-    prisma.agent.findUnique({ where: { id: s.agentId }, select: { maxBranches: true } }),
-    prisma.branch.count({ where: { agentId: s.agentId, isDemo: false } }),
-    prisma.branch.findFirst({ where: { agentId: s.agentId, code: code.data }, select: { id: true } }),
-  ]);
-  if (existing) return { ok: false, error: "outlets.err.exists" };
-  // Same limit as v1's branches: sample branches don't count.
-  if (agent && count >= agent.maxBranches) return { ok: false, error: "outlets.err.limit", vars: { limit: agent.maxBranches } };
-  try {
-    const outlet = await prisma.branch.create({ data: { agentId: s.agentId, code: code.data }, select: { id: true, code: true } });
-    await prisma.ruleAudit.create({ data: { agentId: s.agentId, actor: s.actor, action: "outlet", detail: { outlet: outlet.code } } });
-    revalidatePath("/app/outlets");
-    return { ok: true, data: outlet };
-  } catch (e) {
-    if ((e as { code?: string }).code === "P2002") return { ok: false, error: "outlets.err.exists" }; // added at the same moment elsewhere
-    throw e;
-  }
+  const outlet = await ensureOutlet(s.agentId, code.data);
+  if (!outlet.ok) return outlet;
+  if (!outlet.data.created) return { ok: false, error: "outlets.err.exists" };
+  await prisma.ruleAudit.create({ data: { agentId: s.agentId, actor: s.actor, action: "outlet", detail: { outlet: outlet.data.code } } });
+  revalidatePath("/app/outlets");
+  return { ok: true, data: { id: outlet.data.id, code: outlet.data.code } };
 }
 
 const profileInput = z.object({

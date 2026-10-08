@@ -55,6 +55,8 @@ describe("createI18n", () => {
   it("formats money as RM in both languages", () => {
     expect(t.money(1234.5)).toBe("RM 1,234.50");
     expect(createI18n("zh", en).money(1234.5)).toBe("RM 1,234.50");
+    expect(t.rate(0.1234)).toBe("RM 0.1234");
+    expect(t.rate(1.4)).toBe("RM 1.40");
   });
 
   it("formats months per language", () => {

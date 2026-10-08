@@ -21,6 +21,7 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
   const agent = await prisma.agent.findUnique({ where: { id: v2.agentId }, select: { name: true, email: true } });
   const nav = [
     { href: "/app", label: t("nav.dashboard") },
+    { href: "/app/payroll", label: t("nav.payroll") },
     { href: "/app/dispatchers", label: t("nav.dispatchers") },
     { href: "/app/outlets", label: t("nav.outlets") },
     { href: "/app/rules", label: t("nav.rules") },

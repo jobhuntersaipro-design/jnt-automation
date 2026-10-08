@@ -649,6 +649,8 @@ model PayrollRun {
   r2Key        String
   parcelCount  Int
   rules        Json?
+  /// What the file held: rows read, rows from other outlets or months.
+  stats        Json?
   calculatedAt DateTime?
   finalisedAt  DateTime?
   finalisedBy  String?
@@ -672,6 +674,8 @@ model PayrollResult {
   parcels        Json
   profile        Json?
   lines          Json
+  /// Why a dispatcher isn't fully paid (no vehicle/type, a rule without rates).
+  warnings       Json?
   earningsCents  Int        @default(0)
   deductionCents Int        @default(0)
   netCents       Int        @default(0)
