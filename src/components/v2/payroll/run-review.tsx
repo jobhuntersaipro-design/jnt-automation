@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, RefreshCw, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
@@ -96,6 +96,10 @@ export function RunReview({ run }: { run: RunView }) {
           <Button variant="secondary" onClick={() => router.push(`/app/payslips/${run.id}`)}>
             <FileText size={16} aria-hidden="true" />
             {t("run.payslips")}
+          </Button>
+          <Button variant="secondary" onClick={() => router.push(`/app/payroll/check?month=${run.period}`)}>
+            <Scale size={16} aria-hidden="true" />
+            {t("run.check")}
           </Button>
           {draft && (
             <>

@@ -44,6 +44,11 @@ export function Runs({ runs }: { runs: RunSummary[] }) {
           <h1 className={ui.title}>{t("runs.title")}</h1>
           <p className={ui.subtitle}>{t("runs.subtitle")}</p>
         </div>
+        {runs.length > 0 && (
+          <Link href="/app/payroll/check" className={ui.link}>
+            {t("runs.check")}
+          </Link>
+        )}
       </header>
       <RunUpload />
       {runs.length === 0 ? (

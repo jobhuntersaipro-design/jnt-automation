@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { importPlan, readPenaltyFile } from "@/lib/v2/penalties/file";
+import { readSheetUpload } from "@/lib/v2/pay/sheet-upload";
+import { importPlan } from "@/lib/v2/penalties/file";
 import { readPenalties } from "@/lib/v2/penalties/parse";
 import { importPenalties } from "@/lib/v2/penalties/store";
 import { v2Session } from "@/lib/v2/session";
@@ -14,8 +15,8 @@ export async function POST(req: Request) {
   const s = await v2Session();
   if (!s) return NextResponse.json({ error: "error.forbidden" }, { status: 403 });
   const form = await req.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: "penalty.err.noFile" }, { status: 400 });
-  const file = await readPenaltyFile(form);
+  if (!form) return NextResponse.json({ error: "sheet.err.noFile" }, { status: 400 });
+  const file = await readSheetUpload(form);
   if (!file.ok) return NextResponse.json({ error: file.error }, { status: 422 });
 
   const planText = form.get("plan");

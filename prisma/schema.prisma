@@ -52,6 +52,7 @@ model Agent {
   penaltyImports        PenaltyImport[]
   penaltyItems          PenaltyItem[]
   penaltyAliases        PenaltyAlias[]
+  payrollChecks         PayrollCheck[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -798,4 +799,25 @@ model PenaltyAlias {
   dispatcher   Dispatcher? @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, key])
+}
+
+/// A month's pay compared with the account's own payroll sheet (reconciliation). One per month:
+/// uploading the sheet again replaces it and keeps the notes on differences.
+model PayrollCheck {
+  id        String   @id @default(cuid())
+  agentId   String
+  period    Int
+  fileName  String
+  /// Which sheet columns hold the person and which figures (see src/lib/v2/payroll/reconcile.ts).
+  plan      Json
+  /// The sheet's people and figures as read.
+  people    Json
+  /// Explanations by line key: { note, excluded }.
+  notes     Json?
+  actor     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, period])
 }

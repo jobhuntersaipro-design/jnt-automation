@@ -56,3 +56,26 @@ export async function deleteRun(input: { runId: string }): Promise<ActionResult>
   refresh();
   return { ok: true, data: undefined };
 }
+
+/** Explains a difference on the month's comparison; `excluded` leaves it out as explained. */
+export async function saveCheckNote(input: { period: number; key: string; note: string; excluded: boolean }): Promise<ActionResult> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const check = await prisma.payrollCheck.findUnique({ where: { agentId_period: { agentId: s.agentId, period: input.period } } });
+  if (!check) return { ok: false, error: "error.notFound" };
+  const notes = { ...((check.notes ?? {}) as Record<string, { note: string; excluded: boolean }>) };
+  const note = String(input.note ?? "").trim().slice(0, 500);
+  if (note || input.excluded) notes[String(input.key).slice(0, 300)] = { note, excluded: !!input.excluded };
+  else delete notes[input.key];
+  await prisma.payrollCheck.update({ where: { id: check.id }, data: { notes } });
+  revalidatePath("/app/payroll/check");
+  return { ok: true, data: undefined };
+}
+
+export async function deleteCheck(input: { period: number }): Promise<ActionResult> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  await prisma.payrollCheck.deleteMany({ where: { agentId: s.agentId, period: input.period } });
+  revalidatePath("/app/payroll/check");
+  return { ok: true, data: undefined };
+}

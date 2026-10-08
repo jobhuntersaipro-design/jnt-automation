@@ -24,7 +24,7 @@ type Failure = { error: MessageKey; vars?: Record<string, string | number> };
 async function post<T>(form: FormData): Promise<T | Failure> {
   const res = await fetch("/api/v2/penalties", { method: "POST", body: form }).catch(() => null);
   const body = (await res?.json().catch(() => null)) as T | Failure | null;
-  if (!res?.ok || !body) return body && "error" in (body as object) ? (body as Failure) : { error: "penalty.err.unreadable" };
+  if (!res?.ok || !body) return body && "error" in (body as object) ? (body as Failure) : { error: "sheet.err.unreadable" };
   return body;
 }
 
