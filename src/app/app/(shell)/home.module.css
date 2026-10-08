@@ -41,3 +41,9 @@
   color: var(--accent-strong);
   text-decoration: underline;
 }
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-4);
+}

@@ -32,6 +32,8 @@ export interface ComboboxProps
   description?: string;
   placeholder?: string;
   emptyMessage?: string;
+  /** Accessible name of the button that clears the choice. */
+  clearLabel?: string;
   className?: string;
 }
 
@@ -59,6 +61,7 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(function Com
     description,
     placeholder = "Search or select…",
     emptyMessage = "No matches found",
+    clearLabel = "Clear selection",
     id,
     className,
     disabled,
@@ -230,7 +233,7 @@ export const Combobox = forwardRef<HTMLInputElement, ComboboxProps>(function Com
             <motion.button
               type="button"
               className={styles.clear}
-              aria-label="Clear selection"
+              aria-label={clearLabel}
               onMouseDown={event => event.preventDefault()}
               onClick={clear}
               initial={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.6, filter: `blur(${motionTokens.blur.subtle}px)` }}

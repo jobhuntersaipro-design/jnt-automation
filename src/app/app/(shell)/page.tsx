@@ -1,54 +1,128 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckCircle2, Circle } from "lucide-react";
+import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
 import { v2Session } from "@/lib/v2/session";
+import { monthLabel } from "@/components/v2/labels";
 import ui from "@/components/v2/ui.module.css";
 import styles from "./home.module.css";
 
-// Getting started: the three things a new v2 account does before its first payroll.
+const RM = "RM ";
+const MAX_ATTENTION = 12;
+
+// The latest month at a glance, what needs doing, and (until it's done) the three setup steps.
 export default async function V2Dashboard() {
   const s = await v2Session();
   if (!s) notFound();
-  const { t } = await getI18n();
-  const [rateCards, runs, unpaid] = await Promise.all([
+  const i18n = await getI18n();
+  const { t, tp } = i18n;
+  const [rateCards, runs, flagged, unmatched] = await Promise.all([
     prisma.payRuleAssignment.count({ where: { agentId: s.agentId, kind: "PARCEL", rule: { archivedAt: null } } }),
-    prisma.payrollRun.count({ where: { agentId: s.agentId } }),
-    prisma.payrollResult.count({ where: { run: { agentId: s.agentId, status: "DRAFT" }, warnings: { not: Prisma.DbNull } } }),
+    prisma.payrollRun.findMany({
+      where: { agentId: s.agentId },
+      orderBy: [{ period: "desc" }, { createdAt: "desc" }],
+      select: { id: true, period: true, status: true, parcelCount: true, branch: { select: { code: true } }, _count: { select: { results: true } } },
+    }),
+    prisma.payrollResult.groupBy({ by: ["runId"], where: { run: { agentId: s.agentId, status: "DRAFT" }, warnings: { not: Prisma.DbNull } }, _count: { _all: true } }),
+    prisma.penaltyItem.groupBy({ by: ["period"], where: { agentId: s.agentId, status: "UNMATCHED" }, _count: { _all: true }, orderBy: { period: "desc" } }),
   ]);
+  const flaggedBy = new Map(flagged.map((f) => [f.runId, f._count._all]));
   const steps = [
     { done: rateCards > 0, href: "/app/rules", title: t("dashboard.rules"), body: t("dashboard.rulesBody") },
-    { done: runs > 0, href: "/app/payroll", title: t("dashboard.run"), body: t("dashboard.runBody") },
-    { done: runs > 0 && unpaid === 0, href: "/app/dispatchers", title: t("dashboard.people"), body: t("dashboard.peopleBody") },
+    { done: runs.length > 0, href: "/app/payroll", title: t("dashboard.run"), body: t("dashboard.runBody") },
+    { done: runs.length > 0 && flagged.length === 0, href: "/app/dispatchers", title: t("dashboard.people"), body: t("dashboard.peopleBody") },
   ];
+  const setUp = steps.every((step) => step.done);
+
+  const latest = runs[0]?.period ?? null;
+  const latestRuns = runs.filter((r) => r.period === latest);
+  const month = latest ? monthLabel(i18n, latest) : "";
+  const net = latest
+    ? await prisma.payrollResult.aggregate({ where: { runId: { in: latestRuns.map((r) => r.id) } }, _sum: { netCents: true } })
+    : null;
+
+  const attention = [
+    ...runs
+      .filter((r) => r.status === "DRAFT")
+      .map((r) => {
+        const what = { outlet: r.branch.code, month: monthLabel(i18n, r.period) };
+        const count = flaggedBy.get(r.id) ?? 0;
+        return { href: `/app/payroll/${r.id}`, text: count > 0 ? tp("dashboard.attention.run", count, what) : t("dashboard.attention.draft", what) };
+      }),
+    ...unmatched.map((u) => ({ href: `/app/penalties?month=${u.period}`, text: tp("dashboard.attention.penalties", u._count._all, { month: monthLabel(i18n, u.period) }) })),
+  ].slice(0, MAX_ATTENTION);
 
   return (
     <div className={ui.page}>
       <header>
         <h1 className={ui.title}>{t("dashboard.title")}</h1>
-        <p className={ui.subtitle}>{t("dashboard.intro")}</p>
+        {!setUp && <p className={ui.subtitle}>{t("dashboard.intro")}</p>}
       </header>
-      <ol className={styles.steps}>
-        {steps.map((step) => (
-          <li key={step.href} className={ui.card}>
-            <span className={styles.step}>
-              {step.done ? (
-                <CheckCircle2 className={styles.done} size={22} aria-label={t("dashboard.done")} />
-              ) : (
-                <Circle className={styles.todo} size={22} aria-label={t("dashboard.todo")} />
-              )}
-              <span className={styles.text}>
-                <Link href={step.href} className={styles.title}>
-                  {step.title}
-                </Link>
-                <span className={ui.help}>{step.body}</span>
+
+      {latest && (
+        <section className={ui.stack} aria-labelledby="latest-title">
+          <h2 id="latest-title" className={ui.cardTitle}>
+            {t("dashboard.latest", { month })}
+          </h2>
+          <div className={styles.metrics}>
+            <MetricCard label={t("dashboard.net")} value={(net?._sum.netCents ?? 0) / 100} prefix={RM} decimals={2} locale={i18n.tag} context={month} />
+            <MetricCard label={t("dashboard.dispatchers")} value={latestRuns.reduce((n, r) => n + r._count.results, 0)} locale={i18n.tag} context={month} />
+            <MetricCard label={t("dashboard.parcels")} value={latestRuns.reduce((n, r) => n + r.parcelCount, 0)} locale={i18n.tag} context={month} />
+            <MetricCard
+              label={t("dashboard.finalised")}
+              value={latestRuns.filter((r) => r.status === "FINAL").length}
+              locale={i18n.tag}
+              context={t("dashboard.ofOutlets", { count: latestRuns.length })}
+            />
+          </div>
+        </section>
+      )}
+
+      {runs.length > 0 && (
+        <section className={ui.card} aria-labelledby="attention-title">
+          <h2 id="attention-title" className={ui.cardTitle}>
+            {t("dashboard.attention")}
+          </h2>
+          {attention.length === 0 ? (
+            <p className={ui.muted}>{t("dashboard.allClear")}</p>
+          ) : (
+            <ul className={ui.list}>
+              {attention.map((a) => (
+                <li key={a.href}>
+                  <Link href={a.href} className={ui.link}>
+                    {a.text}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {!setUp && (
+        <ol className={styles.steps}>
+          {steps.map((step) => (
+            <li key={step.href} className={ui.card}>
+              <span className={styles.step}>
+                {step.done ? (
+                  <CheckCircle2 className={styles.done} size={22} aria-label={t("dashboard.done")} />
+                ) : (
+                  <Circle className={styles.todo} size={22} aria-label={t("dashboard.todo")} />
+                )}
+                <span className={styles.text}>
+                  <Link href={step.href} className={styles.title}>
+                    {step.title}
+                  </Link>
+                  <span className={ui.help}>{step.body}</span>
+                </span>
               </span>
-            </span>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
     </div>
   );
 }

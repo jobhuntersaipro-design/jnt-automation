@@ -279,6 +279,7 @@ function Decide({ item, options }: { item: PenaltyItemView; options: { value: st
         onValueChange={setDispatcherId}
         placeholder={t("penalties.pick")}
         emptyMessage={t("penalties.noPeople")}
+        clearLabel={t("common.clear")}
       />
       <div className={ui.row}>
         <Button onClick={save} loading={saving} disabled={!dispatcherId || dispatcherId === item.dispatcher?.id}>

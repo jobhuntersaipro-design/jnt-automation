@@ -1,6 +1,7 @@
 import type { I18n } from "@/lib/i18n/core";
 import { boundRanges, EMPLOYMENTS, penaltyTypeOf, VEHICLES, type Employment, type PenaltyType, type RuleConfig, type Unit, type Vehicle } from "@/lib/v2/pay/config";
 import { periodMonth, periodYear, type Period } from "@/lib/v2/pay/resolve";
+import type { Warning } from "@/lib/v2/payroll/calc";
 
 export const monthLabel = (i18n: I18n, p: Period) => i18n.month(periodYear(p), periodMonth(p));
 
@@ -35,6 +36,14 @@ export function rangeLabels(i18n: I18n, bounds: (number | null)[], kind: "count"
     if (i === 0) return i18n.t(kind === "count" ? "rule.countUpTo" : "rule.kgUpTo", { to: fmt(to) });
     return i18n.t(kind === "count" ? "rule.countRange" : "rule.kgRange", { from: fmt(from), to: fmt(to) });
   });
+}
+
+/** Why a dispatcher isn't (fully) paid, in words. */
+export function warningText(i18n: I18n, w: Warning): string {
+  if (w.code === "noProfile") return i18n.t("run.warn.noProfile");
+  if (w.code === "noParcelRule") return i18n.t("run.warn.noParcelRule");
+  if (w.code === "noPenaltyAmount") return i18n.tp("run.warn.noPenaltyAmount", w.count, { type: penaltyLabel(i18n, w.type) });
+  return i18n.t("run.warn.noRates", { rule: w.rule, kind: i18n.t(`kind.${w.kind}`) });
 }
 
 /** Short facts about a config for list cards. */

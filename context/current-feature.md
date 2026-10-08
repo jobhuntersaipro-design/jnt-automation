@@ -2,9 +2,9 @@
 
 ## Status
 
-In progress: EasyStaff v2. Phases 0 to 3 done: account routing, Arc UI foundation, pay rules,
-payroll calculation, penalty import. Phase 1 designs (`/app/design`) and the Phase 2/3 screens await
-review. Phases 4 and 5 in progress.
+In progress: EasyStaff v2. Phases 0 to 4 done: account routing, Arc UI foundation, pay rules,
+payroll calculation, penalty import, bilingual payslips and account settings. Phase 1 designs
+(`/app/design`) and the Phase 2 to 4 screens await review. Phase 5 in progress.
 
 ## Goals
 
@@ -43,7 +43,11 @@ EasyStaff tokens, 中文/English toggle, i18n, v2 sign-in, payroll table, design
   the same file again updates instead of double-counting. Manual matches and ignores are
   remembered per person (`PenaltyAlias`) and apply to later files.
 
-**Next:** Phase 4 (bilingual payslip), Phase 5 (reconciliation against the client's own sheet).
+**Phase 4 (done, review pending): bilingual payslips, settings, dashboard.** See History.
+- Payslips are an HTML print view (A4, one per page) rather than a PDF file: the browser prints
+  or saves them as PDF, and Chinese needs no embedded font. Every label is 中文 then English.
+
+**Next:** Phase 5 (reconciliation against the client's own sheet, go-live gates).
 
 ## Notes
 
@@ -53,13 +57,15 @@ EasyStaff tokens, 中文/English toggle, i18n, v2 sign-in, payroll table, design
 - v2 URLs are `/app/*` (customers never see "v2").
 - Not done here (needs prod access): Neon backup branch + v1 golden-master baseline.
   This change touches no v1 calculation code.
-- Gaps before v2 ships: v2 accounts can't reach v1's Settings (profile, password, plan and
-  billing) because v1 pages send them to `/app`; a dispatcher who moves outlets gets a second
-  record (no cross-outlet matching in v2 yet).
+- Gaps before v2 ships: a dispatcher who moves outlets gets a second record (no cross-outlet
+  matching in v2 yet); after paying an invoice online, Billplz returns to v1's `/settings`, which
+  sends a v2 account to `/app` (the payment is still recorded by the callback).
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-10-08: **EasyStaff v2 Phase 4: bilingual payslips, account settings, dashboard, zh complete**. Completed, pending review. **Payslips** `/app/payslips/[runId]` (all of a run) and `?d=<result>` (one dispatcher), linked from the run header and each breakdown; outside the app shell so only payslips print. Every label 中文 then English whatever the UI language (shown once when both are the same, e.g. KPI): company name, registration no. and address, month, name, J&T ID, outlet, parcels, vehicle and type; earnings and deductions tables (item, qty, rate, amount) with each rule's tiers and bands, penalty lines with each case (date, waybill, reason; the file's amount when that's what is deducted); totals, net pay, stamp; drafts say so. Print CSS: A4, one dispatcher per page (32 dispatchers → a 32-page PDF from the browser). Server-rendered from the run's stored lines and penalty snapshot, so a finalised run's payslips never change. **Settings** `/app/settings` (account menu → Settings): company name, registration no. and address for payslips (v2 action on the account being viewed, so an admin viewing as a client can fill them in); stamp upload/replace/remove, password change and plan & billing (outlet limit with confirm, monthly price, trial/next invoice, invoices with PDF and Pay now) for the signed-in account only, through the shared account APIs (`/api/settings/stamp`, `/api/settings/plan`, invoices) and a v2 password action with translated errors; hidden with a notice while viewing as someone else. **Dashboard** `/app`: latest month (net pay, dispatchers paid, parcels, outlets finalised of N), a "needs attention" list (draft runs, flagged dispatchers, unmatched penalty cases, each linking there), and the setup checklist until it's done. **zh**: all 703 keys translated (the 17 identical are brand names, KPI/SC codes and number formats); Arc combobox gets a `clearLabel` prop (was fixed English; listed in `scripts/arc-add.mjs`); `warningText` moved to `labels.ts` for reuse. **Verified** with Playwright on local Postgres: dashboard totals for Nov 2026 and its draft; settings: company saved and shown on payslips, wrong current password refused in words, password changed and changed back, outlet limit 3 → 4 with the RM 600 prompt; payslips: 32 on screen, Ahmad Faiz 1's slip line by line (rate card by band, KPI tiers, fake-attempt ladder RM 10 + 10 + 20 with its three cases, net RM 47.10), print-to-PDF 32 pages; one dispatcher's payslip from the breakdown; Chinese UI with payslips still bilingual; viewing as the account shows only company details plus the notice; no horizontal scroll at 375 on dashboard, settings, penalties and payslips. 612/612 vitest, lint clean on v2 code, build clean.
 
 - 2026-10-08: **EasyStaff v2 Phase 3: penalty import, matching, unmatched queue**. Completed, pending review. **Schema** (additive; migration `20261011_v2_penalties`): `PayRuleKind.PENALTY`, enums `PenaltyType` (fake attempt, fake POP, PDNC, inactive, POD, COD late, COD issue, lost, late arrival, other) and `PenaltyStatus`; models `PenaltyImport`, `PenaltyItem` (unique on agent + month + type + key), `PenaltyAlias`; `PayrollResult.penalties` (the cases deducted, kept with the run). **Parser** (`src/lib/v2/penalties/parse.ts`, pure, +30 tests on synthetic sheets): each sheet's type from its name, title rows, headers or the file name (English, Chinese, Malay words), and a sheet named by an outlet code listing people (no waybills) reads as the per-outlet inactive report; header row and columns found by header words; dates (`2026-10-03 14:22`, day-first `3/10/2026`, `2026年10月3日`, Excel serials) and amounts (`RM 1,200.50`, negatives, brackets); totals and repeated header rows skipped; an accepted appeal waives the case. Keys: the waybill, else outlet + J&T ID or name + day, with #2/#3 for repeats, so the same file gives the same keys. **Matching** (`match.ts`): a remembered decision, then the J&T ID (using the outlet when an ID is at two), then a name only one dispatcher has; anything else waits in the queue. **Import** `POST /api/v2/penalties` (multipart, 403 for v1/signed out; action bodies stop at 1 MB, so a route): without a plan it returns the sheets for the preview; with the month and per-sheet plan it upserts by key, keeps hand-set waives, and logs the import. **Screen** `/app/penalties` (nav "Penalties"): upload → per-sheet type, header row, column mapping, first cases and month (detected from the dates) → import; summary (cases, charged at file amounts, need a dispatcher, waived), the unmatched queue (match to a dispatcher via search, or ignore, e.g. a hub's ID; applies to every case naming that person, now and later), by-type table, all cases (search, CSV) with a case dialog (details, change dispatcher, ignore, undo, waive / charge again), files imported for the month with remove (drops the cases that file added). **Pay**: matched, unwaived cases go into the run in the order they happened, after the parcels (weight 0), so a penalty rule can escalate with repeat cases; each penalty type picks its own rule (dispatcher > outlet > FT/PT > everyone); a type without a rule is deducted at the file's amounts, and cases without an amount and without a rule are flagged (blocks finalising). Penalty audit actions make drafts stale. The run's breakdown lists each case under its line. Rule editor: penalty rules count cases (no weight bands), the simulator takes a number of cases. Dispatcher detail shows one penalty rule per type. **Verified** on local Postgres 16 + Playwright against a synthetic workbook (5 sheets: English fake-attempt sheet under a title with a totals row, Chinese PDNC sheet with appeals, an outlet-named inactive sheet, a lost-parcel sheet without amounts, a notes sheet): types and columns detected, notes skipped, month detected (Nov 2026), 10 cases imported, 1 (ID HUB) in the queue → ignored; the same file again → "0 new, 0 updated, 10 already imported"; the November draft goes stale, then deducts RM 150 for three fake attempts at file amounts and flags the lost parcel (finalise blocked); a "Fake attempt ladder" rule (RM 10 for the first two, RM 20 after) → RM 40 for the same three, and a lost-parcel rule clears the flag; waiving a case → stale → its deduction goes. Chinese, no horizontal scroll at 375, no console errors. Isolation: signed out and v1 get 403 from the route, v1 is sent to `/dashboard`, a second v2 account sees none of it. 612/612 vitest (+33), lint clean on v2 code, build clean.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { DropdownMenu } from "@/components/arc/dropdown-menu/dropdown-menu";
 import { Button } from "@/components/arc/button/button";
@@ -24,10 +24,19 @@ export function NavLinks({ items }: { items: { href: string; label: string }[] }
 
 export function AccountMenu({ name }: { name: string }) {
   const { t } = useI18n();
+  const router = useRouter();
   // First name only, so a long name never crowds the mobile header.
   const label = name.split(/\s+/)[0] || name;
   // next-auth/react signs out with a full page load, so no v2 styles carry over to the next page.
-  return <DropdownMenu label={label} items={[{ label: t("user.signOut"), onSelect: () => signOut({ callbackUrl: "/app/login" }) }]} />;
+  return (
+    <DropdownMenu
+      label={label}
+      items={[
+        { label: t("user.settings"), onSelect: () => router.push("/app/settings") },
+        { label: t("user.signOut"), onSelect: () => signOut({ callbackUrl: "/app/login" }) },
+      ]}
+    />
+  );
 }
 
 /** Shown to a superadmin viewing as a v2 account. */

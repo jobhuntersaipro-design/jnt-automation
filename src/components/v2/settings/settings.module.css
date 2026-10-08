@@ -1,0 +1,28 @@
+/* v2 settings. Tokens only. */
+
+.stamp {
+  width: 9rem;
+  height: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  background: var(--surface-muted);
+}
+
+.plan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-6);
+}
+
+.price {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.invoice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}

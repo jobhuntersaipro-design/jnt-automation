@@ -14,6 +14,7 @@
 // - metric-card/metric-card.tsx: prefix, decimals and locale passed to AnimatedCounter (RM amounts).
 // - dialog/dialog.tsx: closeLabel prop (was a fixed English aria-label).
 // - number-field/number-field.tsx: stepMessages prop (was fixed English Increase/Decrease).
+// - combobox/combobox.tsx: clearLabel prop (was a fixed English aria-label).
 // - calendar/calendar.tsx: eslint-disable for react-hooks/preserve-manual-memoization on `weeks`.
 import fs from "node:fs";
 import path from "node:path";

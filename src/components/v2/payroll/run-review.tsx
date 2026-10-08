@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, FileText, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
@@ -13,26 +13,18 @@ import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { DataTable, type Column } from "@/components/v2/data-table/data-table";
 import { useI18n } from "@/components/v2/i18n-provider";
-import type { I18n } from "@/lib/i18n/core";
 import type { Group } from "@/lib/v2/pay/engine";
 import { periodToInput } from "@/lib/v2/pay/resolve";
 import { deleteRun, finalise, recalculateRun } from "@/lib/v2/payroll/actions";
-import type { PayLine, PenaltyCase, Warning } from "@/lib/v2/payroll/calc";
+import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import { setProfiles } from "@/lib/v2/people/actions";
-import { monthLabel, penaltyLabel, PROFILES, profileLabel, rangeLabels } from "../labels";
+import { monthLabel, penaltyLabel, PROFILES, profileLabel, rangeLabels, warningText } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./payroll.module.css";
 
 const RM = "RM ";
 const DATE_TIME: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" };
-
-function warningText(i18n: I18n, w: Warning): string {
-  if (w.code === "noProfile") return i18n.t("run.warn.noProfile");
-  if (w.code === "noParcelRule") return i18n.t("run.warn.noParcelRule");
-  if (w.code === "noPenaltyAmount") return i18n.tp("run.warn.noPenaltyAmount", w.count, { type: penaltyLabel(i18n, w.type) });
-  return i18n.t("run.warn.noRates", { rule: w.rule, kind: i18n.t(`kind.${w.kind}`) });
-}
 
 type Row = { id: string; name: string; extId: string; profile: string; parcels: number; earnings: number; deductions: number; net: number; status: string };
 
@@ -100,50 +92,56 @@ export function RunReview({ run }: { run: RunView }) {
               : t("run.file", { file: run.fileName, when: run.calculatedAt ? i18n.date(new Date(run.calculatedAt), DATE_TIME) : "—" })}
           </p>
         </div>
-        {draft && (
-          <div className={ui.row}>
-            <Button variant="secondary" onClick={recalculate} loading={busy}>
-              <RefreshCw size={16} aria-hidden="true" />
-              {t("run.recalculate")}
-            </Button>
-            <ConfirmMorph
-              label={t("run.finalise")}
-              prompt={t("run.lockPrompt")}
-              confirmLabel={t("run.finalise")}
-              cancelLabel={t("common.cancel")}
-              pendingLabel={t("common.loading")}
-              doneLabel={t("run.finalised")}
-              errorLabel={t("common.failed")}
-              retryLabel={t("common.retry")}
-              onConfirm={async () => {
-                const r = await finalise({ runId: run.id });
-                if (!r.ok) {
-                  toast.error(t(r.error, r.vars));
-                  throw new Error(r.error);
-                }
-                router.refresh();
-              }}
-            />
-            <ConfirmMorph
-              label={t("run.delete")}
-              prompt={t("run.deletePrompt")}
-              confirmLabel={t("run.delete")}
-              cancelLabel={t("common.cancel")}
-              pendingLabel={t("common.loading")}
-              doneLabel={t("run.deleted")}
-              errorLabel={t("common.failed")}
-              retryLabel={t("common.retry")}
-              onConfirm={async () => {
-                const r = await deleteRun({ runId: run.id });
-                if (!r.ok) {
-                  toast.error(t(r.error, r.vars));
-                  throw new Error(r.error);
-                }
-                router.push("/app/payroll");
-              }}
-            />
-          </div>
-        )}
+        <div className={ui.row}>
+          <Button variant="secondary" onClick={() => router.push(`/app/payslips/${run.id}`)}>
+            <FileText size={16} aria-hidden="true" />
+            {t("run.payslips")}
+          </Button>
+          {draft && (
+            <>
+              <Button variant="secondary" onClick={recalculate} loading={busy}>
+                <RefreshCw size={16} aria-hidden="true" />
+                {t("run.recalculate")}
+              </Button>
+              <ConfirmMorph
+                label={t("run.finalise")}
+                prompt={t("run.lockPrompt")}
+                confirmLabel={t("run.finalise")}
+                cancelLabel={t("common.cancel")}
+                pendingLabel={t("common.loading")}
+                doneLabel={t("run.finalised")}
+                errorLabel={t("common.failed")}
+                retryLabel={t("common.retry")}
+                onConfirm={async () => {
+                  const r = await finalise({ runId: run.id });
+                  if (!r.ok) {
+                    toast.error(t(r.error, r.vars));
+                    throw new Error(r.error);
+                  }
+                  router.refresh();
+                }}
+              />
+              <ConfirmMorph
+                label={t("run.delete")}
+                prompt={t("run.deletePrompt")}
+                confirmLabel={t("run.delete")}
+                cancelLabel={t("common.cancel")}
+                pendingLabel={t("common.loading")}
+                doneLabel={t("run.deleted")}
+                errorLabel={t("common.failed")}
+                retryLabel={t("common.retry")}
+                onConfirm={async () => {
+                  const r = await deleteRun({ runId: run.id });
+                  if (!r.ok) {
+                    toast.error(t(r.error, r.vars));
+                    throw new Error(r.error);
+                  }
+                  router.push("/app/payroll");
+                }}
+              />
+            </>
+          )}
+        </div>
       </header>
 
       {draft && run.stale && <Alert tone="info" title={t("run.stale")} />}
@@ -279,6 +277,12 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
                 );
               })
             )}
+            <div>
+              <Button variant="secondary" size="sm" onClick={() => router.push(`/app/payslips/${run.id}?d=${result.id}`)}>
+                <FileText size={16} aria-hidden="true" />
+                {t("run.payslip")}
+              </Button>
+            </div>
             <dl className={styles.totals}>
               <div>
                 <dt>{t("run.total.earnings")}</dt>
