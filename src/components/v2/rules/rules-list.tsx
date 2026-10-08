@@ -6,9 +6,7 @@ import { useState } from "react";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Input } from "@/components/arc/input/input";
-import { Select } from "@/components/arc/select/select";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { KINDS, type Kind } from "@/lib/v2/pay/config";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
@@ -21,8 +19,6 @@ import styles from "./rules.module.css";
 export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: Period }) {
   const i18n = useI18n();
   const { t } = i18n;
-  const kinds = KINDS.filter((k) => rules.some((r) => r.kind === k));
-
   return (
     <div className={ui.page}>
       <header className={ui.pageHeader}>
@@ -30,14 +26,9 @@ export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: 
           <h1 className={ui.title}>{t("rules.title")}</h1>
           <p className={ui.subtitle}>{t("rules.subtitle")}</p>
         </div>
-        <NewRuleDialog thisMonth={thisMonth} />
       </header>
 
-      {rules.length === 0 && (
-        <EmptyState title={t("rules.emptyTitle")} description={t("rules.emptyBody")} action={<NewRuleDialog thisMonth={thisMonth} kind="PARCEL" />} />
-      )}
-
-      {kinds.map((kind) => (
+      {KINDS.map((kind) => (
         <section key={kind} className={ui.stack} aria-labelledby={`kind-${kind}`}>
           <div>
             <h2 id={`kind-${kind}`} className={ui.cardTitle}>
@@ -46,6 +37,14 @@ export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: 
             <p className={ui.help}>{t(`kind.${kind}.help`)}</p>
           </div>
           <div className={ui.grid}>
+            {!rules.some((r) => r.kind === kind) && (
+              <div className={styles.ruleCard}>
+                <Badge size="sm" tone="warning" className={styles.fit}>
+                  {t("rules.notSet")}
+                </Badge>
+                <NewRuleDialog thisMonth={thisMonth} kind={kind} />
+              </div>
+            )}
             {rules
               .filter((r) => r.kind === kind)
               .map((rule) => (
@@ -81,11 +80,10 @@ export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: 
   );
 }
 
-function NewRuleDialog({ thisMonth, kind: initialKind }: { thisMonth: Period; kind?: Kind }) {
+function NewRuleDialog({ thisMonth, kind }: { thisMonth: Period; kind: Kind }) {
   const { t } = useI18n();
   const router = useRouter();
-  const [kind, setKind] = useState<Kind>(initialKind ?? "PARCEL");
-  const [name, setName] = useState("");
+  const [name, setName] = useState(t(`kind.${kind}`));
   const [month, setMonth] = useState(periodToInput(thisMonth));
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -104,17 +102,10 @@ function NewRuleDialog({ thisMonth, kind: initialKind }: { thisMonth: Period; ki
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>{initialKind ? t("rules.emptyAction") : t("rules.new")}</Button>
+        <Button className={styles.fit}>{t("rules.setUp")}</Button>
       </DialogTrigger>
-      <DialogContent title={t("rules.newTitle")} description={t("rules.newHelp")} closeLabel={t("common.close")}>
+      <DialogContent title={t(`kind.${kind}`)} description={t("rules.newHelp")} closeLabel={t("common.close")}>
         <form className={ui.stack} onSubmit={create}>
-          <Select
-            label={t("rules.kind")}
-            value={kind}
-            onValueChange={(v) => setKind(v as Kind)}
-            description={t(`kind.${kind}.help`)}
-            options={KINDS.map((k) => ({ value: k, label: t(`kind.${k}`) }))}
-          />
           <Input label={t("rules.name")} value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required />
           <label className={ui.field}>
             <span className={ui.label}>{t("rules.from")}</span>
