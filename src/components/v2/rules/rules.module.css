@@ -170,3 +170,22 @@
   margin: 0;
   font-weight: 500;
 }
+
+/* Rule types, three across on wide screens. */
+.kindGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-8) var(--space-6);
+}
+
+@media (max-width: 64rem) {
+  .kindGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 40rem) {
+  .kindGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

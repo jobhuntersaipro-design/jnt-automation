@@ -221,7 +221,7 @@ export const zh: Partial<Record<MessageKey, string>> = {
   "rules.from": "生效月份",
   "rules.create": "创建",
   "rules.notSet": "尚未设置",
-  "rules.setUp": "设置",
+  "rules.add": "添加",
   "rules.fromMonth": "{month}起",
   "rules.notApplied": "尚未适用于任何人",
   "rules.tierCount.one": "{count} 个数量档（{basis}）",
