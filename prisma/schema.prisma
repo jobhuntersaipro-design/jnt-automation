@@ -9,6 +9,11 @@ datasource db {
 
 // ─── Auth & Tenancy ───────────────────────────────────────────
 
+enum UiVersion {
+  V1
+  V2
+}
+
 model Agent {
   id           String         @id @default(cuid())
   email        String         @unique
@@ -18,6 +23,9 @@ model Agent {
   isSuperAdmin Boolean        @default(false)
   maxBranches  Int            @default(1)
   onlinePayment Boolean  @default(false) // admin opt-in: auto invoices + Billplz Pay now
+  // Which app the account uses. V1 is frozen; V2 is the config-driven payroll.
+  // Default flips to V2 once v2 has screens to land on.
+  uiVersion    UiVersion      @default(V1)
   // Onboarding tour. False only for agents created after the onboarding
   // migration — gates the first-sign-in demo seed + auto-started tour.
   hasSeenTutorial Boolean     @default(false)

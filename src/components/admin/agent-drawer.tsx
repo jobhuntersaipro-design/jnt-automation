@@ -16,6 +16,7 @@ import {
   monthBill,
   trialInfo,
 } from "./admin-shared";
+import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 
 export interface BillingActions {
   markPaid: (agent: AdminAgent, ym: YearMonth, paid: boolean) => void;
@@ -95,6 +96,8 @@ export function AgentDrawer({
               />
             </div>
           </section>
+
+          {!agent.isSuperAdmin && <UiVersionToggle agent={agent} onUpdate={onUpdate} />}
 
           {!agent.isSuperAdmin && (
             <section className="flex flex-col gap-2">
@@ -478,22 +481,83 @@ function OnlinePaymentToggle({ agent, onUpdate }: { agent: AdminAgent; onUpdate:
   }
 
   return (
+    <SwitchRow
+      label="Online payment"
+      hint={
+        on
+          ? "Invoices and due-date reminders are emailed automatically, with a Pay now link. Pay now shows in their Settings."
+          : "Off — no automatic invoices or Pay now. Send invoices manually below."
+      }
+      on={on}
+      disabled={saving}
+      onClick={toggle}
+    />
+  );
+}
+
+/** Which app the account signs in to. v2 accounts are locked out of v1 pages and vice versa. */
+function UiVersionToggle({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Partial<AdminAgent>) => void }) {
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
+  const on = agent.uiVersion === "V2";
+  const next = on ? "V1" : "V2";
+  const who = agent.name || agent.email;
+
+  async function save() {
+    const res = await fetch(`/api/admin/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ uiVersion: next }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(data.error || "Couldn't change app version");
+      return false;
+    }
+    onUpdate({ uiVersion: data.uiVersion });
+    toast.success(`${who} now uses ${data.uiVersion === "V2" ? "v2" : "v1"}`);
+  }
+
+  return (
+    <>
+      <SwitchRow
+        label="New payroll (v2)"
+        hint={
+          on
+            ? "Signs in to the v2 app. v1 pages are blocked; their v1 data is kept."
+            : "Uses the current app (v1)."
+        }
+        on={on}
+        disabled={Boolean(confirm)}
+        onClick={() =>
+          setConfirm({
+            title: on ? `Move ${who} back to v1?` : `Move ${who} to v2?`,
+            body: on
+              ? "They'll sign in to the current app again. Nothing is deleted."
+              : "They'll sign in to the v2 app from their next page load and can no longer open v1 pages. Their v1 data is kept, and you can switch back.",
+            confirmLabel: on ? "Move to v1" : "Move to v2",
+            onConfirm: save,
+          })
+        }
+      />
+      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
+    </>
+  );
+}
+
+function SwitchRow({ label, hint, on, disabled, onClick }: { label: string; hint: string; on: boolean; disabled: boolean; onClick: () => void }) {
+  return (
     <div className="flex items-start justify-between gap-3 p-3 rounded-md bg-surface-low">
       <div className="min-w-0">
-        <p className="text-[0.8rem] font-medium text-on-surface">Online payment</p>
-        <p className="text-[0.72rem] text-on-surface-variant">
-          {on
-            ? "Invoices and due-date reminders are emailed automatically, with a Pay now link. Pay now shows in their Settings."
-            : "Off — no automatic invoices or Pay now. Send invoices manually below."}
-        </p>
+        <p className="text-[0.8rem] font-medium text-on-surface">{label}</p>
+        <p className="text-[0.72rem] text-on-surface-variant">{hint}</p>
       </div>
       <button
         type="button"
-        onClick={toggle}
-        disabled={saving}
+        onClick={onClick}
+        disabled={disabled}
         role="switch"
         aria-checked={on}
-        aria-label="Online payment"
+        aria-label={label}
         className="relative w-9 h-5 mt-0.5 rounded-full transition-colors shrink-0 disabled:opacity-50"
         style={{ backgroundColor: on ? "#12B981" : "rgba(195, 198, 214, 0.4)" }}
       >

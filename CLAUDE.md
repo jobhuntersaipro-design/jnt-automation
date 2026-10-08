@@ -1,6 +1,20 @@
 # EasyStaff
 
-A developer knowledge hub for snippets, commands, prompts, notes, files, images, links and custom types.
+Payroll for J&T Express dispatcher agents: upload the monthly J&T delivery Excel, get net salaries per dispatcher, plus staff payroll, payslips and billing.
+
+## v1 / v2
+
+Each account picks one app via `Agent.uiVersion` (set by the superadmin in Admin → Manage):
+
+- **v1**: `src/app/(dashboard)` and the existing `/api/*` routes. Frozen: no feature or calculation changes, critical bug fixes only.
+- **v2**: `src/app/app` (`/app/*`), the config-driven payroll. Every v2 page and API route gates on `getV2Agent()` (`src/lib/ui-version.ts`); API routes return 403 when it is null.
+
+Rules:
+
+- Never change v1 code paths for v2 work. Shared code (auth, admin, Prisma client) changes additively only.
+- Migrations are additive only: new tables and nullable or defaulted columns. No renames, drops or type changes on tables v1 uses.
+- Every v2 query is scoped by `agentId`.
+- Never commit client files (payroll sheets, penalty files, rate cards) or client pricing; use synthetic fixtures.
 
 ## Context Files
 

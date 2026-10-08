@@ -2,40 +2,33 @@
 
 ## Status
 
-In progress — P0 shipped, P1–P3 pending approval
+In progress: EasyStaff v2, Phase 0 (account routing) done. Phase 1+ pending.
 
 ## Goals
 
-Make the whole site mobile-friendly. Spec: `context/features/mobile-responsive-overhaul-spec.md`.
-Branch: `feature/mobile-responsive-p0`.
+EasyStaff v2: a second, config-driven payroll app for new accounts, with v1 frozen for
+existing ones. Spec: ClickUp "SPEC: EasyStaff v2" (not copied here; it holds client pricing).
 
-**P0 (done, verified at 375x812):**
-- Shell switched from `h-screen overflow-hidden` to `min-h-dvh` + natural document
-  scroll below `lg`; fixed shell retained from `lg` up.
-- All 38 sub-16px `<input>` sites raised to 16px on mobile (kills iOS zoom-on-focus).
-- Three non-wrapping filter toolbars now wrap (Overview, Staff Payroll, Staff Settings).
-- Overview + Staff summary-card figures made fluid so they no longer clip mid-digit.
+**Phase 0 (done):** `Agent.uiVersion` (V1/V2), routing and guards. See History.
 
-**P1–P3 (not started):** wide tables to card layout, touch targets, polish.
+**Next:** Phase 1 (v2 shell, tokens, 中文/English toggle), Phase 2 (rate cards + tier
+engine + payroll calc), Phase 3 (penalty import), Phase 4 (bilingual payslip), Phase 5
+(reconciliation against the client's own sheet).
 
 ## Notes
 
-Measured before/after at 375px, logged in:
-
-| Metric | Before | After |
-|---|---|---|
-| Routes with horizontal page scroll | 3 (436 / 584 / 822 px) | 0 |
-| `document.scrollWidth` at 375px | up to 822px | 375px on every route |
-| Sub-16px inputs, Staff Payroll | 274 / 274 | 0 / 274 |
-| Sub-16px inputs, all routes | 38 sites | 0 |
-| Document scrollable on mobile | no (inner scroller only) | yes, header stays pinned |
-
-Dev server was restarted during this work (it had been serving a stale bundle that
-masked the input-font fix). `.next/cache` cleared.
+- Default stays V1 until v2 has real screens; otherwise every new signup (auto-approved,
+  demo data, tour, all v1) lands on an empty app. Flip `@default(V2)` in one migration
+  when v2 ships. Until then the superadmin moves accounts to v2 in Admin → Manage.
+- v2 URLs are `/app/*` (customers never see "v2").
+- Not done here (needs prod access): Neon backup branch + v1 golden-master baseline.
+  This change touches no v1 calculation code.
 
 ## History
 
 > Sorted from latest to earliest.
+
+- 2026-10-08: **EasyStaff v2 Phase 0: per-account app version (v1/v2) + routing guards**. Completed. New `enum UiVersion { V1 V2 }` + `Agent.uiVersion @default(V1)` (migration `20261008_agent_ui_version`, additive; every existing account stays V1 with no backfill). New `getV2Agent()` (`src/lib/ui-version.ts`, +5 vitest): the effective (impersonation-aware) agent only if it's on V2; v2 pages redirect and future v2 API routes 403 on null. **v1 side**: the dashboard layout already loads the effective agent, so it now also selects `uiVersion` and redirects V2 accounts to `/app`. That one line covers login (both providers land on `/dashboard`), `/`, the auth layout and every v1 page incl. `/admin`. **v2 side**: new `/app` route (`src/app/app/{layout,page}.tsx`): auth + approval + `getV2Agent()` else back to `/dashboard`; minimal header (logo, sign out, impersonation banner) and a placeholder page; `/app/:path*` added to the proxy matcher. **Admin**: Manage drawer has a "New payroll (v2)" switch (hidden for superadmins so the admin can't lock themselves out of `/admin`), behind `ConfirmDialog`; PATCH `/api/admin/agents/[id]` accepts `uiVersion` (zod enum). The switch markup is shared with Online payment (`SwitchRow`). `CLAUDE.md` now describes EasyStaff and the v1/v2 rules (was a stale "developer knowledge hub" blurb). **Verified** on local Postgres 16 + production build with Playwright (25/25): v1 login → `/dashboard`, v1 → `/app` bounced; v2 login → `/app`, v2 → `/dashboard` `/dispatchers` `/staff` `/settings` `/branches` `/admin` `/` all bounced to `/app`; signed-out `/app` → login; v2 sign out; admin switch cancel keeps V1, confirm flips; impersonating a V2 account lands on `/app` with the banner, Exit returns to `/admin`; PATCH rejects `V3` (400), non-admin PATCH 401; `/app` at 375px has no horizontal scroll. 437/437 vitest, build clean. **Prod follow-up**: Vercel build runs `prisma migrate deploy`; nothing else needed (all accounts stay V1).
 
 - 2026-10-07: **Fix: large uploads killed for running out of memory** — Completed. Three September uploads (`sep 4602.xlsx`, `sep 350.xlsx`, `NEWDetails…20261007144809.xlsx`) died in `POST /api/upload/detect` with Vercel's "instance was killed because it ran out of available memory" before parsing finished. `sep 4602.xlsx` is 28 MB zipped but 165 MB of sheet XML (194k rows); `parseExcelBuffer` loaded it as a full ExcelJS workbook, which peaks at ~2.5 GB, over the 2 GB function limit. The same parser also runs in the worker (both phases) and on confirm. **Fix** (`src/lib/upload/parser.ts` only): parse with ExcelJS's streaming `WorkbookReader`, keeping only the six used columns per row. Same sheet selection ("sheet1" if it holds data, else the first sheet with a waybill header, else "sheet1"/first sheet), at most three sheets' rows held while streaming. The JSZip duplicate-sheet-name rewrite is gone: the streaming reader builds no workbook model, so "Sheet1" + "sheet1" can't break it. The streaming reader stops early on zips with uncompressed (STORE) entries, which the old loader accepted, so on any failure the parser re-compresses with JSZip and retries once (a non-zip file then fails with JSZip's error, as before). **Verified** on the real file: output byte-identical to the old parser (194,206 rows, branch KUL4602, Sep 2026, 110 dispatchers), same 195 progress callbacks, peak RSS 2,720 MB → ~600 MB, 56 s → 24 s locally. +3 vitest (uncompressed zip, "sheet1" preferred among several data sheets, non-xlsx rejected); 432/432 vitest, build clean. No schema/API change.
 

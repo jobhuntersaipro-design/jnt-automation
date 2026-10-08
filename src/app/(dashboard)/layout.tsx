@@ -33,10 +33,13 @@ export default async function DashboardLayout({
           hasSeenTutorial: true,
           isSuperAdmin: true,
           createdAt: true,
+          uiVersion: true,
           branches: { where: { isDemo: true }, select: { id: true }, take: 1 },
         },
       })
     : null;
+  // v2 accounts never see v1 pages (impersonating admins follow the agent).
+  if (onboarding?.uiVersion === "V2") redirect("/app");
   const hasDemo = (onboarding?.branches.length ?? 0) > 0;
 
   return (
