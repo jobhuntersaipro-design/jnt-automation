@@ -16,9 +16,13 @@ import { configSummary, monthLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 
+// SC and SC-RTN stay in the engine, hidden until the client's J&T file shows how they're marked.
+const SHOWN_KINDS = KINDS.filter((k) => k !== "SC" && k !== "SC_RTN");
+
 export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: Period }) {
   const i18n = useI18n();
   const { t } = i18n;
+  const router = useRouter();
   return (
     <div className={ui.page}>
       <header className={ui.pageHeader}>
@@ -29,60 +33,69 @@ export function RulesList({ rules, thisMonth }: { rules: RuleView[]; thisMonth: 
       </header>
 
       <div className={styles.kindGrid}>
-        {KINDS.map((kind) => (
-          <section key={kind} className={ui.stack} aria-labelledby={`kind-${kind}`}>
-            <div>
-              <div className={styles.cardHead}>
-                <h2 id={`kind-${kind}`} className={ui.cardTitle}>
-                  {t(`kind.${kind}`)}
-                </h2>
-                <NewRuleDialog thisMonth={thisMonth} kind={kind} />
-              </div>
-              <p className={ui.help}>{t(`kind.${kind}.help`)}</p>
-            </div>
-            <div className={ui.stack}>
-              {!rules.some((r) => r.kind === kind) && (
-                <div className={styles.ruleCard}>
-                  <Badge size="sm" tone="warning" className={styles.fit}>
-                    {t("rules.notSet")}
-                  </Badge>
+        {SHOWN_KINDS.map((kind) => {
+          const first = rules.find((r) => r.kind === kind);
+          return (
+            <section key={kind} className={styles.kindSection} aria-labelledby={`kind-${kind}`}>
+              <div>
+                <div className={styles.cardHead}>
+                  <h2 id={`kind-${kind}`} className={ui.cardTitle}>
+                    {t(`kind.${kind}`)}
+                  </h2>
+                  {first ? (
+                    <Button size="sm" variant="secondary" onClick={() => router.push(`/app/rules/${first.id}`)}>
+                      {t("common.edit")}
+                    </Button>
+                  ) : (
+                    <NewRuleDialog thisMonth={thisMonth} kind={kind} />
+                  )}
                 </div>
-              )}
-              {rules
-                .filter((r) => r.kind === kind)
-                .map((rule) => (
-                  <Link key={rule.id} href={`/app/rules/${rule.id}`} className={styles.ruleCard}>
-                    <span className={styles.ruleName}>{rule.name}</span>
-                    <span className={ui.help}>
-                      {t("rules.fromMonth", {
-                        month: monthLabel(i18n, rule.versions[0].effectiveFrom),
-                      })}
-                    </span>
-                    <span className={ui.row}>
-                      {configSummary(i18n, rule.versions[0].config).map((fact) => (
-                        <Badge key={fact} size="sm">
-                          {fact}
-                        </Badge>
-                      ))}
-                    </span>
-                    <span className={ui.row}>
-                      {rule.assignments.length === 0 ? (
-                        <Badge size="sm" tone="warning">
-                          {t("rules.notApplied")}
-                        </Badge>
-                      ) : (
-                        rule.assignments.map((a) => (
-                          <Badge key={a.id} size="sm" tone="info">
-                            {scopeLabel(i18n, a)}
+                <p className={ui.help}>{t(`kind.${kind}.help`)}</p>
+              </div>
+              <div className={styles.kindCards}>
+                {!first && (
+                  <div className={styles.ruleCard}>
+                    <Badge size="sm" tone="warning" className={styles.fit}>
+                      {t("rules.notSet")}
+                    </Badge>
+                  </div>
+                )}
+                {rules
+                  .filter((r) => r.kind === kind)
+                  .map((rule) => (
+                    <Link key={rule.id} href={`/app/rules/${rule.id}`} className={styles.ruleCard}>
+                      <span className={styles.ruleName}>{rule.name}</span>
+                      <span className={ui.help}>
+                        {t("rules.fromMonth", {
+                          month: monthLabel(i18n, rule.versions[0].effectiveFrom),
+                        })}
+                      </span>
+                      <span className={ui.row}>
+                        {configSummary(i18n, rule.versions[0].config).map((fact) => (
+                          <Badge key={fact} size="sm">
+                            {fact}
                           </Badge>
-                        ))
-                      )}
-                    </span>
-                  </Link>
-                ))}
-            </div>
-          </section>
-        ))}
+                        ))}
+                      </span>
+                      <span className={ui.row}>
+                        {rule.assignments.length === 0 ? (
+                          <Badge size="sm" tone="warning">
+                            {t("rules.notApplied")}
+                          </Badge>
+                        ) : (
+                          rule.assignments.map((a) => (
+                            <Badge key={a.id} size="sm" tone="info">
+                              {scopeLabel(i18n, a)}
+                            </Badge>
+                          ))
+                        )}
+                      </span>
+                    </Link>
+                  ))}
+              </div>
+            </section>
+          );
+        })}
       </div>
     </div>
   );
@@ -111,7 +124,7 @@ function NewRuleDialog({ thisMonth, kind }: { thisMonth: Period; kind: Kind }) {
     <Dialog>
       <DialogTrigger asChild>
         <Button size="sm" variant="secondary">
-          {t("rules.add")}
+          {t("common.edit")}
         </Button>
       </DialogTrigger>
       <DialogContent title={t(`kind.${kind}`)} description={t("rules.newHelp")} closeLabel={t("common.close")}>

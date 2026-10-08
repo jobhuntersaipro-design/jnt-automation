@@ -219,7 +219,6 @@ export const en = {
   "rules.from": "Applies from",
   "rules.create": "Create",
   "rules.notSet": "Not set yet",
-  "rules.add": "Add",
   "rules.fromMonth": "From {month}",
   "rules.notApplied": "Not applied to anyone",
   "rules.tierCount.one": "{count} tier ({basis})",

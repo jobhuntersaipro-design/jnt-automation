@@ -178,6 +178,25 @@
   gap: var(--space-8) var(--space-6);
 }
 
+/* Header and cards line up across a row, and cards fill it, so every type is the same size. */
+.kindSection {
+  display: grid;
+  grid-row: span 2;
+  grid-template-rows: subgrid;
+  gap: var(--space-4);
+}
+
+.kindCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.kindCards > * {
+  flex: 1;
+  min-height: 9.5rem;
+}
+
 @media (max-width: 64rem) {
   .kindGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
