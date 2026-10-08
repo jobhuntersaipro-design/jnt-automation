@@ -16,6 +16,12 @@ Rules:
 - Every v2 query is scoped by `agentId`.
 - Never commit client files (payroll sheets, penalty files, rate cards) or client pricing; use synthetic fixtures.
 
+v2 UI:
+
+- Built on Arc UI free components, copied into `src/components/arc`. Add more with `node scripts/arc-add.mjs <item>`, never `npx shadcn add` (it rewrites Arc's Radix code for Base UI). Local edits to Arc files are listed at the top of that script.
+- Style with CSS Modules reading the tokens in `src/components/v2/tokens.css`. No Tailwind and no raw colours in v2; v1's Tailwind scan skips the v2 folders so v2 can't change v1 CSS.
+- Every v2 string goes through `t()` (`src/lib/i18n`, `en.ts` + `zh.ts`; `useI18n()` in client components, `getI18n()` on the server). ESLint rejects JSX text in v2 folders, and a test fails if `zh.ts` misses a key.
+
 ## Context Files
 
 Read the following to get the full context of the project:

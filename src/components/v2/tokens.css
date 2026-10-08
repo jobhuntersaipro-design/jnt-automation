@@ -1,0 +1,65 @@
+/*
+ * EasyStaff v2 tokens. Loaded after Arc's foundation.css by the v2 layout only, so
+ * v1 pages never see them. Arc components and v2 screens read these variables;
+ * nothing in v2 uses a raw colour, size or duration.
+ *
+ * Text colours must clear 4.5:1 on --background, --surface and --surface-muted
+ * (checked in tokens.test.ts).
+ */
+:root {
+  /* Surfaces: a light grey canvas with white cards. */
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #eef0f3;
+
+  /* Text. Darkest is #191c1d, never pure black. */
+  --foreground: #191c1d;
+  --text-secondary: #424654;
+  --text-muted: #585c6b;
+
+  --border: #e2e4e9;
+  --border-subtle: #eceef1;
+  --border-strong: #c3c6d6;
+
+  /* Brand: EasyStaff blue. */
+  --accent: #0056d2;
+  --accent-strong: #00439f;
+  --accent-subtle: rgb(0 86 210 / .1);
+  --accent-foreground: #ffffff;
+  --control-on: #0056d2;
+  --control-fill: #0056d2;
+  --control-thumb-on: #ffffff;
+  --control-glyph: #ffffff;
+
+  /* Status, readable as text on white. */
+  --success: #0b7a4b;
+  --warning: #8a5300;
+  --danger: #b3261e;
+
+  /* Shape: squarer than Arc's default, dense enough for payroll tables. */
+  --radius-control: .5rem;
+  --radius-panel: .75rem;
+  --radius-surface: 1rem;
+
+  /* Type: Manrope headings, Inter body, Simplified Chinese fallbacks. */
+  --font-cjk: "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --font-display: var(--font-manrope), var(--font-cjk);
+  --font-body: var(--font-inter), var(--font-cjk);
+  --tracking-display: -.02em;
+
+  /* Layout */
+  --header-height: 4rem;
+  --page-max-width: 90rem;
+  --page-gutter: var(--space-4);
+}
+
+@media (min-width: 64rem) {
+  :root { --page-gutter: var(--space-10); }
+}
+
+/* iOS Safari zooms into any focused field under 16px and never zooms back out.
+   !important: Arc sets the size on each field's own class, which outranks this. */
+@media (hover: none) and (pointer: coarse) {
+  input, textarea, select { font-size: max(1rem, 16px) !important; }
+}

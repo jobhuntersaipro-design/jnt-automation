@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* v2 (/app) styles itself with CSS Modules and its own tokens. Keep its source out
+   of this scan so v2 code can never change the CSS v1 pages load. */
+@source not "./app";
+@source not "../components/v2";
+@source not "../components/arc";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
