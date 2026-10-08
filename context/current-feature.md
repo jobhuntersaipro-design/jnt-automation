@@ -3,7 +3,7 @@
 ## Status
 
 In progress: EasyStaff v2. Phase 0 (account routing) and Phase 1 (Arc UI foundation) done;
-Phase 1 screen designs await review at `/app/design`. Phase 2+ pending.
+Phase 2 (pay rules + payroll calculation) in progress.
 
 ## Goals
 
@@ -15,9 +15,26 @@ existing ones. Spec: ClickUp "SPEC: EasyStaff v2" (not copied here; it holds cli
 **Phase 1 (done, design review pending):** full v2 UI on Arc UI (free components, as specced),
 EasyStaff tokens, 中文/English toggle, i18n, v2 sign-in, payroll table, design review page. See History.
 
-**Next:** Phase 1 (v2 shell, tokens, 中文/English toggle), Phase 2 (rate cards + tier
-engine + payroll calc), Phase 3 (penalty import), Phase 4 (bilingual payslip), Phase 5
-(reconciliation against the client's own sheet).
+**Phase 2 (in progress): pay rules + payroll calculation.**
+- One generic rule shape (`src/lib/v2/pay`): count `tiers` (upper bounds on the monthly
+  count, whole or marginal) x weight `bands` (kg upper bounds) x vehicle -> RM per unit, or a
+  flat amount for the tier reached. Rate cards, KPI, fuel, SC/SC-RTN and allowances are all
+  this shape with a different `unit` and `kind`; a new pay mode is a new rule, not new code.
+- Tiers are stored as upper bounds, so gaps and overlaps can't exist; the last tier and band
+  must be open-ended so every parcel has a price (set 0 where nothing is paid).
+- Content is versioned by month (`PayRuleVersion.effectiveFrom`, yyyymm); editing saves a new
+  version. Who gets a rule is a `PayRuleAssignment`: most specific wins
+  (dispatcher > outlet > FT/PT > everyone). Dispatcher vehicle + FT/PT is a month-versioned
+  `DispatcherProfile`. Finalised runs keep the rules they used.
+- Outlets and dispatchers reuse v1's `Branch` / `Dispatcher` / `DispatcherAssignment` rows
+  (outlets count towards the branch limit, as in v1).
+- Payroll run: J&T Excel -> R2 -> v1's streaming parser (read-only reuse) -> per-dispatcher
+  parcels stored compactly in `PayrollResult` -> engine -> review -> finalise.
+- Open (needs the client's data): how SC / SC-RTN parcels are marked in the J&T file; KPI
+  whole vs marginal; whether full-timers get a basic salary; real rates.
+
+**Next:** Phase 3 (penalty import), Phase 4 (bilingual payslip), Phase 5 (reconciliation
+against the client's own sheet).
 
 ## Notes
 

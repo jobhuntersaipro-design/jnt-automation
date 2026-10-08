@@ -1,0 +1,184 @@
+.ruleCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+  color: inherit;
+  text-decoration: none;
+  transition: box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+.ruleCard:hover {
+  box-shadow: var(--shadow-raised);
+}
+
+.ruleName {
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 650;
+}
+
+/* Editor */
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+@media (min-width: 72rem) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 24rem;
+    align-items: start;
+  }
+}
+
+.versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.versionChip {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.versionChip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+.bounds {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.boundRow {
+  display: grid;
+  grid-template-columns: 9rem 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.fill {
+  width: 100%;
+}
+
+.fit {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.rangeText {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.ratesWrap {
+  overflow-x: auto;
+}
+
+.rates {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rates th,
+.rates td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border-subtle);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.rates thead th {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.rates td:not(:first-child),
+.rates thead th:not(:first-child) {
+  text-align: right;
+}
+
+.rateInput {
+  width: 6.5rem;
+  text-align: right;
+}
+
+.tierHeading {
+  margin: var(--space-2) 0 0;
+  font-weight: 600;
+}
+
+.saveBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.total {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.simRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+
+.cardHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+/* Import */
+.wideDialog[role="dialog"] {
+  width: min(calc(100vw - var(--space-8)), 44rem);
+}
+
+.issueLine {
+  display: block;
+}
+
+.fileName {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.ready {
+  margin: 0;
+  font-weight: 500;
+}

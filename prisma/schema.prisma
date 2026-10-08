@@ -46,6 +46,9 @@ model Agent {
   notifications         Notification[]
   employees             Employee[]
   dispatchers           Dispatcher[]
+  payRules              PayRule[]
+  payrollRuns           PayrollRun[]
+  ruleAudits            RuleAudit[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -143,6 +146,8 @@ model Branch {
   employees   Employee[]
   uploads     Upload[]
   defaults    AgentDefault[]
+  payRuleAssignments PayRuleAssignment[]
+  payrollRuns        PayrollRun[]
   agent       Agent                  @relation(fields: [agentId], references: [id], onDelete: Cascade)
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
@@ -175,6 +180,9 @@ model Dispatcher {
   petrolRule    PetrolRule?
   salaryRecords SalaryRecord[]
   employees     Employee[]
+  payRuleAssignments PayRuleAssignment[]
+  profiles           DispatcherProfile[]
+  payrollResults     PayrollResult[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -532,4 +540,159 @@ model Notification {
 
   @@index([agentId, isRead])
   @@index([agentId, createdAt])
+}
+
+// ─── v2: config-driven pay rules and payroll runs ─────────────
+// Used only by v2 accounts (/app). Rule numbers are JSON validated by
+// src/lib/v2/pay/config.ts; money is stored in cents; months are yyyymm Ints.
+
+enum Vehicle {
+  BIKE
+  CAR
+  LORRY
+}
+
+enum Employment {
+  FULL_TIME
+  PART_TIME
+}
+
+enum PayRuleKind {
+  PARCEL
+  KPI
+  FUEL
+  SC
+  SC_RTN
+  ALLOWANCE
+  DEDUCTION
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  FINAL
+}
+
+/// A named pay rule: a rate card, the KPI card, a fuel rule. Its numbers live in
+/// month-versioned PayRuleVersion rows; who it applies to, in PayRuleAssignment.
+model PayRule {
+  id          String              @id @default(cuid())
+  agentId     String
+  kind        PayRuleKind
+  name        String
+  archivedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  agent       Agent               @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  versions    PayRuleVersion[]
+  assignments PayRuleAssignment[]
+
+  @@index([agentId, kind])
+}
+
+/// A rule's tiers and rates from `effectiveFrom` on. A change is a new version, so
+/// months before it keep their numbers.
+model PayRuleVersion {
+  id            String   @id @default(cuid())
+  ruleId        String
+  effectiveFrom Int
+  config        Json
+  source        String?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  rule          PayRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, effectiveFrom])
+}
+
+/// Who a rule applies to from `effectiveFrom` on. Per kind the most specific match
+/// wins: dispatcher > outlet > FT/PT > everyone (all scope fields null).
+model PayRuleAssignment {
+  id            String      @id @default(cuid())
+  agentId       String
+  kind          PayRuleKind
+  ruleId        String
+  branchId      String?
+  dispatcherId  String?
+  employment    Employment?
+  effectiveFrom Int
+  createdAt     DateTime    @default(now())
+  rule          PayRule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  branch        Branch?     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  dispatcher    Dispatcher? @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, kind])
+  @@index([ruleId])
+}
+
+/// A dispatcher's vehicle and full/part-time status from `effectiveFrom` on.
+model DispatcherProfile {
+  id            String     @id @default(cuid())
+  dispatcherId  String
+  effectiveFrom Int
+  vehicle       Vehicle
+  employment    Employment
+  createdAt     DateTime   @default(now())
+  dispatcher    Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatcherId, effectiveFrom])
+}
+
+/// One outlet's payroll for one month, from one J&T delivery file. A FINAL run is
+/// never recalculated; `rules` keeps every rule version it used.
+model PayrollRun {
+  id           String           @id @default(cuid())
+  agentId      String
+  branchId     String
+  period       Int
+  status       PayrollRunStatus @default(DRAFT)
+  fileName     String
+  r2Key        String
+  parcelCount  Int
+  rules        Json?
+  calculatedAt DateTime?
+  finalisedAt  DateTime?
+  finalisedBy  String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  agent        Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  branch       Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  results      PayrollResult[]
+
+  @@unique([branchId, period])
+  @@index([agentId, period])
+}
+
+/// One dispatcher in a run: their parcels (compact, in delivery order) and computed pay.
+model PayrollResult {
+  id             String     @id @default(cuid())
+  runId          String
+  dispatcherId   String
+  extId          String
+  name           String
+  parcels        Json
+  profile        Json?
+  lines          Json
+  earningsCents  Int        @default(0)
+  deductionCents Int        @default(0)
+  netCents       Int        @default(0)
+  run            PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  dispatcher     Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, dispatcherId])
+  @@index([dispatcherId])
+}
+
+/// Who changed which rule, assignment or profile, and when.
+model RuleAudit {
+  id        String   @id @default(cuid())
+  agentId   String
+  ruleId    String?
+  action    String
+  detail    Json?
+  actor     String?
+  createdAt DateTime @default(now())
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, createdAt])
+  @@index([ruleId])
 }

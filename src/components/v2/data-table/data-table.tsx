@@ -6,6 +6,7 @@ import { Button } from "@/components/arc/button/button";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
+import { downloadCsv } from "../download";
 import { filterRows, nextSort, parseAmount, sortRows, sumBy, toCsv, type Row, type SortState } from "./table-logic";
 import styles from "./data-table.module.css";
 
@@ -50,12 +51,7 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
   );
   const hasTotals = columns.some((c) => c.total);
 
-  function exportCsv() {
-    const blob = new Blob([toCsv(columns, visible)], { type: "text/csv;charset=utf-8" });
-    const link = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `${exportName}.csv` });
-    link.click();
-    URL.revokeObjectURL(link.href);
-  }
+  const exportCsv = () => downloadCsv(`${exportName}.csv`, toCsv(columns, visible));
 
   return (
     <div className={styles.wrap}>

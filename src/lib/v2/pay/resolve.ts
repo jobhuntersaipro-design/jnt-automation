@@ -1,0 +1,86 @@
+import { KINDS, type Employment, type Kind } from "./config";
+
+// Which rule and which version applies to a dispatcher in a month. Pure, so the payroll
+// run and the rule simulator resolve exactly the same way.
+
+/** yyyymm, e.g. 202611. Compares correctly as a number. */
+export type Period = number;
+
+export const toPeriod = (year: number, month: number): Period => year * 100 + month;
+export const periodYear = (p: Period) => Math.floor(p / 100);
+export const periodMonth = (p: Period) => p % 100;
+/** "2026-11" (the value of an <input type="month">) ⇄ 202611. */
+export const periodToInput = (p: Period) => `${periodYear(p)}-${String(periodMonth(p)).padStart(2, "0")}`;
+/** The payroll month a moment falls in, in Malaysian time. */
+export function periodOf(date: Date): Period {
+  const [year, month] = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur", year: "numeric", month: "2-digit" })
+    .format(date)
+    .split("-")
+    .map(Number);
+  return toPeriod(year, month);
+}
+
+export function periodFromInput(value: string): Period | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const month = Number(m[2]);
+  return month >= 1 && month <= 12 ? toPeriod(Number(m[1]), month) : null;
+}
+
+export interface AssignmentRow {
+  id: string;
+  kind: Kind;
+  ruleId: string;
+  branchId: string | null;
+  dispatcherId: string | null;
+  employment: Employment | null;
+  effectiveFrom: Period;
+  createdAt: Date;
+}
+
+export interface Context {
+  period: Period;
+  branchId: string;
+  dispatcherId: string;
+  /** null when the dispatcher has no profile yet: FT/PT-only assignments then don't match. */
+  employment: Employment | null;
+}
+
+/** dispatcher > outlet > FT/PT > everyone; an outlet + FT/PT assignment beats either alone. */
+export const specificity = (a: AssignmentRow) => (a.dispatcherId ? 4 : 0) + (a.branchId ? 2 : 0) + (a.employment ? 1 : 0);
+
+function matches(a: AssignmentRow, ctx: Context) {
+  return (
+    a.effectiveFrom <= ctx.period &&
+    (a.dispatcherId === null || a.dispatcherId === ctx.dispatcherId) &&
+    (a.branchId === null || a.branchId === ctx.branchId) &&
+    (a.employment === null || a.employment === ctx.employment)
+  );
+}
+
+/** The winning assignment per kind: most specific, then the latest effective month, then the newest. */
+export function pickAssignments(assignments: AssignmentRow[], ctx: Context): Map<Kind, AssignmentRow> {
+  const best = new Map<Kind, AssignmentRow>();
+  for (const a of assignments) {
+    if (!matches(a, ctx)) continue;
+    const current = best.get(a.kind);
+    if (
+      !current ||
+      specificity(a) > specificity(current) ||
+      (specificity(a) === specificity(current) &&
+        (a.effectiveFrom > current.effectiveFrom || (a.effectiveFrom === current.effectiveFrom && a.createdAt > current.createdAt)))
+    ) {
+      best.set(a.kind, a);
+    }
+  }
+  return new Map(KINDS.filter((k) => best.has(k)).map((k) => [k, best.get(k)!]));
+}
+
+/** The row in force for a month: the latest `effectiveFrom` not after it, or null. */
+export function inForce<T extends { effectiveFrom: Period }>(rows: T[], period: Period): T | null {
+  let found: T | null = null;
+  for (const row of rows) {
+    if (row.effectiveFrom <= period && (!found || row.effectiveFrom > found.effectiveFrom)) found = row;
+  }
+  return found;
+}

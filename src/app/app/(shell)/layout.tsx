@@ -19,7 +19,10 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
 
   const { t } = await getI18n();
   const agent = await prisma.agent.findUnique({ where: { id: v2.agentId }, select: { name: true, email: true } });
-  const nav = [{ href: "/app", label: t("nav.dashboard") }];
+  const nav = [
+    { href: "/app", label: t("nav.dashboard") },
+    { href: "/app/rules", label: t("nav.rules") },
+  ];
   // Design review is for the EasyStaff team, reached by viewing as a v2 account.
   if (v2.impersonating) nav.push({ href: "/app/design", label: t("nav.design") });
 
