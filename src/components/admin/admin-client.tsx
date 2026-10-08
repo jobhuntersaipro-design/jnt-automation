@@ -34,8 +34,9 @@ import {
 } from "./admin-shared";
 
 type StatusFilter = "all" | "approved" | "disabled";
+type AppFilter = "all" | "V1" | "V2";
 type BillingFilter = "all" | BillingStatus;
-type SortKey = "name" | "email" | "branches" | "joined" | "trial" | "billing" | "status";
+type SortKey = "name" | "email" | "branches" | "joined" | "trial" | "billing" | "status" | "app";
 
 const BILLING_ORDER: Record<BillingStatus, number> = { unpaid: 0, paid: 1, trial: 2, exempt: 3 };
 
@@ -55,6 +56,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [billingFilter, setBillingFilter] = useState<BillingFilter>("all");
+  const [appFilter, setAppFilter] = useState<AppFilter>("all");
   const [month, setMonth] = useState<YearMonth>(currentMonth);
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "joined", dir: "desc" });
   const [openId, setOpenId] = useState<string | null>(null);
@@ -112,6 +114,33 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         }
         updateAgent(agent.id, { isApproved });
         toast.success(isApproved ? "Account re-enabled" : "Account disabled");
+      },
+    });
+  }, [updateAgent]);
+
+  // Which app the account signs in to. Superadmins have no control (they'd lose /admin).
+  const requestVersionChange = useCallback((agent: AdminAgent, uiVersion: "V1" | "V2") => {
+    const who = agent.name || agent.email;
+    setConfirm({
+      title: uiVersion === "V2" ? `Move ${who} to v2?` : `Move ${who} back to v1?`,
+      body:
+        uiVersion === "V2"
+          ? "They'll sign in to the v2 app from their next page load and can no longer open v1 pages. Their v1 data is kept, and you can switch back."
+          : "They'll sign in to the current app (v1) again. Nothing is deleted; their v2 data waits until you switch them back.",
+      confirmLabel: uiVersion === "V2" ? "Move to v2" : "Move to v1",
+      onConfirm: async () => {
+        const res = await fetch(`/api/admin/agents/${agent.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ uiVersion }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(data.error || "Couldn't change the app version");
+          return false;
+        }
+        updateAgent(agent.id, { uiVersion: data.uiVersion });
+        toast.success(`${who} now uses ${data.uiVersion === "V2" ? "v2" : "v1"}`);
       },
     });
   }, [updateAgent]);
@@ -220,6 +249,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         if (statusFilter === "approved" && !agent.isApproved) return false;
         if (statusFilter === "disabled" && agent.isApproved) return false;
         if (billingFilter !== "all" && bill.status !== billingFilter) return false;
+        if (appFilter !== "all" && agent.uiVersion !== appFilter) return false;
         if (!q) return true;
         return [agent.name, agent.email, agent.phone, agent.adminNotes, ...agent.branches]
           .some((v) => v?.toLowerCase().includes(q));
@@ -235,6 +265,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         case "trial": return r.trialEnd.getTime();
         case "billing": return BILLING_ORDER[r.bill.status];
         case "status": return r.agent.isApproved ? 1 : 0;
+        case "app": return r.agent.uiVersion;
       }
     };
     return list.sort((a, b) => {
@@ -242,7 +273,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
       const vb = value(b);
       return va < vb ? -dir : va > vb ? dir : 0;
     });
-  }, [agents, search, statusFilter, billingFilter, month, sort]);
+  }, [agents, search, statusFilter, billingFilter, appFilter, month, sort]);
 
   const totals = useMemo(() => {
     const t = { paid: 0, paidCount: 0, unpaid: 0, unpaidCount: 0, trialCount: 0 };
@@ -284,15 +315,16 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         </div>
         <Select label="Status" value={statusFilter} onChange={(v) => setStatusFilter(v as StatusFilter)} options={[["all", "All statuses"], ["approved", "Approved"], ["disabled", "Disabled"]]} />
         <Select label="Billing" value={billingFilter} onChange={(v) => setBillingFilter(v as BillingFilter)} options={[["all", "All billing"], ["unpaid", "Unpaid"], ["paid", "Paid"], ["trial", "In trial"]]} />
+        <Select label="App" value={appFilter} onChange={(v) => setAppFilter(v as AppFilter)} options={[["all", "All apps"], ["V1", "v1 (current app)"], ["V2", "v2 (new payroll)"]]} />
         <Select
           label="Billing month"
           value={`${month.year}-${month.month}`}
           onChange={(v) => { const [y, m] = v.split("-").map(Number); setMonth({ year: y, month: m }); }}
           options={monthOptions().map((ym) => [`${ym.year}-${ym.month}`, formatMonth(ym)] as [string, string])}
         />
-        {(search || statusFilter !== "all" || billingFilter !== "all") && (
+        {(search || statusFilter !== "all" || billingFilter !== "all" || appFilter !== "all") && (
           <button
-            onClick={() => { setSearch(""); setStatusFilter("all"); setBillingFilter("all"); }}
+            onClick={() => { setSearch(""); setStatusFilter("all"); setBillingFilter("all"); setAppFilter("all"); }}
             className="flex items-center gap-1 px-2 py-1.5 text-[0.75rem] text-on-surface-variant hover:text-on-surface"
           >
             <X size={12} /> Clear
@@ -315,7 +347,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
 
       {/* Table */}
       <div className="bg-surface-card rounded-lg border border-outline-variant/15 overflow-x-auto">
-        <table className="w-full min-w-[1280px] text-left">
+        <table className="w-full min-w-[1380px] text-left">
           <thead>
             <tr className="text-[0.68rem] font-semibold uppercase tracking-wider text-on-surface-variant bg-surface-low">
               <Th label="Name" k="name" sort={sort} onSort={toggleSort} />
@@ -326,6 +358,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
               <Th label="Trial ends" k="trial" sort={sort} onSort={toggleSort} />
               <Th label={`Bill · ${monthLabel}`} k="billing" sort={sort} onSort={toggleSort} />
               <Th label="Status" k="status" sort={sort} onSort={toggleSort} />
+              <Th label="App" k="app" sort={sort} onSort={toggleSort} />
               <th className="px-2.5 py-2.5">Notes</th>
               <th className="px-2.5 py-2.5 text-right">Actions</th>
             </tr>
@@ -424,6 +457,23 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
                       </select>
                     )}
                   </td>
+                  <td className="px-2.5 py-3">
+                    {agent.isSuperAdmin ? (
+                      <span className="text-[0.75rem] text-on-surface-variant/60" title="Superadmins stay on v1 so they keep /admin">v1</span>
+                    ) : (
+                      <select
+                        aria-label={`App for ${agent.email}`}
+                        value={agent.uiVersion}
+                        onChange={(e) => requestVersionChange(agent, e.target.value === "V2" ? "V2" : "V1")}
+                        className={`px-2 py-1 text-base sm:text-[0.75rem] font-medium rounded-md border-0 cursor-pointer outline-none focus:ring-2 focus:ring-brand/30 ${
+                          agent.uiVersion === "V2" ? "bg-brand/10 text-brand" : "bg-surface-low text-on-surface-variant"
+                        }`}
+                      >
+                        <option value="V1">v1 (current app)</option>
+                        <option value="V2">v2 (new payroll)</option>
+                      </select>
+                    )}
+                  </td>
                   <td className="px-2.5 py-3 max-w-40">
                     <button
                       onClick={() => setOpenId(agent.id)}
@@ -459,7 +509,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-[0.85rem] text-on-surface-variant/60">
+                <td colSpan={11} className="px-3 py-10 text-center text-[0.85rem] text-on-surface-variant/60">
                   No accounts match these filters.
                 </td>
               </tr>

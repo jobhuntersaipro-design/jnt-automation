@@ -97,7 +97,13 @@ export function AgentDrawer({
             </div>
           </section>
 
-          {!agent.isSuperAdmin && <UiVersionToggle agent={agent} onUpdate={onUpdate} />}
+          {!agent.isSuperAdmin && (
+            <section className="flex flex-col gap-2">
+              <h3 className="text-[0.85rem] font-semibold text-on-surface">App</h3>
+              <UiVersionToggle agent={agent} onUpdate={onUpdate} />
+              <LanguageSelect agent={agent} onUpdate={onUpdate} />
+            </section>
+          )}
 
           {!agent.isSuperAdmin && (
             <section className="flex flex-col gap-2">
@@ -541,6 +547,49 @@ function UiVersionToggle({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u:
       />
       <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </>
+  );
+}
+
+/** The v2 app's language until the user picks one with the 中文 / English toggle. */
+function LanguageSelect({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Partial<AdminAgent>) => void }) {
+  const [saving, setSaving] = useState(false);
+
+  async function save(value: string) {
+    const language = value === "en" || value === "zh" ? value : null;
+    setSaving(true);
+    const res = await fetch(`/api/admin/agents/${agent.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language }),
+    });
+    const data = await res.json().catch(() => ({}));
+    setSaving(false);
+    if (!res.ok) {
+      toast.error(data.error || "Couldn't change the language");
+      return;
+    }
+    onUpdate({ language: data.language });
+    toast.success(`Language for ${agent.name || agent.email}: ${data.language === "zh" ? "中文" : data.language === "en" ? "English" : "browser default"}`);
+  }
+
+  return (
+    <div className="flex items-start justify-between gap-3 p-3 rounded-md bg-surface-low">
+      <div className="min-w-0">
+        <p className="text-[0.8rem] font-medium text-on-surface">Language (v2)</p>
+        <p className="text-[0.72rem] text-on-surface-variant">Used until they pick 中文 or English themselves. v1 is English only.</p>
+      </div>
+      <select
+        aria-label="Language (v2)"
+        value={agent.language ?? ""}
+        disabled={saving}
+        onChange={(e) => save(e.target.value)}
+        className="px-2 py-1 text-base sm:text-[0.78rem] bg-surface-card border border-outline-variant/20 rounded-md text-on-surface outline-none focus:border-brand/40 cursor-pointer disabled:opacity-50"
+      >
+        <option value="">Browser default</option>
+        <option value="zh">中文</option>
+        <option value="en">English</option>
+      </select>
+    </div>
   );
 }
 

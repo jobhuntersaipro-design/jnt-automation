@@ -12,6 +12,8 @@ const profileSchema = z
     maxBranches: z.number().int().min(1).max(1000).optional(),
     onlinePayment: z.boolean().optional(),
     uiVersion: z.enum(["V1", "V2"]).optional(),
+    /** The v2 app's language until they pick one themselves; null = their browser's. */
+    language: z.enum(["en", "zh"]).nullable().optional(),
   })
   .strict();
 
@@ -56,6 +58,12 @@ export async function PATCH(
     }
   }
   if (typeof data.adminNotes === "string") data.adminNotes = data.adminNotes.trim() || null;
+  if (data.uiVersion) {
+    // Superadmins stay on v1: /admin is a v1 page, so v2 would lock them out of it.
+    const target = await getInvoiceAgent(agentId);
+    if (!target) return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    if (target.isSuperAdmin) return NextResponse.json({ error: "Superadmin accounts stay on v1" }, { status: 400 });
+  }
 
   try {
     const result = await updateAgentProfile(agentId, data, {
