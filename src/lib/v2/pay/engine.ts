@@ -9,7 +9,25 @@ export interface Parcels {
   c: string;
 }
 
-export const UNIT_LETTER: Record<Unit, string> = { parcels: "n", sc: "s", sc_rtn: "r" };
+/** One letter per unit in `Parcels.c`. Penalties are appended at calculation time, weight 0. */
+export const UNIT_LETTER: Record<Unit, string> = {
+  parcels: "n",
+  sc: "s",
+  sc_rtn: "r",
+  "penalty:FAKE_ATTEMPT": "a",
+  "penalty:FAKE_POP": "b",
+  "penalty:PDNC": "c",
+  "penalty:INACTIVE": "d",
+  "penalty:POD": "e",
+  "penalty:COD_LATE": "f",
+  "penalty:COD_ISSUE": "g",
+  "penalty:LOST": "h",
+  "penalty:LATE_ARRIVAL": "i",
+  "penalty:OTHER": "j",
+};
+
+/** Kinds whose lines are taken off pay. */
+export const DEDUCTING: readonly Kind[] = ["DEDUCTION", "PENALTY"];
 
 /** Index of the range a value falls in: the first upper bound it doesn't exceed (null = no limit). */
 export function boundIndex(x: number, bounds: (number | null)[]): number {
@@ -99,10 +117,14 @@ export interface Pay {
   netCents: number;
 }
 
-/** One dispatcher's month: every resolved rule applied to their parcels. DEDUCTION lines subtract. */
+/** One dispatcher's month: every resolved rule applied to their parcels. Deduction and penalty lines subtract. */
 export function computePay(parcels: Parcels, vehicle: Vehicle, rules: ResolvedRule[]): Pay {
   const lines = rules.map((r) => ({ kind: r.kind, ruleId: r.ruleId, versionId: r.versionId, name: r.name, ...computeRule(r.config, parcels, vehicle) }));
-  const deductionCents = lines.filter((l) => l.kind === "DEDUCTION").reduce((s, l) => s + l.cents, 0);
-  const earningsCents = lines.filter((l) => l.kind !== "DEDUCTION").reduce((s, l) => s + l.cents, 0);
+  return totals(lines);
+}
+
+export function totals(lines: Line[]): Pay {
+  const deductionCents = lines.filter((l) => DEDUCTING.includes(l.kind)).reduce((s, l) => s + l.cents, 0);
+  const earningsCents = lines.filter((l) => !DEDUCTING.includes(l.kind)).reduce((s, l) => s + l.cents, 0);
   return { lines, earningsCents, deductionCents, netCents: earningsCents - deductionCents };
 }

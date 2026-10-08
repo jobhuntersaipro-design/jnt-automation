@@ -5,7 +5,8 @@ import { ArrowDown, ArrowUp, ArrowUpDown, Download } from "lucide-react";
 import { Button } from "@/components/arc/button/button";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { useI18n } from "@/components/v2/i18n-provider";
-import type { I18n } from "@/lib/i18n/core";
+import type { I18n, PluralKey } from "@/lib/i18n/core";
+import type { MessageKey } from "@/lib/i18n/en";
 import { downloadCsv } from "../download";
 import { filterRows, nextSort, parseAmount, sortRows, sumBy, toCsv, type Row, type SortState } from "./table-logic";
 import styles from "./data-table.module.css";
@@ -32,6 +33,8 @@ interface DataTableProps<T extends Row> {
   /** Makes the first column a button that opens the row (a detail view). */
   onOpen?: (row: T) => void;
   exportName: string;
+  /** What the rows are called in the toolbar; dispatchers unless set. */
+  labels?: { search: MessageKey; rows: PluralKey; empty: MessageKey };
 }
 
 /**
@@ -40,7 +43,7 @@ interface DataTableProps<T extends Row> {
  */
 // ponytail: renders every row. A sort of 300 rows costs ~8ms in React plus ~70ms of
 // browser re-layout (headless, 4 cores); virtualise the rows if an account reaches thousands.
-export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, searchKeys, onEdit, onOpen, exportName }: DataTableProps<T>) {
+export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, searchKeys, onEdit, onOpen, exportName, labels }: DataTableProps<T>) {
   const i18n = useI18n();
   const { t, tp } = i18n;
   const [query, setQuery] = useState("");
@@ -60,13 +63,13 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
       <div className={styles.toolbar}>
         <SearchField
           className={styles.search}
-          label={t("table.search")}
+          label={t(labels?.search ?? "table.search")}
           value={query}
           onValueChange={setQuery}
           clearLabel={t("common.clearSearch")}
         />
         <span className={styles.count} aria-live="polite">
-          {tp("table.rows", visible.length)}
+          {tp(labels?.rows ?? "table.rows", visible.length)}
         </span>
         <Button variant="secondary" size="sm" onClick={exportCsv} disabled={visible.length === 0}>
           <Download size={16} aria-hidden="true" />
@@ -114,13 +117,14 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
             </tfoot>
           )}
         </table>
-        {visible.length === 0 && <p className={styles.empty}>{t("table.empty")}</p>}
+        {visible.length === 0 && <p className={styles.empty}>{t(labels?.empty ?? "table.empty")}</p>}
       </div>
     </div>
   );
 }
 
 function formatCell<T extends Row>(i18n: I18n, col: Column<T>, value: T[keyof T] | number) {
+  if (value === "" && col.format && col.format !== "text") return "—"; // no value, as opposed to 0
   if (col.format === "money") return i18n.money(Number(value));
   if (col.format === "number") return i18n.number(Number(value));
   return String(value);

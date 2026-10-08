@@ -1,9 +1,9 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { Kind, RuleConfig } from "@/lib/v2/pay/config";
-import type { Line, Parcels } from "@/lib/v2/pay/engine";
+import type { Parcels } from "@/lib/v2/pay/engine";
 import type { Period } from "@/lib/v2/pay/resolve";
-import type { Profile, Warning } from "./calc";
+import type { PayLine, PenaltyCase, Profile, Warning } from "./calc";
 import type { FileStats } from "./file";
 import { isStale } from "./run";
 
@@ -51,8 +51,10 @@ export interface ResultView {
   extId: string;
   parcels: number;
   profile: Profile | null;
-  lines: Line[];
+  lines: PayLine[];
   warnings: Warning[];
+  /** The penalty cases deducted, as they were when calculated. */
+  penalties: PenaltyCase[];
   earningsCents: number;
   deductionCents: number;
   netCents: number;
@@ -112,8 +114,9 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
       extId: r.extId,
       parcels: (r.parcels as unknown as Parcels).w.length,
       profile: r.profile as Profile | null,
-      lines: r.lines as unknown as Line[],
+      lines: r.lines as unknown as PayLine[],
       warnings: (r.warnings ?? []) as unknown as Warning[],
+      penalties: (r.penalties ?? []) as unknown as PenaltyCase[],
       earningsCents: r.earningsCents,
       deductionCents: r.deductionCents,
       netCents: r.netCents,

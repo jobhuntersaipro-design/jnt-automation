@@ -67,22 +67,26 @@ function matches(a: AssignmentRow, ctx: Context) {
   );
 }
 
-/** The winning assignment per kind: most specific, then the latest effective month, then the newest. */
-export function pickAssignments<T extends AssignmentRow>(assignments: T[], ctx: Context): Map<Kind, T> {
-  const best = new Map<Kind, T>();
+/**
+ * The winning assignment per slot: most specific, then the latest effective month, then the newest.
+ * A slot is the kind, except penalty rules, which get one slot per penalty type (see `slotOf`).
+ */
+export function pickAssignments<T extends AssignmentRow>(assignments: T[], ctx: Context, slotOf: (a: T) => string = (a) => a.kind): Map<string, T> {
+  const best = new Map<string, T>();
   for (const a of assignments) {
     if (!matches(a, ctx)) continue;
-    const current = best.get(a.kind);
+    const slot = slotOf(a);
+    const current = best.get(slot);
     if (
       !current ||
       specificity(a) > specificity(current) ||
       (specificity(a) === specificity(current) &&
         (a.effectiveFrom > current.effectiveFrom || (a.effectiveFrom === current.effectiveFrom && a.createdAt > current.createdAt)))
     ) {
-      best.set(a.kind, a);
+      best.set(slot, a);
     }
   }
-  return new Map(KINDS.filter((k) => best.has(k)).map((k) => [k, best.get(k)!]));
+  return new Map([...best].sort(([sa, a], [sb, b]) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || sa.localeCompare(sb)));
 }
 
 /** The row in force for a month: the latest `effectiveFrom` not after it, or null. */

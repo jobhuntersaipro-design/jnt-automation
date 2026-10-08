@@ -14,7 +14,7 @@ import { Input } from "@/components/arc/input/input";
 import { downloadCsv } from "@/components/v2/download";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { MessageKey } from "@/lib/i18n/en";
-import { configProblems, type RuleConfig } from "@/lib/v2/pay/config";
+import { configProblems, kindProblems, type RuleConfig } from "@/lib/v2/pay/config";
 import { configToRows, FIELDS, toCsv, type Field } from "@/lib/v2/pay/rate-card-io";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
 import { archiveRule, copyRule, deleteVersion, renameRule, saveVersion } from "@/lib/v2/rules/actions";
@@ -50,7 +50,7 @@ export function RuleEditor({ rule, version, outlets, dispatchers, audit, thisMon
   const [source, setSource] = useState<string | null>(null);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(version.config);
-  const problems = configProblems(draft);
+  const problems = [...configProblems(draft), ...kindProblems(rule.kind, draft)];
   const effectiveFrom = periodFromInput(month);
   const go = (p: Period) => router.replace(`/app/rules/${rule.id}?month=${p}`, { scroll: false });
 
@@ -172,7 +172,7 @@ export function RuleEditor({ rule, version, outlets, dispatchers, audit, thisMon
                 </Button>
               </div>
             </div>
-            <ConfigEditor config={draft} onChange={setDraft} />
+            <ConfigEditor kind={rule.kind} config={draft} onChange={setDraft} />
             {problems.length > 0 && (
               <Alert tone="warning" title={t("rule.problems")}>
                 {problems.map((p) => t(p.key, p.vars)).join(" ")}

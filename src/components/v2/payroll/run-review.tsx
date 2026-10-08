@@ -14,13 +14,13 @@ import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { DataTable, type Column } from "@/components/v2/data-table/data-table";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
-import type { Group, Line } from "@/lib/v2/pay/engine";
+import type { Group } from "@/lib/v2/pay/engine";
 import { periodToInput } from "@/lib/v2/pay/resolve";
 import { deleteRun, finalise, recalculateRun } from "@/lib/v2/payroll/actions";
-import type { Warning } from "@/lib/v2/payroll/calc";
+import type { PayLine, PenaltyCase, Warning } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import { setProfiles } from "@/lib/v2/people/actions";
-import { monthLabel, PROFILES, profileLabel, rangeLabels } from "../labels";
+import { monthLabel, penaltyLabel, PROFILES, profileLabel, rangeLabels } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./payroll.module.css";
 
@@ -30,6 +30,7 @@ const DATE_TIME: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", 
 function warningText(i18n: I18n, w: Warning): string {
   if (w.code === "noProfile") return i18n.t("run.warn.noProfile");
   if (w.code === "noParcelRule") return i18n.t("run.warn.noParcelRule");
+  if (w.code === "noPenaltyAmount") return i18n.tp("run.warn.noPenaltyAmount", w.count, { type: penaltyLabel(i18n, w.type) });
   return i18n.t("run.warn.noRates", { rule: w.rule, kind: i18n.t(`kind.${w.kind}`) });
 }
 
@@ -190,14 +191,21 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
   const [saving, setSaving] = useState(false);
   const money = (cents: number) => i18n.money(cents / 100);
 
-  function groupText(line: Line, g: Group) {
+  function groupText(line: PayLine, g: Group) {
     const config = run.rules[line.versionId]?.config;
-    const tier = config && config.tiers.length > 1 ? t("rule.tierHeading", { n: g.tier + 1, range: rangeLabels(i18n, config.tiers, "count")[g.tier] }) : null;
+    const heading = line.penalty ? "rule.tierHeadingCases" : "rule.tierHeading";
+    const tier = config && config.tiers.length > 1 ? t(heading, { n: g.tier + 1, range: rangeLabels(i18n, config.tiers, "count")[g.tier] }) : null;
     const band = config && config.bands.length > 1 ? rangeLabels(i18n, config.bands, "kg")[g.band] : null;
     const range = [tier, band].filter(Boolean).join(" · ") || t("run.allParcels");
     return config?.valueType === "flat"
       ? t("run.flat", { range, amount: money(g.cents) })
       : t("run.line", { range, units: i18n.number(g.units), rate: i18n.rate(g.rate), amount: money(g.cents) });
+  }
+
+  /** One penalty case: when, which parcel, why; with the file's amount when that's what is deducted. */
+  function caseText(c: PenaltyCase, fromFile: boolean) {
+    const when = c.occurredAt ? i18n.date(new Date(`${c.occurredAt.slice(0, 10)}T00:00:00Z`), { day: "numeric", month: "short", timeZone: "UTC" }) : null;
+    return [when, c.waybill, c.note, fromFile && c.amountCents !== null ? money(c.amountCents) : null].filter(Boolean).join(" · ");
   }
 
   async function saveProfile(dispatcherId: string) {
@@ -243,22 +251,33 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
             {result.lines.length === 0 ? (
               <p className={ui.muted}>{t("run.noLines")}</p>
             ) : (
-              result.lines.map((line) => (
-                <section key={line.ruleId} className={styles.line} aria-label={line.name}>
-                  <div className={styles.lineHead}>
-                    <span className={styles.lineName}>
-                      <span className={ui.help}>{t(`kind.${line.kind}`)}</span>
-                      <strong>{line.name}</strong>
-                    </span>
-                    <span className={styles.amount}>{money(line.cents)}</span>
-                  </div>
-                  <ul className={styles.groups}>
-                    {line.groups.map((g) => (
-                      <li key={`${g.tier}:${g.band}`}>{groupText(line, g)}</li>
-                    ))}
-                  </ul>
-                </section>
-              ))
+              result.lines.map((line) => {
+                const fromFile = line.ruleId.startsWith("file:");
+                const name = fromFile ? t("run.fromFile") : line.name;
+                return (
+                  <section key={line.ruleId} className={styles.line} aria-label={line.penalty ? `${penaltyLabel(i18n, line.penalty)}: ${name}` : name}>
+                    <div className={styles.lineHead}>
+                      <span className={styles.lineName}>
+                        <span className={ui.help}>{line.penalty ? penaltyLabel(i18n, line.penalty) : t(`kind.${line.kind}`)}</span>
+                        <strong>{name}</strong>
+                      </span>
+                      <span className={styles.amount}>{money(line.cents)}</span>
+                    </div>
+                    <ul className={styles.groups}>
+                      {line.groups.map((g) => (
+                        <li key={`${g.tier}:${g.band}`}>{groupText(line, g)}</li>
+                      ))}
+                      {result.penalties
+                        .filter((c) => c.type === line.penalty)
+                        .map((c) => (
+                          <li key={c.id} className={ui.help}>
+                            {caseText(c, fromFile)}
+                          </li>
+                        ))}
+                    </ul>
+                  </section>
+                );
+              })
             )}
             <dl className={styles.totals}>
               <div>

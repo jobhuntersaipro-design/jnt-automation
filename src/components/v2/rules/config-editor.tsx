@@ -7,16 +7,18 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { Switch } from "@/components/arc/switch/switch";
 import { DecimalInput } from "@/components/v2/decimal-input";
 import { useI18n } from "@/components/v2/i18n-provider";
-import { addBound, removeBound, setBound, setByVehicle, UNITS, VEHICLES, type RuleConfig, type Unit } from "@/lib/v2/pay/config";
-import { rangeLabels, vehicleLabel } from "../labels";
+import { addBound, penaltyTypeOf, removeBound, setBound, setByVehicle, unitsFor, VEHICLES, type Kind, type RuleConfig, type Unit } from "@/lib/v2/pay/config";
+import { rangeLabels, unitLabel, vehicleLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 
 /** Edits one rule version: what it counts, how it pays, tiers, weight bands and the rate table. */
-export function ConfigEditor({ config, onChange }: { config: RuleConfig; onChange: (next: RuleConfig) => void }) {
+export function ConfigEditor({ kind, config, onChange }: { kind: Kind; config: RuleConfig; onChange: (next: RuleConfig) => void }) {
   const i18n = useI18n();
   const { t } = i18n;
   const flat = config.valueType === "flat";
+  // Penalties weigh nothing: no weight bands, unless an import brought some (so they can be removed).
+  const penalty = penaltyTypeOf(config.unit) !== null;
 
   return (
     <div className={ui.stack}>
@@ -25,7 +27,7 @@ export function ConfigEditor({ config, onChange }: { config: RuleConfig; onChang
           label={t("rule.counts")}
           value={config.unit}
           onValueChange={(unit) => onChange({ ...config, unit: unit as Unit })}
-          options={UNITS.map((u) => ({ value: u, label: t(`unit.${u}`) }))}
+          options={unitsFor(kind).map((u) => ({ value: u, label: unitLabel(i18n, u) }))}
         />
         <div className={ui.field}>
           <span className={ui.label}>{t("rule.pays")}</span>
@@ -78,7 +80,7 @@ export function ConfigEditor({ config, onChange }: { config: RuleConfig; onChang
         )}
       </section>
 
-      {!flat && (
+      {!flat && (!penalty || config.bands.length > 1) && (
         <section className={ui.stack} aria-labelledby="bands-title">
           <div>
             <h3 id="bands-title" className={ui.sectionTitle}>
@@ -106,7 +108,7 @@ function Bounds({ config, axis, onChange }: { config: RuleConfig; axis: "tiers" 
   const list = config[axis];
   const kind = axis === "tiers" ? "count" : "kg";
   const ranges = rangeLabels(i18n, list, kind);
-  const unit = t(axis === "tiers" ? "rule.parcels" : "rule.kg");
+  const unit = t(axis === "tiers" ? (penaltyTypeOf(config.unit) ? "rule.cases" : "rule.parcels") : "rule.kg");
 
   return (
     <div className={styles.bounds}>
@@ -145,8 +147,9 @@ function Bounds({ config, axis, onChange }: { config: RuleConfig; axis: "tiers" 
 function Rates({ config, onChange }: { config: RuleConfig; onChange: (next: RuleConfig) => void }) {
   const i18n = useI18n();
   const { t } = i18n;
+  const penalty = penaltyTypeOf(config.unit) !== null;
   const tierRanges = rangeLabels(i18n, config.tiers, "count");
-  const bandRanges = rangeLabels(i18n, config.bands, "kg");
+  const bandRanges = penalty && config.bands.length === 1 ? [t("rule.eachCase")] : rangeLabels(i18n, config.bands, "kg");
   const columns = config.byVehicle ? VEHICLES.map((v) => vehicleLabel(i18n, v)) : [t(config.valueType === "flat" ? "rule.amount" : "rule.rate")];
 
   function setRate(tier: number, band: number, col: number, value: number) {
@@ -156,12 +159,12 @@ function Rates({ config, onChange }: { config: RuleConfig; onChange: (next: Rule
 
   return config.values.map((tierValues, ti) => (
     <div key={ti} className={ui.stack}>
-      {config.tiers.length > 1 && <p className={styles.tierHeading}>{t("rule.tierHeading", { n: ti + 1, range: tierRanges[ti] })}</p>}
+      {config.tiers.length > 1 && <p className={styles.tierHeading}>{t(penalty ? "rule.tierHeadingCases" : "rule.tierHeading", { n: ti + 1, range: tierRanges[ti] })}</p>}
       <div className={styles.ratesWrap}>
         <table className={styles.rates}>
           <thead>
             <tr>
-              <th scope="col">{t("rule.weight")}</th>
+              <th scope="col">{t(penalty ? "sim.cases" : "rule.weight")}</th>
               {columns.map((c) => (
                 <th key={c} scope="col">
                   {c}

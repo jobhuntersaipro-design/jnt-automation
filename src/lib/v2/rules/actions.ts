@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
-import { EMPLOYMENTS, KINDS, parseConfig, type Employment, type Kind } from "@/lib/v2/pay/config";
+import { EMPLOYMENTS, KINDS, kindProblems, parseConfig, type Employment, type Kind } from "@/lib/v2/pay/config";
 import { MAX_FILE_BYTES, parseCsv } from "@/lib/v2/pay/rate-card-io";
 import { isPeriod } from "@/lib/v2/pay/resolve";
 import { capRows, readCsvText, readXlsx, type Sheet } from "@/lib/v2/pay/sheet";
@@ -58,6 +58,7 @@ export async function saveVersion(input: { ruleId: string; effectiveFrom: number
   if (!config) return { ok: false, error: "rule.err.invalidConfig" };
   const rule = await ownRule(s.agentId, input.ruleId);
   if (!rule) return { ok: false, error: "error.notFound" };
+  if (kindProblems(rule.kind, config).length > 0) return { ok: false, error: "rule.err.invalidConfig" };
 
   const key = { ruleId_effectiveFrom: { ruleId: rule.id, effectiveFrom: input.effectiveFrom } };
   const existing = await prisma.payRuleVersion.findUnique({ where: key, select: { id: true } });

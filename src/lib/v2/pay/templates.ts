@@ -13,4 +13,6 @@ export const TEMPLATES: Record<Kind, RuleConfig> = {
   SC_RTN: blankConfig({ unit: "sc_rtn" }),
   ALLOWANCE: blankConfig({ valueType: "flat" }),
   DEDUCTION: blankConfig({ valueType: "flat" }),
+  // Escalates with repeat offences in a month: the first two cases at one rate, later ones higher.
+  PENALTY: { ...blankConfig({ unit: "penalty:FAKE_ATTEMPT", tiers: [2, null] }), basis: "marginal" },
 };

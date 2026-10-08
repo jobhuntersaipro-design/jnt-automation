@@ -1,11 +1,17 @@
 import type { I18n } from "@/lib/i18n/core";
-import { boundRanges, EMPLOYMENTS, VEHICLES, type Employment, type RuleConfig, type Vehicle } from "@/lib/v2/pay/config";
+import { boundRanges, EMPLOYMENTS, penaltyTypeOf, VEHICLES, type Employment, type PenaltyType, type RuleConfig, type Unit, type Vehicle } from "@/lib/v2/pay/config";
 import { periodMonth, periodYear, type Period } from "@/lib/v2/pay/resolve";
 
 export const monthLabel = (i18n: I18n, p: Period) => i18n.month(periodYear(p), periodMonth(p));
 
 export const vehicleLabel = (i18n: I18n, v: Vehicle) => i18n.t(`vehicle.${v.toLowerCase() as Lowercase<Vehicle>}`);
 export const employmentLabel = (i18n: I18n, e: Employment) => i18n.t(e === "FULL_TIME" ? "employment.ft" : "employment.pt");
+export const penaltyLabel = (i18n: I18n, type: PenaltyType) => i18n.t(`penalty.type.${type}`);
+/** What a rule counts: "Delivered parcels", or a penalty type. */
+export function unitLabel(i18n: I18n, unit: Unit) {
+  const type = penaltyTypeOf(unit);
+  return type ? penaltyLabel(i18n, type) : i18n.t(`unit.${unit as "parcels" | "sc" | "sc_rtn"}`);
+}
 
 /** Every vehicle × FT/PT pair, for one select that sets a whole dispatcher profile. */
 export const PROFILES = VEHICLES.flatMap((vehicle) => EMPLOYMENTS.map((employment) => ({ key: `${vehicle}:${employment}`, vehicle, employment })));
@@ -33,7 +39,7 @@ export function rangeLabels(i18n: I18n, bounds: (number | null)[], kind: "count"
 
 /** Short facts about a config for list cards. */
 export function configSummary(i18n: I18n, c: RuleConfig): string[] {
-  const facts: string[] = [i18n.t(`unit.${c.unit}`)];
+  const facts: string[] = [unitLabel(i18n, c.unit)];
   if (c.valueType === "flat") facts.push(i18n.t("valueType.flat"));
   if (c.tiers.length > 1) facts.push(i18n.tp("rules.tierCount", c.tiers.length, { basis: i18n.t(`basis.${c.basis}`) }));
   if (c.bands.length > 1) facts.push(i18n.tp("rules.bandCount", c.bands.length));

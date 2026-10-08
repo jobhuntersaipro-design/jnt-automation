@@ -4,16 +4,39 @@ import type { MessageKey } from "@/lib/i18n/en";
 // One shape for every v2 pay rule. A rate card, the KPI card, fuel and SC-RTN differ only
 // in what they count (`unit`) and their numbers, so a new pay mode is a new rule, not code.
 
-export const KINDS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "ALLOWANCE", "DEDUCTION"] as const;
+export const KINDS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "ALLOWANCE", "DEDUCTION", "PENALTY"] as const;
 export type Kind = (typeof KINDS)[number];
 export const VEHICLES = ["BIKE", "CAR", "LORRY"] as const;
 export type Vehicle = (typeof VEHICLES)[number];
 export const EMPLOYMENTS = ["FULL_TIME", "PART_TIME"] as const;
 export type Employment = (typeof EMPLOYMENTS)[number];
 
-/** What a rule counts: normal deliveries, SC parcels or SC-RTN parcels. */
-export const UNITS = ["parcels", "sc", "sc_rtn"] as const;
+/** J&T HQ's QC penalty types. */
+export const PENALTY_TYPES = ["FAKE_ATTEMPT", "FAKE_POP", "PDNC", "INACTIVE", "POD", "COD_LATE", "COD_ISSUE", "LOST", "LATE_ARRIVAL", "OTHER"] as const;
+export type PenaltyType = (typeof PENALTY_TYPES)[number];
+
+/** What a rule counts: normal deliveries, SC or SC-RTN parcels, or a month's penalties of one type. */
+export const UNITS = [
+  "parcels",
+  "sc",
+  "sc_rtn",
+  "penalty:FAKE_ATTEMPT",
+  "penalty:FAKE_POP",
+  "penalty:PDNC",
+  "penalty:INACTIVE",
+  "penalty:POD",
+  "penalty:COD_LATE",
+  "penalty:COD_ISSUE",
+  "penalty:LOST",
+  "penalty:LATE_ARRIVAL",
+  "penalty:OTHER",
+] as const;
 export type Unit = (typeof UNITS)[number];
+export const penaltyUnit = (type: PenaltyType) => `penalty:${type}` as Unit;
+/** The penalty type a unit counts, or null for parcel units. */
+export const penaltyTypeOf = (unit: Unit): PenaltyType | null => (unit.startsWith("penalty:") ? (unit.slice(8) as PenaltyType) : null);
+/** Penalty rules count penalties; every other kind counts parcels. */
+export const unitsFor = (kind: Kind): Unit[] => UNITS.filter((u) => (penaltyTypeOf(u) !== null) === (kind === "PENALTY"));
 
 /**
  * Tier and band edges are upper bounds in ascending order; the last is null ("and above").
@@ -70,6 +93,12 @@ export function configProblems(config: RuleConfig): ConfigProblem[] {
   if (!shapeOk) problems.push({ key: "rule.err.shape" });
   else if (config.values.flat(2).some((v) => decimals(v) > 4)) problems.push({ key: "rule.err.rateDecimals" });
   return problems;
+}
+
+/** A rule's unit must suit its kind: penalties for penalty rules, parcels for the rest. Penalties have no weight. */
+export function kindProblems(kind: Kind, config: RuleConfig): ConfigProblem[] {
+  if (!unitsFor(kind).includes(config.unit)) return [{ key: "rule.err.unitKind" }];
+  return penaltyTypeOf(config.unit) && config.bands.length > 1 ? [{ key: "rule.err.penaltyBands" }] : [];
 }
 
 /** Parses untrusted input (a form post, a JSON column) into a valid config, or null. */

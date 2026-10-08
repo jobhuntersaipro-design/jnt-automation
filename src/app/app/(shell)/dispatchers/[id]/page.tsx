@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { DispatcherDetail, type ResolvedView } from "@/components/v2/people/dispatcher-detail";
-import { getDispatcher, listAssignments, listRuleOptions, ratesFrom } from "@/lib/v2/people/data";
+import { getDispatcher, listAssignments, listRuleOptions, penaltyTypesIn, ratesFrom } from "@/lib/v2/people/data";
 import { inForce, periodFromParam, periodOf, pickAssignments } from "@/lib/v2/pay/resolve";
 import { v2Session } from "@/lib/v2/session";
 
@@ -15,15 +15,23 @@ export default async function DispatcherPage({
   if (!s) notFound();
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const period = periodFromParam(query.month) ?? periodOf(new Date());
-  const [dispatcher, assignments, ruleOptions] = await Promise.all([getDispatcher(s.agentId, id), listAssignments(s.agentId), listRuleOptions(s.agentId)]);
+  const [dispatcher, assignments, ruleOptions, penaltyTypes] = await Promise.all([
+    getDispatcher(s.agentId, id),
+    listAssignments(s.agentId),
+    listRuleOptions(s.agentId),
+    penaltyTypesIn(s.agentId, period),
+  ]);
   if (!dispatcher) notFound();
 
   // Pay is worked out per outlet run; show the outlet asked for, else the first one.
   const outletId = dispatcher.outlets.find((o) => o.id === query.outlet)?.id ?? dispatcher.outlets[0].id;
   const profile = inForce(dispatcher.profiles, period);
-  const picked = pickAssignments(assignments, { period, branchId: outletId, dispatcherId: dispatcher.id, employment: profile?.employment ?? null });
+  // As in a payroll run: each penalty type picks its own rule.
+  const slotOf = (a: (typeof assignments)[number]) => (a.kind === "PENALTY" ? `PENALTY:${penaltyTypes.get(a.ruleId) ?? a.ruleId}` : a.kind);
+  const picked = pickAssignments(assignments, { period, branchId: outletId, dispatcherId: dispatcher.id, employment: profile?.employment ?? null }, slotOf);
   const resolved: ResolvedView[] = [...picked.values()].map((a) => ({
     kind: a.kind,
+    penalty: penaltyTypes.get(a.ruleId) ?? null,
     ruleId: a.ruleId,
     ruleName: a.ruleName,
     self: a.dispatcherId !== null,

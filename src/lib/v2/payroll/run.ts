@@ -8,7 +8,7 @@ import { inForce } from "@/lib/v2/pay/resolve";
 import { listAssignments } from "@/lib/v2/people/data";
 import { ensureOutlet } from "@/lib/v2/people/outlet";
 import type { ActionResult } from "@/lib/v2/session";
-import { payDispatcher, type Profile, type VersionRow } from "./calc";
+import { payDispatcher, type PenaltyCase, type Profile, type VersionRow } from "./calc";
 import { summariseRows, type FileDispatcher } from "./file";
 
 // Server side of a payroll run: the J&T file's rows → outlet, dispatchers and their parcels,
@@ -17,7 +17,22 @@ import { summariseRows, type FileDispatcher } from "./file";
 const json = (value: unknown) => value as Prisma.InputJsonValue;
 
 /** Audit actions that can change what a run pays. Anything logged after a run's calculation makes it stale. */
-const PAY_CHANGES = ["version", "replace", "deleteVersion", "archive", "assign", "unassign", "profile", "profileDelete"];
+const PAY_CHANGES = [
+  "version",
+  "replace",
+  "deleteVersion",
+  "archive",
+  "assign",
+  "unassign",
+  "profile",
+  "profileDelete",
+  "penaltyImport",
+  "penaltyDeleteImport",
+  "penaltyMatch",
+  "penaltyIgnore",
+  "penaltyUndo",
+  "penaltyWaive",
+];
 
 async function audit(agentId: string, actor: string | null, action: string, detail: Record<string, string | number | boolean | null>) {
   await prisma.ruleAudit.create({ data: { agentId, actor, action, detail } });
@@ -95,10 +110,17 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
 
-  const [assignments, versionRows, profileRows] = await Promise.all([
+  const dispatcherIds = run.results.map((r) => r.dispatcherId);
+  const [assignments, versionRows, profileRows, penaltyRows] = await Promise.all([
     listAssignments(agentId),
     prisma.payRuleVersion.findMany({ where: { rule: { agentId, archivedAt: null } }, select: { id: true, ruleId: true, effectiveFrom: true, config: true } }),
-    prisma.dispatcherProfile.findMany({ where: { dispatcherId: { in: run.results.map((r) => r.dispatcherId) } }, select: { dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true } }),
+    prisma.dispatcherProfile.findMany({ where: { dispatcherId: { in: dispatcherIds } }, select: { dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true } }),
+    // The month's matched cases, in the order they happened, so repeat cases escalate in order.
+    prisma.penaltyItem.findMany({
+      where: { agentId, period: run.period, status: "MATCHED", waived: false, dispatcherId: { in: dispatcherIds } },
+      orderBy: [{ occurredAt: { sort: "asc", nulls: "last" } }, { key: "asc" }],
+      select: { id: true, dispatcherId: true, type: true, waybill: true, occurredAt: true, amountCents: true, note: true },
+    }),
   ]);
   const versions = new Map<string, VersionRow[]>();
   for (const v of versionRows) {
@@ -111,11 +133,16 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
   }
   const profiles = new Map<string, Profile[]>();
   for (const { dispatcherId, ...p } of profileRows) profiles.set(dispatcherId, [...(profiles.get(dispatcherId) ?? []), p]);
+  const penalties = new Map<string, PenaltyCase[]>();
+  for (const { dispatcherId, occurredAt, ...p } of penaltyRows) {
+    penalties.set(dispatcherId!, [...(penalties.get(dispatcherId!) ?? []), { ...p, occurredAt: occurredAt?.toISOString().slice(0, 19) ?? null }]);
+  }
 
   // The rule versions the run used, so a finalised run keeps the rates it was paid at.
   const used: Record<string, { ruleId: string; name: string; kind: string; effectiveFrom: number; config: unknown }> = {};
   const updates = run.results.map((r) => {
     const profile = inForce(profiles.get(r.dispatcherId) ?? [], run.period);
+    const cases = penalties.get(r.dispatcherId) ?? [];
     const pay = payDispatcher({
       period: run.period,
       branchId: run.branchId,
@@ -124,6 +151,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
       profile,
       assignments,
       versionsOf: (ruleId) => versions.get(ruleId) ?? [],
+      penalties: cases,
     });
     for (const line of pay.lines) {
       const v = versions.get(line.ruleId)?.find((x) => x.id === line.versionId);
@@ -135,6 +163,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
         profile: profile ? json(profile) : Prisma.DbNull,
         lines: json(pay.lines),
         warnings: pay.warnings.length ? json(pay.warnings) : Prisma.DbNull,
+        penalties: cases.length ? json(cases) : Prisma.DbNull,
         earningsCents: pay.earningsCents,
         deductionCents: pay.deductionCents,
         netCents: pay.netCents,

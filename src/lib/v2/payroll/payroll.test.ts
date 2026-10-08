@@ -117,6 +117,79 @@ describe("payDispatcher", () => {
     expect(payDispatcher({ ...base, profile: { vehicle: "BIKE", employment: "FULL_TIME", effectiveFrom: 202610 }, assignments: [] }).warnings).toEqual([{ code: "noParcelRule" }]);
   });
 
+  describe("penalties", () => {
+    const profile = { vehicle: "BIKE" as const, employment: "PART_TIME" as const, effectiveFrom: 202610 };
+    // RM 10 for the first two fake attempts in a month, RM 20 for each one after.
+    const fake: RuleConfig = { ...blankConfig({ unit: "penalty:FAKE_ATTEMPT", tiers: [2, null] }), basis: "marginal", values: [[[10]], [[20]]] };
+    const lost: RuleConfig = { ...blankConfig({ unit: "penalty:LOST" }), values: [[[0]]] };
+    const withPenaltyRules = (ruleId: string) => [...versions, { id: "v-fake", ruleId: "fake", effectiveFrom: 202601, config: fake }, { id: "v-lost", ruleId: "lost", effectiveFrom: 202601, config: lost }].filter((v) => v.ruleId === ruleId);
+
+    it("deducts the file's amounts when no rule covers a type, and flags cases without one", () => {
+      const pay = payDispatcher({
+        ...base,
+        profile,
+        assignments: [at("a1", "PARCEL", "card")],
+        penalties: [
+          { type: "LOST", amountCents: 5000 },
+          { type: "FAKE_ATTEMPT", amountCents: 1000 },
+          { type: "LOST", amountCents: null },
+        ],
+      });
+      expect(pay.lines.map((l) => [l.ruleId, l.units, l.cents])).toEqual([
+        ["card", 4, 600],
+        ["file:FAKE_ATTEMPT", 1, 1000],
+        ["file:LOST", 2, 5000],
+      ]);
+      expect(pay.warnings).toEqual([{ code: "noPenaltyAmount", type: "LOST", count: 1 }]);
+      expect([pay.earningsCents, pay.deductionCents, pay.netCents]).toEqual([600, 6000, -5400]);
+    });
+
+    it("runs a type's rule over its cases in order, so repeat cases escalate; parcels are unaffected", () => {
+      const pay = payDispatcher({
+        ...base,
+        profile,
+        versionsOf: withPenaltyRules,
+        assignments: [at("a1", "PARCEL", "card"), at("a2", "KPI", "kpi"), at("a3", "PENALTY", "fake"), at("a4", "PENALTY", "lost")],
+        penalties: [
+          { type: "FAKE_ATTEMPT", amountCents: 500 },
+          { type: "FAKE_ATTEMPT", amountCents: 500 },
+          { type: "COD_LATE", amountCents: 300 },
+          { type: "FAKE_ATTEMPT", amountCents: null },
+        ],
+      });
+      expect(pay.warnings).toEqual([]);
+      expect(pay.lines.map((l) => [l.ruleId, l.units, l.cents])).toEqual([
+        ["card", 4, 600],
+        ["kpi", 4, 100], // still 4 parcels: penalties don't count towards parcel tiers
+        ["fake", 3, 4000], // 10 + 10 + 20; the file's amounts are ignored
+        ["file:COD_LATE", 1, 300],
+      ]);
+      expect(pay.lines.find((l) => l.ruleId === "fake")?.groups.map((g) => [g.tier, g.units])).toEqual([
+        [0, 2],
+        [1, 1],
+      ]);
+    });
+
+    it("lets a dispatcher's own penalty rule win for its type only", () => {
+      const own: RuleConfig = { ...fake, values: [[[1]], [[1]]] };
+      const pay = payDispatcher({
+        ...base,
+        profile,
+        versionsOf: (ruleId) => (ruleId === "own" ? [{ id: "v-own", ruleId, effectiveFrom: 202601, config: own }] : withPenaltyRules(ruleId)),
+        assignments: [at("a1", "PARCEL", "card"), at("a2", "PENALTY", "fake"), at("a3", "PENALTY", "own", { dispatcherId: "d1" }), at("a4", "PENALTY", "lost")],
+        penalties: [
+          { type: "FAKE_ATTEMPT", amountCents: 500 },
+          { type: "LOST", amountCents: 9900 },
+        ],
+      });
+      expect(pay.lines.map((l) => [l.ruleId, l.cents])).toEqual([
+        ["card", 600],
+        ["own", 100],
+        ["lost", 0], // a rule of RM 0 waives the file's amount
+      ]);
+    });
+  });
+
   it("uses this dispatcher's own rule over everyone's", () => {
     const pay = payDispatcher({
       ...base,

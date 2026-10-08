@@ -49,6 +49,9 @@ model Agent {
   payRules              PayRule[]
   payrollRuns           PayrollRun[]
   ruleAudits            RuleAudit[]
+  penaltyImports        PenaltyImport[]
+  penaltyItems          PenaltyItem[]
+  penaltyAliases        PenaltyAlias[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -183,6 +186,8 @@ model Dispatcher {
   payRuleAssignments PayRuleAssignment[]
   profiles           DispatcherProfile[]
   payrollResults     PayrollResult[]
+  penaltyItems       PenaltyItem[]
+  penaltyAliases     PenaltyAlias[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -565,6 +570,7 @@ enum PayRuleKind {
   SC_RTN
   ALLOWANCE
   DEDUCTION
+  PENALTY
 }
 
 enum PayrollRunStatus {
@@ -676,6 +682,8 @@ model PayrollResult {
   lines          Json
   /// Why a dispatcher isn't fully paid (no vehicle/type, a rule without rates).
   warnings       Json?
+  /// The penalty cases deducted, as they were when calculated (itemised on the payslip).
+  penalties      Json?
   earningsCents  Int        @default(0)
   deductionCents Int        @default(0)
   netCents       Int        @default(0)
@@ -699,4 +707,95 @@ model RuleAudit {
 
   @@index([agentId, createdAt])
   @@index([ruleId])
+}
+
+/// J&T HQ QC penalty types.
+enum PenaltyType {
+  FAKE_ATTEMPT
+  FAKE_POP
+  PDNC
+  INACTIVE
+  POD
+  COD_LATE
+  COD_ISSUE
+  LOST
+  LATE_ARRIVAL
+  OTHER
+}
+
+enum PenaltyStatus {
+  MATCHED
+  UNMATCHED
+  IGNORED
+}
+
+/// One penalty file imported into a month. Items point at the import that added them.
+model PenaltyImport {
+  id        String        @id @default(cuid())
+  agentId   String
+  period    Int
+  fileName  String
+  /// Cases read from the file, and how many were new or changed.
+  rows      Int
+  added     Int
+  updated   Int
+  actor     String?
+  createdAt DateTime      @default(now())
+  agent     Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  items     PenaltyItem[]
+
+  @@index([agentId, period])
+}
+
+/// One penalty case from a J&T QC file. Unique per month, type and key, so importing the
+/// same cases again updates them instead of counting them twice.
+model PenaltyItem {
+  id           String        @id @default(cuid())
+  agentId      String
+  importId     String
+  period       Int
+  type         PenaltyType
+  key          String
+  waybill      String?
+  /// The dispatcher as the file names them; matching links `dispatcherId`.
+  extId        String?
+  name         String?
+  /// "id:<J&T ID>" or "name:<normalized name>": a manual match or ignore applies to every case with the same.
+  who          String?
+  outlet       String?
+  occurredAt   DateTime?
+  /// The amount in the file, if it has one. A penalty rule, when one applies, decides instead.
+  amountCents  Int?
+  appeal       String?
+  note         String?
+  waived       Boolean       @default(false)
+  /// Set when someone waived or un-waived by hand; imports then keep that choice.
+  waivedBy     String?
+  status       PenaltyStatus @default(UNMATCHED)
+  dispatcherId String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  file         PenaltyImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  dispatcher   Dispatcher?   @relation(fields: [dispatcherId], references: [id], onDelete: SetNull)
+
+  @@unique([agentId, period, type, key])
+  @@index([agentId, period, status])
+  @@index([agentId, who])
+  @@index([dispatcherId, period])
+}
+
+/// A manual decision for penalty rows naming someone the matcher couldn't place:
+/// "id:<J&T ID>" or "name:<normalized name>" -> a dispatcher, or none to ignore them.
+model PenaltyAlias {
+  id           String      @id @default(cuid())
+  agentId      String
+  key          String
+  dispatcherId String?
+  actor        String?
+  createdAt    DateTime    @default(now())
+  agent        Agent       @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  dispatcher   Dispatcher? @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, key])
 }

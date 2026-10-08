@@ -9,17 +9,19 @@ import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
 import { Select } from "@/components/arc/select/select";
 import { useI18n } from "@/components/v2/i18n-provider";
-import { KINDS, type Employment, type Kind } from "@/lib/v2/pay/config";
+import { KINDS, type Employment, type Kind, type PenaltyType } from "@/lib/v2/pay/config";
 import { deleteProfile, setProfiles } from "@/lib/v2/people/actions";
 import type { ProfileView } from "@/lib/v2/people/data";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
 import { addAssignment, removeAssignment } from "@/lib/v2/rules/actions";
-import { monthLabel, PROFILES, profileKey, profileLabel, scopeLabel } from "../labels";
+import { monthLabel, penaltyLabel, PROFILES, profileKey, profileLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./people.module.css";
 
 export interface ResolvedView {
   kind: Kind;
+  /** The type a penalty rule deducts this month; each type has its own rule. */
+  penalty: PenaltyType | null;
   ruleId: string;
   ruleName: string;
   self: boolean;
@@ -47,6 +49,11 @@ export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasPr
   const { t } = i18n;
   const router = useRouter();
   const go = (p: Period, outlet: string) => router.replace(`/app/dispatchers/${dispatcher.id}?month=${p}&outlet=${outlet}`, { scroll: false });
+  // One row per kind; penalties get one per type that has a rule.
+  const rows: { kind: Kind; r?: ResolvedView }[] = KINDS.flatMap((kind) => {
+    const rs = resolved.filter((x) => x.kind === kind);
+    return rs.length > 0 ? rs.map((r) => ({ kind, r })) : [{ kind }];
+  });
 
   return (
     <div className={ui.page}>
@@ -94,19 +101,18 @@ export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasPr
             </div>
             {!hasProfile && <Alert tone="warning" title={t("dispatcher.noProfile")} />}
             <ul className={ui.list}>
-              {KINDS.map((kind) => {
-                const r = resolved.find((x) => x.kind === kind);
+              {rows.map(({ kind, r }) => {
                 const who = r && (r.self ? t("dispatcher.self") : scopeLabel(i18n, { branchCode: r.branchCode, dispatcherName: null, employment: r.employment }));
                 return (
-                  <li key={kind}>
+                  <li key={r ? `${kind}:${r.ruleId}` : kind}>
                     <span className={styles.named}>
-                      <span className={ui.help}>{t(`kind.${kind}`)}</span>
+                      <span className={ui.help}>{r?.penalty ? `${t(`kind.${kind}`)} · ${penaltyLabel(i18n, r.penalty)}` : t(`kind.${kind}`)}</span>
                       {r ? (
                         <Link href={`/app/rules/${r.ruleId}`} className={ui.link}>
                           {r.ruleName}
                         </Link>
                       ) : (
-                        <span className={ui.muted}>{t("dispatcher.noRule")}</span>
+                        <span className={ui.muted}>{t(kind === "PENALTY" ? "dispatcher.noPenaltyRule" : "dispatcher.noRule")}</span>
                       )}
                     </span>
                     {r && who && (

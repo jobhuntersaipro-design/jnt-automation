@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Employment, Kind, Vehicle } from "@/lib/v2/pay/config";
+import { parseConfig, penaltyTypeOf, type Employment, type Kind, type PenaltyType, type Vehicle } from "@/lib/v2/pay/config";
 import { inForce, type AssignmentRow, type Period } from "@/lib/v2/pay/resolve";
 
 // Read models for the v2 outlet and dispatcher screens. Every query is scoped by agentId;
@@ -124,6 +124,21 @@ export async function listAssignments(agentId: string): Promise<AssignmentInfo[]
 
 /** The month a rule's rates come from in `period`, or null when it has none yet. */
 export const ratesFrom = (a: AssignmentInfo, period: Period) => inForce(a.versionMonths.map((effectiveFrom) => ({ effectiveFrom })), period)?.effectiveFrom ?? null;
+
+/** The penalty type each penalty rule deducts in `period`: rules are picked per type, not per kind. */
+export async function penaltyTypesIn(agentId: string, period: Period): Promise<Map<string, PenaltyType>> {
+  const versions = await prisma.payRuleVersion.findMany({
+    where: { rule: { agentId, kind: "PENALTY", archivedAt: null }, effectiveFrom: { lte: period } },
+    orderBy: { effectiveFrom: "asc" },
+    select: { ruleId: true, config: true },
+  });
+  const types = new Map<string, PenaltyType>();
+  for (const v of versions) {
+    const type = penaltyTypeOf(parseConfig(v.config)?.unit ?? "parcels");
+    if (type) types.set(v.ruleId, type); // ascending, so the version in force wins
+  }
+  return types;
+}
 
 export function listRuleOptions(agentId: string) {
   return prisma.payRule.findMany({ where: { agentId, archivedAt: null }, orderBy: [{ kind: "asc" }, { name: "asc" }], select: { id: true, name: true, kind: true } });
