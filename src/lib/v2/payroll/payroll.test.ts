@@ -83,6 +83,20 @@ describe("payDispatcher", () => {
   };
   const everyone = [at("a1", "PARCEL", "card"), at("a2", "KPI", "kpi", { employment: "FULL_TIME" }), at("a3", "DEDUCTION", "loan", { dispatcherId: "d1" })];
 
+  it("pays the success-rate bonus of the tier the month's rate reaches, and flags a missing rate", () => {
+    const success: RuleConfig = { ...blankConfig({ unit: "success_rate", valueType: "flat", tiers: [94.99, 97.99, null] }), values: [[[0]], [[100]], [[200]]] };
+    const withSuccess = (ruleId: string) => (id: string) => (id === ruleId ? [{ id: "v-s", ruleId, effectiveFrom: 202601, config: success }] : base.versionsOf(id));
+    const profile = { vehicle: "BIKE" as const, employment: "PART_TIME" as const, effectiveFrom: 202610 };
+    const rules = [at("a1", "PARCEL", "card"), at("a9", "SUCCESS", "succ")];
+    const line = (rate: number | null) => payDispatcher({ ...base, profile, assignments: rules, versionsOf: withSuccess("succ"), successRate: rate });
+    expect(line(98).lines.find((l) => l.kind === "SUCCESS")).toMatchObject({ units: 98, cents: 20000 });
+    expect(line(97.99).lines.find((l) => l.kind === "SUCCESS")?.cents).toBe(10000);
+    expect(line(94.99).lines.find((l) => l.kind === "SUCCESS")?.cents).toBe(0);
+    const missing = line(null);
+    expect(missing.warnings).toEqual([{ code: "noSuccessRate" }]);
+    expect(missing.lines.find((l) => l.kind === "SUCCESS")?.cents).toBe(0);
+  });
+
   it("takes advances back last, never below RM 0 net", () => {
     const profile = { vehicle: "CAR" as const, employment: "PART_TIME" as const, effectiveFrom: 202610 };
     const card = [at("a1", "PARCEL", "card")];

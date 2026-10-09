@@ -8,7 +8,7 @@ import { DecimalInput } from "@/components/v2/decimal-input";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { configProblems, penaltyTypeOf, VEHICLES, type RuleConfig, type Vehicle } from "@/lib/v2/pay/config";
 import { computeRule, UNIT_LETTER } from "@/lib/v2/pay/engine";
-import { rangeLabels, unitLabel, vehicleLabel } from "../labels";
+import { rangeLabels, tierScale, unitLabel, vehicleLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 
@@ -23,15 +23,19 @@ export function Simulator({ config }: { config: RuleConfig }) {
   // Penalty rules count a month's cases, which weigh nothing: one count, no weights.
   const penalty = penaltyTypeOf(config.unit) !== null;
   const [cases, setCases] = useState(3);
+  // A success-rate bonus reads one number: the month's rate.
+  const success = config.unit === "success_rate";
+  const [rate, setRate] = useState(97.5);
 
   const result = useMemo(() => {
     if (configProblems(config).length > 0) return null;
     const w: number[] = penalty ? Array.from({ length: Math.min(cases, MAX_PARCELS) }, () => 0) : [];
     if (!penalty) for (const row of rows) for (let i = 0; i < row.count && w.length < MAX_PARCELS; i++) w.push(row.weight);
+    if (success) return computeRule(config, { w: [], c: "" }, vehicle, { successRate: rate });
     return computeRule(config, { w, c: UNIT_LETTER[config.unit].repeat(w.length) }, vehicle);
-  }, [config, rows, vehicle, penalty, cases]);
+  }, [config, rows, vehicle, penalty, cases, success, rate]);
 
-  const tiers = rangeLabels(i18n, config.tiers, "count");
+  const tiers = rangeLabels(i18n, config.tiers, tierScale(config));
   const bands = rangeLabels(i18n, config.bands, "kg");
   const update = (i: number, patch: Partial<(typeof rows)[number]>) => setRows((rs) => rs.map((r, j) => (j === i ? { ...r, ...patch } : r)));
 
@@ -41,7 +45,7 @@ export function Simulator({ config }: { config: RuleConfig }) {
         <h2 id="sim-title" className={ui.cardTitle}>
           {t("sim.title")}
         </h2>
-        <p className={ui.help}>{penalty ? t("sim.helpPenalty") : t("sim.help", { unit: unitLabel(i18n, config.unit) })}</p>
+        <p className={ui.help}>{success ? t("sim.helpSuccess") : penalty ? t("sim.helpPenalty") : t("sim.help", { unit: unitLabel(i18n, config.unit) })}</p>
       </div>
       {config.byVehicle && (
         <Select
@@ -51,13 +55,19 @@ export function Simulator({ config }: { config: RuleConfig }) {
           options={VEHICLES.map((v) => ({ value: v, label: vehicleLabel(i18n, v) }))}
         />
       )}
+      {success && (
+        <label className={ui.field}>
+          <span className={ui.label}>{t("sim.rate")}</span>
+          <DecimalInput className={styles.fill} label={t("sim.rate")} value={rate} onValueChange={(n) => setRate(Math.min(100, Math.max(0, n)))} />
+        </label>
+      )}
       {penalty && (
         <label className={ui.field}>
           <span className={ui.label}>{t("sim.cases")}</span>
           <DecimalInput className={styles.fill} label={t("sim.cases")} value={cases} onValueChange={(n) => setCases(Math.max(0, Math.floor(n)))} />
         </label>
       )}
-      {!penalty && rows.map((row, i) => (
+      {!penalty && !success && rows.map((row, i) => (
         <div key={i} className={styles.simRow}>
           <label className={ui.field}>
             <span className={ui.label}>{t("sim.weight")}</span>
@@ -72,7 +82,7 @@ export function Simulator({ config }: { config: RuleConfig }) {
           </Button>
         </div>
       ))}
-      {!penalty && (
+      {!penalty && !success && (
         <div>
           <Button variant="secondary" size="sm" onClick={() => setRows((rs) => [...rs, { weight: 6, count: 200 }])}>
             <Plus size={16} aria-hidden="true" />

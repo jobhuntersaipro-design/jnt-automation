@@ -8,7 +8,7 @@ import { Switch } from "@/components/arc/switch/switch";
 import { DecimalInput } from "@/components/v2/decimal-input";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { addBound, penaltyTypeOf, removeBound, setBound, setByVehicle, unitsFor, VEHICLES, type Kind, type RuleConfig, type Unit } from "@/lib/v2/pay/config";
-import { rangeLabels, unitLabel, vehicleLabel } from "../labels";
+import { rangeLabels, tierHeadingKey, tierScale, unitLabel, vehicleLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./rules.module.css";
 
@@ -17,6 +17,8 @@ export function ConfigEditor({ kind, config, onChange }: { kind: Kind; config: R
   const i18n = useI18n();
   const { t } = i18n;
   const flat = config.valueType === "flat";
+  // A success-rate bonus is one fixed amount per % tier: nothing else to choose.
+  const success = config.unit === "success_rate";
   // Penalties weigh nothing: no weight bands, unless an import brought some (so they can be removed).
   const penalty = penaltyTypeOf(config.unit) !== null;
 
@@ -29,6 +31,7 @@ export function ConfigEditor({ kind, config, onChange }: { kind: Kind; config: R
           onValueChange={(unit) => onChange({ ...config, unit: unit as Unit })}
           options={unitsFor(kind).map((u) => ({ value: u, label: unitLabel(i18n, u) }))}
         />
+        {!success && (
         <div className={ui.field}>
           <span className={ui.label}>{t("rule.pays")}</span>
           <SegmentedControl
@@ -47,6 +50,7 @@ export function ConfigEditor({ kind, config, onChange }: { kind: Kind; config: R
             ]}
           />
         </div>
+        )}
         <div className={ui.field}>
           <span className={ui.label}>{t("rule.vehicles")}</span>
           <Switch label={t("rule.byVehicle")} checked={config.byVehicle} onCheckedChange={(on) => onChange(setByVehicle(config, on))} />
@@ -56,9 +60,9 @@ export function ConfigEditor({ kind, config, onChange }: { kind: Kind; config: R
       <section className={ui.stack} aria-labelledby="tiers-title">
         <div>
           <h3 id="tiers-title" className={ui.sectionTitle}>
-            {t("rule.tiers")}
+            {t(success ? "rule.tiersSuccess" : "rule.tiers")}
           </h3>
-          <p className={ui.help}>{t(flat ? "rule.tiersHelpFlat" : "rule.tiersHelp")}</p>
+          <p className={ui.help}>{t(success ? "rule.tiersHelpSuccess" : flat ? "rule.tiersHelpFlat" : "rule.tiersHelp")}</p>
         </div>
         <Bounds config={config} axis="tiers" onChange={onChange} />
         {config.tiers.length > 1 && !flat && (
@@ -106,9 +110,9 @@ function Bounds({ config, axis, onChange }: { config: RuleConfig; axis: "tiers" 
   const i18n = useI18n();
   const { t } = i18n;
   const list = config[axis];
-  const kind = axis === "tiers" ? "count" : "kg";
+  const kind = axis === "tiers" ? tierScale(config) : "kg";
   const ranges = rangeLabels(i18n, list, kind);
-  const unit = t(axis === "tiers" ? (penaltyTypeOf(config.unit) ? "rule.cases" : "rule.parcels") : "rule.kg");
+  const unit = t(axis === "tiers" ? (kind === "pct" ? "rule.percent" : penaltyTypeOf(config.unit) ? "rule.cases" : "rule.parcels") : "rule.kg");
 
   return (
     <div className={styles.bounds}>
@@ -148,8 +152,9 @@ function Rates({ config, onChange }: { config: RuleConfig; onChange: (next: Rule
   const i18n = useI18n();
   const { t } = i18n;
   const penalty = penaltyTypeOf(config.unit) !== null;
-  const tierRanges = rangeLabels(i18n, config.tiers, "count");
-  const bandRanges = penalty && config.bands.length === 1 ? [t("rule.eachCase")] : rangeLabels(i18n, config.bands, "kg");
+  const success = config.unit === "success_rate";
+  const tierRanges = rangeLabels(i18n, config.tiers, tierScale(config));
+  const bandRanges = success ? [t("rule.forTheMonth")] : penalty && config.bands.length === 1 ? [t("rule.eachCase")] : rangeLabels(i18n, config.bands, "kg");
   const columns = config.byVehicle ? VEHICLES.map((v) => vehicleLabel(i18n, v)) : [t(config.valueType === "flat" ? "rule.amount" : "rule.rate")];
 
   function setRate(tier: number, band: number, col: number, value: number) {
@@ -159,12 +164,12 @@ function Rates({ config, onChange }: { config: RuleConfig; onChange: (next: Rule
 
   return config.values.map((tierValues, ti) => (
     <div key={ti} className={ui.stack}>
-      {config.tiers.length > 1 && <p className={styles.tierHeading}>{t(penalty ? "rule.tierHeadingCases" : "rule.tierHeading", { n: ti + 1, range: tierRanges[ti] })}</p>}
+      {config.tiers.length > 1 && <p className={styles.tierHeading}>{t(tierHeadingKey(config), { n: ti + 1, range: tierRanges[ti] })}</p>}
       <div className={styles.ratesWrap}>
         <table className={styles.rates}>
           <thead>
             <tr>
-              <th scope="col">{t(penalty ? "sim.cases" : "rule.weight")}</th>
+              <th scope="col">{t(success ? "rule.paid" : penalty ? "sim.cases" : "rule.weight")}</th>
               {columns.map((c) => (
                 <th key={c} scope="col">
                   {c}

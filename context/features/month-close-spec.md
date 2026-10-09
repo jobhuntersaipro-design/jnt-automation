@@ -140,5 +140,12 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    (for Bukku, SQL Account or the accountant to map) and Xero's manual journal CSV (signed amounts, tax rate name,
    branch as a tracking option). Bukku's and SQL Account's own import templates weren't confirmed; fit them once a
    client shares one.
-7. Later: LHDN self-billed e-Invoice if riders are contractors
-   (verify against LHDN); success-rate bonus tiers; COD reconciliation; weekly pay.
+7. **Built:** success-rate bonus. Rule type *Success-rate bonus* (`PayRuleKind.SUCCESS`, unit `success_rate`):
+   tiers are % upper bounds (two decimals), each pays one fixed amount for the month. Rates come from J&T's
+   success-rate report on `/app/success-rates` (nav *Success rates*, sidebar month): columns guessed from English,
+   Chinese or Malay headers (J&T ID, name, branch, rate, or delivered and total), changeable before import; fractions
+   and percentages both read; one row per month and J&T ID (`SuccessRate`, migration `20261019_v2_success_rate`), so
+   importing again updates. Typed-in rates for anyone the report misses. Runs read the rate by the J&T ID in the run;
+   a dispatcher a success rule applies to with no rate is flagged (blocks finalising until a rate is typed in).
+8. Later: LHDN self-billed e-Invoice if riders are contractors
+   (verify against LHDN); COD reconciliation; weekly pay.
