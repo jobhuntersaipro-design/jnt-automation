@@ -63,7 +63,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   if (rows.length === 0) {
     return (
       <div className={ui.page}>
-        <Header />
+        <DispatchersHeader tab="list" />
         <EmptyState title={t("dispatchers.emptyTitle")} description={t("dispatchers.emptyBody")} />
       </div>
     );
@@ -71,7 +71,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
 
   return (
     <div className={ui.page}>
-      <Header />
+      <DispatchersHeader tab="list" />
       <div className={styles.toolbar}>
         <div className={styles.search}>
           <SearchField label={t("dispatchers.search")} value={query} onValueChange={setQuery} clearLabel={t("common.clearSearch")} />
@@ -189,14 +189,25 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   );
 }
 
-function Header() {
+/** Page header shared by the dispatcher list and the vehicle-and-type change log. */
+export function DispatchersHeader({ tab }: { tab: "list" | "history" }) {
   const { t } = useI18n();
   return (
-    <header className={ui.pageHeader}>
-      <div>
-        <h1 className={ui.title}>{t("dispatchers.title")}</h1>
-        <p className={ui.subtitle}>{t("dispatchers.subtitle")}</p>
-      </div>
-    </header>
+    <>
+      <header className={ui.pageHeader}>
+        <div>
+          <h1 className={ui.title}>{t("dispatchers.title")}</h1>
+          <p className={ui.subtitle}>{t("dispatchers.subtitle")}</p>
+        </div>
+      </header>
+      <nav className={styles.tabs} aria-label={t("dispatchers.title")}>
+        <Link href="/app/dispatchers" className={styles.tab} aria-current={tab === "list" ? "page" : undefined}>
+          {t("dispatchers.tabList")}
+        </Link>
+        <Link href="/app/dispatchers/history" className={styles.tab} aria-current={tab === "history" ? "page" : undefined}>
+          {t("dispatchers.tabHistory")}
+        </Link>
+      </nav>
+    </>
   );
 }
