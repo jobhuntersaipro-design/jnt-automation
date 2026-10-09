@@ -47,3 +47,20 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: var(--space-4);
 }
+
+/* A long RM figure in a narrow card steps down a size instead of running into the next card. */
+.metrics > * {
+  container-type: inline-size;
+}
+
+@container (max-width: 18rem) {
+  .metrics > * > * {
+    --text-3xl: var(--text-2xl);
+  }
+}
+
+@container (max-width: 14rem) {
+  .metrics > * > * {
+    --text-3xl: var(--text-xl);
+  }
+}

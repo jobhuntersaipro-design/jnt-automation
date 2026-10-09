@@ -19,15 +19,17 @@ export default async function V2Dashboard() {
   if (!s) notFound();
   const i18n = await getI18n();
   const { t, tp } = i18n;
-  const [rateCards, runs, flagged, unmatched] = await Promise.all([
+  const [rateCards, runs, flagged, unmatched, outlets] = await Promise.all([
     prisma.payRuleAssignment.count({ where: { agentId: s.agentId, kind: "PARCEL", rule: { archivedAt: null } } }),
     prisma.payrollRun.findMany({
       where: { agentId: s.agentId },
-      orderBy: [{ period: "desc" }, { createdAt: "desc" }],
-      select: { id: true, period: true, status: true, parcelCount: true, branch: { select: { code: true } }, _count: { select: { results: true } } },
+      // Most recently worked on first: uploading an older month makes it the one shown.
+      orderBy: { updatedAt: "desc" },
+      select: { id: true, period: true, status: true, parcelCount: true, branch: { select: { code: true } } },
     }),
     prisma.payrollResult.groupBy({ by: ["runId"], where: { run: { agentId: s.agentId, status: "DRAFT" }, warnings: { not: Prisma.DbNull } }, _count: { _all: true } }),
     prisma.penaltyItem.groupBy({ by: ["period"], where: { agentId: s.agentId, status: "UNMATCHED" }, _count: { _all: true }, orderBy: { period: "desc" } }),
+    prisma.branch.count({ where: { agentId: s.agentId, isDemo: false } }),
   ]);
   const flaggedBy = new Map(flagged.map((f) => [f.runId, f._count._all]));
   const steps = [
@@ -40,9 +42,13 @@ export default async function V2Dashboard() {
   const latest = runs[0]?.period ?? null;
   const latestRuns = runs.filter((r) => r.period === latest);
   const month = latest ? monthLabel(i18n, latest) : "";
-  const net = latest
-    ? await prisma.payrollResult.aggregate({ where: { runId: { in: latestRuns.map((r) => r.id) } }, _sum: { netCents: true } })
-    : null;
+  const inLatest = { runId: { in: latestRuns.map((r) => r.id) } };
+  const [net, paid] = latest
+    ? await Promise.all([
+        prisma.payrollResult.aggregate({ where: inLatest, _sum: { netCents: true } }),
+        prisma.payrollResult.count({ where: { ...inLatest, netCents: { gt: 0 } } }),
+      ])
+    : [null, 0];
 
   const attention = [
     ...runs
@@ -69,13 +75,13 @@ export default async function V2Dashboard() {
           </h2>
           <div className={styles.metrics}>
             <MetricCard label={t("dashboard.net")} value={(net?._sum.netCents ?? 0) / 100} prefix={RM} decimals={2} locale={i18n.tag} context={month} />
-            <MetricCard label={t("dashboard.dispatchers")} value={latestRuns.reduce((n, r) => n + r._count.results, 0)} locale={i18n.tag} context={month} />
+            <MetricCard label={t("dashboard.dispatchers")} value={paid} locale={i18n.tag} context={month} />
             <MetricCard label={t("dashboard.parcels")} value={latestRuns.reduce((n, r) => n + r.parcelCount, 0)} locale={i18n.tag} context={month} />
             <MetricCard
               label={t("dashboard.finalised")}
               value={latestRuns.filter((r) => r.status === "FINAL").length}
               locale={i18n.tag}
-              context={t("dashboard.ofOutlets", { count: latestRuns.length })}
+              context={t("dashboard.ofOutlets", { count: Math.max(outlets, latestRuns.length) })}
             />
           </div>
         </section>

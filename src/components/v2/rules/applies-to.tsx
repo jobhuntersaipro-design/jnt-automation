@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/arc/button/button";
@@ -36,6 +36,8 @@ export function AppliesTo({
   const [dispatcherId, setDispatcherId] = useState(dispatchers[0]?.id ?? "");
   const [month, setMonth] = useState(periodToInput(thisMonth));
   const [pending, setPending] = useState(false);
+  // Keeps the button busy until the refreshed list is on screen, not just until the save returns.
+  const [refreshing, startRefresh] = useTransition();
 
   const needsOutlet = who.startsWith("outlet");
   const employment: Employment | null = who.endsWith("ft") ? "FULL_TIME" : who.endsWith("pt") ? "PART_TIME" : null;
@@ -54,7 +56,8 @@ export function AppliesTo({
     });
     setPending(false);
     if (!result.ok) return toast.error(t(result.error));
-    router.refresh();
+    toast.success(t("applies.added"));
+    startRefresh(() => router.refresh());
   }
 
   async function remove(assignmentId: string) {
@@ -91,11 +94,11 @@ export function AppliesTo({
       <div className={ui.stack}>
         <Select label={t("applies.who")} value={who} onValueChange={(v) => setWho(v as Who)} options={available.map((w) => ({ value: w, label: t(`applies.${w}`) }))} />
         {needsOutlet && (
-          <Select label={t("applies.outlet")} value={outletId} onValueChange={setOutletId} options={outlets.map((o) => ({ value: o.id, label: o.code }))} />
+          <Select label={t("applies.whichOutlet")} value={outletId} onValueChange={setOutletId} options={outlets.map((o) => ({ value: o.id, label: o.code }))} />
         )}
         {who === "dispatcher" && (
           <Select
-            label={t("applies.dispatcher")}
+            label={t("applies.whichDispatcher")}
             value={dispatcherId}
             onValueChange={setDispatcherId}
             options={dispatchers.map((d) => ({ value: d.id, label: `${d.name} · ${d.extId}` }))}
@@ -106,7 +109,7 @@ export function AppliesTo({
           <input type="month" className={ui.input} value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
         <div>
-          <Button variant="secondary" onClick={add} loading={pending}>
+          <Button variant="secondary" onClick={add} loading={pending || refreshing}>
             {t("applies.add")}
           </Button>
         </div>

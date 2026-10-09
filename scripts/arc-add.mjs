@@ -11,7 +11,8 @@
 // - button/button.module.css: .primary uses --accent (EasyStaff blue) instead of --foreground.
 // - search-field/search-field.tsx: clearLabel prop (was a fixed English aria-label).
 // - calendar/calendar.tsx, date-picker/date-picker.tsx: messages prop for their English strings.
-// - metric-card/metric-card.tsx: prefix, decimals and locale passed to AnimatedCounter (RM amounts).
+// - metric-card/metric-card.tsx: prefix, decimals and locale passed to AnimatedCounter (RM amounts);
+//   no count-up when there is a prefix (money reads jumbled mid-roll).
 // - dialog/dialog.tsx: closeLabel prop (was a fixed English aria-label).
 // - number-field/number-field.tsx: stepMessages prop (was fixed English Increase/Decrease).
 // - combobox/combobox.tsx: clearLabel prop (was a fixed English aria-label).

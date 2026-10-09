@@ -69,6 +69,37 @@
   text-align: right;
 }
 
+/* One language only: the other half of every bilingual label is hidden, on screen and in print. */
+.sheets[data-lang="en"] [lang="zh-CN"],
+.sheets[data-lang="zh"] [lang="en"] {
+  display: none;
+}
+
+.langs {
+  display: inline-flex;
+  gap: var(--space-1);
+}
+
+.langs a {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.langs a[aria-current] {
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
 .both {
   display: inline-flex;
   flex-wrap: wrap;

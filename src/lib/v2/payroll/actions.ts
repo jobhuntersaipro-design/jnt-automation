@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { planCover } from "./cover";
 import { calculateRun, finaliseRun } from "./run";
 
 // Mutations behind the v2 payroll screens; every one is scoped to the caller's account.
@@ -31,6 +32,43 @@ export async function recalculateRun(input: { runId: string }): Promise<ActionRe
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
   const result = await calculateRun(s.agentId, input.runId);
+  if (result.ok) refresh();
+  return result;
+}
+
+/**
+ * One click for "no rate card covers this month": the account's rate cards start from the run's month instead,
+ * numbers unchanged (see planCover), then the draft is recalculated.
+ */
+export async function coverRunMonth(input: { runId: string }): Promise<ActionResult> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const run = await prisma.payrollRun.findFirst({ where: { id: input.runId, agentId: s.agentId }, select: { id: true, period: true, status: true, branch: { select: { code: true } } } });
+  if (!run) return { ok: false, error: "error.notFound" };
+  if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
+  const rules = await prisma.payRule.findMany({
+    where: { agentId: s.agentId, kind: "PARCEL", archivedAt: null },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      versions: { select: { id: true, effectiveFrom: true } },
+      assignments: { select: { id: true, branchId: true, dispatcherId: true, employment: true, effectiveFrom: true } },
+    },
+  });
+  const plan = planCover(run.period, rules);
+  if (!plan) return { ok: false, error: "run.cover.noCard" };
+  const month = run.period;
+  await prisma.$transaction([
+    prisma.payRuleVersion.updateMany({ where: { id: { in: plan.versions } }, data: { effectiveFrom: month } }),
+    prisma.payRuleAssignment.updateMany({ where: { id: { in: plan.assignments }, agentId: s.agentId }, data: { effectiveFrom: month } }),
+    ...(plan.assignEveryone ? [prisma.payRuleAssignment.create({ data: { agentId: s.agentId, ruleId: plan.assignEveryone, kind: "PARCEL", effectiveFrom: month } })] : []),
+    // One entry per card touched, so its history says why its start month moved.
+    ...rules
+      .filter((r) => r.id === plan.assignEveryone || r.versions.some((v) => plan.versions.includes(v.id)) || r.assignments.some((a) => plan.assignments.includes(a.id)))
+      .map((r) => prisma.ruleAudit.create({ data: { agentId: s.agentId, actor: s.actor, ruleId: r.id, action: "cover", detail: { month, outlet: run.branch.code } } })),
+  ]);
+  const result = await calculateRun(s.agentId, run.id);
+  revalidatePath("/app/rules", "layout");
   if (result.ok) refresh();
   return result;
 }

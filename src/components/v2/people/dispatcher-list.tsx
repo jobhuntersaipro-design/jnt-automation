@@ -25,7 +25,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   const [query, setQuery] = useState("");
   const [show, setShow] = useState<"all" | "unset">("all");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [bulk, setBulk] = useState(PROFILES[0].key);
+  const [bulk, setBulk] = useState("");
   const [bulkPending, setBulkPending] = useState(false);
   // What the user just picked, shown until the server's copy catches up.
   const [picked, setPicked] = useState<Record<string, string>>({});
@@ -36,6 +36,10 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   const visible = rows.filter((r) => (show === "all" || !valueOf(r)) && (!q || [r.name, r.extId, ...r.outlets].some((s) => s.toLowerCase().includes(q))));
   const unset = rows.filter((r) => !valueOf(r)).length;
   const allSelected = visible.length > 0 && visible.every((r) => selected.has(r.id));
+  // Two J&T IDs under one name are usually one person registered twice; worth a look before paying both.
+  const nameKey = (r: DispatcherRow) => r.name.trim().replace(/\s+/g, " ").toUpperCase();
+  const nameCounts = new Map<string, number>();
+  for (const r of rows) nameCounts.set(nameKey(r), (nameCounts.get(nameKey(r)) ?? 0) + 1);
 
   async function save(ids: string[], key: string) {
     const profile = PROFILES.find((p) => p.key === key);
@@ -106,6 +110,9 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
         <div className={styles.bulkBar} role="region" aria-label={t("dispatchers.setSelected")}>
           <span className={styles.bulkCount}>{i18n.tp("dispatchers.selected", selected.size)}</span>
           <select className={ui.input} aria-label={t("dispatchers.setSelected")} value={bulk} onChange={(e) => setBulk(e.target.value)}>
+            <option value="" disabled>
+              {t("profile.choose")}
+            </option>
             {PROFILES.map((p) => (
               <option key={p.key} value={p.key}>
                 {profileLabel(i18n, p)}
@@ -114,6 +121,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
           </select>
           <Button
             size="sm"
+            disabled={!bulk}
             loading={bulkPending}
             onClick={async () => {
               setBulkPending(true);
@@ -160,6 +168,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
                         {r.name}
                       </Link>
                       <span className={ui.help}>{[...r.outlets, r.extId].join(" · ")}</span>
+                      {(nameCounts.get(nameKey(r)) ?? 0) > 1 && <span className={styles.warn}>{t("dispatchers.sameName")}</span>}
                     </span>
                   </td>
                   <td>

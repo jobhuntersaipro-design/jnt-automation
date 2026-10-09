@@ -7,7 +7,6 @@ import { ArrowLeft, FileUp, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
@@ -15,6 +14,7 @@ import { Select } from "@/components/arc/select/select";
 import { Switch } from "@/components/arc/switch/switch";
 import { Textarea } from "@/components/arc/textarea/textarea";
 import { DataTable, type Column } from "@/components/v2/data-table/data-table";
+import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
 import type { MessageKey } from "@/lib/i18n/en";
@@ -141,15 +141,12 @@ export function Check({ view }: { view: CheckView }) {
                 />
               </section>
               <div>
-                <ConfirmMorph
+                <ConfirmButton
+                  confirmVariant="danger"
                   label={t("check.remove")}
                   prompt={t("check.removePrompt")}
                   confirmLabel={t("check.remove")}
-                  cancelLabel={t("common.cancel")}
-                  pendingLabel={t("common.loading")}
                   doneLabel={t("penalties.removed")}
-                  errorLabel={t("common.failed")}
-                  retryLabel={t("common.retry")}
                   onConfirm={async () => {
                     const r = await deleteCheck({ period: view.period });
                     if (!r.ok) throw new Error(r.error);

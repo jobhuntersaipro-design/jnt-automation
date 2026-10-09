@@ -7,11 +7,11 @@ import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Input } from "@/components/arc/input/input";
 import { NumberField } from "@/components/arc/number-field/number-field";
 import { PasswordField } from "@/components/arc/password-field/password-field";
 import { Textarea } from "@/components/arc/textarea/textarea";
+import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { changePassword, updateCompany } from "@/lib/v2/account/actions";
 import type { Period } from "@/lib/v2/pay/resolve";
@@ -52,7 +52,7 @@ export function Settings({ account, plan, viewingAs }: { account: AccountView; p
       <header className={ui.pageHeader}>
         <div>
           <h1 className={ui.title}>{t("settings.title")}</h1>
-          <p className={ui.subtitle}>{t("settings.subtitle")}</p>
+          <p className={ui.subtitle}>{t(!viewingAs && account.hasPassword ? "settings.subtitle" : "settings.subtitleNoPassword")}</p>
         </div>
       </header>
       {viewingAs && <Alert tone="info" title={t("settings.ownOnly", { name: viewingAs })} />}
@@ -158,15 +158,12 @@ function Stamp({ url }: { url: string | null }) {
           {t(url ? "settings.stampReplace" : "settings.stampUpload")}
         </Button>
         {url && (
-          <ConfirmMorph
+          <ConfirmButton
+            confirmVariant="danger"
             label={t("settings.stampRemove")}
             prompt={t("settings.stampRemovePrompt")}
             confirmLabel={t("settings.stampRemove")}
-            cancelLabel={t("common.cancel")}
-            pendingLabel={t("common.loading")}
             doneLabel={t("settings.stampRemoved")}
-            errorLabel={t("common.failed")}
-            retryLabel={t("common.retry")}
             onConfirm={async () => {
               const res = await fetch("/api/settings/stamp", { method: "DELETE" }).catch(() => null);
               if (!res?.ok) throw new Error("stamp");
@@ -269,15 +266,11 @@ function Plan({ plan }: { plan: PlanView }) {
             : t("settings.billed", { month: monthLabel(i18n, plan.nextInvoice) })}
       </p>
       {limit !== plan.limit && (
-        <ConfirmMorph
+        <ConfirmButton
           label={t("settings.limitSave")}
           prompt={tp("settings.limitPrompt", limit, { amount: price(limit), month: monthLabel(i18n, plan.nextInvoice) })}
           confirmLabel={t("settings.limitSave")}
-          cancelLabel={t("common.cancel")}
-          pendingLabel={t("common.loading")}
           doneLabel={t("settings.limitSaved", { count: limit })}
-          errorLabel={t("common.failed")}
-          retryLabel={t("common.retry")}
           onConfirm={async () => {
             const res = await fetch("/api/settings/plan", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ maxBranches: limit }) }).catch(() => null);
             if (!res?.ok) {

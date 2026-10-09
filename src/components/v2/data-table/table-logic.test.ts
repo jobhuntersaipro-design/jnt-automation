@@ -40,6 +40,16 @@ describe("table logic", () => {
     expect(csv).toBe('﻿派件员,"Net, RM"\r\n"A ""B""",12.5');
   });
 
+  it("writes money to 2 decimals and adds a totals row", () => {
+    const columns = [
+      { key: "name", header: "Name" },
+      { key: "parcels", header: "Parcels", format: "number", total: true },
+      { key: "net", header: "Net", format: "money", total: true },
+    ] as const;
+    const csv = toCsv([...columns], [{ name: "A", parcels: 3, net: 1186.4 }, { name: "B", parcels: 2, net: 0.1 }], "Total");
+    expect(csv.split("\r\n").slice(1)).toEqual(["A,3,1186.40", "B,2,0.10", "Total,5,1186.50"]);
+  });
+
   it("accepts only non-negative amounts with up to 2 decimals", () => {
     expect(parseAmount("12.5")).toBe(12.5);
     expect(parseAmount("1,234.56")).toBe(1234.56);

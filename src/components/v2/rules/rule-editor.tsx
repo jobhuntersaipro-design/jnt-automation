@@ -8,10 +8,10 @@ import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/arc/dialog/dialog";
 import { Input } from "@/components/arc/input/input";
 import { downloadCsv } from "@/components/v2/download";
+import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { MessageKey } from "@/lib/i18n/en";
 import { configProblems, kindProblems, type RuleConfig } from "@/lib/v2/pay/config";
@@ -82,7 +82,7 @@ export function RuleEditor({ rule, version, outlets, dispatchers, audit, thisMon
           </Link>
           <div className={ui.row}>
             <h1 className={ui.title}>{rule.name}</h1>
-            <Badge tone="info">{t(`kind.${rule.kind}`)}</Badge>
+            <Badge tone="info" title={t(`kind.${rule.kind}.help`)}>{t(`kind.${rule.kind}`)}</Badge>
           </div>
         </div>
         <div className={ui.row}>
@@ -109,15 +109,12 @@ export function RuleEditor({ rule, version, outlets, dispatchers, audit, thisMon
               return r;
             }}
           />
-          <ConfirmMorph
+          <ConfirmButton
+            confirmVariant="danger"
             label={t("rule.archive")}
             prompt={t("rule.archivePrompt")}
             confirmLabel={t("rule.archive")}
-            cancelLabel={t("common.cancel")}
-            pendingLabel={t("common.loading")}
             doneLabel={t("rule.archived")}
-            errorLabel={t("common.failed")}
-            retryLabel={t("common.retry")}
             onConfirm={async () => {
               const r = await archiveRule({ ruleId: rule.id });
               if (!r.ok) throw new Error(r.error);

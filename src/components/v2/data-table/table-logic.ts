@@ -34,9 +34,14 @@ export function sumBy<T extends Row>(rows: T[], key: keyof T): number {
   return rows.reduce((total, row) => total + Math.round(Number(row[key]) * 100), 0) / 100;
 }
 
-/** CSV of what the table shows. Starts with a BOM so Excel opens Chinese headers as UTF-8. */
-export function toCsv<T extends Row>(columns: { key: keyof T; header: string }[], rows: T[]): string {
-  const lines = [columns.map((c) => escapeCsv(c.header)), ...rows.map((row) => columns.map((c) => escapeCsv(row[c.key])))];
+/**
+ * CSV of what the table shows: money to 2 decimals, and a totals row (labelled in the first column) when any column
+ * totals. Starts with a BOM so Excel opens Chinese headers as UTF-8.
+ */
+export function toCsv<T extends Row>(columns: { key: keyof T; header: string; format?: string; total?: boolean }[], rows: T[], totalLabel = ""): string {
+  const cell = (c: (typeof columns)[number], v: Cell) => escapeCsv(c.format === "money" && typeof v === "number" ? v.toFixed(2) : v);
+  const lines = [columns.map((c) => escapeCsv(c.header)), ...rows.map((row) => columns.map((c) => cell(c, row[c.key])))];
+  if (columns.some((c) => c.total)) lines.push(columns.map((c, i) => (c.total ? cell(c, sumBy(rows, c.key)) : i === 0 ? escapeCsv(totalLabel) : "")));
   return "﻿" + lines.map((cells) => cells.join(",")).join("\r\n");
 }
 

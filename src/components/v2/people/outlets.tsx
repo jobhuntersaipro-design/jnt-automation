@@ -15,7 +15,7 @@ import { employmentLabel, monthLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./people.module.css";
 
-export function Outlets({ outlets }: { outlets: OutletView[] }) {
+export function Outlets({ outlets, everyoneHasRules }: { outlets: OutletView[]; everyoneHasRules: boolean }) {
   const i18n = useI18n();
   const { t } = i18n;
 
@@ -43,8 +43,15 @@ export function Outlets({ outlets }: { outlets: OutletView[] }) {
               </div>
               <div className={ui.stack}>
                 <h3 className={ui.sectionTitle}>{t("outlets.rules")}</h3>
-                {o.rules.length === 0 ? (
+                {o.rules.length === 0 && everyoneHasRules ? (
                   <p className={ui.muted}>{t("outlets.everyone")}</p>
+                ) : o.rules.length === 0 ? (
+                  <p className={ui.muted}>
+                    {t("outlets.noRules")}{" "}
+                    <Link href="/app/rules" className={ui.link}>
+                      {t("outlets.setUpRules")}
+                    </Link>
+                  </p>
                 ) : (
                   <ul className={ui.list}>
                     {o.rules.map((r) => (

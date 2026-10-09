@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { ArrowLeft, FileText, RefreshCw, Scale } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { DataTable, type Column } from "@/components/v2/data-table/data-table";
+import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { Group } from "@/lib/v2/pay/engine";
 import { periodToInput } from "@/lib/v2/pay/resolve";
-import { deleteRun, finalise, recalculateRun } from "@/lib/v2/payroll/actions";
+import { coverRunMonth, deleteRun, finalise, recalculateRun } from "@/lib/v2/payroll/actions";
 import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import { setProfiles } from "@/lib/v2/people/actions";
@@ -29,12 +29,21 @@ const DATE_TIME: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", 
 type Row = { id: string; name: string; extId: string; profile: string; parcels: number; earnings: number; deductions: number; net: number; status: string };
 
 /** One outlet's month: totals, every dispatcher's pay, what needs fixing, and finalising. */
-export function RunReview({ run }: { run: RunView }) {
+export function RunReview({ run, uncovered }: { run: RunView; uncovered: boolean }) {
   const i18n = useI18n();
   const { t } = i18n;
   const router = useRouter();
   const [openId, setOpenId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [covering, setCovering] = useState(false);
+  // Payslips and Compare render on the server: show the press until the next page is ready.
+  const [going, setGoing] = useState<string | null>(null);
+  const [navigating, startNav] = useTransition();
+  const go = (href: string) => {
+    setGoing(href);
+    startNav(() => router.push(href));
+  };
+  const busyFor = (href: string) => navigating && going === href;
   const month = monthLabel(i18n, run.period);
   const draft = run.status === "DRAFT";
   const flagged = run.results.filter((r) => r.warnings.length > 0).length;
@@ -65,6 +74,15 @@ export function RunReview({ run }: { run: RunView }) {
     { key: "status", header: t("run.col.status") },
   ];
 
+  async function cover() {
+    setCovering(true);
+    const r = await coverRunMonth({ runId: run.id });
+    setCovering(false);
+    if (!r.ok) return toast.error(t(r.error, r.vars));
+    toast.success(t("run.recalculated"));
+    router.refresh();
+  }
+
   async function recalculate() {
     setBusy(true);
     const r = await recalculateRun({ runId: run.id });
@@ -93,11 +111,11 @@ export function RunReview({ run }: { run: RunView }) {
           </p>
         </div>
         <div className={ui.row}>
-          <Button variant="secondary" onClick={() => router.push(`/app/payslips/${run.id}`)}>
+          <Button variant="secondary" loading={busyFor(`/app/payslips/${run.id}`)} onClick={() => go(`/app/payslips/${run.id}`)}>
             <FileText size={16} aria-hidden="true" />
             {t("run.payslips")}
           </Button>
-          <Button variant="secondary" onClick={() => router.push(`/app/payroll/check?month=${run.period}`)}>
+          <Button variant="secondary" loading={busyFor(`/app/payroll/check?month=${run.period}`)} onClick={() => go(`/app/payroll/check?month=${run.period}`)}>
             <Scale size={16} aria-hidden="true" />
             {t("run.check")}
           </Button>
@@ -107,15 +125,12 @@ export function RunReview({ run }: { run: RunView }) {
                 <RefreshCw size={16} aria-hidden="true" />
                 {t("run.recalculate")}
               </Button>
-              <ConfirmMorph
+              <ConfirmButton
+                variant="primary"
                 label={t("run.finalise")}
                 prompt={t("run.lockPrompt")}
                 confirmLabel={t("run.finalise")}
-                cancelLabel={t("common.cancel")}
-                pendingLabel={t("common.loading")}
                 doneLabel={t("run.finalised")}
-                errorLabel={t("common.failed")}
-                retryLabel={t("common.retry")}
                 onConfirm={async () => {
                   const r = await finalise({ runId: run.id });
                   if (!r.ok) {
@@ -125,15 +140,12 @@ export function RunReview({ run }: { run: RunView }) {
                   router.refresh();
                 }}
               />
-              <ConfirmMorph
+              <ConfirmButton
+                confirmVariant="danger"
                 label={t("run.delete")}
                 prompt={t("run.deletePrompt")}
                 confirmLabel={t("run.delete")}
-                cancelLabel={t("common.cancel")}
-                pendingLabel={t("common.loading")}
                 doneLabel={t("run.deleted")}
-                errorLabel={t("common.failed")}
-                retryLabel={t("common.retry")}
                 onConfirm={async () => {
                   const r = await deleteRun({ runId: run.id });
                   if (!r.ok) {
@@ -149,6 +161,21 @@ export function RunReview({ run }: { run: RunView }) {
       </header>
 
       {draft && run.stale && <Alert tone="info" title={t("run.stale")} />}
+      {draft && uncovered && (
+        <div className={ui.stack}>
+          <Alert tone="warning" title={t("run.cover.title", { month, outlet: run.outlet })}>
+            {t("run.cover.body", { month })}
+          </Alert>
+          <div className={ui.row}>
+            <Button size="sm" onClick={cover} loading={covering}>
+              {t("run.cover.action", { month })}
+            </Button>
+            <Link href="/app/rules" className={ui.link}>
+              {t("run.cover.rules")}
+            </Link>
+          </div>
+        </div>
+      )}
       {flagged > 0 && (
         <Alert tone="warning" title={i18n.tp("run.attentionTitle", flagged)}>
           {t("run.attentionBody")}
@@ -189,7 +216,7 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
   const i18n = useI18n();
   const { t } = i18n;
   const router = useRouter();
-  const [key, setKey] = useState(PROFILES[0].key);
+  const [key, setKey] = useState("");
   const [saving, setSaving] = useState(false);
   const money = (cents: number) => i18n.money(cents / 100);
 
@@ -238,6 +265,9 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
                 <label className={ui.field}>
                   <span className={ui.label}>{t("run.setProfile", { month: monthLabel(i18n, run.period) })}</span>
                   <select className={ui.input} value={key} onChange={(e) => setKey(e.target.value)}>
+                    <option value="" disabled>
+                      {t("profile.choose")}
+                    </option>
                     {PROFILES.map((p) => (
                       <option key={p.key} value={p.key}>
                         {profileLabel(i18n, p)}
@@ -245,7 +275,7 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
                     ))}
                   </select>
                 </label>
-                <Button onClick={() => saveProfile(result.dispatcherId)} loading={saving}>
+                <Button onClick={() => saveProfile(result.dispatcherId)} loading={saving} disabled={!key}>
                   {t("run.setProfileSave")}
                 </Button>
               </div>
@@ -260,7 +290,9 @@ function Breakdown({ run, result, onClose }: { run: RunView; result: ResultView 
                   <section key={line.ruleId} className={styles.line} aria-label={line.penalty ? `${penaltyLabel(i18n, line.penalty)}: ${name}` : name}>
                     <div className={styles.lineHead}>
                       <span className={styles.lineName}>
-                        <span className={ui.help}>{line.penalty ? penaltyLabel(i18n, line.penalty) : t(`kind.${line.kind}`)}</span>
+                        <span className={ui.help} title={line.penalty ? undefined : t(`kind.${line.kind}.help`)}>
+                          {line.penalty ? penaltyLabel(i18n, line.penalty) : t(`kind.${line.kind}`)}
+                        </span>
                         <strong>{name}</strong>
                       </span>
                       <span className={styles.amount}>{money(line.cents)}</span>

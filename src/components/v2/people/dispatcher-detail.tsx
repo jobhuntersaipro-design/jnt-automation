@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { ArrowLeft, X } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
@@ -141,6 +141,7 @@ function Overrides({ dispatcherId, overrides, ruleOptions, period }: { dispatche
   const [ruleId, setRuleId] = useState(ruleOptions[0]?.id ?? "");
   const [month, setMonth] = useState(periodToInput(period));
   const [pending, setPending] = useState(false);
+  const [refreshing, startRefresh] = useTransition();
 
   async function add() {
     const effectiveFrom = periodFromInput(month);
@@ -149,7 +150,8 @@ function Overrides({ dispatcherId, overrides, ruleOptions, period }: { dispatche
     const r = await addAssignment({ ruleId, branchId: null, dispatcherId, employment: null, effectiveFrom });
     setPending(false);
     if (!r.ok) return toast.error(t(r.error));
-    router.refresh();
+    toast.success(t("applies.added"));
+    startRefresh(() => router.refresh());
   }
 
   return (
@@ -203,7 +205,7 @@ function Overrides({ dispatcherId, overrides, ruleOptions, period }: { dispatche
             <span className={ui.label}>{t("dispatcher.from")}</span>
             <input type="month" className={ui.input} value={month} onChange={(e) => setMonth(e.target.value)} />
           </label>
-          <Button variant="secondary" onClick={add} loading={pending}>
+          <Button variant="secondary" onClick={add} loading={pending || refreshing}>
             {t("dispatcher.add")}
           </Button>
         </div>
@@ -216,7 +218,11 @@ function Profiles({ dispatcherId, name, profiles, period }: { dispatcherId: stri
   const i18n = useI18n();
   const { t } = i18n;
   const router = useRouter();
-  const [key, setKey] = useState(profiles[0] ? profileKey(profiles[0]) : PROFILES[0].key);
+  // The profile in force this month; nothing picked when there isn't one, so "not set" never looks set.
+  const [key, setKey] = useState(() => {
+    const current = profiles.find((p) => p.effectiveFrom <= period);
+    return current ? profileKey(current) : "";
+  });
   const [month, setMonth] = useState(periodToInput(period));
   const [pending, setPending] = useState(false);
 
@@ -267,22 +273,19 @@ function Profiles({ dispatcherId, name, profiles, period }: { dispatcherId: stri
         </ul>
       )}
       <div className={ui.stack}>
-        <label className={ui.field}>
-          <span className={ui.label}>{t("dispatcher.set")}</span>
-          <select className={ui.input} value={key} onChange={(e) => setKey(e.target.value)}>
-            {PROFILES.map((p) => (
-              <option key={p.key} value={p.key}>
-                {profileLabel(i18n, p)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <Select
+          label={t("dispatcher.set")}
+          placeholder={t("profile.choose")}
+          value={key}
+          onValueChange={setKey}
+          options={PROFILES.map((p) => ({ value: p.key, label: profileLabel(i18n, p) }))}
+        />
         <label className={ui.field}>
           <span className={ui.label}>{t("dispatcher.from")}</span>
           <input type="month" className={ui.input} value={month} onChange={(e) => setMonth(e.target.value)} />
         </label>
         <div>
-          <Button onClick={save} loading={pending}>
+          <Button onClick={save} loading={pending} disabled={!key}>
             {t("dispatcher.save")}
           </Button>
         </div>

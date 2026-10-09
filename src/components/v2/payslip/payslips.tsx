@@ -14,8 +14,11 @@ import { PrintButton } from "./print-button";
 import ui from "../ui.module.css";
 import styles from "./payslip.module.css";
 
-// Payslips stay bilingual whatever the UI language: every label is 中文 then English.
+// Payslips are bilingual by default (中文 then English) whatever the UI language; `lang` can narrow them to one.
 // Printed from the browser (A4, one dispatcher per page), which also saves them as PDF.
+
+export type SlipLang = "both" | "zh" | "en";
+export const SLIP_LANGS: SlipLang[] = ["both", "zh", "en"];
 
 export interface Company {
   name: string;
@@ -90,7 +93,7 @@ function Lines({ lines, run, result, caption }: { lines: PayLine[]; run: RunView
                 <th scope="row">
                   <span className={styles.both}>
                     {penalty ? <Both text={(i) => penaltyLabel(i, penalty)} /> : both(`kind.${line.kind}`)}
-                    {fromFile ? both("run.fromFile") : <span>{line.name}</span>}
+                    {fromFile ? both("run.fromFile") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
                   </span>
                 </th>
                 <td data-numeric>{en.number(line.units)}</td>
@@ -200,7 +203,8 @@ function Payslip({ run, result, company }: { run: RunView; result: ResultView; c
 }
 
 /** One run's payslips (or one dispatcher's), ready to print. */
-export function Payslips({ run, results, company, back }: { run: RunView; results: ResultView[]; company: Company; back: string }) {
+export function Payslips({ run, results, company, back, lang, langHref }: { run: RunView; results: ResultView[]; company: Company; back: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
+  const missing = !company.companyRegistrationNo || !company.companyAddress;
   return (
     <div>
       <div className={styles.toolbar}>
@@ -211,9 +215,23 @@ export function Payslips({ run, results, company, back }: { run: RunView; result
         <span className={ui.help}>
           <Both text={(i) => i.tp("payslip.count", results.length)} />
         </span>
+        <nav className={styles.langs} aria-label={`${zh.t("payslip.language")} · ${en.t("payslip.language")}`}>
+          {SLIP_LANGS.map((l) => (
+            <Link key={l} href={langHref(l)} aria-current={l === lang ? "true" : undefined} replace scroll={false}>
+              {en.t(`payslip.lang.${l}`)}
+            </Link>
+          ))}
+        </nav>
         <PrintButton label={`${zh.t("payslip.print")} · ${en.t("payslip.print")}`} />
+        {missing && (
+          <p className={styles.hint}>
+            <Link href="/app/settings" className={ui.link}>
+              {both("payslip.companyMissing")}
+            </Link>
+          </p>
+        )}
       </div>
-      <div className={styles.sheets}>
+      <div className={styles.sheets} data-lang={lang}>
         {results.map((r) => (
           <Payslip key={r.id} run={run} result={r} company={company} />
         ))}

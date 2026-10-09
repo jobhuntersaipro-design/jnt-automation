@@ -38,6 +38,8 @@ export function History({ audit }: { audit: AuditView[] }) {
         return t("history.copy", { from: String(d.from ?? "") });
       case "assign":
         return t("history.assign", { who, month });
+      case "cover":
+        return t("history.cover", { month, outlet: String(d.outlet ?? "") });
       case "unassign":
         return t("history.unassign", { who, month });
       default:

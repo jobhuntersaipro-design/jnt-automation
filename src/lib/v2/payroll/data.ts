@@ -9,6 +9,12 @@ import { isStale } from "./run";
 
 // Read models for the v2 payroll screens. Every query is scoped by agentId.
 
+/** The month of the payroll worked on most recently: where the month pickers start. */
+export async function lastWorkedPeriod(agentId: string): Promise<Period | null> {
+  const run = await prisma.payrollRun.findFirst({ where: { agentId }, orderBy: { updatedAt: "desc" }, select: { period: true } });
+  return run?.period ?? null;
+}
+
 export interface RunSummary {
   id: string;
   outlet: string;

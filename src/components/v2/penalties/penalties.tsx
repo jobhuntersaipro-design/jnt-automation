@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { Combobox } from "@/components/arc/combobox/combobox";
-import { ConfirmMorph } from "@/components/arc/confirm-morph/confirm-morph";
 import { Dialog, DialogContent } from "@/components/arc/dialog/dialog";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { DataTable, type Column } from "@/components/v2/data-table/data-table";
+import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
 import type { MessageKey } from "@/lib/i18n/en";
@@ -175,15 +175,12 @@ export function Penalties({ data, people }: { data: PenaltyMonth; people: Person
                     {t("penalties.fileLine", { when: i18n.date(new Date(f.createdAt), DATE_TIME), actor: f.actor ?? "—", added: f.added, updated: f.updated })}
                   </span>
                 </span>
-                <ConfirmMorph
+                <ConfirmButton
+                  confirmVariant="danger"
                   label={t("penalties.remove")}
                   prompt={tp("penalties.removePrompt", f.items)}
                   confirmLabel={t("penalties.remove")}
-                  cancelLabel={t("common.cancel")}
-                  pendingLabel={t("common.loading")}
                   doneLabel={t("penalties.removed")}
-                  errorLabel={t("common.failed")}
-                  retryLabel={t("common.retry")}
                   onConfirm={async () => {
                     const r = await deletePenaltyImport({ importId: f.id });
                     if (!r.ok) {

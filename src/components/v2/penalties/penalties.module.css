@@ -139,3 +139,20 @@
 .dialog[role="dialog"] {
   width: min(calc(100vw - var(--space-8)), 36rem);
 }
+
+/* A long RM figure in a narrow card steps down a size instead of running into the next card. */
+.metrics > * {
+  container-type: inline-size;
+}
+
+@container (max-width: 18rem) {
+  .metrics > * > * {
+    --text-3xl: var(--text-2xl);
+  }
+}
+
+@container (max-width: 14rem) {
+  .metrics > * > * {
+    --text-3xl: var(--text-xl);
+  }
+}

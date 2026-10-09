@@ -56,7 +56,7 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
   );
   const hasTotals = columns.some((c) => c.total);
 
-  const exportCsv = () => downloadCsv(`${exportName}.csv`, toCsv(columns, visible));
+  const exportCsv = () => downloadCsv(`${exportName}.csv`, toCsv(columns, visible, t("common.total")));
 
   return (
     <div className={styles.wrap}>
