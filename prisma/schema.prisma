@@ -60,6 +60,7 @@ model Agent {
   penaltyAliases        PenaltyAlias[]
   payrollChecks         PayrollCheck[]
   advances              Advance[]
+  journalSetup          JournalSetup?
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -856,4 +857,18 @@ model Advance {
 
   @@index([agentId, period])
   @@index([dispatcherId])
+}
+
+/// v2: how the month's payroll journal maps to the account's chart of accounts (accounting export).
+model JournalSetup {
+  id        String   @id @default(cuid())
+  agentId   String   @unique
+  /// Account code and name per slot (see src/lib/v2/accounting/journal.ts).
+  accounts  Json
+  /// Xero tax rate name on every line, e.g. "No Tax".
+  taxRate   String   @default("No Tax")
+  /// Xero tracking category the branch goes into; empty = none.
+  tracking  String   @default("")
+  updatedAt DateTime @updatedAt
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 }

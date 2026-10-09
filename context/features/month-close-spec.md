@@ -132,5 +132,13 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    compare with your sheet, rate-card fixes, merging dispatchers, removing a penalty file, account settings (a
    supervisor's Settings is their password). Other branches' runs, payslips and dispatchers 404. Changes are logged
    under the supervisor's email.
-6. Accounting export (Bukku, SQL Account, Xero); LHDN self-billed e-Invoice if riders are contractors
+6. **Built:** accounting export. `/app/payroll/journal` (owner only; "Accounting export" on month close once a branch
+   is finalised): the month's finalised runs as one balanced journal, one line per branch and account, dated the
+   month's last day. Pay kinds are debits; penalties, other deductions and advances taken back are credits; net pay
+   owed is the balancing credit (`buildJournal`, `src/lib/v2/accounting/journal.ts`). Account code and name per line
+   type are set once (`JournalSetup`, migration `20261018_v2_journal_setup`). Downloads: a plain debit/credit CSV
+   (for Bukku, SQL Account or the accountant to map) and Xero's manual journal CSV (signed amounts, tax rate name,
+   branch as a tracking option). Bukku's and SQL Account's own import templates weren't confirmed; fit them once a
+   client shares one.
+7. Later: LHDN self-billed e-Invoice if riders are contractors
    (verify against LHDN); success-rate bonus tiers; COD reconciliation; weekly pay.
