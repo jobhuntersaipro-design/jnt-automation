@@ -170,3 +170,17 @@
   margin: 0;
   font-weight: 500;
 }
+
+/* Phones: rate inputs shrink and range labels wrap, so three vehicles fit without sideways scrolling. */
+@media (max-width: 40rem) {
+  .rates th,
+  .rates td {
+    padding: var(--space-1);
+    white-space: normal;
+  }
+
+  .rateInput {
+    width: 100%;
+    min-width: 3.75rem;
+  }
+}

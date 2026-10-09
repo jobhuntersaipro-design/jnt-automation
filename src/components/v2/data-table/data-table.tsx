@@ -109,7 +109,7 @@ export function DataTable<T extends Row>({ rows, columns, rowKey, rowLabel, sear
             <tfoot>
               <tr>
                 {columns.map((col, index) => (
-                  <td key={col.key} data-numeric={col.total ? true : undefined}>
+                  <td key={col.key} data-numeric={col.total ? true : undefined} data-label={col.total ? col.header : undefined}>
                     {col.total ? formatCell(i18n, col, sumBy(visible, col.key)) : index === 0 ? t("common.total") : null}
                   </td>
                 ))}
@@ -152,7 +152,7 @@ const TableRow = memo(function TableRow<T extends Row>({
         const numeric = col.format && col.format !== "text";
         const Cell = index === 0 ? "th" : "td";
         return (
-          <Cell key={col.key} scope={index === 0 ? "row" : undefined} data-numeric={numeric ? true : undefined}>
+          <Cell key={col.key} scope={index === 0 ? "row" : undefined} data-numeric={numeric ? true : undefined} data-label={col.header}>
             {col.editable && onEdit ? (
               <EditableAmount
                 value={Number(row[col.key])}

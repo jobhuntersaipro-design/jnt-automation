@@ -85,11 +85,11 @@ export function JournalExport({ period, setup, runs, drafts }: { period: Period;
                 <tbody>
                   {lines.map((l) => (
                     <tr key={`${l.branch}:${l.slot}`}>
-                      <td>{l.branch}</td>
-                      <td>{l.code ? `${l.code} ${l.name}`.trim() : <span className={styles.warn}>{t("journal.noCode")}</span>}</td>
-                      <td>{text.describe(l)}</td>
-                      <td data-numeric>{l.debitCents ? i18n.money(l.debitCents / 100) : ""}</td>
-                      <td data-numeric>{l.creditCents ? i18n.money(l.creditCents / 100) : ""}</td>
+                      <td data-label={t("runs.outlet")}>{l.branch}</td>
+                      <td data-label={t("journal.account")}>{l.code ? `${l.code} ${l.name}`.trim() : <span className={styles.warn}>{t("journal.noCode")}</span>}</td>
+                      <td data-label={t("journal.description")}>{text.describe(l)}</td>
+                      <td data-label={t("journal.debit")} data-numeric>{l.debitCents ? i18n.money(l.debitCents / 100) : ""}</td>
+                      <td data-label={t("journal.credit")} data-numeric>{l.creditCents ? i18n.money(l.creditCents / 100) : ""}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -98,8 +98,8 @@ export function JournalExport({ period, setup, runs, drafts }: { period: Period;
                     <th scope="row">{t("common.total")}</th>
                     <td />
                     <td />
-                    <td data-numeric>{i18n.money(debit / 100)}</td>
-                    <td data-numeric>{i18n.money(credit / 100)}</td>
+                    <td data-label={t("journal.debit")} data-numeric>{i18n.money(debit / 100)}</td>
+                    <td data-label={t("journal.credit")} data-numeric>{i18n.money(credit / 100)}</td>
                   </tr>
                 </tfoot>
               </table>

@@ -100,9 +100,9 @@ export function Advances({ data, people }: { data: { period: Period; advances: A
               {data.advances.map((a) => (
                 <tr key={a.id}>
                   <th scope="row">{a.name}</th>
-                  <td data-numeric>{i18n.money(a.amountCents / 100)}</td>
-                  <td>{a.note ?? "—"}</td>
-                  <td>{`${a.createdBy ?? "—"} · ${i18n.date(new Date(a.createdAt))}`}</td>
+                  <td data-label={t("advance.amount")} data-numeric>{i18n.money(a.amountCents / 100)}</td>
+                  <td data-label={t("advance.note")}>{a.note ?? "—"}</td>
+                  <td data-label={t("dispatchers.history.col.by")}>{`${a.createdBy ?? "—"} · ${i18n.date(new Date(a.createdAt))}`}</td>
                   <td>
                     {a.locked ? (
                       <span className={ui.help}>{t("advance.locked")}</span>
@@ -130,7 +130,7 @@ export function Advances({ data, people }: { data: { period: Period; advances: A
             <tfoot>
               <tr>
                 <th scope="row">{t("common.total")}</th>
-                <td data-numeric>{i18n.money(total / 100)}</td>
+                <td data-label={t("advance.amount")} data-numeric>{i18n.money(total / 100)}</td>
                 <td colSpan={3} />
               </tr>
             </tfoot>
