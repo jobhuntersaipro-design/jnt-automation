@@ -4,7 +4,7 @@ import type { MessageKey } from "@/lib/i18n/en";
 // One shape for every v2 pay rule. A rate card, the KPI card, fuel and SC-RTN differ only
 // in what they count (`unit`) and their numbers, so a new pay mode is a new rule, not code.
 
-export const KINDS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "ALLOWANCE", "DEDUCTION", "PENALTY"] as const;
+export const KINDS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "SUCCESS", "ALLOWANCE", "DEDUCTION", "PENALTY"] as const;
 export type Kind = (typeof KINDS)[number];
 export const VEHICLES = ["BIKE", "CAR", "LORRY"] as const;
 export type Vehicle = (typeof VEHICLES)[number];
@@ -15,11 +15,15 @@ export type Employment = (typeof EMPLOYMENTS)[number];
 export const PENALTY_TYPES = ["FAKE_ATTEMPT", "FAKE_POP", "PDNC", "INACTIVE", "POD", "COD_LATE", "COD_ISSUE", "LOST", "LATE_ARRIVAL", "OTHER"] as const;
 export type PenaltyType = (typeof PENALTY_TYPES)[number];
 
-/** What a rule counts: normal deliveries, SC or SC-RTN parcels, or a month's penalties of one type. */
+/**
+ * What a rule counts: normal deliveries, SC or SC-RTN parcels, a month's penalties of one type, or (success-rate
+ * bonus) the month's delivery success rate in %, from J&T's report.
+ */
 export const UNITS = [
   "parcels",
   "sc",
   "sc_rtn",
+  "success_rate",
   "penalty:FAKE_ATTEMPT",
   "penalty:FAKE_POP",
   "penalty:PDNC",
@@ -35,8 +39,9 @@ export type Unit = (typeof UNITS)[number];
 export const penaltyUnit = (type: PenaltyType) => `penalty:${type}` as Unit;
 /** The penalty type a unit counts, or null for parcel units. */
 export const penaltyTypeOf = (unit: Unit): PenaltyType | null => (unit.startsWith("penalty:") ? (unit.slice(8) as PenaltyType) : null);
-/** Penalty rules count penalties; every other kind counts parcels. */
-export const unitsFor = (kind: Kind): Unit[] => UNITS.filter((u) => (penaltyTypeOf(u) !== null) === (kind === "PENALTY"));
+/** Penalty rules count penalties, success-rate bonuses the success rate; every other kind counts parcels. */
+export const unitsFor = (kind: Kind): Unit[] =>
+  kind === "SUCCESS" ? ["success_rate"] : UNITS.filter((u) => u !== "success_rate" && (penaltyTypeOf(u) !== null) === (kind === "PENALTY"));
 
 /**
  * Tier and band edges are upper bounds in ascending order; the last is null ("and above").
@@ -84,7 +89,8 @@ function boundProblems(list: (number | null)[], wholeNumbers: boolean, which: "t
 
 /** Everything wrong with a config, in words the editor can show. Empty = valid. */
 export function configProblems(config: RuleConfig): ConfigProblem[] {
-  const problems = [...boundProblems(config.tiers, true, "tier"), ...boundProblems(config.bands, false, "band")];
+  // Success-rate tiers are percentages (97.99), counted tiers whole numbers.
+  const problems = [...boundProblems(config.tiers, config.unit !== "success_rate", "tier"), ...boundProblems(config.bands, false, "band")];
   if (config.valueType === "flat" && config.bands.length > 1) problems.push({ key: "rule.err.flatBands" });
   const width = config.byVehicle ? VEHICLES.length : 1;
   const shapeOk =
@@ -98,6 +104,7 @@ export function configProblems(config: RuleConfig): ConfigProblem[] {
 /** A rule's unit must suit its kind: penalties for penalty rules, parcels for the rest. Penalties have no weight. */
 export function kindProblems(kind: Kind, config: RuleConfig): ConfigProblem[] {
   if (!unitsFor(kind).includes(config.unit)) return [{ key: "rule.err.unitKind" }];
+  if (config.unit === "success_rate") return config.valueType !== "flat" || config.bands.length > 1 ? [{ key: "rule.err.successFlat" }] : [];
   return penaltyTypeOf(config.unit) && config.bands.length > 1 ? [{ key: "rule.err.penaltyBands" }] : [];
 }
 
@@ -124,7 +131,7 @@ const zeros = (n: number) => Array.from({ length: n }, () => 0);
 export function addBound(config: RuleConfig, axis: "tiers" | "bands"): RuleConfig {
   const list = config[axis];
   const lastEdge = list.length > 1 ? (list[list.length - 2] ?? 0) : 0;
-  const edge = lastEdge + (axis === "tiers" ? 1000 : 5);
+  const edge = lastEdge + (axis === "tiers" ? (config.unit === "success_rate" ? 1 : 1000) : 5);
   const at = list.length - 1;
   const nextList = [...list.slice(0, at), edge, null];
   const values =

@@ -9,7 +9,7 @@ import { DEDUCTING, type Group } from "@/lib/v2/pay/engine";
 import { periodMonth, periodYear } from "@/lib/v2/pay/resolve";
 import { ADVANCE, type PayLine, type PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
-import { employmentLabel, penaltyLabel, rangeLabels, vehicleLabel, warningText } from "../labels";
+import { employmentLabel, penaltyLabel, rangeLabels, tierHeadingKey, tierScale, vehicleLabel, warningText } from "../labels";
 import { PrintButton } from "./print-button";
 import ui from "../ui.module.css";
 import styles from "./payslip.module.css";
@@ -46,7 +46,7 @@ const both = (key: MessageKey, vars?: Record<string, string | number>) => <Both 
 const money = (cents: number) => en.money(cents / 100);
 
 function groupLabel(i: I18n, line: PayLine, g: Group, config: RuleConfig | undefined) {
-  const tier = config && config.tiers.length > 1 ? i.t(line.penalty ? "rule.tierHeadingCases" : "rule.tierHeading", { n: g.tier + 1, range: rangeLabels(i, config.tiers, "count")[g.tier] }) : null;
+  const tier = config && config.tiers.length > 1 ? i.t(tierHeadingKey(config), { n: g.tier + 1, range: rangeLabels(i, config.tiers, tierScale(config))[g.tier] }) : null;
   const band = config && config.bands.length > 1 ? rangeLabels(i, config.bands, "kg")[g.band] : null;
   return [tier, band].filter(Boolean).join(" · ") || i.t(line.penalty ? "sim.allCases" : "run.allParcels");
 }
@@ -96,7 +96,7 @@ function Lines({ lines, run, result, caption }: { lines: PayLine[]; run: RunView
                     {fromFile ? both("run.fromFile") : line.ruleId === ADVANCE ? both("advance.line") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
                   </span>
                 </th>
-                <td data-numeric>{en.number(line.units)}</td>
+                <td data-numeric>{config?.unit === "success_rate" ? `${en.number(line.units)}%` : en.number(line.units)}</td>
                 <td />
                 <td data-numeric>{money(line.cents)}</td>
               </tr>

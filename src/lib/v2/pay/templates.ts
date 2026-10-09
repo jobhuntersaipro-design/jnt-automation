@@ -11,6 +11,8 @@ export const TEMPLATES: Record<Kind, RuleConfig> = {
   FUEL: blankConfig(),
   SC: blankConfig({ unit: "sc" }),
   SC_RTN: blankConfig({ unit: "sc_rtn" }),
+  // Below 95% nothing, 95 to 97.99% and 98% and above each a fixed amount (rates to fill in).
+  SUCCESS: blankConfig({ unit: "success_rate", valueType: "flat", tiers: [94.99, 97.99, null] }),
   ALLOWANCE: blankConfig({ valueType: "flat" }),
   DEDUCTION: blankConfig({ valueType: "flat" }),
   // Escalates with repeat offences in a month: the first two cases at one rate, later ones higher.

@@ -7,7 +7,7 @@ import { ADVANCE, type PayLine } from "@/lib/v2/payroll/calc";
 // penalties, deductions and advances taken back are credits, and what's left is owed to dispatchers (credit).
 // One line per branch and account, so each branch's cost can be tracked. Pure.
 
-export const SLOTS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "ALLOWANCE", "PENALTY", "DEDUCTION", "ADVANCE", "NET"] as const;
+export const SLOTS = ["PARCEL", "KPI", "FUEL", "SC", "SC_RTN", "SUCCESS", "ALLOWANCE", "PENALTY", "DEDUCTION", "ADVANCE", "NET"] as const;
 export type Slot = (typeof SLOTS)[number];
 
 export interface Account {

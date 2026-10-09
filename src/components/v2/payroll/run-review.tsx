@@ -34,6 +34,8 @@ import {
   PROFILES,
   profileLabel,
   rangeLabels,
+  tierHeadingKey,
+  tierScale,
   warningText,
 } from "../labels";
 import ui from "../ui.module.css";
@@ -576,20 +578,21 @@ function Breakdown({
 
   function groupText(line: PayLine, g: Group) {
     const config = run.rules[line.versionId]?.config;
-    const heading = line.penalty ? "rule.tierHeadingCases" : "rule.tierHeading";
     const tier =
       config && config.tiers.length > 1
-        ? t(heading, {
+        ? t(tierHeadingKey(config), {
             n: g.tier + 1,
-            range: rangeLabels(i18n, config.tiers, "count")[g.tier],
+            range: rangeLabels(i18n, config.tiers, tierScale(config))[g.tier],
           })
         : null;
     const band =
       config && config.bands.length > 1
         ? rangeLabels(i18n, config.bands, "kg")[g.band]
         : null;
+    // A success-rate bonus says which rate reached the tier.
+    const rate = config?.unit === "success_rate" ? t("run.successRate", { rate: i18n.number(line.units) }) : null;
     const range =
-      [tier, band].filter(Boolean).join(" · ") || t("run.allParcels");
+      [tier, band, rate].filter(Boolean).join(" · ") || t("run.allParcels");
     return config?.valueType === "flat"
       ? t("run.flat", { range, amount: money(g.cents) })
       : t("run.line", {

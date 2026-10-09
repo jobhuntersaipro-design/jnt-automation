@@ -39,7 +39,8 @@ export type Warning =
   | { code: "noProfile" }
   | { code: "noParcelRule" }
   | { code: "noRates"; kind: Kind; rule: string }
-  | { code: "noPenaltyAmount"; type: PenaltyType; count: number };
+  | { code: "noPenaltyAmount"; type: PenaltyType; count: number }
+  | { code: "noSuccessRate" };
 
 /** ruleId of the line that takes back advances (a deduction, not a rule). */
 export const ADVANCE = "advance";
@@ -69,6 +70,8 @@ export function payDispatcher(input: {
   penalties?: Charge[];
   /** Advances given and not yet taken back, up to this month. */
   advanceOwedCents?: number;
+  /** The month's delivery success rate in % from J&T's report; null/absent = not in the report. */
+  successRate?: number | null;
 }): DispatcherPay {
   const { period, profile } = input;
   const charges = input.penalties ?? [];
@@ -91,7 +94,10 @@ export function payDispatcher(input: {
   // Penalties count after the month's parcels (weight 0), so a rule can escalate with repeat cases.
   const parcels = { w: [...input.parcels.w, ...charges.map(() => 0)], c: input.parcels.c + charges.map((c) => UNIT_LETTER[penaltyUnit(c.type)]).join("") };
   const ruled = new Set<PenaltyType>();
-  const lines: PayLine[] = computePay(parcels, profile.vehicle, rules).lines.flatMap((line, i) => {
+  const successRate = input.successRate ?? null;
+  // A success-rate bonus applies but J&T's report has no rate for them: say so rather than pay RM 0 silently.
+  if (successRate === null && rules.some((r) => r.config.unit === "success_rate")) warnings.push({ code: "noSuccessRate" });
+  const lines: PayLine[] = computePay(parcels, profile.vehicle, rules, { successRate }).lines.flatMap((line, i) => {
     const type = penaltyTypeOf(rules[i].config.unit);
     if (!type) return [line];
     ruled.add(type);

@@ -24,6 +24,8 @@ export const UNIT_LETTER: Record<Unit, string> = {
   "penalty:LOST": "h",
   "penalty:LATE_ARRIVAL": "i",
   "penalty:OTHER": "j",
+  // Never in a parcel string: a success-rate rule reads the month's measured rate instead.
+  success_rate: "z",
 };
 
 /** Kinds whose lines are taken off pay. */
@@ -59,9 +61,24 @@ export interface RuleResult {
   cents: number;
 }
 
-export function computeRule(config: RuleConfig, parcels: Parcels, vehicle: Vehicle): RuleResult {
+/** What a month measures besides parcels; null = not known (no line is paid). */
+export interface Measures {
+  /** Delivery success rate in %, e.g. 97.85. */
+  successRate?: number | null;
+}
+
+export function computeRule(config: RuleConfig, parcels: Parcels, vehicle: Vehicle, measures: Measures = {}): RuleResult {
   const letter = UNIT_LETTER[config.unit];
   const v = config.byVehicle ? VEHICLES.indexOf(vehicle) : 0;
+  // The flat amount of the tier the month's rate falls in; `units` holds the rate itself, for the payslip.
+  if (config.unit === "success_rate") {
+    const rate = measures.successRate;
+    if (rate == null) return { units: 0, groups: [], cents: 0 };
+    const tier = boundIndex(rate, config.tiers);
+    const value = config.values[tier][0][v];
+    const cents = toCents(1, value);
+    return { units: rate, groups: [{ tier, band: 0, units: 1, rate: value, cents }], cents };
+  }
   let units = 0;
   for (let i = 0; i < parcels.c.length; i++) if (parcels.c[i] === letter) units++;
 
@@ -118,8 +135,8 @@ export interface Pay {
 }
 
 /** One dispatcher's month: every resolved rule applied to their parcels. Deduction and penalty lines subtract. */
-export function computePay(parcels: Parcels, vehicle: Vehicle, rules: ResolvedRule[]): Pay {
-  const lines = rules.map((r) => ({ kind: r.kind, ruleId: r.ruleId, versionId: r.versionId, name: r.name, ...computeRule(r.config, parcels, vehicle) }));
+export function computePay(parcels: Parcels, vehicle: Vehicle, rules: ResolvedRule[], measures: Measures = {}): Pay {
+  const lines = rules.map((r) => ({ kind: r.kind, ruleId: r.ruleId, versionId: r.versionId, name: r.name, ...computeRule(r.config, parcels, vehicle, measures) }));
   return totals(lines);
 }
 

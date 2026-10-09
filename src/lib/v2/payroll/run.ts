@@ -37,6 +37,7 @@ const PAY_CHANGES = [
   "penaltyWaive",
   "cover",
   "merge",
+  "successRate",
 ];
 
 async function audit(agentId: string, actor: string | null, action: string, detail: Record<string, string | number | boolean | null>) {
@@ -139,13 +140,13 @@ export async function advancesOwed(agentId: string, dispatcherIds: string[], per
 export async function calculateRun(agentId: string, runId: string): Promise<ActionResult> {
   const run = await prisma.payrollRun.findFirst({
     where: { id: runId, agentId },
-    select: { id: true, branchId: true, period: true, status: true, branch: { select: { code: true } }, results: { select: { id: true, dispatcherId: true, parcels: true } } },
+    select: { id: true, branchId: true, period: true, status: true, branch: { select: { code: true } }, results: { select: { id: true, dispatcherId: true, extId: true, parcels: true } } },
   });
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
 
   const dispatcherIds = run.results.map((r) => r.dispatcherId);
-  const [assignments, versionRows, profileRows, penaltyRows, owed] = await Promise.all([
+  const [assignments, versionRows, profileRows, penaltyRows, owed, rateRows] = await Promise.all([
     listAssignments(agentId),
     prisma.payRuleVersion.findMany({ where: { rule: { agentId, archivedAt: null } }, select: { id: true, ruleId: true, effectiveFrom: true, config: true } }),
     prisma.dispatcherProfile.findMany({ where: { dispatcherId: { in: dispatcherIds } }, select: { dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true } }),
@@ -156,7 +157,10 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
       select: { id: true, dispatcherId: true, type: true, waybill: true, occurredAt: true, amountCents: true, note: true },
     }),
     advancesOwed(agentId, dispatcherIds, run.period, run.id),
+    // J&T's success rates for the month, by the J&T ID each dispatcher has in this run.
+    prisma.successRate.findMany({ where: { agentId, period: run.period, extId: { in: run.results.map((r) => r.extId) } }, select: { extId: true, rateBp: true } }),
   ]);
+  const successRates = new Map(rateRows.map((r) => [r.extId, r.rateBp / 100]));
   const versions = new Map<string, VersionRow[]>();
   for (const v of versionRows) {
     const config = parseConfig(v.config);
@@ -188,6 +192,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
       versionsOf: (ruleId) => versions.get(ruleId) ?? [],
       penalties: cases,
       advanceOwedCents: owed.get(r.dispatcherId) ?? 0,
+      successRate: successRates.get(r.extId) ?? null,
     });
     for (const line of pay.lines) {
       const v = versions.get(line.ruleId)?.find((x) => x.id === line.versionId);

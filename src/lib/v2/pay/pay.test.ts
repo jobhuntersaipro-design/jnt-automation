@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addBound, blankConfig, boundRanges, configProblems, parseConfig, removeBound, setBound, setByVehicle, type RuleConfig } from "./config";
+import { addBound, blankConfig, boundRanges, configProblems, kindProblems, parseConfig, removeBound, setBound, setByVehicle, type RuleConfig } from "./config";
 import { boundIndex, computePay, computeRule, toCents, type Parcels } from "./engine";
 import { inForce, monthChange, prevPeriod, periodFromInput, periodToInput, pickAssignments, type AssignmentRow, type Context } from "./resolve";
 
@@ -95,6 +95,17 @@ describe("computeRule: flat and units", () => {
     const p = parcels([1, 2, 3, 4, 5], "nrnsr");
     expect(computeRule(scRtn, p, "BIKE")).toMatchObject({ units: 2, cents: 120 });
     expect(computeRule({ ...blankConfig(), values: [[[1]]] }, p, "BIKE").units).toBe(2);
+  });
+});
+
+describe("success-rate rules", () => {
+  it("takes % tiers with decimals, one flat amount, no weight bands", () => {
+    const ok = blankConfig({ unit: "success_rate", valueType: "flat", tiers: [94.99, 97.99, null] });
+    expect(configProblems(ok)).toEqual([]);
+    expect(kindProblems("SUCCESS", ok)).toEqual([]);
+    expect(kindProblems("SUCCESS", { ...ok, valueType: "per_unit" })).toEqual([{ key: "rule.err.successFlat" }]);
+    expect(kindProblems("SUCCESS", blankConfig())).toEqual([{ key: "rule.err.unitKind" }]);
+    expect(kindProblems("KPI", ok)).toEqual([{ key: "rule.err.unitKind" }]);
   });
 });
 

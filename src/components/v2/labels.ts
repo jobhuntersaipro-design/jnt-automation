@@ -11,7 +11,7 @@ export const penaltyLabel = (i18n: I18n, type: PenaltyType) => i18n.t(`penalty.t
 /** What a rule counts: "Delivered parcels", or a penalty type. */
 export function unitLabel(i18n: I18n, unit: Unit) {
   const type = penaltyTypeOf(unit);
-  return type ? penaltyLabel(i18n, type) : i18n.t(`unit.${unit as "parcels" | "sc" | "sc_rtn"}`);
+  return type ? penaltyLabel(i18n, type) : i18n.t(`unit.${unit as "parcels" | "sc" | "sc_rtn" | "success_rate"}`);
 }
 
 /** Every vehicle × FT/PT pair, for one select that sets a whole dispatcher profile. */
@@ -27,14 +27,28 @@ export function scopeLabel(i18n: I18n, a: { branchCode: string | null; dispatche
   return parts.length ? parts.join(" · ") : i18n.t("applies.everyone");
 }
 
-/** Human ranges for tier (count) or band (kg) upper bounds. */
-export function rangeLabels(i18n: I18n, bounds: (number | null)[], kind: "count" | "kg"): string[] {
-  if (bounds.length === 1) return [i18n.t(kind === "count" ? "rule.anyCount" : "rule.anyWeight")];
+/** The heading over a tier's rates: parcels, penalty cases, or a success-rate range. */
+export const tierHeadingKey = (c: Pick<RuleConfig, "unit">) =>
+  c.unit === "success_rate" ? "rule.tierHeadingRate" : penaltyTypeOf(c.unit) ? "rule.tierHeadingCases" : "rule.tierHeading";
+
+/** What a rule's tiers measure: a monthly count, or (success-rate bonus) a percentage. */
+export const tierScale = (c: Pick<RuleConfig, "unit">): "count" | "pct" => (c.unit === "success_rate" ? "pct" : "count");
+
+const RANGE_KEYS = {
+  count: { any: "rule.anyCount", above: "rule.countAbove", upTo: "rule.countUpTo", range: "rule.countRange" },
+  pct: { any: "rule.anyRate", above: "rule.pctAbove", upTo: "rule.pctUpTo", range: "rule.pctRange" },
+  kg: { any: "rule.anyWeight", above: "rule.kgAbove", upTo: "rule.kgUpTo", range: "rule.kgRange" },
+} as const;
+
+/** Human ranges for tier (count or %) or band (kg) upper bounds. */
+export function rangeLabels(i18n: I18n, bounds: (number | null)[], kind: "count" | "pct" | "kg"): string[] {
+  const keys = RANGE_KEYS[kind];
+  if (bounds.length === 1) return [i18n.t(keys.any)];
   const fmt = (n: number) => i18n.number(n);
   return boundRanges(bounds, kind === "count" ? 1 : 0.01).map(({ from, to }, i) => {
-    if (to === null) return i18n.t(kind === "count" ? "rule.countAbove" : "rule.kgAbove", { from: fmt(from) });
-    if (i === 0) return i18n.t(kind === "count" ? "rule.countUpTo" : "rule.kgUpTo", { to: fmt(to) });
-    return i18n.t(kind === "count" ? "rule.countRange" : "rule.kgRange", { from: fmt(from), to: fmt(to) });
+    if (to === null) return i18n.t(keys.above, { from: fmt(from) });
+    if (i === 0) return i18n.t(keys.upTo, { to: fmt(to) });
+    return i18n.t(keys.range, { from: fmt(from), to: fmt(to) });
   });
 }
 
@@ -42,6 +56,7 @@ export function rangeLabels(i18n: I18n, bounds: (number | null)[], kind: "count"
 export function warningText(i18n: I18n, w: Warning): string {
   if (w.code === "noProfile") return i18n.t("run.warn.noProfile");
   if (w.code === "noParcelRule") return i18n.t("run.warn.noParcelRule");
+  if (w.code === "noSuccessRate") return i18n.t("run.warn.noSuccessRate");
   if (w.code === "noPenaltyAmount") return i18n.tp("run.warn.noPenaltyAmount", w.count, { type: penaltyLabel(i18n, w.type) });
   return i18n.t("run.warn.noRates", { rule: w.rule, kind: i18n.t(`kind.${w.kind}`) });
 }

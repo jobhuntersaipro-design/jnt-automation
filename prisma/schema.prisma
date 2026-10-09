@@ -61,6 +61,7 @@ model Agent {
   payrollChecks         PayrollCheck[]
   advances              Advance[]
   journalSetup          JournalSetup?
+  successRates          SuccessRate[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -581,6 +582,7 @@ enum PayRuleKind {
   FUEL
   SC
   SC_RTN
+  SUCCESS
   ALLOWANCE
   DEDUCTION
   PENALTY
@@ -871,4 +873,28 @@ model JournalSetup {
   tracking  String   @default("")
   updatedAt DateTime @updatedAt
   agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+}
+
+/// v2: a dispatcher's delivery success rate for a month, from J&T's success-rate report (or typed in).
+/// Matched to pay by J&T ID when a run is worked out; one row per month and J&T ID, so importing again updates.
+model SuccessRate {
+  id        String   @id @default(cuid())
+  agentId   String
+  period    Int
+  /// J&T ID as the report gives it.
+  extId     String
+  name      String?
+  outlet    String?
+  /// Basis points: 9785 = 97.85%.
+  rateBp    Int
+  delivered Int?
+  total     Int?
+  /// The report it came from; null = typed in.
+  fileName  String?
+  actor     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, period, extId])
 }
