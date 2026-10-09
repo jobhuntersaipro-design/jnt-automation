@@ -133,3 +133,17 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
     })),
   };
 }
+
+/** A month's penalty cases for one branch: the file names the branch, or the case is matched to someone working there. */
+export async function branchPenaltyCounts(agentId: string, period: Period, branch: { id: string; code: string }) {
+  const where = {
+    agentId,
+    period,
+    OR: [{ outlet: branch.code }, { dispatcher: { assignments: { some: { branchId: branch.id } } } }],
+  };
+  const [cases, unmatched] = await Promise.all([
+    prisma.penaltyItem.count({ where }),
+    prisma.penaltyItem.count({ where: { ...where, status: "UNMATCHED" } }),
+  ]);
+  return { cases, unmatched };
+}

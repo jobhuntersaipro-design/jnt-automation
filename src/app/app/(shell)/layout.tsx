@@ -29,7 +29,7 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
     { href: "/app/payroll", label: t("nav.payroll") },
     { href: "/app/penalties", label: t("nav.penalties") },
     { href: "/app/dispatchers", label: t("nav.dispatchers") },
-    { href: "/app/outlets", label: t("nav.outlets") },
+    { href: "/app/branches", label: t("nav.outlets") },
     { href: "/app/rules", label: t("nav.rules") },
   ];
   // Design review is for the EasyStaff team, reached by viewing as a v2 account.

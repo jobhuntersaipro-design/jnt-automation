@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // v2's Outlets page became Branches; old links and bookmarks still land there.
+  redirects: async () => [{ source: "/app/outlets", destination: "/app/branches", permanent: true }],
   devIndicators: false,
   images: {
     remotePatterns: [

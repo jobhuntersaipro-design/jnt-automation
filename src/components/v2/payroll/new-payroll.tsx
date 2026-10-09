@@ -20,7 +20,7 @@ export interface WizardRun {
   id: string;
   outlet: string;
   period: Period;
-  /** Penalty cases already imported for the run's month, and how many still need a dispatcher. */
+  /** The branch's penalty cases already imported for the run's month, and how many still need a dispatcher. */
   cases: number;
   unmatched: number;
 }
@@ -88,8 +88,8 @@ function PenaltiesStep({ run }: { run: WizardRun }) {
           </Alert>
         )}
         <div className={ui.row}>
-          <Button onClick={next} loading={busy}>
-            {t(run.cases > 0 ? "wizard.penalties.continue" : "wizard.penalties.skip")}
+          <Button onClick={next} loading={busy} disabled={run.cases === 0}>
+            {t("wizard.penalties.continue")}
           </Button>
         </div>
       </section>

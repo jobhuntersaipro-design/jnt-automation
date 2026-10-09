@@ -22,7 +22,7 @@ export async function createOutlet(input: { code: string }): Promise<ActionResul
   if (!outlet.ok) return outlet;
   if (!outlet.data.created) return { ok: false, error: "outlets.err.exists" };
   await prisma.ruleAudit.create({ data: { agentId: s.agentId, actor: s.actor, action: "outlet", detail: { outlet: outlet.data.code } } });
-  revalidatePath("/app/outlets");
+  revalidatePath("/app/branches");
   return { ok: true, data: { id: outlet.data.id, code: outlet.data.code } };
 }
 

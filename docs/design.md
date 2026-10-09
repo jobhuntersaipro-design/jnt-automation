@@ -25,7 +25,7 @@ the 2026-10-09 UX-review fixes. Sections marked *Proposed* are not built yet.
 | Users | The agent's owner or office staff, one account per agent. The EasyStaff superadmin can view as an account. |
 | Job | Turn a month's J&T delivery file and penalty files into correct, explainable pay per dispatcher, then payslips |
 | People | **Dispatcher** everywhere in UI and code (派件员 in Chinese). Identified by J&T ID; vehicle (Bike · Car · Lorry) and type (Full-time · Part-time) set per month. |
-| Places | **Outlet** in the UI (a J&T branch code such as `KUL4602`). Stored as v1's `Branch`. |
+| Places | **Branch** in the UI (a J&T branch code such as `KUL4602`; 网点 in Chinese). Stored as v1's `Branch`; code and earlier spec sections still say "outlet". |
 | Languages | 中文 and English, switched top right. Payslips are bilingual by default. |
 | Currency | Always `RM`, 2 decimals for money, up to 4 for rates. |
 | Devices | Desktop-first office tool; every screen usable at 375px with no horizontal page scroll. |
@@ -124,7 +124,9 @@ browser lands in Chinese).
 
 ### 3.2 Dashboard — `/app`
 
-What needs doing this month, then how the month looks.
+What needs doing, then how the sidebar's month looks: all branches, or only the
+branch chosen in the sidebar ("PHG415 · payroll for Oct 2026"). A month without
+payroll says "No payroll for {month} yet." with *New payroll* instead of zeros.
 
 1. **Getting started** (until done) — three steps as a checklist card, each
    *Done* / *To do* with a link: *Set up your pay rules* · *Upload a J&T
@@ -150,9 +152,11 @@ the file. Actions: primary *New payroll*, link *Compare with your sheet*.
 *Penalties* · *Review and finalise*. Step 1 is the upload below. Step 2
 ("Penalties for {outlet} · {month}") shows the cases already imported for the
 month, a warning with a link to Penalties when cases need a dispatcher, the
-penalty import in place, and the primary *Continue to review* (or *No penalties
-this month: continue* when none are imported), which recalculates and opens the
-run review. A run can't be finalised until step 2 is done; its review says
+penalty import in place, and the primary *Continue to review*, which recalculates
+and opens the run review. Every branch has J&T HQ penalties every month, so the
+step is required: *Continue* stays disabled (and the server refuses) until the
+month has at least one case for the branch (the file names the branch, or the
+case is matched to someone working there). Unmatched cases warn but don't block. A run can't be finalised until step 2 is done; its review says
 "Penalties for {month} haven't been checked" with *Check penalties*.
 
 **Upload** — the header button opens the file picker, `.xlsx` only, 100 MB max
@@ -298,7 +302,7 @@ sort, CSV. Changes that don't change anything aren't logged.
 - **Vehicle and type** (side) — history, newest first: "From {month}: Bike ·
   Full-time", each removable; *Set to … from …* *Save*.
 
-### 3.9 Outlets — `/app/outlets`
+### 3.9 Branches — `/app/branches` (`/app/outlets` redirects)
 
 Card grid. Each card: outlet code (Manrope, `--text-lg`), "{n} dispatchers",
 "Rules for this outlet" lines ("Rate cards: Standard bike card") or "Uses the

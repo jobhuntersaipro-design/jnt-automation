@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET } from "@/lib/r2";
 import { v2Session, type ActionResult } from "@/lib/v2/session";
 import { planCover } from "./cover";
+import { branchPenaltyCounts } from "./data";
 import { calculateRun, finaliseRun } from "./run";
 
 // Mutations behind the v2 payroll screens; every one is scoped to the caller's account.
@@ -36,16 +37,20 @@ export async function recalculateRun(input: { runId: string }): Promise<ActionRe
   return result;
 }
 
-/** Step 2 of New payroll: the month's penalty files are in (or there are none). Recalculates so the review includes them. */
+/** Step 2 of New payroll: the branch's penalty file for the month is in. Recalculates so the review includes it. */
 export async function confirmPenalties(input: { runId: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const { count } = await prisma.payrollRun.updateMany({
+  const run = await prisma.payrollRun.findFirst({
     where: { id: input.runId, agentId: s.agentId, status: "DRAFT" },
-    data: { penaltiesCheckedAt: new Date() },
+    select: { id: true, period: true, branch: { select: { id: true, code: true } } },
   });
-  if (count === 0) return { ok: false, error: "error.notFound" };
-  const result = await calculateRun(s.agentId, input.runId);
+  if (!run) return { ok: false, error: "error.notFound" };
+  // Every branch gets J&T HQ penalties every month, so a month without any for the branch means the file is missing.
+  const { cases } = await branchPenaltyCounts(s.agentId, run.period, run.branch);
+  if (cases === 0) return { ok: false, error: "wizard.penalties.missing", vars: { outlet: run.branch.code } };
+  await prisma.payrollRun.update({ where: { id: run.id }, data: { penaltiesCheckedAt: new Date() } });
+  const result = await calculateRun(s.agentId, run.id);
   if (result.ok) refresh();
   return result;
 }
