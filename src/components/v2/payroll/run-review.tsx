@@ -64,9 +64,12 @@ type Row = {
 export function RunReview({
   run,
   uncovered,
+  hasCard,
 }: {
   run: RunView;
   uncovered: boolean;
+  /** The account has a rate card at all; without one there's nothing to "use from this month". */
+  hasCard: boolean;
 }) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -285,19 +288,28 @@ export function RunReview({
             tone="warning"
             title={t("run.cover.title", { month, outlet: run.outlet })}
           >
-            {t("run.cover.body", { month })}
+            {hasCard ? t("run.cover.body", { month }) : t("run.cover.noCard")}
           </Alert>
-          <div className={ui.row}>
-            <Button size="sm" onClick={cover} loading={covering}>
-              {t("run.cover.action", { month })}
-            </Button>
-            <Link href="/app/rules" className={ui.link}>
-              {t("run.cover.rules")}
-            </Link>
-          </div>
+          {hasCard ? (
+            <div className={ui.row}>
+              <Button size="sm" onClick={cover} loading={covering}>
+                {t("run.cover.action", { month })}
+              </Button>
+              <Link href="/app/rules" className={ui.link}>
+                {t("run.cover.rules")}
+              </Link>
+            </div>
+          ) : (
+            <div className={ui.row}>
+              <Button size="sm" onClick={() => router.push("/app/rules")}>
+                {t("run.cover.create")}
+              </Button>
+            </div>
+          )}
         </div>
       )}
       {draft && run.profileChanges.length > 0 && <ProfileChanges run={run} />}
+      {draft && <SetMissingProfiles run={run} />}
       {flagged > 0 && (
         <Alert tone="warning" title={i18n.tp("run.attentionTitle", flagged)}>
           {t("run.attentionBody")}
@@ -411,6 +423,52 @@ export function RunReview({
         result={run.results.find((r) => r.id === openId) ?? null}
         onClose={() => setOpenId(null)}
       />
+    </div>
+  );
+}
+
+/** Everyone the run couldn't pay for lack of a vehicle and type, set in one go from the run's month. */
+function SetMissingProfiles({ run }: { run: RunView }) {
+  const i18n = useI18n();
+  const { t, tp } = i18n;
+  const router = useRouter();
+  const [key, setKey] = useState("");
+  const [saving, setSaving] = useState(false);
+  const missing = run.results.filter((r) => r.warnings.some((w) => w.code === "noProfile")).map((r) => r.dispatcherId);
+  if (missing.length === 0) return null;
+
+  async function save() {
+    const profile = PROFILES.find((p) => p.key === key);
+    if (!profile) return;
+    setSaving(true);
+    const saved = await setProfiles({ dispatcherIds: missing, effectiveFrom: run.period, vehicle: profile.vehicle, employment: profile.employment });
+    const done = saved.ok ? await recalculateRun({ runId: run.id }) : saved;
+    setSaving(false);
+    if (!done.ok) return toast.error(t(done.error, done.vars));
+    toast.success(t("run.recalculated"));
+    router.refresh();
+  }
+
+  return (
+    <div className={ui.stack}>
+      <Alert tone="warning" title={tp("run.missing.title", missing.length, { month: monthLabel(i18n, run.period) })}>
+        {t("run.missing.body")}
+      </Alert>
+      <div className={styles.inline}>
+        <select className={ui.input} value={key} onChange={(e) => setKey(e.target.value)} aria-label={t("run.col.profile")}>
+          <option value="" disabled>
+            {t("profile.choose")}
+          </option>
+          {PROFILES.map((p) => (
+            <option key={p.key} value={p.key}>
+              {profileLabel(i18n, p)}
+            </option>
+          ))}
+        </select>
+        <Button onClick={save} loading={saving} disabled={!key}>
+          {tp("run.missing.action", missing.length)}
+        </Button>
+      </div>
     </div>
   );
 }

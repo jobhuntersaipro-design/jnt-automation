@@ -2,13 +2,17 @@ import { notFound } from "next/navigation";
 import { RunReview } from "@/components/v2/payroll/run-review";
 import { prisma } from "@/lib/prisma";
 import { getRunView } from "@/lib/v2/payroll/data";
+import { calculateRun } from "@/lib/v2/payroll/run";
 import { v2Session } from "@/lib/v2/session";
 
 export default async function RunPage({ params }: { params: Promise<{ runId: string }> }) {
   const s = await v2Session();
   if (!s) notFound();
-  const run = await getRunView(s.agentId, (await params).runId);
+  const { runId } = await params;
+  let run = await getRunView(s.agentId, runId);
   if (!run) notFound();
+  // A draft is always shown with today's rules: work it out again when something changed since.
+  if (run.stale && (await calculateRun(s.agentId, runId)).ok) run = (await getRunView(s.agentId, runId)) ?? run;
   // "No rate card covers the month": nothing with rates by then applies to everyone or to this outlet. The run's
   // warnings can't say so while vehicles are unset, so it's asked here. FT/PT-only and per-dispatcher cards don't count.
   const covering =
@@ -24,5 +28,6 @@ export default async function RunPage({ params }: { params: Promise<{ runId: str
           },
         })
       : 1;
-  return <RunReview run={run} uncovered={covering === 0} />;
+  const hasCard = covering > 0 || (await prisma.payRule.count({ where: { agentId: s.agentId, kind: "PARCEL", archivedAt: null } })) > 0;
+  return <RunReview run={run} uncovered={covering === 0} hasCard={hasCard} />;
 }
