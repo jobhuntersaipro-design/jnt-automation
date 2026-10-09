@@ -149,22 +149,25 @@ export interface ProfileChange {
   id: string;
   at: string;
   actor: string | null;
-  /** "profile" sets a vehicle and type; "profileDelete" removes one. */
-  action: "profile" | "profileDelete";
+  /** "profile" sets a vehicle and type; "profileDelete" removes one; "merge" joins a second record of the same person. */
+  action: "profile" | "profileDelete" | "merge";
   dispatcherId: string | null;
   /** Null on bulk changes logged before the per-dispatcher log, which kept only a count. */
   dispatcher: string | null;
   count: number;
-  month: Period;
+  /** Null for a merge. */
+  month: Period | null;
   to: ProfilePair;
   from: ProfilePair | null;
+  /** A merge: the record joined in and its branch + J&T IDs. */
+  merged: { name: string; ids: string } | null;
 }
 
 /** Every vehicle and type change, newest first. */
 export async function listProfileChanges(agentId: string): Promise<ProfileChange[]> {
   // ponytail: last 2,000 changes; page it if an account needs further back.
   const rows = await prisma.ruleAudit.findMany({
-    where: { agentId, action: { in: ["profile", "profileDelete"] } },
+    where: { agentId, action: { in: ["profile", "profileDelete", "merge"] } },
     orderBy: { createdAt: "desc" },
     take: 2000,
   });
@@ -174,13 +177,14 @@ export async function listProfileChanges(agentId: string): Promise<ProfileChange
       id: r.id,
       at: r.createdAt.toISOString(),
       actor: r.actor,
-      action: r.action === "profileDelete" ? "profileDelete" : "profile",
+      action: r.action === "profileDelete" || r.action === "merge" ? r.action : "profile",
       dispatcherId: typeof d.dispatcherId === "string" ? d.dispatcherId : null,
       dispatcher: typeof d.dispatcher === "string" ? d.dispatcher : null,
       count: typeof d.count === "number" ? d.count : 1,
-      month: Number(d.month),
+      month: r.action === "merge" ? null : Number(d.month),
       to: { vehicle: d.vehicle as Vehicle, employment: d.employment as Employment },
       from: (d.from as ProfilePair | null | undefined) ?? null,
+      merged: r.action === "merge" ? { name: String(d.merged ?? ""), ids: String(d.ids ?? "") } : null,
     };
   });
 }

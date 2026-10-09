@@ -36,6 +36,7 @@ const PAY_CHANGES = [
   "penaltyUndo",
   "penaltyWaive",
   "cover",
+  "merge",
 ];
 
 async function audit(agentId: string, actor: string | null, action: string, detail: Record<string, string | number | boolean | null>) {

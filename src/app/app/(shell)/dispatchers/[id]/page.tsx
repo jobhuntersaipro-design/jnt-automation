@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { DispatcherDetail, type ResolvedView } from "@/components/v2/people/dispatcher-detail";
+import { listPersonOptions } from "@/lib/v2/penalties/data";
 import { getDispatcher, listAssignments, listRuleOptions, penaltyTypesIn, ratesFrom } from "@/lib/v2/people/data";
 import { inForce, periodFromParam, periodOf, pickAssignments } from "@/lib/v2/pay/resolve";
 import { v2Session } from "@/lib/v2/session";
@@ -15,13 +16,16 @@ export default async function DispatcherPage({
   if (!s) notFound();
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const period = periodFromParam(query.month) ?? periodOf(new Date());
-  const [dispatcher, assignments, ruleOptions, penaltyTypes] = await Promise.all([
+  const [dispatcher, assignments, ruleOptions, penaltyTypes, people] = await Promise.all([
     getDispatcher(s.agentId, id),
     listAssignments(s.agentId),
     listRuleOptions(s.agentId),
     penaltyTypesIn(s.agentId, period),
+    listPersonOptions(s.agentId),
   ]);
   if (!dispatcher) notFound();
+  const others = people.filter((p) => p.id !== dispatcher.id);
+  const nameKey = (name: string) => name.trim().replace(/\s+/g, " ").toUpperCase();
 
   // Pay is worked out per outlet run; show the outlet asked for, else the first one.
   const outletId = dispatcher.outlets.find((o) => o.id === query.outlet)?.id ?? dispatcher.outlets[0].id;
@@ -56,6 +60,8 @@ export default async function DispatcherPage({
       resolved={resolved}
       overrides={overrides}
       ruleOptions={ruleOptions}
+      others={others}
+      suggested={others.filter((p) => nameKey(p.name) === nameKey(dispatcher.name))}
     />
   );
 }
