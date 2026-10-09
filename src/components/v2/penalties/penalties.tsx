@@ -15,7 +15,7 @@ import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
 import type { MessageKey } from "@/lib/i18n/en";
 import { PENALTY_TYPES } from "@/lib/v2/pay/config";
-import { periodFromInput, periodToInput } from "@/lib/v2/pay/resolve";
+import { periodToInput } from "@/lib/v2/pay/resolve";
 import { assignPenalty, deletePenaltyImport, ignorePenalty, setPenaltyWaived, undoPenaltyDecision } from "@/lib/v2/penalties/actions";
 import type { PenaltyItemView, PenaltyMonth, PersonOption } from "@/lib/v2/penalties/data";
 import { monthLabel, penaltyLabel } from "../labels";
@@ -74,18 +74,6 @@ export function Penalties({ data, people }: { data: PenaltyMonth; people: Person
           <h1 className={ui.title}>{t("penalties.title")}</h1>
           <p className={ui.subtitle}>{t("penalties.subtitle")}</p>
         </div>
-        <label className={ui.field}>
-          <span className={ui.label}>{t("penalties.month")}</span>
-          <input
-            type="month"
-            className={ui.input}
-            value={periodToInput(data.period)}
-            onChange={(e) => {
-              const p = periodFromInput(e.target.value);
-              if (p) router.replace(`/app/penalties?month=${p}`, { scroll: false });
-            }}
-          />
-        </label>
       </header>
 
       <PenaltyImport defaultPeriod={data.period} />

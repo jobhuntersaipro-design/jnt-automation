@@ -1,20 +1,13 @@
 import { notFound } from "next/navigation";
 import { Penalties } from "@/components/v2/penalties/penalties";
-import { periodFromParam, periodOf } from "@/lib/v2/pay/resolve";
 import { getPenaltyMonth, listPersonOptions } from "@/lib/v2/penalties/data";
-import { lastWorkedPeriod } from "@/lib/v2/payroll/data";
-import { prisma } from "@/lib/prisma";
+import { chosenPeriod } from "@/lib/v2/scope";
 import { v2Session } from "@/lib/v2/session";
 
 export default async function PenaltiesPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const s = await v2Session();
   if (!s) notFound();
-  // Without a month asked for: the payroll month worked on last, else the latest month with penalties, else this month.
-  const [worked, latest] = await Promise.all([
-    lastWorkedPeriod(s.agentId),
-    prisma.penaltyItem.findFirst({ where: { agentId: s.agentId }, orderBy: { period: "desc" }, select: { period: true } }),
-  ]);
-  const period = periodFromParam((await searchParams).month) ?? worked ?? latest?.period ?? periodOf(new Date());
+  const period = await chosenPeriod(s.agentId, (await searchParams).month);
   const [data, people] = await Promise.all([getPenaltyMonth(s.agentId, period), listPersonOptions(s.agentId)]);
   return <Penalties key={period} data={data} people={people} />;
 }

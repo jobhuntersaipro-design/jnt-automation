@@ -36,6 +36,10 @@ export const en = {
   "nav.label": "Main",
   "nav.dashboard": "Dashboard",
   "nav.design": "Design review",
+  "nav.menu": "Menu",
+  "scope.outlet": "Outlet",
+  "scope.allOutlets": "All outlets",
+  "scope.month": "Month",
 
   "user.menu": "Account",
   "user.signOut": "Sign out",

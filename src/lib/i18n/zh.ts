@@ -41,6 +41,10 @@ export const zh: Partial<Record<MessageKey, string>> = {
   "nav.label": "主菜单",
   "nav.dashboard": "概览",
   "nav.design": "设计审阅",
+  "nav.menu": "菜单",
+  "scope.outlet": "网点",
+  "scope.allOutlets": "全部网点",
+  "scope.month": "月份",
 
   "user.menu": "账户",
   "user.signOut": "退出登录",
