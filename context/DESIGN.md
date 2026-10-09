@@ -1,84 +1,189 @@
-# Design System Specification: The Logistics Authority
+applied to anyone" (warning). Primary *New rule* (dialog: type, name, applies
+from; starts with example numbers). Empty: "No pay rules yet" / "Start with a
+rate card" → *New rate card*.
 
-## 1. Overview & Creative North Star
-**The Creative North Star: "The Precision Architect"**
-This design system moves away from the cluttered, utilitarian aesthetic of traditional logistics software. Instead, it adopts the persona of a high-end editorial publication—clean, authoritative, and obsessively organized. We achieve "Modern Minimalism" not through emptiness, but through intentional structural depth.
+### 3.11 Rule editor — `/app/rules/[ruleId]`
 
-By breaking the rigid 12-column grid with **intentional asymmetry** (e.g., wide data tables offset by slim, high-contrast summary sidebars) and utilizing a **Tonal Layering** approach, we transform dry salary data into a premium dashboard experience. The interface should feel like a custom-tailored suit: perfectly fitted, quiet in its elegance, yet unmistakably powerful.
+The densest screen. `.split`: editor left, *Try it* / *Applies to* / *History*
+right.
 
----
+- **Header** — back "Pay rules"; name; *Rename*, *Copy*, *Archive* (confirm);
+  *Import* / *Export*.
+- **Versions** — chips by month; "Rates from {month}" with help "Changes are
+  saved as a new version from the month you pick. Earlier months keep their
+  numbers." Switching is blocked while there are unsaved changes.
+- **Shape** — Counts (delivered / SC / SC-RTN parcels, or cases), Pays (per
+  parcel / flat), *Different rate per vehicle* switch.
+- **Monthly count tiers** — upper bounds only ("Up to 1,400", "1,401–2,600",
+  "2,601 and above"); the last is always "and above". *Tier basis*:
+  Whole / Marginal with an example sentence for each.
+- **Weight bands** — same pattern in kg ("Up to 5 kg", "5.01–10 kg", "10.01 kg
+  and above").
+- **Rate table** — tier × band rows, one column per vehicle, `DecimalInput`
+  cells right-aligned, tabular figures, up to 4 decimals.
+- **Problems** — warning alert "Fix before saving" listing each issue by row.
+- **Save bar** — "Save as the version from {month}", primary *Save version*,
+  *Discard changes*. Replacing an existing month confirms: "Replace the {month}
+  version? Unfinalised payroll from that month on will use the new numbers."
+- **Try it** — sample parcels (vehicle, weight, count) → lines "26 × RM 1.00 =
+  RM 26.00" and a total. Penalty rules take a number of cases.
+- **Applies to** — Everyone / Full-time / Part-time / Outlet (± FT/PT only) /
+  Dispatcher, from a month. Help: "The most specific match wins: a dispatcher,
+  then an outlet, then full- or part-time, then everyone."
+- **History** — "New rates from Oct 2026 (from rates.xlsx)" · "{actor} · {when}".
 
-## 2. Colors & Surface Logic
-Our palette balances the cold, trustworthy professionalism of deep blues with the high-energy "J&T" red/orange accent to signal action and brand identity.
+### 3.12 Settings — `/app/settings` (account menu)
 
-### Surface Hierarchy & The "No-Line" Rule
-Traditional 1px borders are prohibited for sectioning. We define space through **Background Shifts**:
-- **Base Layer:** `surface` (#f8f9fa) – The canvas.
-- **Sectioning:** Use `surface_container_low` (#f3f4f5) to group related data clusters.
-- **Prominence:** Use `surface_container_lowest` (#ffffff) for primary interactive cards to make them "pop" against the gray base.
+Stacked cards: **Company on payslips** (name, registration no., address) ·
+**Company stamp** (preview, upload/replace/remove; white made transparent) ·
+**Password** (hidden for Google-only accounts) · **Plan and billing** (outlet
+limit stepper, "RM {price} per outlet per month", trial/next invoice, invoices
+with *Paid*/*Due*, PDF and *Pay now*). Viewing as an account shows only company
+details plus an info alert explaining why.
 
-### The Glass & Gradient Rule
-For high-level summary cards (e.g., Total Monthly Payout), do not use flat colors. Apply a subtle **Linear Gradient** from `primary` (#0056D2) to `primary_container` (#0056d2) at a 135° angle. For floating navigation or filters, use **Glassmorphism**:
-- **Background:** `surface_container_lowest` at 80% opacity.
-- **Effect:** `backdrop-filter: blur(12px)`.
+### 3.13 Payslips — `/app/payslips/[runId]` (`?d=` for one dispatcher)
 
-### Specialized Logistics Logic (Gender-Specific Avatars)
-To provide instant visual recognition for dispatcher management:
-- **Male Dispatchers:** Avatar ring uses `primary` (#0056D2) at 2px weight.
-- **Female Dispatchers:** Avatar ring uses a custom soft rose (suggested: #f472b6) to provide a clear, non-conflicting distinction from the brand red.
+Outside the shell so only payslips print. On screen: a toolbar with "{n}
+payslips", language switch (*中文 + English* · *中文* · *English*, `?lang=`),
+*Print or save as PDF*; a link to Settings when company details are missing.
 
----
+One A4 page per dispatcher (`@page` A4, page break per slip):
+1. Company name, registration no., address; "Payslip 工资单" and the month.
+2. Particulars: Name, J&T ID, Outlet, Parcels delivered, Vehicle and type.
+3. **Earnings** and **Deductions** tables — Item · Qty · Rate · Amount, each
+   rule's tiers and bands as lines; penalty lines with each case.
+4. Totals, then **Net pay** as the largest figure on the page.
+5. Stamp bottom right; "Computer-generated payslip. No signature required."
+6. Drafts carry "Draft: not finalised" across the top.
 
-## 3. Typography
-We utilize a dual-typeface system to create an editorial feel. **Manrope** provides a modern, geometric authority for headings, while **Inter** ensures maximum legibility for dense tabular data.
+Every label is 中文 then English (shown once when identical, e.g. KPI). The
+saved PDF is named `<Dispatcher>_<Outlet>_<YYYY-MM>` via the page title.
+Black-on-white only; nothing on the payslip depends on colour.
 
-*   **Display (Manrope):** Use `display-lg` (3.5rem) for high-level monthly totals. Tracking should be set to `-0.02em` to feel "tight" and premium.
-*   **Headlines (Manrope):** `headline-sm` (1.5rem) for section titles. Use `on_surface` color to maintain a "dark ink" feel.
-*   **Body (Inter):** `body-md` (0.875rem) is the workhorse for table data. Use `on_surface_variant` (#424654) for secondary data to create a clear hierarchy.
-*   **Labels (Inter):** `label-md` (0.75rem) in All Caps with `+0.05em` letter spacing for table headers.
+### 3.14 Design review — `/app/design`
 
----
-
-## 4. Elevation & Depth
-We eschew "Standard Web" shadows for **Ambient Occlusion**.
-
-*   **The Layering Principle:** Depth is achieved by stacking. A `surface_container_lowest` card sitting on a `surface_container_high` background creates a natural lift.
-*   **Ambient Shadows:** For floating modals or "Active" states, use:
-    *   `box-shadow: 0 12px 40px -12px rgba(25, 28, 29, 0.08);`
-    *   The shadow must be tinted with the `on_surface` color to feel like natural light, never pure black.
-*   **The Ghost Border:** If a separator is required for accessibility, use `outline_variant` (#c3c6d6) at **15% opacity**. Anything higher is too heavy for this system.
-
----
-
-## 5. Components
-
-### Summary Cards
-*   **Styling:** No borders. Use `surface_container_lowest` (#ffffff).
-*   **Corner Radius:** `xl` (0.75rem) for the outer container; `md` (0.375rem) for internal elements.
-*   **Logic:** Feature a "Brand Accent Trace"—a 4px vertical line of `tertiary` (#940002) on the left edge to anchor the brand identity.
-
-### Data Tables (Logistics Heavy)
-*   **Layout:** Forbid divider lines. Use `spacing-4` (0.9rem) vertical padding between rows.
-*   **Row Hover:** Transition background to `surface_container_high` (#e7e8e9) with a `DEFAULT` (0.25rem) radius.
-*   **Hierarchy:** The "Salary Amount" column should use `title-md` and `primary` color to draw the eye immediately.
-
-### Buttons
-*   **Primary:** `primary` (#0056D2) background with `on_primary` text. Use `md` (0.375rem) rounding.
-*   **Tertiary (Action):** `tertiary` (#940002) used exclusively for "Finalize Payroll" or "Critical Error" states. This is our "J&T" signature pop.
-
-### Input Fields
-*   **Soft Focus:** Default state uses `surface_container_highest` background. On focus, transition to `surface_container_lowest` with a 1px `ghost border` and a subtle `primary` outer glow (4px blur).
+Superadmin only, viewing as a v2 account. Tokens, buttons, fields, badges,
+alerts, metric cards, stepper, dialogs, empty state, chart, and the payroll
+table with 300 synthetic dispatchers. Any new shared component appears here
+before it's used on a screen.
 
 ---
 
-## 6. Do’s and Don’ts
+## 4. Shared components
 
-### Do:
-*   **Embrace Negative Space:** Use `spacing-12` (2.75rem) between major dashboard modules. Space is a luxury; use it.
-*   **Use Tonal Shifts:** Distinguish the sidebar from the main content by using `surface_dim` (#d9dadb) for the sidebar background.
-*   **Align to the Baseline:** Ensure all numerical data in tables is tabular-numeric (monospaced numbers) for easy vertical scanning.
+**Buttons** — Arc `Button`: `primary` (one per screen), `secondary`, `ghost`,
+`danger`. `loading` keeps the label width and disables the button; actions that
+refresh a list stay busy until the list has refreshed.
 
-### Don’t:
-*   **Don't use 100% Black:** Never use #000000. Use `on_surface` (#191c1d) for maximum readability without eye strain.
-*   **Don't use "Floating" Dividers:** Never place a line in the middle of a card. Use a 4px gap (`spacing-2.5`) to create a visual break instead.
-*   **Don't Over-Round:** Avoid "Pill" shapes for anything other than status chips. We want the system to feel architectural and precise, not "bubbly." Use `md` and `lg` radii for a professional edge.
+**ConfirmButton** (`src/components/v2/confirm-button.tsx`) — a normal button
+that opens a dialog with a question, an optional body, *Cancel* and the confirm
+action (`danger` when it deletes). The only confirm pattern in v2.
+
+**Status badge** — Arc `Badge`, colour on a tinted ground, always with its label.
+
+| Tone | Meaning | Used for |
+|---|---|---|
+| `success` | Done and correct | Finalised, OK, Matched, Paid, all figures match |
+| `warning` | Needs a person to act | Needs attention, Needs a dispatcher, Not applied to anyone, Due, problems before saving |
+| `info` | Context, nothing broken | Rule kind, In review, Stale (recalculate), viewing-as notice |
+| `neutral` | Standing state | Draft, Ignored, Waived |
+| `danger` | Something failed | Errors from an action only |
+
+A draft is neutral, not warning: being a draft is normal; what needs action is
+flagged separately.
+
+**Alert** — Arc `Alert`, same tones as badges; title is the sentence, body the
+consequence, then at most one action.
+
+**Metric card** — Arc `MetricCard`: label, value, optional caption. Money with
+`RM` prefix and 2 decimals, no count-up; the value steps down a font size in
+narrow cards rather than overlapping.
+
+**Data table** (`src/components/v2/data-table`) — in-house, not Arc's.
+- Toolbar: search (left, up to 24rem), count right ("32 dispatchers"), export.
+- Scrolls inside its own bordered box (`--radius-panel`, max 70vh) so the
+  header and first column stick; min width 56rem, the page itself never
+  scrolls sideways.
+- Every column sorts (`aria-sort`); numbers, money and dates first click
+  descending, text ascending.
+- Cells `--space-3` × `--space-4`, `--border-subtle` rule between rows, no
+  zebra. Numeric cells right-aligned, `tabular-nums`. Money `RM 1,186.40`.
+- Inline-editable cells are highlighted; Enter saves, Escape cancels,
+  non-negative, 2 dp.
+- Footer totals summed in cents. CSV: what's shown, UTF-8 BOM (Excel reads
+  Chinese headers), money to 2 dp, totals row.
+- Empty search: "No dispatchers match your search."
+- Anything ellipsised carries a `title` with the full value.
+
+**Month picker** — native month input styled as an Arc field (`.input`),
+defaulting to the month worked on last.
+
+**Inputs** — Arc fields with `--radius-control` (0.5rem). `DecimalInput` for
+money and rates. On touch screens every input is at least 16px so iOS doesn't
+zoom.
+
+**Empty state** — Arc `EmptyState`: title says what's missing, body says how it
+gets filled, one action.
+
+**Toast** — Arc `Toast`, short past-tense confirmation ("Saved for Ahmad from
+Nov 2026."). Toasts confirm; they never carry the only copy of an error.
+
+**Motion** — Arc's `--duration-*` and `--ease-*` only. No motion on numbers or
+table rows; `prefers-reduced-motion` turns transitions off.
+
+### Tokens at a glance
+
+| Token | Value | Use |
+|---|---|---|
+| `--background` | `#f6f7f9` | Page canvas |
+| `--surface` | `#ffffff` | Cards, tables, dialogs |
+| `--surface-muted` | `#eef0f3` | Hover, quiet panels |
+| `--foreground` | `#191c1d` | Text (never `#000`) |
+| `--text-secondary` / `--text-muted` | `#424654` / `#585c6b` | Subtitles, help, counts |
+| `--border` / `--border-subtle` / `--border-strong` | `#e2e4e9` / `#eceef1` / `#c3c6d6` | Box, row rule, input |
+| `--accent` / `--accent-strong` | `#0056d2` / `#00439f` | Primary, active nav, links |
+| `--success` / `--warning` / `--danger` | `#0b7a4b` / `#8a5300` / `#b3261e` | Status text |
+| `--radius-control` / `-panel` / `-surface` | 0.5 / 0.75 / 1rem | Inputs / cards / sign-in card |
+| `--font-display` | Manrope + CJK fallback | Titles, big numbers |
+| `--font-body` | Inter + CJK fallback | Everything else |
+
+Breakpoints: 40rem (short labels), 48rem (nav strip), 64rem (wide gutter),
+72rem (side column).
+
+---
+
+## 5. Sample data
+
+Synthetic only. Never use a client's payroll sheet, penalty file, rate card or
+real rates in designs, fixtures or screenshots.
+
+- **Account** — "Demo Logistics Sdn Bhd", three outlets: `PHG415`, `PHG350`,
+  `KUL4602`.
+- **Dispatchers** — 32 at the main outlet, Malaysian names in mixed scripts
+  ("Ahmad Faiz", "Tan Wei Ming", "Siti Nurhaliza", "Rajesh a/l Kumar"), J&T IDs
+  like `PHG4150001`. Two share a name; two are new in the month with no vehicle
+  and type.
+- **Rate card** — illustrative numbers only: Bike 0–5 kg RM 1.00, 5.01–10 kg
+  RM 1.40, 10.01 kg+ RM 2.20; KPI RM 0.10 per parcel above 1,400 (marginal);
+  fuel per delivered parcel.
+- **Month** — ~3,300 parcels; a few rows from another outlet, another month and
+  undated, so the run notes show.
+- **Penalties** — a five-sheet workbook: an English fake-attempt sheet with a
+  totals row, a Chinese PDNC sheet with appeals, an outlet-named inactive
+  sheet, a lost-parcel sheet without amounts, a notes sheet. One case names a
+  hub ID so the queue has an entry.
+- **Design review table** — 300 generated dispatchers
+  (`src/components/v2/design/sample-payroll.ts`).
+
+---
+
+## 6. Open questions
+
+- How the J&T file marks SC / SC-RTN parcels (the UI says it's still to be
+  confirmed, in the help text and the badge tooltip).
+- KPI whole vs marginal, and whether full-timers get a basic salary — both
+  change what the rule editor defaults to.
+- Payslip fields not stored yet: company logo, pay date, bank account; a
+  company name separate from the account name; Bahasa Malaysia payslips.
+- App shell with a sidebar and a persistent outlet/month switcher (§3.0).
+- Dispatcher list as cards on phones (§3.7).
