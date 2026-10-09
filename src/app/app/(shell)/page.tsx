@@ -22,7 +22,7 @@ export default async function V2Dashboard() {
   const { t, tp } = i18n;
   const [period, chosen, codes] = await Promise.all([
     chosenPeriod(s.agentId),
-    chosenOutlet(),
+    chosenOutlet(s),
     prisma.branch.findMany({
       where: { agentId: s.agentId, isDemo: false },
       select: { code: true },
@@ -89,7 +89,8 @@ export default async function V2Dashboard() {
       body: t("dashboard.peopleBody"),
     },
   ];
-  const setUp = steps.every((step) => step.done);
+  // The setup steps are the owner's (rate cards); a branch supervisor never sees them.
+  const setUp = !!s.member || steps.every((step) => step.done);
 
   const latestRuns = runs.filter((r) => r.period === period);
   const month = monthLabel(i18n, period);

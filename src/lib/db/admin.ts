@@ -4,6 +4,8 @@ import type { Language, UiVersion } from "@/generated/prisma/client";
 // Get all agents with branches, contact details and invoices
 export async function getAllAgents() {
   const agents = await prisma.agent.findMany({
+    // v2 team members are logins inside an owner's account, not accounts (removed with their owner).
+    where: { ownerId: null },
     select: {
       id: true,
       name: true,

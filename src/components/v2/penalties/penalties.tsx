@@ -38,7 +38,8 @@ function statusText(i18n: I18n, item: PenaltyItemView, withName = false) {
 type Row = { id: string; date: string; type: string; waybill: string; inFile: string; dispatcher: string; amount: number | ""; status: string };
 
 /** A month's QC penalties: import files, give unmatched cases a dispatcher, check every case. */
-export function Penalties({ data, people }: { data: PenaltyMonth; people: PersonOption[] }) {
+/** `owner` false for a branch supervisor: they see their branches' cases and can't remove a file (it holds every branch's). */
+export function Penalties({ data, people, owner = true }: { data: PenaltyMonth; people: PersonOption[]; owner?: boolean }) {
   const i18n = useI18n();
   const { t, tp } = i18n;
   const router = useRouter();
@@ -163,6 +164,7 @@ export function Penalties({ data, people }: { data: PenaltyMonth; people: Person
                     {t("penalties.fileLine", { when: i18n.date(new Date(f.createdAt), DATE_TIME), actor: f.actor ?? "—", added: f.added, updated: f.updated })}
                   </span>
                 </span>
+                {owner && (
                 <ConfirmButton
                   confirmVariant="danger"
                   label={t("penalties.remove")}
@@ -178,6 +180,7 @@ export function Penalties({ data, people }: { data: PenaltyMonth; people: Person
                     router.refresh();
                   }}
                 />
+                )}
               </li>
             ))}
           </ul>

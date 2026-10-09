@@ -18,11 +18,12 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
   if (!v2) redirect("/dashboard");
 
   const { t } = await getI18n();
+  // A branch supervisor sees their own name and photo, and only their branches.
   const [agent, branches, month, outlet] = await Promise.all([
-    prisma.agent.findUnique({ where: { id: v2.agentId }, select: { name: true, email: true, avatarUrl: true } }),
-    prisma.branch.findMany({ where: { agentId: v2.agentId }, select: { code: true }, orderBy: { code: "asc" } }),
+    prisma.agent.findUnique({ where: { id: v2.member?.id ?? v2.agentId }, select: { name: true, email: true, avatarUrl: true } }),
+    prisma.branch.findMany({ where: { agentId: v2.agentId, ...(v2.member && { id: { in: v2.member.branchIds } }) }, select: { code: true }, orderBy: { code: "asc" } }),
     chosenPeriod(v2.agentId),
-    chosenOutlet(),
+    chosenOutlet(v2),
   ]);
   const nav = [
     { href: "/app", label: t("nav.dashboard") },
@@ -30,12 +31,16 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
     { href: "/app/penalties", label: t("nav.penalties") },
     { href: "/app/advances", label: t("nav.advances") },
     { href: "/app/dispatchers", label: t("nav.dispatchers") },
-    { href: "/app/branches", label: t("nav.outlets") },
-    { href: "/app/rules", label: t("nav.rules") },
+    ...(v2.member
+      ? []
+      : [
+          { href: "/app/branches", label: t("nav.outlets") },
+          { href: "/app/rules", label: t("nav.rules") },
+        ]),
   ];
   // Design review is for the EasyStaff team, reached by viewing as a v2 account.
   if (v2.impersonating) nav.push({ href: "/app/design", label: t("nav.design") });
-  const sidebar = { nav, outlets: branches.map((b) => b.code), month, outlet };
+  const sidebar = { nav, outlets: branches.map((b) => b.code), month, outlet, allBranches: !v2.member };
   const name = agent?.name || agent?.email || "";
 
   return (

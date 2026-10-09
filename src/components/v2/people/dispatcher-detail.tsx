@@ -46,10 +46,12 @@ interface Props {
   /** Everyone else, for joining a second record of the same person; `suggested` share this name. */
   others: PersonOption[];
   suggested: PersonOption[];
+  /** False for a branch supervisor: no merging, no rules of their own. */
+  owner: boolean;
 }
 
 /** One dispatcher: vehicle and FT/PT over time, which rules pay them in a month, and their own rules. */
-export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasProfile, resolved, overrides, ruleOptions, others, suggested }: Props) {
+export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasProfile, resolved, overrides, ruleOptions, others, suggested, owner }: Props) {
   const i18n = useI18n();
   const { t } = i18n;
   const router = useRouter();
@@ -128,8 +130,8 @@ export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasPr
               })}
             </ul>
           </section>
-          <Overrides dispatcherId={dispatcher.id} overrides={overrides} ruleOptions={ruleOptions} period={period} />
-          <MergeDispatcher dispatcher={dispatcher} others={others} suggested={suggested} />
+          {owner && <Overrides dispatcherId={dispatcher.id} overrides={overrides} ruleOptions={ruleOptions} period={period} />}
+          {owner && <MergeDispatcher dispatcher={dispatcher} others={others} suggested={suggested} />}
         </div>
         <Profiles dispatcherId={dispatcher.id} name={dispatcher.name} profiles={profiles} period={period} />
       </div>

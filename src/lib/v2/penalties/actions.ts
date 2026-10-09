@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { dispatcherScope, penaltyScope, v2Owner, v2Session, type ActionResult, type V2Session } from "@/lib/v2/session";
 import { rematch } from "./store";
 
 // Decisions on imported penalty cases. A match or ignore is about the person the file names,
@@ -17,8 +17,8 @@ function refresh() {
 
 const audit = (agentId: string, actor: string | null, action: string, detail: Detail) => prisma.ruleAudit.create({ data: { agentId, actor, action, detail } });
 
-const ownItem = (agentId: string, id: string) =>
-  prisma.penaltyItem.findFirst({ where: { id, agentId }, select: { id: true, who: true, extId: true, name: true, waybill: true, period: true, type: true } });
+const ownItem = async (s: V2Session, id: string) =>
+  prisma.penaltyItem.findFirst({ where: { id, agentId: s.agentId, ...(await penaltyScope(s)) }, select: { id: true, who: true, extId: true, name: true, waybill: true, period: true, type: true } });
 
 const label = (item: { extId: string | null; name: string | null; waybill: string | null }) => item.name ?? item.extId ?? item.waybill ?? "";
 
@@ -52,8 +52,8 @@ export async function assignPenalty(input: { itemId: string; dispatcherId: strin
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
   const [item, person] = await Promise.all([
-    ownItem(s.agentId, input.itemId),
-    prisma.dispatcher.findFirst({ where: { id: input.dispatcherId, agentId: s.agentId, branch: { isDemo: false } }, select: { id: true, name: true } }),
+    ownItem(s, input.itemId),
+    prisma.dispatcher.findFirst({ where: { id: input.dispatcherId, agentId: s.agentId, branch: { isDemo: false }, ...dispatcherScope(s) }, select: { id: true, name: true } }),
   ]);
   if (!item || !person) return { ok: false, error: "error.notFound" };
   return { ok: true, data: { count: await decide(s, item, person.id, { dispatcher: person.name }) } };
@@ -63,7 +63,7 @@ export async function assignPenalty(input: { itemId: string; dispatcherId: strin
 export async function ignorePenalty(input: { itemId: string }): Promise<ActionResult<{ count: number }>> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const item = await ownItem(s.agentId, input.itemId);
+  const item = await ownItem(s, input.itemId);
   if (!item) return { ok: false, error: "error.notFound" };
   return { ok: true, data: { count: await decide(s, item, null, {}) } };
 }
@@ -72,7 +72,7 @@ export async function ignorePenalty(input: { itemId: string }): Promise<ActionRe
 export async function undoPenaltyDecision(input: { itemId: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const item = await ownItem(s.agentId, input.itemId);
+  const item = await ownItem(s, input.itemId);
   if (!item) return { ok: false, error: "error.notFound" };
   if (item.who) {
     await prisma.penaltyAlias.deleteMany({ where: { agentId: s.agentId, key: item.who } });
@@ -89,7 +89,7 @@ export async function undoPenaltyDecision(input: { itemId: string }): Promise<Ac
 export async function setPenaltyWaived(input: { itemId: string; waived: boolean }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const item = await ownItem(s.agentId, input.itemId);
+  const item = await ownItem(s, input.itemId);
   if (!item) return { ok: false, error: "error.notFound" };
   await prisma.$transaction([
     prisma.penaltyItem.update({ where: { id: item.id }, data: { waived: input.waived, waivedBy: s.actor ?? "manual" } }),
@@ -101,7 +101,7 @@ export async function setPenaltyWaived(input: { itemId: string; waived: boolean 
 
 /** Removes a file's import: the cases it added go; cases it only updated stay as updated. */
 export async function deletePenaltyImport(input: { importId: string }): Promise<ActionResult<{ count: number }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const file = await prisma.penaltyImport.findFirst({ where: { id: input.importId, agentId: s.agentId }, select: { id: true, fileName: true, period: true, _count: { select: { items: true } } } });
   if (!file) return { ok: false, error: "error.notFound" };

@@ -10,7 +10,7 @@ import type { Parcels } from "@/lib/v2/pay/engine";
 import { calculateRun } from "@/lib/v2/payroll/run";
 import { planMerge, profilesToMove } from "@/lib/v2/people/merge";
 import { ensureOutlet } from "@/lib/v2/people/outlet";
-import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { dispatcherScope, v2Owner, v2Session, type ActionResult } from "@/lib/v2/session";
 
 // Mutations behind the v2 outlet and dispatcher screens. Each one checks the caller is a
 // v2 account, touches only that account's rows, and leaves an audit entry.
@@ -18,7 +18,7 @@ import { v2Session, type ActionResult } from "@/lib/v2/session";
 const outletCode = z.string().trim().toUpperCase().pipe(z.string().regex(/^[A-Z0-9-]{2,20}$/));
 
 export async function createOutlet(input: { code: string }): Promise<ActionResult<{ id: string; code: string }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const code = outletCode.safeParse(input.code);
   if (!code.success) return { ok: false, error: "outlets.err.code" };
@@ -43,7 +43,7 @@ export async function setPhone(input: { dispatcherId: string; phone: string }): 
   if (!s) return { ok: false, error: "error.forbidden" };
   const phone = input.phone.trim() ? normalizePhone(input.phone) : null;
   if (input.phone.trim() && !phone) return { ok: false, error: "send.err.phone" };
-  const { count } = await prisma.dispatcher.updateMany({ where: { id: input.dispatcherId, agentId: s.agentId }, data: { phone } });
+  const { count } = await prisma.dispatcher.updateMany({ where: { id: input.dispatcherId, agentId: s.agentId, ...dispatcherScope(s) }, data: { phone } });
   if (count === 0) return { ok: false, error: "error.notFound" };
   return { ok: true, data: { phone } };
 }
@@ -57,7 +57,7 @@ export async function setProfiles(input: z.input<typeof profileInput>): Promise<
   const { effectiveFrom, vehicle, employment } = parsed.data;
   const ids = [...new Set(parsed.data.dispatcherIds)];
   const owned = await prisma.dispatcher.findMany({
-    where: { id: { in: ids }, agentId: s.agentId },
+    where: { id: { in: ids }, agentId: s.agentId, ...dispatcherScope(s) },
     // What each one had in that month before this change, for the change log.
     select: { id: true, name: true, profiles: { where: { effectiveFrom: { lte: effectiveFrom } }, orderBy: { effectiveFrom: "desc" }, take: 1 } },
   });
@@ -94,7 +94,7 @@ export async function confirmProfile(input: { profileId: string }): Promise<Acti
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
   const { count } = await prisma.dispatcherProfile.updateMany({
-    where: { id: input.profileId, dispatcher: { agentId: s.agentId } },
+    where: { id: input.profileId, dispatcher: { agentId: s.agentId, ...dispatcherScope(s) } },
     data: { confirmedAt: new Date() },
   });
   if (count === 0) return { ok: false, error: "error.notFound" };
@@ -106,7 +106,7 @@ export async function deleteProfile(input: { profileId: string }): Promise<Actio
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
   const profile = await prisma.dispatcherProfile.findFirst({
-    where: { id: input.profileId, dispatcher: { agentId: s.agentId } },
+    where: { id: input.profileId, dispatcher: { agentId: s.agentId, ...dispatcherScope(s) } },
     select: { id: true, dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true, dispatcher: { select: { name: true } } },
   });
   if (!profile) return { ok: false, error: "error.notFound" };
@@ -148,7 +148,7 @@ async function mergeSide(agentId: string, id: string) {
  * name and ID they were paid under. Refused when both were paid in the same finalised run.
  */
 export async function mergeDispatchers(input: { keepId: string; mergeId: string }): Promise<ActionResult<{ recalculated: number }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   if (input.keepId === input.mergeId) return { ok: false, error: "error.invalid" };
   const [keep, drop] = await Promise.all([mergeSide(s.agentId, input.keepId), mergeSide(s.agentId, input.mergeId)]);

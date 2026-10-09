@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { PenaltyType } from "@/lib/v2/pay/config";
 import type { Period } from "@/lib/v2/pay/resolve";
@@ -44,10 +45,11 @@ export interface PenaltyMonth {
   imports: PenaltyImportView[];
 }
 
-export async function getPenaltyMonth(agentId: string, period: Period): Promise<PenaltyMonth> {
+/** `scope` narrows the cases (a branch supervisor's: see penaltyScope). */
+export async function getPenaltyMonth(agentId: string, period: Period, scope: Prisma.PenaltyItemWhereInput = {}): Promise<PenaltyMonth> {
   const [items, imports, aliases] = await Promise.all([
     prisma.penaltyItem.findMany({
-      where: { agentId, period },
+      where: { agentId, period, ...scope },
       orderBy: [{ occurredAt: { sort: "asc", nulls: "last" } }, { key: "asc" }],
       include: { dispatcher: { select: { id: true, name: true } }, file: { select: { fileName: true } } },
     }),
@@ -94,9 +96,9 @@ export interface PersonOption {
   detail: string;
 }
 
-export async function listPersonOptions(agentId: string): Promise<PersonOption[]> {
+export async function listPersonOptions(agentId: string, scope: Prisma.DispatcherWhereInput = {}): Promise<PersonOption[]> {
   const people = await prisma.dispatcher.findMany({
-    where: { agentId, branch: { isDemo: false } },
+    where: { agentId, branch: { isDemo: false }, ...scope },
     orderBy: { name: "asc" },
     select: { id: true, name: true, assignments: { select: { extId: true, branch: { select: { code: true } } } } },
   });

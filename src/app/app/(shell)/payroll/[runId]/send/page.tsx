@@ -16,7 +16,7 @@ const en = createI18n("en", messagesFor("en"));
 export default async function SendPage({ params }: { params: Promise<{ runId: string }> }) {
   const s = await v2Session();
   if (!s) notFound();
-  const run = await getRunView(s.agentId, (await params).runId);
+  const run = await getRunView(s.agentId, (await params).runId, s.member?.branchIds);
   if (!run) notFound();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`;

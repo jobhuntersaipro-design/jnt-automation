@@ -1,17 +1,26 @@
 import { notFound } from "next/navigation";
-import { Settings } from "@/components/v2/settings/settings";
+import { MemberSettings, Settings } from "@/components/v2/settings/settings";
 import { billableMonths, billingStatus, firstBillableMonth, isInTrial, monthKey, PRICE_PER_BRANCH, SELF_SERVE_MAX_BRANCHES, trialEndDate } from "@/lib/billing";
 import { billplzConfigured } from "@/lib/billplz";
 import { prisma } from "@/lib/prisma";
 import { SUPPORT_EMAIL } from "@/lib/support";
 import { getV2Agent } from "@/lib/ui-version";
 import { toPeriod } from "@/lib/v2/pay/resolve";
+import { listTeam } from "@/lib/v2/team/data";
 
 const MONTHS_SHOWN = 12;
 
 export default async function SettingsPage() {
   const v2 = await getV2Agent();
   if (!v2) notFound();
+  if (v2.member) {
+    const self = await prisma.agent.findUnique({ where: { id: v2.member.id }, select: { password: true } });
+    return <MemberSettings hasPassword={!!self?.password} />;
+  }
+  const [members, branches] = await Promise.all([
+    listTeam(v2.agentId),
+    prisma.branch.findMany({ where: { agentId: v2.agentId, isDemo: false }, select: { id: true, code: true }, orderBy: { code: "asc" } }),
+  ]);
   const agent = await prisma.agent.findUnique({
     where: { id: v2.agentId },
     select: {
@@ -49,6 +58,7 @@ export default async function SettingsPage() {
   return (
     <Settings
       viewingAs={v2.impersonating ? (v2.impersonatedName ?? agent.name) : null}
+      team={{ members, branches }}
       account={{
         name: agent.name,
         email: agent.email,

@@ -19,6 +19,8 @@ export interface SidebarProps {
   /** The month the server resolved without a `?month=` (cookie, else month worked on last). */
   month: number;
   outlet: string | null;
+  /** False for a branch supervisor: no "All branches" choice. */
+  allBranches?: boolean;
 }
 
 const ALL = "all";
@@ -28,7 +30,7 @@ const setCookie = (name: string, value: string) => {
 };
 
 /** Outlet and month chosen once for Payroll, Penalties and Dispatchers. */
-function Scope({ outlets, month, outlet }: Omit<SidebarProps, "nav">) {
+function Scope({ outlets, month, outlet, allBranches = true }: Omit<SidebarProps, "nav">) {
   const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
@@ -56,12 +58,12 @@ function Scope({ outlets, month, outlet }: Omit<SidebarProps, "nav">) {
       {outlets.length > 1 && (
         <Select
           label={t("scope.outlet")}
-          value={outlet && outlets.includes(outlet) ? outlet : ALL}
+          value={outlet && outlets.includes(outlet) ? outlet : allBranches ? ALL : outlets[0]}
           onValueChange={(v) => {
             setCookie("es-outlet", v === ALL ? "" : v);
             reload();
           }}
-          options={[{ value: ALL, label: t("scope.allOutlets") }, ...outlets.map((o) => ({ value: o, label: o }))]}
+          options={[...(allBranches ? [{ value: ALL, label: t("scope.allOutlets") }] : []), ...outlets.map((o) => ({ value: o, label: o }))]}
         />
       )}
       <label className={ui.field}>

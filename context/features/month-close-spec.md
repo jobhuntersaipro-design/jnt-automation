@@ -124,6 +124,13 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    record's months win), advances, penalty cases and remembered matches, own rules and phone move over, and the
    other record goes. Finalised payslips keep the name and ID they were paid under. When both are in one draft run
    their parcels join and the run recalculates; both in one finalised run is refused. Logged in the change log.
-5. Roles: branch supervisor prepares, owner finalises.
+5. **Built:** roles. The owner invites branch supervisors in Settings → Team (name, email, branches; an emailed
+   set-password link, also copyable for WhatsApp, 7 days). A supervisor is an `Agent` with `ownerId` (own login) and
+   `teamBranchIds` (migration `20261017_v2_team`, additive); `getV2Agent` puts them in the owner's account with
+   `member` set. They see and change only their branches (sidebar has no "All branches"): upload J&T files for their
+   branches, penalties, vehicle/type, advances, review, payslips. Owner only: finalising, pay rules, branches,
+   compare with your sheet, rate-card fixes, merging dispatchers, removing a penalty file, account settings (a
+   supervisor's Settings is their password). Other branches' runs, payslips and dispatchers 404. Changes are logged
+   under the supervisor's email.
 6. Accounting export (Bukku, SQL Account, Xero); LHDN self-billed e-Invoice if riders are contractors
    (verify against LHDN); success-rate bonus tiers; COD reconciliation; weekly pay.

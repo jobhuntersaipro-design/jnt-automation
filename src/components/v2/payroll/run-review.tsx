@@ -65,11 +65,14 @@ export function RunReview({
   run,
   uncovered,
   hasCard,
+  owner = true,
 }: {
   run: RunView;
   uncovered: boolean;
   /** The account has a rate card at all; without one there's nothing to "use from this month". */
   hasCard: boolean;
+  /** False for a branch supervisor: they prepare the run; finalising, rules and comparing are the owner's. */
+  owner?: boolean;
 }) {
   const i18n = useI18n();
   const { t } = i18n;
@@ -228,6 +231,7 @@ export function RunReview({
               {t("run.send")}
             </Button>
           )}
+          {owner && (
           <Button
             variant="secondary"
             loading={busyFor(`/app/payroll/check?month=${run.period}`)}
@@ -236,12 +240,14 @@ export function RunReview({
             <Scale size={16} aria-hidden="true" />
             {t("run.check")}
           </Button>
+          )}
           {draft && (
             <>
               <Button variant="secondary" onClick={recalculate} loading={busy}>
                 <RefreshCw size={16} aria-hidden="true" />
                 {t("run.recalculate")}
               </Button>
+              {owner && (
               <ConfirmButton
                 variant="primary"
                 label={t("run.finalise")}
@@ -257,6 +263,7 @@ export function RunReview({
                   router.refresh();
                 }}
               />
+              )}
               <ConfirmButton
                 confirmVariant="danger"
                 label={t("run.delete")}
@@ -278,6 +285,7 @@ export function RunReview({
       </header>
 
       {draft && run.stale && <Alert tone="info" title={t("run.stale")} />}
+      {draft && !owner && <Alert tone="info" title={t("team.ownerFinalises")} />}
       {draft && !run.penaltiesChecked && (
         <div className={ui.stack}>
           <Alert tone="warning" title={t("run.penalties.title", { month })}>
@@ -298,7 +306,9 @@ export function RunReview({
           >
             {hasCard ? t("run.cover.body", { month }) : t("run.cover.noCard")}
           </Alert>
-          {hasCard ? (
+          {!owner ? (
+            <p className={ui.help}>{t("team.askOwner")}</p>
+          ) : hasCard ? (
             <div className={ui.row}>
               <Button size="sm" onClick={cover} loading={covering}>
                 {t("run.cover.action", { month })}

@@ -25,7 +25,7 @@ export async function POST(req: Request) {
     console.error("[v2 payroll] could not read", input.data.key, e);
     return NextResponse.json({ error: "run.err.unreadable" }, { status: 422 });
   }
-  const result = await createRun({ agentId: s.agentId, actor: s.actor, key: input.data.key, fileName: input.data.fileName, rows });
+  const result = await createRun({ agentId: s.agentId, actor: s.actor, key: input.data.key, fileName: input.data.fileName, rows, onlyBranchIds: s.member?.branchIds });
   if (!result.ok) return NextResponse.json({ error: result.error, vars: result.vars }, { status: 422 });
   revalidatePath("/app/payroll", "layout");
   return NextResponse.json(result.data, { status: 201 });
