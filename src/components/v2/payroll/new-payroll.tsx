@@ -98,6 +98,11 @@ function PenaltiesStep({ run }: { run: WizardRun }) {
           <Button onClick={next} loading={busy} disabled={run.cases === 0}>
             {t("wizard.penalties.continue")}
           </Button>
+          {run.cases === 0 && (
+            <Button variant="secondary" onClick={() => router.push(`/app/payroll/${run.id}`)}>
+              {t("wizard.penalties.skip")}
+            </Button>
+          )}
         </div>
       </section>
       <PenaltyImport defaultPeriod={run.period} stay />
