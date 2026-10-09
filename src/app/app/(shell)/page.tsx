@@ -5,7 +5,11 @@ import { MetricCard } from "@/components/arc/metric-card/metric-card";
 import { Prisma } from "@/generated/prisma/client";
 import { getI18n } from "@/lib/i18n/server";
 import { prisma } from "@/lib/prisma";
+import { branchStats } from "@/lib/v2/payroll/branch-stats";
+import type { PayLine } from "@/lib/v2/payroll/calc";
+import { prevPeriod } from "@/lib/v2/pay/resolve";
 import { chosenOutlet, chosenPeriod } from "@/lib/v2/scope";
+import { BranchCards } from "@/components/v2/dashboard/branch-cards";
 import { v2Session } from "@/lib/v2/session";
 import { monthLabel } from "@/components/v2/labels";
 import ui from "@/components/v2/ui.module.css";
@@ -107,6 +111,26 @@ export default async function V2Dashboard() {
       ])
     : [null, 0];
 
+  // Per branch: this month's runs and last month's, for the "By branch" cards.
+  const statRuns = async (rs: typeof runs) => {
+    if (rs.length === 0) return [];
+    const results = await prisma.payrollResult.findMany({
+      where: { runId: { in: rs.map((r) => r.id) } },
+      select: { runId: true, name: true, netCents: true, lines: true, penalties: true },
+    });
+    return rs.map((r) => ({
+      branch: r.branch.code,
+      runId: r.id,
+      status: r.status,
+      parcels: r.parcelCount,
+      results: results
+        .filter((x) => x.runId === r.id)
+        .map((x) => ({ name: x.name, netCents: x.netCents, lines: x.lines as unknown as PayLine[], cases: Array.isArray(x.penalties) ? x.penalties.length : 0 })),
+    }));
+  };
+  const [thisMonth, lastMonth] = await Promise.all([statRuns(latestRuns), statRuns(runs.filter((r) => r.period === prevPeriod(period)))]);
+  const byBranch = branchStats(thisMonth, lastMonth);
+
   const attention = [
     ...runs
       .filter((r) => r.status === "DRAFT")
@@ -195,6 +219,8 @@ export default async function V2Dashboard() {
           )}
         </section>
       )}
+
+      {byBranch.length > 0 && <BranchCards stats={byBranch} month={month} />}
 
       {allRuns.length > 0 && (
         <section className={ui.card} aria-labelledby="attention-title">

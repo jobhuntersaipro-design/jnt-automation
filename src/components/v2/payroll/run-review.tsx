@@ -407,9 +407,9 @@ export function RunReview({
                       {g.label}
                     </button>
                   </th>
-                  <td data-numeric>{i18n.number(g.dispatchers)}</td>
-                  <td data-numeric>{i18n.number(g.parcels)}</td>
-                  <td data-numeric>{i18n.money(g.netCents / 100)}</td>
+                  <td data-label={t("run.metric.dispatchers")} data-numeric>{i18n.number(g.dispatchers)}</td>
+                  <td data-label={t("run.metric.parcels")} data-numeric>{i18n.number(g.parcels)}</td>
+                  <td data-label={t("run.metric.net")} data-numeric>{i18n.money(g.netCents / 100)}</td>
                 </tr>
               ))}
             </tbody>

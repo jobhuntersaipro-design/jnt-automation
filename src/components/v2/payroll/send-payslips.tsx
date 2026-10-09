@@ -79,9 +79,9 @@ export function SendPayslips({ run, rows }: { run: { id: string; outlet: string;
                   return (
                     <tr key={r.id}>
                       <th scope="row">{r.name}</th>
-                      <td>{r.extId}</td>
-                      <td data-numeric>{i18n.money(r.netCents / 100)}</td>
-                      <td>
+                      <td data-label={t("run.col.id")}>{r.extId}</td>
+                      <td data-label={t("run.col.net")} data-numeric>{i18n.money(r.netCents / 100)}</td>
+                      <td data-label={t("send.phone")}>
                         <input
                           className={ui.input}
                           type="tel"
@@ -92,7 +92,7 @@ export function SendPayslips({ run, rows }: { run: { id: string; outlet: string;
                           onBlur={(e) => e.target.value.trim() !== phone && void save(r.dispatcherId, e.target.value)}
                         />
                       </td>
-                      <td>
+                      <td data-label={t("send.send")}>
                         <span className={ui.row}>
                           {phone ? (
                             <a className={`${ui.link} ${styles.action}`} href={`${whatsappLink(phone)}?text=${encodeURIComponent(r.message)}`} target="_blank" rel="noreferrer">

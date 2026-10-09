@@ -156,3 +156,55 @@
     --text-3xl: var(--text-xl);
   }
 }
+
+/* Phones: a labelled table becomes one card per row (each value with its column's name), so nothing scrolls sideways.
+   Tables without labels (a file preview) keep scrolling. */
+@media (max-width: 40rem) {
+  .tableWrap:has(td[data-label]) {
+    overflow: visible;
+    background: none;
+    box-shadow: none;
+  }
+
+  .table:has(td[data-label]),
+  .table:has(td[data-label]) :is(tbody, tfoot, tr, th, td) {
+    display: block;
+  }
+
+  .table:has(td[data-label]) thead {
+    display: none;
+  }
+
+  .table:has(td[data-label]) tr {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+    box-shadow: var(--shadow-resting);
+  }
+
+  .table:has(td[data-label]) :is(th, td) {
+    padding: var(--space-1) 0;
+    border: 0;
+    white-space: normal;
+    text-align: left;
+  }
+
+  .table:has(td[data-label]) td:empty {
+    display: none;
+  }
+
+  .table:has(td[data-label]) td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--space-4);
+    text-align: right;
+  }
+
+  .table:has(td[data-label]) td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    text-align: left;
+  }
+}

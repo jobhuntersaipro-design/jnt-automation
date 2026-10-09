@@ -253,11 +253,11 @@ export function SuccessRates({ data }: { data: SuccessMonth }) {
                 {data.rates.map((r) => (
                   <tr key={r.id}>
                     <th scope="row">{r.extId}</th>
-                    <td>{r.dispatcher?.name ?? <span className={table.warn}>{r.name ? t("success.noDispatcher", { name: r.name }) : t("success.unknownId")}</span>}</td>
-                    <td>{r.outlet ?? "—"}</td>
-                    <td data-numeric>{pct(r.rateBp)}</td>
-                    <td data-numeric>{r.delivered !== null && r.total !== null ? `${i18n.number(r.delivered)} / ${i18n.number(r.total)}` : "—"}</td>
-                    <td>{r.fileName ?? t("success.typed", { actor: r.actor ?? "—" })}</td>
+                    <td data-label={t("run.col.name")}>{r.dispatcher?.name ?? <span className={table.warn}>{r.name ? t("success.noDispatcher", { name: r.name }) : t("success.unknownId")}</span>}</td>
+                    <td data-label={t("runs.outlet")}>{r.outlet ?? "—"}</td>
+                    <td data-label={t("success.rate")} data-numeric>{pct(r.rateBp)}</td>
+                    <td data-label={t("success.counts")} data-numeric>{r.delivered !== null && r.total !== null ? `${i18n.number(r.delivered)} / ${i18n.number(r.total)}` : "—"}</td>
+                    <td data-label={t("success.source")}>{r.fileName ?? t("success.typed", { actor: r.actor ?? "—" })}</td>
                     <td>
                       <Button
                         variant="ghost"

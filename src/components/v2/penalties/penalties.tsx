@@ -121,9 +121,9 @@ export function Penalties({ data, people, owner = true }: { data: PenaltyMonth; 
                     return (
                       <tr key={type}>
                         <th scope="row">{penaltyLabel(i18n, type)}</th>
-                        <td data-numeric>{i18n.number(ofType.length)}</td>
-                        <td data-numeric>{i18n.number(ofType.filter((i) => i.status === "UNMATCHED").length)}</td>
-                        <td data-numeric>{i18n.money(fileAmount(ofType) / 100)}</td>
+                        <td data-label={t("penalties.col.cases")} data-numeric>{i18n.number(ofType.length)}</td>
+                        <td data-label={t("penalties.col.unmatched")} data-numeric>{i18n.number(ofType.filter((i) => i.status === "UNMATCHED").length)}</td>
+                        <td data-label={t("penalties.col.amount")} data-numeric>{i18n.money(fileAmount(ofType) / 100)}</td>
                       </tr>
                     );
                   })}

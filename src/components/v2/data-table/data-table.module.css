@@ -181,3 +181,70 @@
 .open:hover {
   text-decoration: underline;
 }
+
+/* Phones: each row is a card, each value labelled with its column; no sideways scrolling. */
+@media (max-width: 40rem) {
+  .scroller {
+    max-height: none;
+    overflow: visible;
+    border: 0;
+    background: none;
+  }
+
+  .table,
+  .table tbody,
+  .table tfoot,
+  .table tr,
+  .table th,
+  .table td {
+    display: block;
+    min-width: 0;
+  }
+
+  .table thead {
+    display: none;
+  }
+
+  .table tr {
+    margin-bottom: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-panel);
+    background: var(--surface);
+  }
+
+  .table tbody th,
+  .table td,
+  .table tfoot td {
+    position: static;
+    padding: var(--space-1) 0;
+    border: 0;
+    background: none;
+    white-space: normal;
+  }
+
+  .table tbody th {
+    padding-bottom: var(--space-2);
+  }
+
+  .table td[data-label] {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--space-4);
+    text-align: right;
+  }
+
+  .table td[data-label]::before {
+    content: attr(data-label);
+    color: var(--text-muted);
+    text-align: left;
+  }
+
+  .table tfoot td:empty {
+    display: none;
+  }
+
+  .table tfoot tr {
+    background: var(--surface-muted);
+  }
+}

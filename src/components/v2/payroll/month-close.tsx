@@ -87,26 +87,26 @@ export function MonthClose({ period, outlet, rows, owner = true }: { period: Per
                         r.branch
                       )}
                     </th>
-                    <td>
+                    <td data-label={t("close.col.file")}>
                       {r.run ? (
                         <span title={r.run.fileName}>{t("close.uploaded", { date: i18n.date(new Date(r.run.uploadedAt)) })}</span>
                       ) : (
                         <span className={styles.warn}>{t("close.notUploaded")}</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label={t("close.col.penalties")}>
                       {r.penaltyCases === 0 ? (
                         <span className={styles.warn}>{t("close.noPenalties")}</span>
                       ) : (
                         tp("close.penalties", r.penaltyCases)
                       )}
                     </td>
-                    <td data-numeric>
+                    <td data-label={t("runs.dispatchers")} data-numeric>
                       {r.run ? i18n.number(r.run.dispatchers) : "—"}
                       {r.run && r.run.missingProfiles > 0 && <div className={styles.warn}>{tp("close.missing", r.run.missingProfiles)}</div>}
                     </td>
-                    <td data-numeric>{r.run ? i18n.money(r.run.netCents / 100) : "—"}</td>
-                    <td>
+                    <td data-label={t("runs.net")} data-numeric>{r.run ? i18n.money(r.run.netCents / 100) : "—"}</td>
+                    <td data-label={t("runs.status")}>
                       <span className={styles.status}>
                         <Badge tone={TONE[r.status]} size="sm">
                           {t(`close.status.${r.status}`)}
@@ -126,8 +126,8 @@ export function MonthClose({ period, outlet, rows, owner = true }: { period: Per
                   <th scope="row">{t("common.total")}</th>
                   <td />
                   <td />
-                  <td data-numeric>{i18n.number(rows.reduce((n, r) => n + (r.run?.dispatchers ?? 0), 0))}</td>
-                  <td data-numeric>{i18n.money(rows.reduce((n, r) => n + (r.run?.netCents ?? 0), 0) / 100)}</td>
+                  <td data-label={t("runs.dispatchers")} data-numeric>{i18n.number(rows.reduce((n, r) => n + (r.run?.dispatchers ?? 0), 0))}</td>
+                  <td data-label={t("runs.net")} data-numeric>{i18n.money(rows.reduce((n, r) => n + (r.run?.netCents ?? 0), 0) / 100)}</td>
                   <td />
                 </tr>
               </tfoot>

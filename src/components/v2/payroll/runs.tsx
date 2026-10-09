@@ -77,11 +77,11 @@ export function Runs({ runs }: { runs: RunSummary[] }) {
                     {monthLabel(i18n, r.period)}
                   </Link>
                 </th>
-                <td>{r.outlet}</td>
-                <td data-numeric>{i18n.number(r.dispatchers)}</td>
-                <td data-numeric>{i18n.number(r.parcels)}</td>
-                <td data-numeric>{i18n.money(r.netCents / 100)}</td>
-                <td>
+                <td data-label={t("runs.outlet")}>{r.outlet}</td>
+                <td data-label={t("runs.dispatchers")} data-numeric>{i18n.number(r.dispatchers)}</td>
+                <td data-label={t("runs.parcels")} data-numeric>{i18n.number(r.parcels)}</td>
+                <td data-label={t("runs.net")} data-numeric>{i18n.money(r.netCents / 100)}</td>
+                <td data-label={t("runs.status")}>
                   <span className={styles.status}>
                     <Badge
                       tone={r.status === "FINAL" ? "success" : "neutral"}
