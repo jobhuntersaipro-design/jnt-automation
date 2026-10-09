@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { RuleEditor } from "@/components/v2/rules/rule-editor";
-import { periodOf } from "@/lib/v2/pay/resolve";
-import { lastWorkedPeriod } from "@/lib/v2/payroll/data";
+import { chosenPeriod } from "@/lib/v2/scope";
 import { getRule, listAudit, listDispatcherOptions, listOutlets } from "@/lib/v2/rules/data";
 import { v2Owner } from "@/lib/v2/session";
 
@@ -15,9 +14,10 @@ export default async function RulePage({ params, searchParams }: { params: Promi
     listOutlets(s.agentId),
     listDispatcherOptions(s.agentId),
     listAudit(s.agentId, rule.id),
-    lastWorkedPeriod(s.agentId),
+    // The sidebar's month (else the month worked on last): new rates and who-gets-it start where the owner is working.
+    chosenPeriod(s.agentId),
   ]);
-  const startMonth = worked ?? periodOf(new Date());
+  const startMonth = worked;
   const version = rule.versions.find((v) => v.effectiveFrom === Number(month)) ?? rule.versions[0];
   // Keyed by version, so switching versions (or saving one) starts the editor from its numbers.
   return (
