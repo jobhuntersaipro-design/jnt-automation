@@ -148,4 +148,4 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    importing again updates. Typed-in rates for anyone the report misses. Runs read the rate by the J&T ID in the run;
    a dispatcher a success rule applies to with no rate is flagged (blocks finalising until a rate is typed in).
 8. Later: LHDN self-billed e-Invoice if riders are contractors
-   (verify against LHDN); success-rate bonus tiers; COD reconciliation; weekly pay.
+   (verify against LHDN); COD reconciliation; weekly pay.
