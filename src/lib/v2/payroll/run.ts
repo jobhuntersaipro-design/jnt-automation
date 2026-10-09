@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import type { ParsedRow } from "@/lib/upload/parser";
 import { parseConfig } from "@/lib/v2/pay/config";
 import type { Parcels } from "@/lib/v2/pay/engine";
-import { inForce } from "@/lib/v2/pay/resolve";
+import { inForce, monthChange, type Period } from "@/lib/v2/pay/resolve";
 import { listAssignments } from "@/lib/v2/people/data";
 import { ensureOutlet } from "@/lib/v2/people/outlet";
 import type { ActionResult } from "@/lib/v2/session";
@@ -175,6 +175,30 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
   return { ok: true, data: undefined };
 }
 
+export interface ProfileChange {
+  dispatcherId: string;
+  /** This month's profile row; confirming it, or deleting it to go back, settles the change. */
+  profileId: string;
+  from: Profile;
+  to: Profile;
+}
+
+/** Dispatchers whose vehicle or type differs from last month and nobody has confirmed it for this month's pay yet. */
+export async function unconfirmedChanges(dispatcherIds: string[], period: Period): Promise<ProfileChange[]> {
+  const rows = await prisma.dispatcherProfile.findMany({
+    where: { dispatcherId: { in: dispatcherIds }, effectiveFrom: { lte: period } },
+    select: { id: true, dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true, confirmedAt: true },
+  });
+  const byDispatcher = new Map<string, typeof rows>();
+  for (const r of rows) byDispatcher.set(r.dispatcherId, [...(byDispatcher.get(r.dispatcherId) ?? []), r]);
+  return [...byDispatcher].flatMap(([dispatcherId, list]) => {
+    const change = monthChange(list, period);
+    if (!change || change.to.confirmedAt) return [];
+    const pick = (p: (typeof list)[number]) => ({ vehicle: p.vehicle, employment: p.employment, effectiveFrom: p.effectiveFrom });
+    return [{ dispatcherId, profileId: change.to.id, from: pick(change.from), to: pick(change.to) }];
+  });
+}
+
 /** True when rules or profiles changed after the run was worked out. */
 export async function isStale(agentId: string, calculatedAt: Date | null): Promise<boolean> {
   if (!calculatedAt) return true;
@@ -192,12 +216,14 @@ export async function finaliseRun(agentId: string, actor: string | null, runId: 
       calculatedAt: true,
       penaltiesCheckedAt: true,
       branch: { select: { code: true } },
-      results: { select: { warnings: true } },
+      results: { select: { warnings: true, dispatcherId: true } },
     },
   });
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
   if (!run.penaltiesCheckedAt) return { ok: false, error: "run.err.penalties" };
+  const changes = await unconfirmedChanges(run.results.map((r) => r.dispatcherId), run.period);
+  if (changes.length > 0) return { ok: false, error: "run.err.profileChanges", vars: { count: changes.length } };
   if (await isStale(agentId, run.calculatedAt)) return { ok: false, error: "run.err.stale" };
   const blocked = run.results.filter((r) => r.warnings !== null).length;
   if (blocked > 0) return { ok: false, error: "run.err.blocked", vars: { count: blocked } };

@@ -638,6 +638,9 @@ model DispatcherProfile {
   effectiveFrom Int
   vehicle       Vehicle
   employment    Employment
+  /// Set when someone confirms a change from last month's vehicle/type is right for this month's pay.
+  /// Saving the month again makes a new row, so a later change needs confirming again.
+  confirmedAt   DateTime?
   createdAt     DateTime   @default(now())
   dispatcher    Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
 

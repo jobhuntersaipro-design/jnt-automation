@@ -9,6 +9,8 @@ export type Period = number;
 export const toPeriod = (year: number, month: number): Period => year * 100 + month;
 export const periodYear = (p: Period) => Math.floor(p / 100);
 export const periodMonth = (p: Period) => p % 100;
+/** The month before: 202601 → 202512. */
+export const prevPeriod = (p: Period) => (periodMonth(p) === 1 ? p - 89 : p - 1);
 /** "2026-11" (the value of an <input type="month">) ⇄ 202611. */
 export const periodToInput = (p: Period) => `${periodYear(p)}-${String(periodMonth(p)).padStart(2, "0")}`;
 /** The payroll month a moment falls in, in Malaysian time. */
@@ -87,6 +89,18 @@ export function pickAssignments<T extends AssignmentRow>(assignments: T[], ctx: 
     }
   }
   return new Map([...best].sort(([sa, a], [sb, b]) => KINDS.indexOf(a.kind) - KINDS.indexOf(b.kind) || sa.localeCompare(sb)));
+}
+
+/**
+ * A dispatcher's vehicle and type changed this month: the row in force starts this month and differs from the one
+ * before it. Returns both rows, or null when nothing changed (a first-ever setting isn't a change).
+ */
+export function monthChange<T extends { effectiveFrom: Period; vehicle: string; employment: string }>(rows: T[], period: Period) {
+  const to = inForce(rows, period);
+  if (!to || to.effectiveFrom !== period) return null;
+  const from = inForce(rows, prevPeriod(period));
+  if (!from || (from.vehicle === to.vehicle && from.employment === to.employment)) return null;
+  return { from, to };
 }
 
 /** The row in force for a month: the latest `effectiveFrom` not after it, or null. */

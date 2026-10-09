@@ -196,10 +196,20 @@ afterwards.").
   Recalculate to see the new pay." Finalise is disabled while stale.
 - **Attention** (warning) — "4 dispatchers need attention. They aren't paid in
   full until it's fixed, and the month can't be finalised."
+- **Vehicle or type changed** (warning) — "{n} dispatchers changed vehicle or
+  type this month": one vehicle and type per dispatcher per month, so each line
+  ("Ahmad Faiz: Bike · Part-time in Sep 2026, Car · Full-time now") has *Pay as
+  Car · Full-time* (confirms) and *Keep Bike · Part-time* (drops this month's
+  change and recalculates). Finalising waits until every change is settled.
 - **Notes** (neutral text) — rows from other outlets, other months, or with no
   date, and how each was paid.
 
 **Metrics** — Net pay · Dispatchers · Parcels · Need attention.
+
+**By vehicle and type** — card listing each vehicle and type in the run
+(including *Not set*) with dispatchers, parcels and net pay; choosing one shows
+only those dispatchers in the table below ("Showing Car · Full-time", *Show
+all*), with their own totals and CSV.
 
 **Table** (shared DataTable, §4) — Dispatcher · J&T ID · Vehicle and type ·
 Parcels · Earnings · Deductions · Net · Status (*OK* success / warning text such

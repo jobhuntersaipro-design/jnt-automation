@@ -74,6 +74,19 @@ export async function setProfiles(input: z.input<typeof profileInput>): Promise<
   return { ok: true, data: { count: ids.length } };
 }
 
+/** Confirms a change from last month's vehicle/type is right for this month's pay. Pay doesn't change, so drafts stay fresh. */
+export async function confirmProfile(input: { profileId: string }): Promise<ActionResult> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const { count } = await prisma.dispatcherProfile.updateMany({
+    where: { id: input.profileId, dispatcher: { agentId: s.agentId } },
+    data: { confirmedAt: new Date() },
+  });
+  if (count === 0) return { ok: false, error: "error.notFound" };
+  revalidatePath("/app/payroll", "layout");
+  return { ok: true, data: undefined };
+}
+
 export async function deleteProfile(input: { profileId: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
