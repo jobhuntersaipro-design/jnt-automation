@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
@@ -12,7 +11,7 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { useI18n } from "@/components/v2/i18n-provider";
 import { setProfiles } from "@/lib/v2/people/actions";
 import type { DispatcherRow } from "@/lib/v2/people/data";
-import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
+import type { Period } from "@/lib/v2/pay/resolve";
 import { monthLabel, PROFILES, profileKey, profileLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./people.module.css";
@@ -21,7 +20,6 @@ import styles from "./people.module.css";
 export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period: Period }) {
   const i18n = useI18n();
   const { t } = i18n;
-  const router = useRouter();
   const [query, setQuery] = useState("");
   const [show, setShow] = useState<"all" | "unset">("all");
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
@@ -65,7 +63,7 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   if (rows.length === 0) {
     return (
       <div className={ui.page}>
-        <Header />
+        <DispatchersHeader tab="list" />
         <EmptyState title={t("dispatchers.emptyTitle")} description={t("dispatchers.emptyBody")} />
       </div>
     );
@@ -73,20 +71,8 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
 
   return (
     <div className={ui.page}>
-      <Header />
+      <DispatchersHeader tab="list" />
       <div className={styles.toolbar}>
-        <label className={ui.field}>
-          <span className={ui.label}>{t("dispatchers.month")}</span>
-          <input
-            type="month"
-            className={ui.input}
-            value={periodToInput(period)}
-            onChange={(e) => {
-              const p = periodFromInput(e.target.value);
-              if (p) router.replace(`/app/dispatchers?month=${p}`, { scroll: false });
-            }}
-          />
-        </label>
         <div className={styles.search}>
           <SearchField label={t("dispatchers.search")} value={query} onValueChange={setQuery} clearLabel={t("common.clearSearch")} />
         </div>
@@ -203,14 +189,25 @@ export function DispatcherList({ rows, period }: { rows: DispatcherRow[]; period
   );
 }
 
-function Header() {
+/** Page header shared by the dispatcher list and the vehicle-and-type change log. */
+export function DispatchersHeader({ tab }: { tab: "list" | "history" }) {
   const { t } = useI18n();
   return (
-    <header className={ui.pageHeader}>
-      <div>
-        <h1 className={ui.title}>{t("dispatchers.title")}</h1>
-        <p className={ui.subtitle}>{t("dispatchers.subtitle")}</p>
-      </div>
-    </header>
+    <>
+      <header className={ui.pageHeader}>
+        <div>
+          <h1 className={ui.title}>{t("dispatchers.title")}</h1>
+          <p className={ui.subtitle}>{t("dispatchers.subtitle")}</p>
+        </div>
+      </header>
+      <nav className={styles.tabs} aria-label={t("dispatchers.title")}>
+        <Link href="/app/dispatchers" className={styles.tab} aria-current={tab === "list" ? "page" : undefined}>
+          {t("dispatchers.tabList")}
+        </Link>
+        <Link href="/app/dispatchers/history" className={styles.tab} aria-current={tab === "history" ? "page" : undefined}>
+          {t("dispatchers.tabHistory")}
+        </Link>
+      </nav>
+    </>
   );
 }

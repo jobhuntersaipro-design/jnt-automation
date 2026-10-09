@@ -78,6 +78,8 @@ export interface RunView {
   stats: FileStats | null;
   /** A draft whose rules or profiles changed after it was worked out. */
   stale: boolean;
+  /** The month's penalties were imported, or there were none (step 2 of New payroll). */
+  penaltiesChecked: boolean;
   /** The rule versions the run used, by version id. */
   rules: Record<string, { name: string; kind: Kind; effectiveFrom: Period; config: RuleConfig }>;
   results: ResultView[];
@@ -94,6 +96,7 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
       calculatedAt: true,
       finalisedAt: true,
       finalisedBy: true,
+      penaltiesCheckedAt: true,
       stats: true,
       rules: true,
       branch: { select: { code: true } },
@@ -112,6 +115,7 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
     finalisedBy: run.finalisedBy,
     stats: run.stats as FileStats | null,
     stale: run.status === "DRAFT" && (await isStale(agentId, run.calculatedAt)),
+    penaltiesChecked: run.penaltiesCheckedAt !== null,
     rules: (run.rules ?? {}) as RunView["rules"],
     results: run.results.map((r) => ({
       id: r.id,
@@ -128,4 +132,18 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
       netCents: r.netCents,
     })),
   };
+}
+
+/** A month's penalty cases for one branch: the file names the branch, or the case is matched to someone working there. */
+export async function branchPenaltyCounts(agentId: string, period: Period, branch: { id: string; code: string }) {
+  const where = {
+    agentId,
+    period,
+    OR: [{ outlet: branch.code }, { dispatcher: { assignments: { some: { branchId: branch.id } } } }],
+  };
+  const [cases, unmatched] = await Promise.all([
+    prisma.penaltyItem.count({ where }),
+    prisma.penaltyItem.count({ where: { ...where, status: "UNMATCHED" } }),
+  ]);
+  return { cases, unmatched };
 }

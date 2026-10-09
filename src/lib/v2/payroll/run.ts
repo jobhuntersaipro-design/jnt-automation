@@ -185,10 +185,19 @@ export async function isStale(agentId: string, calculatedAt: Date | null): Promi
 export async function finaliseRun(agentId: string, actor: string | null, runId: string): Promise<ActionResult> {
   const run = await prisma.payrollRun.findFirst({
     where: { id: runId, agentId },
-    select: { id: true, period: true, status: true, calculatedAt: true, branch: { select: { code: true } }, results: { select: { warnings: true } } },
+    select: {
+      id: true,
+      period: true,
+      status: true,
+      calculatedAt: true,
+      penaltiesCheckedAt: true,
+      branch: { select: { code: true } },
+      results: { select: { warnings: true } },
+    },
   });
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
+  if (!run.penaltiesCheckedAt) return { ok: false, error: "run.err.penalties" };
   if (await isStale(agentId, run.calculatedAt)) return { ok: false, error: "run.err.stale" };
   const blocked = run.results.filter((r) => r.warnings !== null).length;
   if (blocked > 0) return { ok: false, error: "run.err.blocked", vars: { count: blocked } };

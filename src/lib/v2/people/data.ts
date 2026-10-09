@@ -143,3 +143,44 @@ export async function penaltyTypesIn(agentId: string, period: Period): Promise<M
 export function listRuleOptions(agentId: string) {
   return prisma.payRule.findMany({ where: { agentId, archivedAt: null }, orderBy: [{ kind: "asc" }, { name: "asc" }], select: { id: true, name: true, kind: true } });
 }
+
+type ProfilePair = { vehicle: Vehicle; employment: Employment };
+export interface ProfileChange {
+  id: string;
+  at: string;
+  actor: string | null;
+  /** "profile" sets a vehicle and type; "profileDelete" removes one. */
+  action: "profile" | "profileDelete";
+  dispatcherId: string | null;
+  /** Null on bulk changes logged before the per-dispatcher log, which kept only a count. */
+  dispatcher: string | null;
+  count: number;
+  month: Period;
+  to: ProfilePair;
+  from: ProfilePair | null;
+}
+
+/** Every vehicle and type change, newest first. */
+export async function listProfileChanges(agentId: string): Promise<ProfileChange[]> {
+  // ponytail: last 2,000 changes; page it if an account needs further back.
+  const rows = await prisma.ruleAudit.findMany({
+    where: { agentId, action: { in: ["profile", "profileDelete"] } },
+    orderBy: { createdAt: "desc" },
+    take: 2000,
+  });
+  return rows.map((r) => {
+    const d = (r.detail ?? {}) as Record<string, unknown>;
+    return {
+      id: r.id,
+      at: r.createdAt.toISOString(),
+      actor: r.actor,
+      action: r.action === "profileDelete" ? "profileDelete" : "profile",
+      dispatcherId: typeof d.dispatcherId === "string" ? d.dispatcherId : null,
+      dispatcher: typeof d.dispatcher === "string" ? d.dispatcher : null,
+      count: typeof d.count === "number" ? d.count : 1,
+      month: Number(d.month),
+      to: { vehicle: d.vehicle as Vehicle, employment: d.employment as Employment },
+      from: (d.from as ProfilePair | null | undefined) ?? null,
+    };
+  });
+}

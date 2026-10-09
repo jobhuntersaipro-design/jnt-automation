@@ -19,7 +19,7 @@ import { useI18n } from "@/components/v2/i18n-provider";
 import type { I18n } from "@/lib/i18n/core";
 import type { MessageKey } from "@/lib/i18n/en";
 import type { Kind } from "@/lib/v2/pay/config";
-import { periodFromInput, periodToInput } from "@/lib/v2/pay/resolve";
+import { periodToInput } from "@/lib/v2/pay/resolve";
 import type { Sheet } from "@/lib/v2/pay/sheet";
 import { deleteCheck, saveCheckNote } from "@/lib/v2/payroll/actions";
 import type { CheckView } from "@/lib/v2/payroll/check";
@@ -92,18 +92,6 @@ export function Check({ view }: { view: CheckView }) {
           <h1 className={ui.title}>{t("check.title")}</h1>
           <p className={ui.subtitle}>{t("check.subtitle")}</p>
         </div>
-        <label className={ui.field}>
-          <span className={ui.label}>{t("penalties.month")}</span>
-          <input
-            type="month"
-            className={ui.input}
-            value={periodToInput(view.period)}
-            onChange={(e) => {
-              const p = periodFromInput(e.target.value);
-              if (p) router.replace(`/app/payroll/check?month=${p}`, { scroll: false });
-            }}
-          />
-        </label>
       </header>
 
       {view.runs.length === 0 ? (

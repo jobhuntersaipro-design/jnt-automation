@@ -22,7 +22,7 @@ export async function createOutlet(input: { code: string }): Promise<ActionResul
   if (!outlet.ok) return outlet;
   if (!outlet.data.created) return { ok: false, error: "outlets.err.exists" };
   await prisma.ruleAudit.create({ data: { agentId: s.agentId, actor: s.actor, action: "outlet", detail: { outlet: outlet.data.code } } });
-  revalidatePath("/app/outlets");
+  revalidatePath("/app/branches");
   return { ok: true, data: { id: outlet.data.id, code: outlet.data.code } };
 }
 
@@ -41,18 +41,33 @@ export async function setProfiles(input: z.input<typeof profileInput>): Promise<
   if (!parsed.success) return { ok: false, error: "error.invalid" };
   const { effectiveFrom, vehicle, employment } = parsed.data;
   const ids = [...new Set(parsed.data.dispatcherIds)];
-  const owned = await prisma.dispatcher.findMany({ where: { id: { in: ids }, agentId: s.agentId }, select: { name: true } });
+  const owned = await prisma.dispatcher.findMany({
+    where: { id: { in: ids }, agentId: s.agentId },
+    // What each one had in that month before this change, for the change log.
+    select: { id: true, name: true, profiles: { where: { effectiveFrom: { lte: effectiveFrom } }, orderBy: { effectiveFrom: "desc" }, take: 1 } },
+  });
   if (owned.length !== ids.length) return { ok: false, error: "error.notFound" };
   await prisma.$transaction([
     prisma.dispatcherProfile.deleteMany({ where: { dispatcherId: { in: ids }, effectiveFrom } }),
     prisma.dispatcherProfile.createMany({ data: ids.map((dispatcherId) => ({ dispatcherId, effectiveFrom, vehicle, employment })) }),
-    prisma.ruleAudit.create({
-      data: {
-        agentId: s.agentId,
-        actor: s.actor,
-        action: "profile",
-        detail: { count: ids.length, dispatcher: ids.length === 1 ? owned[0].name : null, month: effectiveFrom, vehicle, employment },
-      },
+    prisma.ruleAudit.createMany({
+      // Dispatchers who already had this vehicle and type aren't a change, so they stay out of the log.
+      data: owned.filter((d) => d.profiles[0]?.vehicle !== vehicle || d.profiles[0]?.employment !== employment).map((d) => {
+        const before = d.profiles[0];
+        return {
+          agentId: s.agentId,
+          actor: s.actor,
+          action: "profile",
+          detail: {
+            dispatcherId: d.id,
+            dispatcher: d.name,
+            month: effectiveFrom,
+            vehicle,
+            employment,
+            from: before ? { vehicle: before.vehicle, employment: before.employment } : null,
+          },
+        };
+      }),
     }),
   ]);
   revalidatePath("/app/dispatchers", "layout");
@@ -64,7 +79,7 @@ export async function deleteProfile(input: { profileId: string }): Promise<Actio
   if (!s) return { ok: false, error: "error.forbidden" };
   const profile = await prisma.dispatcherProfile.findFirst({
     where: { id: input.profileId, dispatcher: { agentId: s.agentId } },
-    select: { id: true, effectiveFrom: true, vehicle: true, employment: true, dispatcher: { select: { name: true } } },
+    select: { id: true, dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true, dispatcher: { select: { name: true } } },
   });
   if (!profile) return { ok: false, error: "error.notFound" };
   await prisma.$transaction([
@@ -74,7 +89,7 @@ export async function deleteProfile(input: { profileId: string }): Promise<Actio
         agentId: s.agentId,
         actor: s.actor,
         action: "profileDelete",
-        detail: { dispatcher: profile.dispatcher.name, month: profile.effectiveFrom, vehicle: profile.vehicle, employment: profile.employment },
+        detail: { dispatcherId: profile.dispatcherId, dispatcher: profile.dispatcher.name, month: profile.effectiveFrom, vehicle: profile.vehicle, employment: profile.employment },
       },
     }),
   ]);

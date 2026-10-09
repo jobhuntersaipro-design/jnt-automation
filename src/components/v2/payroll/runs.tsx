@@ -36,6 +36,13 @@ function put(url: string, file: File, contentType: string, onProgress: (percent:
 export function Runs({ runs }: { runs: RunSummary[] }) {
   const i18n = useI18n();
   const { t } = i18n;
+  const router = useRouter();
+  const start = (
+    <Button onClick={() => router.push("/app/payroll/new")}>
+      <FileUp size={16} aria-hidden="true" />
+      {t("wizard.start")}
+    </Button>
+  );
 
   return (
     <div className={ui.page}>
@@ -44,15 +51,17 @@ export function Runs({ runs }: { runs: RunSummary[] }) {
           <h1 className={ui.title}>{t("runs.title")}</h1>
           <p className={ui.subtitle}>{t("runs.subtitle")}</p>
         </div>
-        {runs.length > 0 && (
-          <Link href="/app/payroll/check" className={ui.link}>
-            {t("runs.check")}
-          </Link>
-        )}
+        <div className={ui.row}>
+          {runs.length > 0 && (
+            <Link href="/app/payroll/check" className={ui.link}>
+              {t("runs.check")}
+            </Link>
+          )}
+          {start}
+        </div>
       </header>
-      <RunUpload />
       {runs.length === 0 ? (
-        <EmptyState title={t("runs.emptyTitle")} description={t("runs.emptyBody")} />
+        <EmptyState title={t("runs.emptyTitle")} description={t("runs.emptyBody")} action={start} />
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -102,7 +111,8 @@ export function Runs({ runs }: { runs: RunSummary[] }) {
   );
 }
 
-function RunUpload() {
+/** Step 1 of New payroll: the J&T delivery file. Creates (or replaces) the draft, then moves on to penalties. */
+export function RunUpload() {
   const { t } = useI18n();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
@@ -132,7 +142,7 @@ function RunUpload() {
       return setError(t(body && "error" in body ? body.error : "run.err.unreadable", body && "error" in body ? body.vars : undefined));
     }
     toast.success(t(body.replaced ? "runs.replaced" : "runs.created"));
-    router.push(`/app/payroll/${body.runId}`);
+    router.push(`/app/payroll/new?run=${body.runId}`);
   }
 
   return (

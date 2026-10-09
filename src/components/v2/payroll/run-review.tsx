@@ -161,6 +161,18 @@ export function RunReview({ run, uncovered }: { run: RunView; uncovered: boolean
       </header>
 
       {draft && run.stale && <Alert tone="info" title={t("run.stale")} />}
+      {draft && !run.penaltiesChecked && (
+        <div className={ui.stack}>
+          <Alert tone="warning" title={t("run.penalties.title", { month })}>
+            {t("run.penalties.body")}
+          </Alert>
+          <div className={ui.row}>
+            <Link href={`/app/payroll/new?run=${run.id}`} className={ui.link}>
+              {t("run.penalties.action")}
+            </Link>
+          </div>
+        </div>
+      )}
       {draft && uncovered && (
         <div className={ui.stack}>
           <Alert tone="warning" title={t("run.cover.title", { month, outlet: run.outlet })}>

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -22,7 +23,16 @@ export function NavLinks({ items }: { items: { href: string; label: string }[] }
   ));
 }
 
-export function AccountMenu({ name }: { name: string }) {
+function Avatar({ name, url }: { name: string; url: string | null }) {
+  const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  return url ? (
+    <Image src={url} alt="" width={28} height={28} unoptimized className={styles.avatar} />
+  ) : (
+    <span className={styles.avatar}>{initials}</span>
+  );
+}
+
+export function AccountMenu({ name, avatarUrl }: { name: string; avatarUrl: string | null }) {
   const { t } = useI18n();
   const router = useRouter();
   // First name only, so a long name never crowds the mobile header.
@@ -31,6 +41,7 @@ export function AccountMenu({ name }: { name: string }) {
   return (
     <DropdownMenu
       label={label}
+      icon={<Avatar name={name} url={avatarUrl} />}
       items={[
         { label: t("user.settings"), onSelect: () => router.push("/app/settings") },
         { label: t("user.signOut"), onSelect: () => signOut({ callbackUrl: "/app/login" }) },
