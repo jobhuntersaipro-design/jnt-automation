@@ -186,8 +186,9 @@ function Payslip({ run, result, company }: { run: RunView; result: ResultView; c
         </div>
       </dl>
       <div className={styles.net}>
-        {both("payslip.net")}
-        <span>{money(result.netCents)}</span>
+        {/* Deductions bigger than the pay: the rider owes the difference (the owner's choice), shown as a positive amount. */}
+        {both(result.netCents < 0 ? "payslip.owed" : "payslip.net")}
+        <span>{money(Math.abs(result.netCents))}</span>
       </div>
 
       <footer className={styles.foot}>
