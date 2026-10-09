@@ -46,6 +46,11 @@ export function MonthClose({ period, outlet, rows, owner = true }: { period: Per
               {t("runs.check")}
             </Link>
           )}
+          {owner && finals > 0 && (
+            <Link href={`/app/payroll/journal?month=${period}`} className={ui.link}>
+              {t("journal.link")}
+            </Link>
+          )}
           {start}
         </div>
       </header>
