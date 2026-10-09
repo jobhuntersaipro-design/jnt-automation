@@ -18,7 +18,7 @@ review then offers "use your current rate card" when none exists.
 4. A first-time owner can't end up with a rate card that pays nobody, or be offered a card that
    doesn't exist.
 
-Out of scope here (later phases, below): bank payment files, payslips to riders by WhatsApp,
+Out of scope here (later phases, below): payslips to riders by WhatsApp,
 advances/loans, merging a transferred rider's two J&T IDs, branch-supervisor roles.
 
 ## 1. Month close (`/app/payroll`)
@@ -103,7 +103,7 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
 
 ## Later phases (not in this spec)
 
-1. Bank bulk-payment file (Maybank, CIMB).
+1. Bank bulk-payment file (Maybank, CIMB): dropped by the owner (2026-10-09), not planned.
 2. **Built:** payslips to riders by WhatsApp link. A finalised run's *Send payslips* page
    (`/app/payroll/{runId}/send`, also linked from finalised rows in month close) lists each dispatcher with
    a mobile number (`Dispatcher.phone`, nullable, migration `20261015_v2_dispatcher_phone`), a WhatsApp
@@ -147,5 +147,4 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    and percentages both read; one row per month and J&T ID (`SuccessRate`, migration `20261019_v2_success_rate`), so
    importing again updates. Typed-in rates for anyone the report misses. Runs read the rate by the J&T ID in the run;
    a dispatcher a success rule applies to with no rate is flagged (blocks finalising until a rate is typed in).
-8. Later: LHDN self-billed e-Invoice if riders are contractors
-   (verify against LHDN); COD reconciliation; weekly pay.
+8. Later: COD reconciliation; weekly pay. (LHDN e-Invoice: dropped by the owner, 2026-10-09.)
