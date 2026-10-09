@@ -80,18 +80,22 @@ Payslips shares the App Shell.
 
 ### 3.0 App shell (shared)
 
-- **Header** — sticky, `--header-height` (4rem), `--surface` at 85% with
-  `backdrop-filter: blur(12px)` so the table scrolls under it.
-  Left: EasyStaff logo (links to `/app`). Middle: nav *Dashboard · Payroll ·
-  Penalties · Dispatchers · Outlets · Pay rules* (plus *Design review* while the
-  superadmin is viewing as an account). Right: language toggle (Arc segmented
+- **Sidebar** — 15rem, `--surface`, sticky full height, from 64rem. Top to
+  bottom: EasyStaff logo (links to `/app`), **Outlet** (All outlets or one
+  code, shown with two or more outlets) and **Month**, then the nav *Dashboard ·
+  Payroll · Penalties · Dispatchers · Outlets · Pay rules* (plus *Design
+  review* while the superadmin is viewing as an account). Outlet and month are
+  chosen once and shared by Payroll, Penalties, Dispatchers and Compare
+  (cookies; a `?month=` link wins and becomes the choice).
+- **Top bar** — sticky, `--header-height` (4rem), `--surface` at 85% with
+  `backdrop-filter: blur(12px)`. Right: language toggle (Arc segmented
   control, `中文 / English`, `中 / EN` under 40rem) and the account menu
-  (name, *Settings*, *Sign out*).
+  (avatar: the account photo, else initials; first name; *Settings*, *Sign out*).
 - **Nav links** — inactive `--text-secondary`; hover `--surface-muted`; active
   (`aria-current="page"`) `--accent-subtle` background, `--accent-strong` text.
   `--duration-fast` `--ease-standard`.
-- **Under 48rem** — logo and account on one row, the nav as its own
-  full-width, horizontally scrollable strip beneath.
+- **Under 64rem** — a menu button at the left of the top bar opens the
+  sidebar as a left drawer; it closes when a page is picked.
 - **Viewing as** — a `--warning` banner above the header: "Viewing as
   {name}" with *Exit*. Always visible while impersonating.
 - **Page header** (`ui.module.css` `.pageHeader`) — `h1` at `--text-2xl`
@@ -102,9 +106,6 @@ Payslips shares the App Shell.
   `--shadow-resting`, `--space-6` padding), `.split` (main column + 24rem side
   column from 72rem), `.grid` (auto-fit, 22rem min), `.stack`, `.row`.
 
-*Proposed:* a left sidebar with an outlet and month switcher, so the month
-worked on stays chosen across Payroll, Penalties and Dispatchers. Until then
-each screen has its own month picker defaulting to the month worked on last.
 
 ### 3.1 Sign in — `/app/login`
 
@@ -143,8 +144,16 @@ No charts on the dashboard yet; *Proposed:* "Net pay by month" line chart (Arc
 ### 3.3 Payroll — `/app/payroll`
 
 **Header** — "Payroll", subtitle explaining the outlet and month are read from
-the file. Actions: primary *Upload J&T file*, secondary *Compare with your
-sheet*.
+the file. Actions: primary *New payroll*, link *Compare with your sheet*.
+
+**New payroll** (`/app/payroll/new`) — Arc `Stepper`: *J&T delivery file* ·
+*Penalties* · *Review and finalise*. Step 1 is the upload below. Step 2
+("Penalties for {outlet} · {month}") shows the cases already imported for the
+month, a warning with a link to Penalties when cases need a dispatcher, the
+penalty import in place, and the primary *Continue to review* (or *No penalties
+this month: continue* when none are imported), which recalculates and opens the
+run review. A run can't be finalised until step 2 is done; its review says
+"Penalties for {month} haven't been checked" with *Check penalties*.
 
 **Upload** — the header button opens the file picker, `.xlsx` only, 100 MB max
 (the browser sends it straight to R2). Help: "The J&T
@@ -258,8 +267,13 @@ month's penalties."
 
 ### 3.7 Dispatchers — `/app/dispatchers`
 
-**Header** — "Dispatchers", subtitle on vehicle and type deciding the rates.
-Month picker ("Changes from {month}").
+**Header** — "Dispatchers", subtitle on vehicle and type deciding the rates;
+tabs *Vehicle and type* · *History*. Uses the sidebar's month and outlet.
+
+**History** (`/app/dispatchers/history`) — every vehicle-and-type change:
+Dispatcher (opens them) · Change ("Bike · Part-time → Car · Full-time", "Set to
+…", "Removed …") · From (`2026-10`) · By · When (`2026-10-09 15:02`). Search,
+sort, CSV. Changes that don't change anything aren't logged.
 
 - Warning alert: "{n} dispatchers have no vehicle and type for {month}, so
   can't be paid yet." with a *Show: Not set* filter.
@@ -485,5 +499,4 @@ real rates in designs, fixtures or screenshots.
   change what the rule editor defaults to.
 - Payslip fields not stored yet: company logo, pay date, bank account; a
   company name separate from the account name; Bahasa Malaysia payslips.
-- App shell with a sidebar and a persistent outlet/month switcher (§3.0).
 - Dispatcher list as cards on phones (§3.7).

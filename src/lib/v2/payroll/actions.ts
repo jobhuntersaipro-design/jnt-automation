@@ -36,6 +36,20 @@ export async function recalculateRun(input: { runId: string }): Promise<ActionRe
   return result;
 }
 
+/** Step 2 of New payroll: the month's penalty files are in (or there are none). Recalculates so the review includes them. */
+export async function confirmPenalties(input: { runId: string }): Promise<ActionResult> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const { count } = await prisma.payrollRun.updateMany({
+    where: { id: input.runId, agentId: s.agentId, status: "DRAFT" },
+    data: { penaltiesCheckedAt: new Date() },
+  });
+  if (count === 0) return { ok: false, error: "error.notFound" };
+  const result = await calculateRun(s.agentId, input.runId);
+  if (result.ok) refresh();
+  return result;
+}
+
 /**
  * One click for "no rate card covers this month": the account's rate cards start from the run's month instead,
  * numbers unchanged (see planCover), then the draft is recalculated.

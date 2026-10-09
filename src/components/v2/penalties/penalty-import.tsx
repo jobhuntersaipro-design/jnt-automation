@@ -33,7 +33,8 @@ const columnLetter = (c: number) => (c < 26 ? "" : String.fromCharCode(64 + Math
 const SAMPLE = 3;
 
 /** Upload a QC file, check how each sheet is read, then import its cases into a month. */
-export function PenaltyImport({ defaultPeriod }: { defaultPeriod: Period }) {
+/** `stay` keeps the page (New payroll) instead of opening the imported month on Penalties. */
+export function PenaltyImport({ defaultPeriod, stay = false }: { defaultPeriod: Period; stay?: boolean }) {
   const i18n = useI18n();
   const { t, tp } = i18n;
   const router = useRouter();
@@ -81,7 +82,7 @@ export function PenaltyImport({ defaultPeriod }: { defaultPeriod: Period }) {
     toast.success(t("penalties.imported", { added: body.added, updated: body.updated, unchanged: body.unchanged }) + unmatched);
     setFile(null);
     setPlans([]);
-    router.push(`/app/penalties?month=${period}`);
+    if (!stay) router.push(`/app/penalties?month=${period}`);
     router.refresh();
   }
 

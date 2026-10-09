@@ -661,6 +661,9 @@ model PayrollRun {
   calculatedAt DateTime?
   finalisedAt  DateTime?
   finalisedBy  String?
+  /// Set when the month's penalty files were imported, or there were none, in the New payroll steps.
+  /// A run can't be finalised before.
+  penaltiesCheckedAt DateTime?
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
   agent        Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
