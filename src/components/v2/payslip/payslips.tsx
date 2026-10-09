@@ -203,15 +203,18 @@ function Payslip({ run, result, company }: { run: RunView; result: ResultView; c
 }
 
 /** Payslips ready to print: one run's, one dispatcher's, or every finalised branch of a month. */
-export function Payslips({ slips, company, back, lang, langHref }: { slips: { run: RunView; result: ResultView }[]; company: Company; back: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
-  const missing = !company.companyRegistrationNo || !company.companyAddress;
+export function Payslips({ slips, company, back, lang, langHref }: { slips: { run: RunView; result: ResultView }[]; company: Company; back?: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
+  // Without `back` this is a dispatcher's own link: no way into the app, and no setup hints.
+  const missing = back !== undefined && (!company.companyRegistrationNo || !company.companyAddress);
   return (
     <div>
       <div className={styles.toolbar}>
-        <Link href={back} className={ui.back}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          {both("run.back")}
-        </Link>
+        {back && (
+          <Link href={back} className={ui.back}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            {both("run.back")}
+          </Link>
+        )}
         <span className={ui.help}>
           <Both text={(i) => i.tp("payslip.count", slips.length)} />
         </span>

@@ -169,6 +169,7 @@ model Dispatcher {
   extId          String  // Dispatcher ID from raw data (col M) e.g. "PHG3795023". Moves to DispatcherAssignment in Phase B.
   name           String
   normalizedName String  @default("") // UPPER(TRIM(COLLAPSE_WS(name))) for fallback matching. Backfilled in Phase A.
+  phone          String? // v2: mobile number payslip links are sent to on WhatsApp
   icNo           String? // Malaysian MyKad. Was required; now optional — matches data reality.
   gender         Gender  @default(UNKNOWN)
   avatarUrl      String?

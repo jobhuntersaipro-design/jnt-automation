@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowLeft, FileText, RefreshCw, Scale } from "lucide-react";
+import { ArrowLeft, FileText, RefreshCw, Scale, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
@@ -222,6 +222,12 @@ export function RunReview({
             <FileText size={16} aria-hidden="true" />
             {t("run.payslips")}
           </Button>
+          {!draft && (
+            <Button variant="secondary" loading={busyFor(`/app/payroll/${run.id}/send`)} onClick={() => go(`/app/payroll/${run.id}/send`)}>
+              <Send size={16} aria-hidden="true" />
+              {t("run.send")}
+            </Button>
+          )}
           <Button
             variant="secondary"
             loading={busyFor(`/app/payroll/check?month=${run.period}`)}

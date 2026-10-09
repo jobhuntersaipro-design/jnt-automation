@@ -100,9 +100,16 @@ export function MonthClose({ period, outlet, rows }: { period: Period; outlet: s
                     </td>
                     <td data-numeric>{r.run ? i18n.money(r.run.netCents / 100) : "—"}</td>
                     <td>
-                      <Badge tone={TONE[r.status]} size="sm">
-                        {t(`close.status.${r.status}`)}
-                      </Badge>
+                      <span className={styles.status}>
+                        <Badge tone={TONE[r.status]} size="sm">
+                          {t(`close.status.${r.status}`)}
+                        </Badge>
+                        {r.status === "final" && r.run && (
+                          <Link href={`/app/payroll/${r.run.id}/send`} className={ui.link}>
+                            {t("run.send")}
+                          </Link>
+                        )}
+                      </span>
                     </td>
                   </tr>
                 ))}
