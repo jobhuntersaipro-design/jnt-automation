@@ -7,7 +7,7 @@ import { messagesFor } from "@/lib/i18n/messages";
 import type { RuleConfig } from "@/lib/v2/pay/config";
 import { DEDUCTING, type Group } from "@/lib/v2/pay/engine";
 import { periodMonth, periodYear } from "@/lib/v2/pay/resolve";
-import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
+import { ADVANCE, type PayLine, type PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import { employmentLabel, penaltyLabel, rangeLabels, vehicleLabel, warningText } from "../labels";
 import { PrintButton } from "./print-button";
@@ -93,7 +93,7 @@ function Lines({ lines, run, result, caption }: { lines: PayLine[]; run: RunView
                 <th scope="row">
                   <span className={styles.both}>
                     {penalty ? <Both text={(i) => penaltyLabel(i, penalty)} /> : both(`kind.${line.kind}`)}
-                    {fromFile ? both("run.fromFile") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
+                    {fromFile ? both("run.fromFile") : line.ruleId === ADVANCE ? both("advance.line") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
                   </span>
                 </th>
                 <td data-numeric>{en.number(line.units)}</td>

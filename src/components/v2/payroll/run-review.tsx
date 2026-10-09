@@ -21,7 +21,7 @@ import {
   finalise,
   recalculateRun,
 } from "@/lib/v2/payroll/actions";
-import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
+import { ADVANCE, type PayLine, type PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import {
   confirmProfile,
@@ -687,7 +687,7 @@ function Breakdown({
             ) : (
               result.lines.map((line) => {
                 const fromFile = line.ruleId.startsWith("file:");
-                const name = fromFile ? t("run.fromFile") : line.name;
+                const name = fromFile ? t("run.fromFile") : line.ruleId === ADVANCE ? t("advance.line") : line.name;
                 return (
                   <section
                     key={line.ruleId}

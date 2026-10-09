@@ -83,6 +83,18 @@ describe("payDispatcher", () => {
   };
   const everyone = [at("a1", "PARCEL", "card"), at("a2", "KPI", "kpi", { employment: "FULL_TIME" }), at("a3", "DEDUCTION", "loan", { dispatcherId: "d1" })];
 
+  it("takes advances back last, never below RM 0 net", () => {
+    const profile = { vehicle: "CAR" as const, employment: "PART_TIME" as const, effectiveFrom: 202610 };
+    const card = [at("a1", "PARCEL", "card")];
+    const some = payDispatcher({ ...base, profile, assignments: card, advanceOwedCents: 300 });
+    expect(some.lines.at(-1)).toMatchObject({ kind: "DEDUCTION", ruleId: "advance", cents: 300 });
+    expect([some.earningsCents, some.deductionCents, some.netCents]).toEqual([680, 300, 380]);
+    const capped = payDispatcher({ ...base, profile, assignments: card, advanceOwedCents: 5000 });
+    expect([capped.deductionCents, capped.netCents]).toEqual([680, 0]);
+    const none = payDispatcher({ ...base, profile, assignments: [...card, at("a3", "DEDUCTION", "loan", { dispatcherId: "d1" })], advanceOwedCents: 300 });
+    expect(none.lines.some((l) => l.ruleId === "advance")).toBe(false);
+  });
+
   it("pays a full-timer the card for their vehicle, KPI past the tier, less their deduction", () => {
     const pay = payDispatcher({ ...base, profile: { vehicle: "CAR", employment: "FULL_TIME", effectiveFrom: 202610 }, assignments: everyone });
     expect(pay.warnings).toEqual([]);

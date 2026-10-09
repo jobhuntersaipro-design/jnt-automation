@@ -53,6 +53,7 @@ model Agent {
   penaltyItems          PenaltyItem[]
   penaltyAliases        PenaltyAlias[]
   payrollChecks         PayrollCheck[]
+  advances              Advance[]
   companyRegistrationNo    String?
   companyAddress           String?
   avatarUrl                String?    // R2 URL for profile picture
@@ -189,6 +190,7 @@ model Dispatcher {
   profiles           DispatcherProfile[]
   payrollResults     PayrollResult[]
   penaltyItems       PenaltyItem[]
+  advances           Advance[]
   penaltyAliases     PenaltyAlias[]
 
   createdAt DateTime @default(now())
@@ -827,4 +829,23 @@ model PayrollCheck {
   agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   @@unique([agentId, period])
+}
+
+/// v2: money given to a dispatcher during a month, taken back from that month's pay. What the pay can't
+/// cover (net never goes below RM 0) carries to the next month; recovered amounts are the "advance" lines
+/// of finalised runs, so nothing is stored twice.
+model Advance {
+  id           String     @id @default(cuid())
+  agentId      String
+  dispatcherId String
+  period       Int
+  amountCents  Int
+  note         String?
+  createdBy    String?
+  createdAt    DateTime   @default(now())
+  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  dispatcher   Dispatcher @relation(fields: [dispatcherId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, period])
+  @@index([dispatcherId])
 }

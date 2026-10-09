@@ -41,6 +41,12 @@ export type Warning =
   | { code: "noRates"; kind: Kind; rule: string }
   | { code: "noPenaltyAmount"; type: PenaltyType; count: number };
 
+/** ruleId of the line that takes back advances (a deduction, not a rule). */
+export const ADVANCE = "advance";
+
+/** What to take back this month: what's owed, but never more than the pay, so net doesn't go below RM 0. */
+export const advanceTaken = (owedCents: number, netBeforeCents: number) => Math.max(0, Math.min(owedCents, netBeforeCents));
+
 /** A pay line; penalty lines say which type they deduct. File-amount lines have ruleId `file:<type>`. */
 export type PayLine = Line & { penalty?: PenaltyType };
 
@@ -61,6 +67,8 @@ export function payDispatcher(input: {
   assignments: (AssignmentRow & { ruleName: string })[];
   versionsOf: (ruleId: string) => VersionRow[];
   penalties?: Charge[];
+  /** Advances given and not yet taken back, up to this month. */
+  advanceOwedCents?: number;
 }): DispatcherPay {
   const { period, profile } = input;
   const charges = input.penalties ?? [];
@@ -99,5 +107,9 @@ export function payDispatcher(input: {
     lines.push({ kind: "PENALTY", ruleId: `file:${type}`, versionId: "", name: type, penalty: type, units: cases.length, groups: [], cents });
   }
   const order = (l: PayLine) => (l.penalty ? KINDS.length + PENALTY_TYPES.indexOf(l.penalty) : KINDS.indexOf(l.kind));
-  return { ...totals(lines.sort((a, b) => order(a) - order(b))), warnings };
+  const pay = totals(lines.sort((a, b) => order(a) - order(b)));
+  // Advances come off last, from what's left: the rest carries to next month.
+  const advance = advanceTaken(input.advanceOwedCents ?? 0, pay.netCents);
+  if (advance === 0) return { ...pay, warnings };
+  return { ...totals([...pay.lines, { kind: "DEDUCTION", ruleId: ADVANCE, versionId: "", name: ADVANCE, units: 1, groups: [], cents: advance }]), warnings };
 }
