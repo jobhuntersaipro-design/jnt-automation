@@ -19,7 +19,7 @@ import styles from "./payroll.module.css";
 const TONE: Record<CloseStatus, BadgeTone> = { none: "warning", draft: "neutral", ready: "info", final: "success" };
 
 /** Every branch's payroll for the sidebar's month: what's in, what's missing, what's ready, what's done. */
-export function MonthClose({ period, outlet, rows }: { period: Period; outlet: string | null; rows: CloseRow[] }) {
+export function MonthClose({ period, outlet, rows, owner = true }: { period: Period; outlet: string | null; rows: CloseRow[]; owner?: boolean }) {
   const i18n = useI18n();
   const { t, tp } = i18n;
   const router = useRouter();
@@ -41,9 +41,11 @@ export function MonthClose({ period, outlet, rows }: { period: Period; outlet: s
           <p className={ui.subtitle}>{t("close.subtitle")}</p>
         </div>
         <div className={ui.row}>
-          <Link href={`/app/payroll/check?month=${period}`} className={ui.link}>
-            {t("runs.check")}
-          </Link>
+          {owner && (
+            <Link href={`/app/payroll/check?month=${period}`} className={ui.link}>
+              {t("runs.check")}
+            </Link>
+          )}
           {start}
         </div>
       </header>
@@ -128,7 +130,7 @@ export function MonthClose({ period, outlet, rows }: { period: Period; outlet: s
           </div>
 
           <div className={ui.row}>
-            {ready.length > 0 && (
+            {owner && ready.length > 0 && (
               <ConfirmButton
                 variant="primary"
                 label={tp("close.finalise", ready.length)}
@@ -153,6 +155,7 @@ export function MonthClose({ period, outlet, rows }: { period: Period; outlet: s
               </Button>
             )}
           </div>
+          {!owner && ready.length > 0 && <p className={ui.help}>{t("team.ownerFinalises")}</p>}
           {ready.length === 0 && finals < rows.length && <p className={ui.help}>{t("close.readyHelp")}</p>}
         </>
       )}

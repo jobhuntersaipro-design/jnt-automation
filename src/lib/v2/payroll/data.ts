@@ -26,10 +26,11 @@ export interface RunSummary {
   attention: number;
 }
 
-export async function listRuns(agentId: string): Promise<RunSummary[]> {
+/** `branchIds` limits to some branches (a branch supervisor's). */
+export async function listRuns(agentId: string, branchIds?: string[]): Promise<RunSummary[]> {
   const [runs, sums, flagged] = await Promise.all([
     prisma.payrollRun.findMany({
-      where: { agentId },
+      where: { agentId, ...(branchIds && { branchId: { in: branchIds } }) },
       orderBy: [{ period: "desc" }, { createdAt: "desc" }],
       select: { id: true, period: true, status: true, parcelCount: true, branch: { select: { code: true } }, _count: { select: { results: true } } },
     }),
@@ -87,9 +88,10 @@ export interface RunView {
   results: ResultView[];
 }
 
-export async function getRunView(agentId: string, runId: string): Promise<RunView | null> {
+/** Null when the run isn't the account's, or not in `branchIds` when given (a branch supervisor's). */
+export async function getRunView(agentId: string, runId: string, branchIds?: string[]): Promise<RunView | null> {
   const run = await prisma.payrollRun.findFirst({
-    where: { id: runId, agentId },
+    where: { id: runId, agentId, ...(branchIds && { branchId: { in: branchIds } }) },
     select: {
       id: true,
       period: true,

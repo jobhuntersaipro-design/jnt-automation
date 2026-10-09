@@ -14,7 +14,7 @@ export default async function NewPayrollPage({ searchParams }: { searchParams: P
     return <NewPayroll run={null} hasCard={cards > 0} />;
   }
   const run = await prisma.payrollRun.findFirst({
-    where: { id: runId, agentId: s.agentId },
+    where: { id: runId, agentId: s.agentId, ...(s.member && { branchId: { in: s.member.branchIds } }) },
     select: { id: true, period: true, status: true, branch: { select: { id: true, code: true } } },
   });
   if (!run) notFound();

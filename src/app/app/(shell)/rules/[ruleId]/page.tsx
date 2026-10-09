@@ -3,10 +3,10 @@ import { RuleEditor } from "@/components/v2/rules/rule-editor";
 import { periodOf } from "@/lib/v2/pay/resolve";
 import { lastWorkedPeriod } from "@/lib/v2/payroll/data";
 import { getRule, listAudit, listDispatcherOptions, listOutlets } from "@/lib/v2/rules/data";
-import { v2Session } from "@/lib/v2/session";
+import { v2Owner } from "@/lib/v2/session";
 
 export default async function RulePage({ params, searchParams }: { params: Promise<{ ruleId: string }>; searchParams: Promise<{ month?: string }> }) {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) notFound();
   const [{ ruleId }, { month }] = await Promise.all([params, searchParams]);
   const rule = await getRule(s.agentId, ruleId);

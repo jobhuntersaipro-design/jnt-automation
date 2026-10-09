@@ -9,7 +9,7 @@ import { MAX_FILE_BYTES, parseCsv } from "@/lib/v2/pay/rate-card-io";
 import { isPeriod } from "@/lib/v2/pay/resolve";
 import { capRows, readCsvText, readXlsx, type Sheet } from "@/lib/v2/pay/sheet";
 import { TEMPLATES } from "@/lib/v2/pay/templates";
-import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { v2Owner, type ActionResult } from "@/lib/v2/session";
 
 // Mutations behind the v2 rule screens. Each one checks the caller is a v2 account,
 // touches only that account's rows, and leaves an audit entry.
@@ -31,7 +31,7 @@ function refresh(ruleId?: string) {
 const ownRule = (agentId: string, id: string) => prisma.payRule.findFirst({ where: { id, agentId, archivedAt: null } });
 
 export async function createRule(input: { kind: Kind; name: string; effectiveFrom: number }): Promise<ActionResult<{ id: string }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const parsed = z.object({ kind: z.enum(KINDS), name, effectiveFrom: period }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "error.invalid" };
@@ -57,7 +57,7 @@ export async function createRule(input: { kind: Kind; name: string; effectiveFro
 
 /** Saves rates from a month on. Saving over an existing month needs `replace`, never silently. */
 export async function saveVersion(input: { ruleId: string; effectiveFrom: number; config: unknown; replace?: boolean; source?: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   if (!period.safeParse(input.effectiveFrom).success) return { ok: false, error: "error.invalid" };
   const config = parseConfig(input.config);
@@ -82,7 +82,7 @@ export async function saveVersion(input: { ruleId: string; effectiveFrom: number
 }
 
 export async function deleteVersion(input: { versionId: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const version = await prisma.payRuleVersion.findFirst({
     where: { id: input.versionId, rule: { agentId: s.agentId, archivedAt: null } },
@@ -97,7 +97,7 @@ export async function deleteVersion(input: { versionId: string }): Promise<Actio
 }
 
 export async function renameRule(input: { ruleId: string; name: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const parsed = name.safeParse(input.name);
   if (!parsed.success) return { ok: false, error: "error.invalid" };
@@ -111,7 +111,7 @@ export async function renameRule(input: { ruleId: string; name: string }): Promi
 
 /** Archived rules stop applying to unfinalised months; finalised runs keep what they used. */
 export async function archiveRule(input: { ruleId: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const rule = await ownRule(s.agentId, input.ruleId);
   if (!rule) return { ok: false, error: "error.notFound" };
@@ -123,7 +123,7 @@ export async function archiveRule(input: { ruleId: string }): Promise<ActionResu
 
 /** A new rule starting from another's latest rates; it applies to no one until assigned. */
 export async function copyRule(input: { ruleId: string; name: string }): Promise<ActionResult<{ id: string }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const parsed = name.safeParse(input.name);
   if (!parsed.success) return { ok: false, error: "error.invalid" };
@@ -153,7 +153,7 @@ export async function addAssignment(input: {
   employment: Employment | null;
   effectiveFrom: number;
 }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const parsed = z
     .object({
@@ -190,7 +190,7 @@ export async function addAssignment(input: {
 }
 
 export async function removeAssignment(input: { assignmentId: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const a = await prisma.payRuleAssignment.findFirst({
     where: { id: input.assignmentId, agentId: s.agentId },
@@ -210,7 +210,7 @@ export async function removeAssignment(input: { assignmentId: string }): Promise
 
 /** Reads a rate card for the import preview. Nothing is stored: the numbers arrive as an editor draft. */
 export async function readRateCardFile(form: FormData): Promise<ActionResult<{ name: string; sheets: Sheet[] }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const file = form.get("file");
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: "import.err.noFile" };

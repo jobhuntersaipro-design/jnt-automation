@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { prevPeriod, type Period } from "@/lib/v2/pay/resolve";
 import { ADVANCE, type PayLine } from "@/lib/v2/payroll/calc";
@@ -21,11 +22,12 @@ export interface Carried {
 }
 
 /** The month's advances, and what earlier months' finalised pay couldn't cover (carried into this month). */
-export async function getAdvanceMonth(agentId: string, period: Period): Promise<{ period: Period; advances: AdvanceView[]; carried: Carried[] }> {
+/** `scope` narrows to some dispatchers (a branch supervisor's). */
+export async function getAdvanceMonth(agentId: string, period: Period, scope: Prisma.DispatcherWhereInput = {}): Promise<{ period: Period; advances: AdvanceView[]; carried: Carried[] }> {
   const before = prevPeriod(period);
   const [rows, earlier] = await Promise.all([
-    prisma.advance.findMany({ where: { agentId, period }, orderBy: { createdAt: "asc" }, include: { dispatcher: { select: { name: true } } } }),
-    prisma.advance.groupBy({ by: ["dispatcherId"], where: { agentId, period: { lte: before } }, _sum: { amountCents: true } }),
+    prisma.advance.findMany({ where: { agentId, period, dispatcher: scope }, orderBy: { createdAt: "asc" }, include: { dispatcher: { select: { name: true } } } }),
+    prisma.advance.groupBy({ by: ["dispatcherId"], where: { agentId, period: { lte: before }, dispatcher: scope }, _sum: { amountCents: true } }),
   ]);
   // Finalised pay of everyone with advances: what it took back before this month, and whether it locks this month's.
   const taken = await prisma.payrollResult.findMany({

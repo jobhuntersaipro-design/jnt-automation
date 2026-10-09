@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { readSheetUpload } from "@/lib/v2/pay/sheet-upload";
 import { checkPlan, saveCheck } from "@/lib/v2/payroll/check";
 import { readSheetPeople } from "@/lib/v2/payroll/reconcile";
-import { v2Session } from "@/lib/v2/session";
+import { v2Owner } from "@/lib/v2/session";
 
 /**
  * The agent's own payroll sheet as multipart form data. Without `plan`: its sheets as text, for
@@ -11,7 +11,7 @@ import { v2Session } from "@/lib/v2/session";
  * and figures are stored for comparing with that month's pay.
  */
 export async function POST(req: Request) {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return NextResponse.json({ error: "error.forbidden" }, { status: 403 });
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "sheet.err.noFile" }, { status: 400 });

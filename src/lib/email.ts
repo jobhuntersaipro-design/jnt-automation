@@ -500,3 +500,53 @@ export async function sendWelcomeEmail(agentEmail: string, agentName: string, si
     console.error("[email] welcome email failed", err);
   }
 }
+
+/**
+ * v2: invite a branch supervisor into an owner's account. Throws when sending fails so the owner is told.
+ * Bilingual (中文 then English), like v2's payslips.
+ */
+export async function sendTeamInviteEmail(input: { email: string; name: string; owner: string; branches: string[]; url: string }) {
+  const resend = getResend();
+  if (!resend) throw new Error("Email is not configured (RESEND_API_KEY)");
+  const name = escapeHtml(input.name);
+  const owner = escapeHtml(input.owner);
+  const branches = escapeHtml(input.branches.join(", "));
+  const html = wrapInTemplate(`
+      <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">
+        ${owner} 邀请您加入 EasyStaff · ${owner} invited you to EasyStaff
+      </h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#424654;line-height:1.6;">Hi ${name},</p>
+      <p style="margin:0 0 8px;font-size:15px;color:#424654;line-height:1.6;">
+        您将为以下网点准备工资：${branches}。请设置密码以开始使用。链接 7 天内有效。
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#424654;line-height:1.6;">
+        You'll prepare payroll for ${branches}. Set a password to get started; the link works for 7 days.
+      </p>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
+        <tr>
+          <td style="background-color:#0056D2;border-radius:6px;">
+            <a href="${input.url}" target="_blank" style="display:inline-block;padding:12px 28px;font-family:'Inter','Helvetica Neue',Arial,sans-serif;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">
+              设置密码 · Set your password
+            </a>
+          </td>
+        </tr>
+      </table>
+      <p style="margin:0 0 24px;font-size:13px;word-break:break-all;">
+        <a href="${input.url}" style="color:#0056D2;text-decoration:none;">${input.url}</a>
+      </p>
+  `);
+  await send(resend, {
+    from: FROM,
+    to: input.email,
+    subject: `${input.owner} invited you to EasyStaff`,
+    html,
+    text: [
+      `Hi ${input.name},`,
+      "",
+      `${input.owner} invited you to EasyStaff to prepare payroll for ${input.branches.join(", ")}.`,
+      "Set a password to get started; the link works for 7 days:",
+      "",
+      input.url,
+    ].join("\n"),
+  });
+}

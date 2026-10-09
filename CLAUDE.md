@@ -14,6 +14,7 @@ Rules:
 - Never change v1 code paths for v2 work. Shared code (auth, admin, Prisma client) changes additively only.
 - Migrations are additive only: new tables and nullable or defaulted columns. No renames, drops or type changes on tables v1 uses.
 - Every v2 query is scoped by `agentId`.
+- Branch supervisors (team members, `Agent.ownerId`) work in their owner's account: `v2Session().member` is set. Owner-only actions and pages use `v2Owner()`; everything else narrows to the member's branches (`branchIn`, `dispatcherScope`, `penaltyScope` in `src/lib/v2/session.ts`).
 - Never commit client files (payroll sheets, penalty files, rate cards) or client pricing; use synthetic fixtures.
 
 v2 UI:

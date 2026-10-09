@@ -24,7 +24,7 @@ export default async function MonthPayslipsPage({ params, searchParams }: Props)
   const lang: SlipLang = SLIP_LANGS.find((l) => l === langParam) ?? "both";
   const [runs, company] = await Promise.all([
     prisma.payrollRun.findMany({
-      where: { agentId: s.agentId, period, status: "FINAL", ...(outlet && { branch: { code: outlet } }) },
+      where: { agentId: s.agentId, period, status: "FINAL", ...(outlet && { branch: { code: outlet } }), ...(s.member && { branchId: { in: s.member.branchIds } }) },
       select: { id: true },
       orderBy: { branch: { code: "asc" } },
     }),

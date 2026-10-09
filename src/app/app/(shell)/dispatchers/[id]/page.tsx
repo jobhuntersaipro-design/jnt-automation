@@ -3,7 +3,7 @@ import { DispatcherDetail, type ResolvedView } from "@/components/v2/people/disp
 import { listPersonOptions } from "@/lib/v2/penalties/data";
 import { getDispatcher, listAssignments, listRuleOptions, penaltyTypesIn, ratesFrom } from "@/lib/v2/people/data";
 import { inForce, periodFromParam, periodOf, pickAssignments } from "@/lib/v2/pay/resolve";
-import { v2Session } from "@/lib/v2/session";
+import { dispatcherScope, v2Session } from "@/lib/v2/session";
 
 export default async function DispatcherPage({
   params,
@@ -17,11 +17,11 @@ export default async function DispatcherPage({
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const period = periodFromParam(query.month) ?? periodOf(new Date());
   const [dispatcher, assignments, ruleOptions, penaltyTypes, people] = await Promise.all([
-    getDispatcher(s.agentId, id),
+    getDispatcher(s.agentId, id, dispatcherScope(s)),
     listAssignments(s.agentId),
     listRuleOptions(s.agentId),
     penaltyTypesIn(s.agentId, period),
-    listPersonOptions(s.agentId),
+    s.member ? Promise.resolve([]) : listPersonOptions(s.agentId),
   ]);
   if (!dispatcher) notFound();
   const others = people.filter((p) => p.id !== dispatcher.id);
@@ -61,6 +61,7 @@ export default async function DispatcherPage({
       overrides={overrides}
       ruleOptions={ruleOptions}
       others={others}
+      owner={!s.member}
       suggested={others.filter((p) => nameKey(p.name) === nameKey(dispatcher.name))}
     />
   );

@@ -26,8 +26,20 @@ describe("getV2Agent", () => {
   it("returns the agent for a v2 account", async () => {
     const effective = { agentId: "a2", impersonating: false };
     getEffectiveAgentId.mockResolvedValue(effective);
-    findUnique.mockResolvedValue({ uiVersion: "V2" });
-    expect(await getV2Agent()).toEqual(effective);
+    findUnique.mockResolvedValue({ uiVersion: "V2", ownerId: null });
+    expect(await getV2Agent()).toEqual({ ...effective, member: null });
+  });
+
+  it("puts a team member in their owner's account, limited to their branches", async () => {
+    getEffectiveAgentId.mockResolvedValue({ agentId: "sup", impersonating: false });
+    findUnique.mockResolvedValue({ uiVersion: "V2", ownerId: "owner", teamBranchIds: ["b1"], owner: { uiVersion: "V2", isApproved: true } });
+    expect(await getV2Agent()).toEqual({ agentId: "owner", impersonating: false, member: { id: "sup", branchIds: ["b1"] } });
+  });
+
+  it("locks a team member out when the owner's account is disabled", async () => {
+    getEffectiveAgentId.mockResolvedValue({ agentId: "sup", impersonating: false });
+    findUnique.mockResolvedValue({ uiVersion: "V2", ownerId: "owner", teamBranchIds: ["b1"], owner: { uiVersion: "V2", isApproved: false } });
+    expect(await getV2Agent()).toBeNull();
   });
 
   it("checks the impersonated agent's version, not the admin's", async () => {

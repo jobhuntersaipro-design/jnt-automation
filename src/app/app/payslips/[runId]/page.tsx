@@ -13,7 +13,7 @@ export async function generateMetadata({ params, searchParams }: Props): Promise
   const s = await v2Session();
   if (!s) return {};
   const [{ runId }, { d }] = await Promise.all([params, searchParams]);
-  const run = await prisma.payrollRun.findFirst({ where: { id: runId, agentId: s.agentId }, select: { period: true, branch: { select: { code: true } } } });
+  const run = await prisma.payrollRun.findFirst({ where: { id: runId, agentId: s.agentId, ...(s.member && { branchId: { in: s.member.branchIds } }) }, select: { period: true, branch: { select: { code: true } } } });
   if (!run) return {};
   const one = d ? await prisma.payrollResult.findFirst({ where: { id: d, runId }, select: { name: true } }) : null;
   const parts = [one?.name ?? "Payslips", run.branch.code, periodToInput(run.period)];
@@ -27,7 +27,7 @@ export default async function PayslipsPage({ params, searchParams }: Props) {
   const [{ runId }, { d, lang: langParam }] = await Promise.all([params, searchParams]);
   const lang: SlipLang = SLIP_LANGS.find((l) => l === langParam) ?? "both";
   const [run, company] = await Promise.all([
-    getRunView(s.agentId, runId),
+    getRunView(s.agentId, runId, s.member?.branchIds),
     prisma.agent.findUnique({ where: { id: s.agentId }, select: { name: true, companyRegistrationNo: true, companyAddress: true, stampImageUrl: true } }),
   ]);
   if (!run || !company) notFound();

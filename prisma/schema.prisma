@@ -36,6 +36,12 @@ model Agent {
   // Onboarding tour. False only for agents created after the onboarding
   // migration — gates the first-sign-in demo seed + auto-started tour.
   hasSeenTutorial Boolean     @default(false)
+  // v2 team member (branch supervisor): signs in as themselves, works in the owner's account,
+  // only on `teamBranchIds`, and can't finalise pay or change rules. Null for an account owner.
+  ownerId       String?
+  owner         Agent?        @relation("Team", fields: [ownerId], references: [id], onDelete: Cascade)
+  team          Agent[]       @relation("Team")
+  teamBranchIds String[]      @default([])
   branches     Branch[]
   accounts     Account[]
   sessions     Session[]
@@ -62,6 +68,8 @@ model Agent {
   adminNotes               String?    // superadmin-only notes
   createdAt                DateTime   @default(now())
   updatedAt                DateTime   @updatedAt
+
+  @@index([ownerId])
 }
 
 model AgentDefault {

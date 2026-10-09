@@ -11,14 +11,16 @@ import ui from "@/components/v2/ui.module.css";
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
   const s = await v2Session();
   if (!s) notFound();
-  const [period, chosen] = await Promise.all([chosenPeriod(s.agentId, (await searchParams).month), chosenOutlet()]);
+  const [period, chosen] = await Promise.all([chosenPeriod(s.agentId, (await searchParams).month), chosenOutlet(s)]);
   // getMonthClose works stale drafts out again, so it runs before the run list reads their totals.
-  const all = await getMonthClose(s.agentId, period, null);
+  const every = await getMonthClose(s.agentId, period, null);
+  // A branch supervisor's chosen branch is always one of theirs (chosenOutlet), so only it shows.
+  const all = s.member ? every.filter((r) => r.branch === chosen) : every;
   const outlet = chosen && all.some((r) => r.branch === chosen) ? chosen : null;
-  const runs = await listRuns(s.agentId);
+  const runs = await listRuns(s.agentId, s.member?.branchIds);
   return (
     <div className={ui.page}>
-      <MonthClose period={period} outlet={outlet} rows={outlet ? all.filter((r) => r.branch === outlet) : all} />
+      <MonthClose owner={!s.member} period={period} outlet={outlet} rows={outlet ? all.filter((r) => r.branch === outlet) : all} />
       <Runs runs={outlet ? runs.filter((r) => r.outlet === outlet) : runs} />
     </div>
   );

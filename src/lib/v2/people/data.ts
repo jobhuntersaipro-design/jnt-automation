@@ -1,3 +1,4 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { parseConfig, penaltyTypeOf, type Employment, type Kind, type PenaltyType, type Vehicle } from "@/lib/v2/pay/config";
 import { inForce, type AssignmentRow, type Period } from "@/lib/v2/pay/resolve";
@@ -56,9 +57,9 @@ export interface DispatcherRow {
   next: ProfileView | null;
 }
 
-export async function listDispatcherRows(agentId: string, period: Period): Promise<DispatcherRow[]> {
+export async function listDispatcherRows(agentId: string, period: Period, scope: Prisma.DispatcherWhereInput = {}): Promise<DispatcherRow[]> {
   const rows = await prisma.dispatcher.findMany({
-    where: { agentId, branch: { isDemo: false } },
+    where: { agentId, branch: { isDemo: false }, ...scope },
     orderBy: { name: "asc" },
     select: {
       id: true,
@@ -78,9 +79,9 @@ export async function listDispatcherRows(agentId: string, period: Period): Promi
   }));
 }
 
-export async function getDispatcher(agentId: string, id: string) {
+export async function getDispatcher(agentId: string, id: string, scope: Prisma.DispatcherWhereInput = {}) {
   const d = await prisma.dispatcher.findFirst({
-    where: { id, agentId, branch: { isDemo: false } },
+    where: { id, agentId, branch: { isDemo: false }, ...scope },
     select: {
       id: true,
       name: true,
@@ -163,15 +164,15 @@ export interface ProfileChange {
   merged: { name: string; ids: string } | null;
 }
 
-/** Every vehicle and type change, newest first. */
-export async function listProfileChanges(agentId: string): Promise<ProfileChange[]> {
+/** Every vehicle and type change, newest first; `only` limits it to some dispatchers (a branch supervisor's). */
+export async function listProfileChanges(agentId: string, only?: Set<string>): Promise<ProfileChange[]> {
   // ponytail: last 2,000 changes; page it if an account needs further back.
   const rows = await prisma.ruleAudit.findMany({
     where: { agentId, action: { in: ["profile", "profileDelete", "merge"] } },
     orderBy: { createdAt: "desc" },
     take: 2000,
   });
-  return rows.map((r) => {
+  const changes = rows.map((r): ProfileChange => {
     const d = (r.detail ?? {}) as Record<string, unknown>;
     return {
       id: r.id,
@@ -187,4 +188,5 @@ export async function listProfileChanges(agentId: string): Promise<ProfileChange
       merged: r.action === "merge" ? { name: String(d.merged ?? ""), ids: String(d.ids ?? "") } : null,
     };
   });
+  return only ? changes.filter((c) => c.dispatcherId && only.has(c.dispatcherId)) : changes;
 }

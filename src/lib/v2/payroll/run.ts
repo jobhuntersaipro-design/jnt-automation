@@ -66,10 +66,16 @@ export async function createRun(input: {
   key: string;
   fileName: string;
   rows: ParsedRow[];
+  /** A branch supervisor's branches: their file must be for one of them (they can't add branches). */
+  onlyBranchIds?: string[];
 }): Promise<ActionResult<{ runId: string; replaced: boolean }>> {
   const read = summariseRows(input.rows);
   if (!read.ok) return { ok: false, error: read.error };
   const { outlet: code, period, dispatchers, stats } = read.summary;
+  if (input.onlyBranchIds) {
+    const mine = await prisma.branch.count({ where: { agentId: input.agentId, code, id: { in: input.onlyBranchIds } } });
+    if (!mine) return { ok: false, error: "team.err.notYourBranch", vars: { outlet: code } };
+  }
   const outlet = await ensureOutlet(input.agentId, code);
   if (!outlet.ok) return outlet;
   const branchId = outlet.data.id;

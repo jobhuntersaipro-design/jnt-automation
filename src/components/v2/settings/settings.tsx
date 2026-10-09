@@ -15,7 +15,9 @@ import { ConfirmButton } from "@/components/v2/confirm-button";
 import { useI18n } from "@/components/v2/i18n-provider";
 import { changePassword, updateCompany } from "@/lib/v2/account/actions";
 import type { Period } from "@/lib/v2/pay/resolve";
+import type { TeamMemberView } from "@/lib/v2/team/data";
 import { monthLabel } from "../labels";
+import { Team } from "./team";
 import ui from "../ui.module.css";
 import styles from "./settings.module.css";
 
@@ -44,8 +46,34 @@ export interface PlanView {
   invoices: { period: Period; outlets: number; amount: number; paid: boolean }[];
 }
 
-/** v2 settings: company details on payslips, the stamp, password, and plan & billing. */
-export function Settings({ account, plan, viewingAs }: { account: AccountView; plan: PlanView; viewingAs: string | null }) {
+/** A branch supervisor's settings: their own password only (the account's details are the owner's). */
+export function MemberSettings({ hasPassword }: { hasPassword: boolean }) {
+  const { t } = useI18n();
+  return (
+    <div className={ui.page}>
+      <header className={ui.pageHeader}>
+        <div>
+          <h1 className={ui.title}>{t("settings.title")}</h1>
+          <p className={ui.subtitle}>{t("team.memberSettings")}</p>
+        </div>
+      </header>
+      <div className={ui.grid}>{hasPassword && <Password />}</div>
+    </div>
+  );
+}
+
+/** v2 settings: company details on payslips, the stamp, password, plan & billing, and the team. */
+export function Settings({
+  account,
+  plan,
+  viewingAs,
+  team,
+}: {
+  account: AccountView;
+  plan: PlanView;
+  viewingAs: string | null;
+  team: { members: TeamMemberView[]; branches: { id: string; code: string }[] };
+}) {
   const { t } = useI18n();
   return (
     <div className={ui.page}>
@@ -61,6 +89,7 @@ export function Settings({ account, plan, viewingAs }: { account: AccountView; p
         {!viewingAs && <Stamp url={account.stampImageUrl} />}
         {!viewingAs && <Plan plan={plan} />}
         {!viewingAs && account.hasPassword && <Password />}
+        <Team members={team.members} branches={team.branches} />
       </div>
     </div>
   );

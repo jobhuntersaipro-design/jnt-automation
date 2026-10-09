@@ -5,7 +5,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { r2, R2_BUCKET } from "@/lib/r2";
-import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { branchIn, v2Owner, v2Session, type ActionResult } from "@/lib/v2/session";
 import { planCover } from "./cover";
 import { branchPenaltyCounts } from "./data";
 import { getMonthClose } from "./month";
@@ -33,6 +33,7 @@ export async function getUploadUrl(input: { fileName: string; size: number }): P
 export async function recalculateRun(input: { runId: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
+  if (!(await prisma.payrollRun.count({ where: { id: input.runId, agentId: s.agentId, branchId: branchIn(s) } }))) return { ok: false, error: "error.notFound" };
   const result = await calculateRun(s.agentId, input.runId);
   if (result.ok) refresh();
   return result;
@@ -43,7 +44,7 @@ export async function confirmPenalties(input: { runId: string }): Promise<Action
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
   const run = await prisma.payrollRun.findFirst({
-    where: { id: input.runId, agentId: s.agentId, status: "DRAFT" },
+    where: { id: input.runId, agentId: s.agentId, branchId: branchIn(s), status: "DRAFT" },
     select: { id: true, period: true, branch: { select: { id: true, code: true } } },
   });
   if (!run) return { ok: false, error: "error.notFound" };
@@ -61,7 +62,7 @@ export async function confirmPenalties(input: { runId: string }): Promise<Action
  * numbers unchanged (see planCover), then the draft is recalculated.
  */
 export async function coverRunMonth(input: { runId: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const run = await prisma.payrollRun.findFirst({ where: { id: input.runId, agentId: s.agentId }, select: { id: true, period: true, status: true, branch: { select: { code: true } } } });
   if (!run) return { ok: false, error: "error.notFound" };
@@ -95,7 +96,7 @@ export async function coverRunMonth(input: { runId: string }): Promise<ActionRes
 
 /** Month close: finalises every branch of the month that's ready (the same checks as one run). */
 export async function finaliseMonth(input: { period: number; outlet: string | null }): Promise<ActionResult<{ branches: string[] }>> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const rows = await getMonthClose(s.agentId, input.period, input.outlet);
   const branches: string[] = [];
@@ -107,7 +108,7 @@ export async function finaliseMonth(input: { period: number; outlet: string | nu
 }
 
 export async function finalise(input: { runId: string }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const result = await finaliseRun(s.agentId, s.actor, input.runId);
   if (result.ok) refresh();
@@ -117,7 +118,10 @@ export async function finalise(input: { runId: string }): Promise<ActionResult> 
 export async function deleteRun(input: { runId: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const run = await prisma.payrollRun.findFirst({ where: { id: input.runId, agentId: s.agentId }, select: { id: true, status: true, period: true, branch: { select: { code: true } } } });
+  const run = await prisma.payrollRun.findFirst({
+    where: { id: input.runId, agentId: s.agentId, branchId: branchIn(s) },
+    select: { id: true, status: true, period: true, branch: { select: { code: true } } },
+  });
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
   await prisma.$transaction([
@@ -130,7 +134,7 @@ export async function deleteRun(input: { runId: string }): Promise<ActionResult>
 
 /** Explains a difference on the month's comparison; `excluded` leaves it out as explained. */
 export async function saveCheckNote(input: { period: number; key: string; note: string; excluded: boolean }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   const check = await prisma.payrollCheck.findUnique({ where: { agentId_period: { agentId: s.agentId, period: input.period } } });
   if (!check) return { ok: false, error: "error.notFound" };
@@ -144,7 +148,7 @@ export async function saveCheckNote(input: { period: number; key: string; note: 
 }
 
 export async function deleteCheck(input: { period: number }): Promise<ActionResult> {
-  const s = await v2Session();
+  const s = await v2Owner();
   if (!s) return { ok: false, error: "error.forbidden" };
   await prisma.payrollCheck.deleteMany({ where: { agentId: s.agentId, period: input.period } });
   revalidatePath("/app/payroll/check");

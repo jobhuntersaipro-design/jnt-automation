@@ -5,7 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { isPeriod } from "@/lib/v2/pay/resolve";
 import { ADVANCE, type PayLine } from "@/lib/v2/payroll/calc";
-import { v2Session, type ActionResult } from "@/lib/v2/session";
+import { dispatcherScope, v2Session, type ActionResult } from "@/lib/v2/session";
 
 const refresh = () => {
   revalidatePath("/app/advances");
@@ -26,7 +26,7 @@ export async function addAdvance(raw: z.input<typeof input>): Promise<ActionResu
   const parsed = input.safeParse(raw);
   if (!parsed.success) return { ok: false, error: "error.invalid" };
   const a = parsed.data;
-  const person = await prisma.dispatcher.findFirst({ where: { id: a.dispatcherId, agentId: s.agentId }, select: { name: true } });
+  const person = await prisma.dispatcher.findFirst({ where: { id: a.dispatcherId, agentId: s.agentId, ...dispatcherScope(s) }, select: { name: true } });
   if (!person) return { ok: false, error: "error.notFound" };
   await prisma.$transaction([
     prisma.advance.create({ data: { agentId: s.agentId, dispatcherId: a.dispatcherId, period: a.period, amountCents: a.amountCents, note: a.note || null, createdBy: s.actor } }),
@@ -41,7 +41,7 @@ export async function addAdvance(raw: z.input<typeof input>): Promise<ActionResu
 export async function deleteAdvance(raw: { id: string }): Promise<ActionResult> {
   const s = await v2Session();
   if (!s) return { ok: false, error: "error.forbidden" };
-  const advance = await prisma.advance.findFirst({ where: { id: raw.id, agentId: s.agentId }, include: { dispatcher: { select: { name: true } } } });
+  const advance = await prisma.advance.findFirst({ where: { id: raw.id, agentId: s.agentId, dispatcher: dispatcherScope(s) }, include: { dispatcher: { select: { name: true } } } });
   if (!advance) return { ok: false, error: "error.notFound" };
   const finals = await prisma.payrollResult.findMany({
     where: { dispatcherId: advance.dispatcherId, run: { agentId: s.agentId, status: "FINAL", period: { gte: advance.period } } },
