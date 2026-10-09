@@ -28,6 +28,7 @@ export default async function V2ShellLayout({ children }: { children: React.Reac
     { href: "/app", label: t("nav.dashboard") },
     { href: "/app/payroll", label: t("nav.payroll") },
     { href: "/app/penalties", label: t("nav.penalties") },
+    { href: "/app/advances", label: t("nav.advances") },
     { href: "/app/dispatchers", label: t("nav.dispatchers") },
     { href: "/app/branches", label: t("nav.outlets") },
     { href: "/app/rules", label: t("nav.rules") },

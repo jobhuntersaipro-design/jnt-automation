@@ -189,7 +189,7 @@ export function Penalties({ data, people }: { data: PenaltyMonth; people: Person
   );
 }
 
-function personOptions(people: PersonOption[]) {
+export function personOptions(people: PersonOption[]) {
   return people.map((p) => ({ value: p.id, label: p.detail ? `${p.name} (${p.detail})` : p.name, keywords: [p.detail] }));
 }
 

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { normalizePhone } from "@/lib/billing";
 import { prisma } from "@/lib/prisma";
 import { EMPLOYMENTS, VEHICLES } from "@/lib/v2/pay/config";
 import { isPeriod } from "@/lib/v2/pay/resolve";
@@ -32,6 +33,17 @@ const profileInput = z.object({
   vehicle: z.enum(VEHICLES),
   employment: z.enum(EMPLOYMENTS),
 });
+
+/** A dispatcher's mobile number for payslip links; empty clears it. Malaysian 0… numbers are kept as typed. */
+export async function setPhone(input: { dispatcherId: string; phone: string }): Promise<ActionResult<{ phone: string | null }>> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const phone = input.phone.trim() ? normalizePhone(input.phone) : null;
+  if (input.phone.trim() && !phone) return { ok: false, error: "send.err.phone" };
+  const { count } = await prisma.dispatcher.updateMany({ where: { id: input.dispatcherId, agentId: s.agentId }, data: { phone } });
+  if (count === 0) return { ok: false, error: "error.notFound" };
+  return { ok: true, data: { phone } };
+}
 
 /** Sets vehicle and FT/PT from a month on, for one dispatcher or many. Replaces a change already made for that month. */
 export async function setProfiles(input: z.input<typeof profileInput>): Promise<ActionResult<{ count: number }>> {

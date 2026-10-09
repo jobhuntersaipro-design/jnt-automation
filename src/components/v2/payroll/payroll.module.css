@@ -168,3 +168,11 @@
     --text-3xl: var(--text-xl);
   }
 }
+
+/* A link or button with an icon beside its label, kept on one line. */
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}

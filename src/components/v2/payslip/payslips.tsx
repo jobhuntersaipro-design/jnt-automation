@@ -7,7 +7,7 @@ import { messagesFor } from "@/lib/i18n/messages";
 import type { RuleConfig } from "@/lib/v2/pay/config";
 import { DEDUCTING, type Group } from "@/lib/v2/pay/engine";
 import { periodMonth, periodYear } from "@/lib/v2/pay/resolve";
-import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
+import { ADVANCE, type PayLine, type PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import { employmentLabel, penaltyLabel, rangeLabels, vehicleLabel, warningText } from "../labels";
 import { PrintButton } from "./print-button";
@@ -93,7 +93,7 @@ function Lines({ lines, run, result, caption }: { lines: PayLine[]; run: RunView
                 <th scope="row">
                   <span className={styles.both}>
                     {penalty ? <Both text={(i) => penaltyLabel(i, penalty)} /> : both(`kind.${line.kind}`)}
-                    {fromFile ? both("run.fromFile") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
+                    {fromFile ? both("run.fromFile") : line.ruleId === ADVANCE ? both("advance.line") : [zh, en].some((i) => i.t(`kind.${line.kind}`) === line.name) ? null : <span>{line.name}</span>}
                   </span>
                 </th>
                 <td data-numeric>{en.number(line.units)}</td>
@@ -203,15 +203,18 @@ function Payslip({ run, result, company }: { run: RunView; result: ResultView; c
 }
 
 /** Payslips ready to print: one run's, one dispatcher's, or every finalised branch of a month. */
-export function Payslips({ slips, company, back, lang, langHref }: { slips: { run: RunView; result: ResultView }[]; company: Company; back: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
-  const missing = !company.companyRegistrationNo || !company.companyAddress;
+export function Payslips({ slips, company, back, lang, langHref }: { slips: { run: RunView; result: ResultView }[]; company: Company; back?: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
+  // Without `back` this is a dispatcher's own link: no way into the app, and no setup hints.
+  const missing = back !== undefined && (!company.companyRegistrationNo || !company.companyAddress);
   return (
     <div>
       <div className={styles.toolbar}>
-        <Link href={back} className={ui.back}>
-          <ArrowLeft size={16} aria-hidden="true" />
-          {both("run.back")}
-        </Link>
+        {back && (
+          <Link href={back} className={ui.back}>
+            <ArrowLeft size={16} aria-hidden="true" />
+            {both("run.back")}
+          </Link>
+        )}
         <span className={ui.help}>
           <Both text={(i) => i.tp("payslip.count", slips.length)} />
         </span>

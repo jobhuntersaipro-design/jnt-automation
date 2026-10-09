@@ -8,7 +8,7 @@ import { inForce, monthChange, type Period } from "@/lib/v2/pay/resolve";
 import { listAssignments } from "@/lib/v2/people/data";
 import { ensureOutlet } from "@/lib/v2/people/outlet";
 import type { ActionResult } from "@/lib/v2/session";
-import { payDispatcher, type PenaltyCase, type Profile, type VersionRow } from "./calc";
+import { ADVANCE, payDispatcher, type PayLine, type PenaltyCase, type Profile, type VersionRow } from "./calc";
 import { branchPenaltyCounts } from "./data";
 import { summariseRows, type FileDispatcher } from "./file";
 
@@ -27,6 +27,8 @@ const PAY_CHANGES = [
   "unassign",
   "profile",
   "profileDelete",
+  "advance",
+  "advanceDelete",
   "penaltyImport",
   "penaltyDeleteImport",
   "penaltyMatch",
@@ -103,6 +105,29 @@ export async function createRun(input: {
   return { ok: true, data: { runId, replaced: !!existing } };
 }
 
+/**
+ * What each dispatcher still owes in advances by `period`: given up to that month, less what finalised earlier months
+ * took back and what other runs of the same month take (a dispatcher at two branches is charged once).
+ */
+export async function advancesOwed(agentId: string, dispatcherIds: string[], period: Period, exceptRunId?: string): Promise<Map<string, number>> {
+  const [given, taken] = await Promise.all([
+    prisma.advance.groupBy({ by: ["dispatcherId"], where: { agentId, dispatcherId: { in: dispatcherIds }, period: { lte: period } }, _sum: { amountCents: true } }),
+    prisma.payrollResult.findMany({
+      where: {
+        dispatcherId: { in: dispatcherIds },
+        run: { agentId, ...(exceptRunId && { id: { not: exceptRunId } }), OR: [{ status: "FINAL", period: { lt: period } }, { period }] },
+      },
+      select: { dispatcherId: true, lines: true },
+    }),
+  ]);
+  const owed = new Map(given.map((g) => [g.dispatcherId, g._sum.amountCents ?? 0]));
+  for (const r of taken) {
+    const cents = (r.lines as unknown as PayLine[]).filter((l) => l.ruleId === ADVANCE).reduce((n, l) => n + l.cents, 0);
+    if (cents) owed.set(r.dispatcherId, (owed.get(r.dispatcherId) ?? 0) - cents);
+  }
+  return owed;
+}
+
 /** Works out every dispatcher's pay with today's rules and profiles. Drafts only. */
 export async function calculateRun(agentId: string, runId: string): Promise<ActionResult> {
   const run = await prisma.payrollRun.findFirst({
@@ -113,7 +138,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
 
   const dispatcherIds = run.results.map((r) => r.dispatcherId);
-  const [assignments, versionRows, profileRows, penaltyRows] = await Promise.all([
+  const [assignments, versionRows, profileRows, penaltyRows, owed] = await Promise.all([
     listAssignments(agentId),
     prisma.payRuleVersion.findMany({ where: { rule: { agentId, archivedAt: null } }, select: { id: true, ruleId: true, effectiveFrom: true, config: true } }),
     prisma.dispatcherProfile.findMany({ where: { dispatcherId: { in: dispatcherIds } }, select: { dispatcherId: true, effectiveFrom: true, vehicle: true, employment: true } }),
@@ -123,6 +148,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
       orderBy: [{ occurredAt: { sort: "asc", nulls: "last" } }, { key: "asc" }],
       select: { id: true, dispatcherId: true, type: true, waybill: true, occurredAt: true, amountCents: true, note: true },
     }),
+    advancesOwed(agentId, dispatcherIds, run.period, run.id),
   ]);
   const versions = new Map<string, VersionRow[]>();
   for (const v of versionRows) {
@@ -154,6 +180,7 @@ export async function calculateRun(agentId: string, runId: string): Promise<Acti
       assignments,
       versionsOf: (ruleId) => versions.get(ruleId) ?? [],
       penalties: cases,
+      advanceOwedCents: owed.get(r.dispatcherId) ?? 0,
     });
     for (const line of pay.lines) {
       const v = versions.get(line.ruleId)?.find((x) => x.id === line.versionId);

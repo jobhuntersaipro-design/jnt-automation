@@ -17,6 +17,8 @@ export const authConfig = {
       // v2 (/app) has its own sign-in page.
       const { pathname } = request.nextUrl;
       if (pathname === "/app/login") return true;
+      // A dispatcher's payslip link: the signed token in the URL is the access check.
+      if (pathname.startsWith("/app/p/")) return true;
       if (pathname.startsWith("/app") && !auth?.user) {
         return Response.redirect(new URL("/app/login", request.nextUrl));
       }

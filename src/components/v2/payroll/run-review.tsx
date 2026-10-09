@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowLeft, FileText, RefreshCw, Scale } from "lucide-react";
+import { ArrowLeft, FileText, RefreshCw, Scale, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
@@ -21,7 +21,7 @@ import {
   finalise,
   recalculateRun,
 } from "@/lib/v2/payroll/actions";
-import type { PayLine, PenaltyCase } from "@/lib/v2/payroll/calc";
+import { ADVANCE, type PayLine, type PenaltyCase } from "@/lib/v2/payroll/calc";
 import type { ResultView, RunView } from "@/lib/v2/payroll/data";
 import {
   confirmProfile,
@@ -222,6 +222,12 @@ export function RunReview({
             <FileText size={16} aria-hidden="true" />
             {t("run.payslips")}
           </Button>
+          {!draft && (
+            <Button variant="secondary" loading={busyFor(`/app/payroll/${run.id}/send`)} onClick={() => go(`/app/payroll/${run.id}/send`)}>
+              <Send size={16} aria-hidden="true" />
+              {t("run.send")}
+            </Button>
+          )}
           <Button
             variant="secondary"
             loading={busyFor(`/app/payroll/check?month=${run.period}`)}
@@ -681,7 +687,7 @@ function Breakdown({
             ) : (
               result.lines.map((line) => {
                 const fromFile = line.ruleId.startsWith("file:");
-                const name = fromFile ? t("run.fromFile") : line.name;
+                const name = fromFile ? t("run.fromFile") : line.ruleId === ADVANCE ? t("advance.line") : line.name;
                 return (
                   <section
                     key={line.ruleId}

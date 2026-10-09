@@ -216,6 +216,30 @@
   font-weight: 700;
 }
 
+/* On a phone (a dispatcher's link): tighter padding and smaller table text so the amounts fit. */
+@media screen and (max-width: 40rem) {
+  .sheets {
+    padding: var(--space-3) var(--space-2) var(--space-8);
+  }
+
+  .slip {
+    padding: var(--space-4);
+  }
+
+  .table {
+    font-size: var(--text-xs);
+  }
+
+  .table th,
+  .table td {
+    padding: var(--space-1);
+  }
+
+  .sub > :first-child {
+    padding-left: var(--space-3);
+  }
+}
+
 @media print {
   .toolbar {
     display: none;

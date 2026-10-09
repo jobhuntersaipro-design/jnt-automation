@@ -1,6 +1,6 @@
 # Spec: Month close for multi-branch owners (v2)
 
-Status: in progress (2026-10-09). v2 only (`/app/*`); no v1 code paths change.
+Status: built and live (2026-10-09). Later phase 2 (payslips by WhatsApp link) built after it; see below. v2 only (`/app/*`); no v1 code paths change.
 
 ## Why
 
@@ -104,8 +104,20 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
 ## Later phases (not in this spec)
 
 1. Bank bulk-payment file (Maybank, CIMB).
-2. Payslips to riders by WhatsApp link / phone page.
-3. Advances and loan repayments as scheduled deductions.
+2. **Built:** payslips to riders by WhatsApp link. A finalised run's *Send payslips* page
+   (`/app/payroll/{runId}/send`, also linked from finalised rows in month close) lists each dispatcher with
+   a mobile number (`Dispatcher.phone`, nullable, migration `20261015_v2_dispatcher_phone`), a WhatsApp
+   button (wa.me with a bilingual message and the link) and *Copy link*. The link `/app/p/{resultId}.{sig}`
+   opens that one payslip without signing in (HMAC with `AUTH_SECRET`, `src/lib/v2/payslip/link.ts`; only
+   finalised runs; changed or made-up tokens 404); the payslip fits a phone.
+   Still open: sending to everyone in one go needs the WhatsApp Business API (paid, Meta approval).
+3. **Built (one-off advances):** `/app/advances` (nav *Advances*, the sidebar's month): record an advance
+   (dispatcher, amount, note); it comes off that month's pay as a *Deductions · Advance* line, after every
+   other line, never taking net below RM 0 (`advanceTaken`, `src/lib/v2/payroll/calc.ts`). What pay can't
+   cover carries to the next month: owed = advances up to the month − advance lines of finalised earlier
+   runs − advance lines of other runs that month (`advancesOwed`, `run.ts`), so nothing is stored twice.
+   New table `Advance` (migration `20261016_v2_advances`). An advance can't be deleted once finalised pay
+   took advances back for that dispatcher. Instalment loans: not built (asked; owner chose one-off).
 4. Merge a transferred rider (two J&T IDs, one person).
 5. Roles: branch supervisor prepares, owner finalises.
 6. Accounting export (Bukku, SQL Account, Xero); LHDN self-billed e-Invoice if riders are contractors
