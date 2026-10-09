@@ -141,9 +141,9 @@ export default async function V2Dashboard() {
       {allRuns.length > 0 && (
         <section className={ui.stack} aria-labelledby="latest-title">
           <h2 id="latest-title" className={ui.cardTitle}>
-            {outlet
-              ? t("dashboard.latestAt", { month, outlet })
-              : t("dashboard.latest", { month })}
+            <Link href="/app/payroll" className={ui.link}>
+              {outlet ? t("dashboard.latestAt", { month, outlet }) : t("dashboard.latest", { month })}
+            </Link>
           </h2>
           {latestRuns.length === 0 ? (
             <p className={ui.muted}>
@@ -160,7 +160,15 @@ export default async function V2Dashboard() {
                 prefix={RM}
                 decimals={2}
                 locale={i18n.tag}
-                context={month}
+                // Drafts are counted too, so say how many: their numbers can still change.
+                context={
+                  latestRuns.some((r) => r.status === "DRAFT")
+                    ? t("dashboard.mix", {
+                        final: latestRuns.filter((r) => r.status === "FINAL").length,
+                        draft: latestRuns.filter((r) => r.status === "DRAFT").length,
+                      })
+                    : month
+                }
               />
               <MetricCard
                 label={t("dashboard.dispatchers")}

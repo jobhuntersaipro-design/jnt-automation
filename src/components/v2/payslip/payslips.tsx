@@ -202,8 +202,8 @@ function Payslip({ run, result, company }: { run: RunView; result: ResultView; c
   );
 }
 
-/** One run's payslips (or one dispatcher's), ready to print. */
-export function Payslips({ run, results, company, back, lang, langHref }: { run: RunView; results: ResultView[]; company: Company; back: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
+/** Payslips ready to print: one run's, one dispatcher's, or every finalised branch of a month. */
+export function Payslips({ slips, company, back, lang, langHref }: { slips: { run: RunView; result: ResultView }[]; company: Company; back: string; lang: SlipLang; langHref: (l: SlipLang) => string }) {
   const missing = !company.companyRegistrationNo || !company.companyAddress;
   return (
     <div>
@@ -213,7 +213,7 @@ export function Payslips({ run, results, company, back, lang, langHref }: { run:
           {both("run.back")}
         </Link>
         <span className={ui.help}>
-          <Both text={(i) => i.tp("payslip.count", results.length)} />
+          <Both text={(i) => i.tp("payslip.count", slips.length)} />
         </span>
         <nav className={styles.langs} aria-label={`${zh.t("payslip.language")} · ${en.t("payslip.language")}`}>
           {SLIP_LANGS.map((l) => (
@@ -232,8 +232,8 @@ export function Payslips({ run, results, company, back, lang, langHref }: { run:
         )}
       </div>
       <div className={styles.sheets} data-lang={lang}>
-        {results.map((r) => (
-          <Payslip key={r.id} run={run} result={r} company={company} />
+        {slips.map(({ run, result }) => (
+          <Payslip key={result.id} run={run} result={result} company={company} />
         ))}
       </div>
     </div>

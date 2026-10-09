@@ -78,7 +78,7 @@ export interface RunView {
   stats: FileStats | null;
   /** A draft whose rules or profiles changed after it was worked out. */
   stale: boolean;
-  /** The month's penalties were imported, or there were none (step 2 of New payroll). */
+  /** The branch's penalties for the month are in: confirmed in New payroll, or cases for the branch were imported. */
   penaltiesChecked: boolean;
   /** Vehicle/type changes from last month still waiting for someone to confirm them (drafts only). */
   profileChanges: ProfileChange[];
@@ -101,7 +101,7 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
       penaltiesCheckedAt: true,
       stats: true,
       rules: true,
-      branch: { select: { code: true } },
+      branch: { select: { id: true, code: true } },
       results: { orderBy: [{ name: "asc" }, { extId: "asc" }] },
     },
   });
@@ -117,7 +117,7 @@ export async function getRunView(agentId: string, runId: string): Promise<RunVie
     finalisedBy: run.finalisedBy,
     stats: run.stats as FileStats | null,
     stale: run.status === "DRAFT" && (await isStale(agentId, run.calculatedAt)),
-    penaltiesChecked: run.penaltiesCheckedAt !== null,
+    penaltiesChecked: run.penaltiesCheckedAt !== null || (await branchPenaltyCounts(agentId, run.period, run.branch)).cases > 0,
     profileChanges: run.status === "DRAFT" ? await unconfirmedChanges(run.results.map((r) => r.dispatcherId), run.period) : [],
     rules: (run.rules ?? {}) as RunView["rules"],
     results: run.results.map((r) => ({

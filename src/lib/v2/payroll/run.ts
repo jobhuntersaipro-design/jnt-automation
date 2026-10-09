@@ -9,6 +9,7 @@ import { listAssignments } from "@/lib/v2/people/data";
 import { ensureOutlet } from "@/lib/v2/people/outlet";
 import type { ActionResult } from "@/lib/v2/session";
 import { payDispatcher, type PenaltyCase, type Profile, type VersionRow } from "./calc";
+import { branchPenaltyCounts } from "./data";
 import { summariseRows, type FileDispatcher } from "./file";
 
 // Server side of a payroll run: the J&T file's rows → outlet, dispatchers and their parcels,
@@ -215,13 +216,14 @@ export async function finaliseRun(agentId: string, actor: string | null, runId: 
       status: true,
       calculatedAt: true,
       penaltiesCheckedAt: true,
-      branch: { select: { code: true } },
+      branch: { select: { id: true, code: true } },
       results: { select: { warnings: true, dispatcherId: true } },
     },
   });
   if (!run) return { ok: false, error: "error.notFound" };
   if (run.status === "FINAL") return { ok: false, error: "run.err.final", vars: { outlet: run.branch.code } };
-  if (!run.penaltiesCheckedAt) return { ok: false, error: "run.err.penalties" };
+  // Every branch has J&T penalties every month: they're in once the branch has cases for the month.
+  if (!run.penaltiesCheckedAt && (await branchPenaltyCounts(agentId, run.period, run.branch)).cases === 0) return { ok: false, error: "run.err.penalties" };
   const changes = await unconfirmedChanges(run.results.map((r) => r.dispatcherId), run.period);
   if (changes.length > 0) return { ok: false, error: "run.err.profileChanges", vars: { count: changes.length } };
   if (await isStale(agentId, run.calculatedAt)) return { ok: false, error: "run.err.stale" };

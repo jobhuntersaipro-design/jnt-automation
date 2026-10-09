@@ -43,7 +43,10 @@ flow (straight to step 2 of that run).
 | Net pay | RM, from the run (draft numbers say Draft) |
 | Status | Not started · Draft · Ready · Finalised |
 
-"Ready" = draft, penalties checked, nobody flagged, no unconfirmed vehicle changes. Totals row for
+"Ready" = draft, penalties in, nobody flagged, no unconfirmed vehicle changes. Penalties are "in" once the
+branch has cases for the month (every branch has J&T penalties every month) or step 2 was confirmed, so
+importing the shared penalty file once covers every branch; `finaliseRun` and the run review use the same
+rule. Totals row for
 dispatchers and net pay. Branch filter in the sidebar narrows the table.
 
 **Actions**

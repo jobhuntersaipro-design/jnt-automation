@@ -88,6 +88,8 @@ export function RunReview({
   const month = monthLabel(i18n, run.period);
   const draft = run.status === "DRAFT";
   const flagged = run.results.filter((r) => r.warnings.length > 0).length;
+  // People whose only problem is a missing vehicle and type have their own card, so this alert leaves them out.
+  const flaggedOther = run.results.filter((r) => r.warnings.some((w) => w.code !== "noProfile")).length;
   const parcels = run.results.reduce((n, r) => n + r.parcels, 0);
   const net = run.results.reduce((n, r) => n + r.netCents, 0) / 100;
   const stats = run.stats;
@@ -310,8 +312,8 @@ export function RunReview({
       )}
       {draft && run.profileChanges.length > 0 && <ProfileChanges run={run} />}
       {draft && <SetMissingProfiles run={run} />}
-      {flagged > 0 && (
-        <Alert tone="warning" title={i18n.tp("run.attentionTitle", flagged)}>
+      {flaggedOther > 0 && (
+        <Alert tone="warning" title={i18n.tp("run.attentionTitle", flaggedOther)}>
           {t("run.attentionBody")}
         </Alert>
       )}
