@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import { describe, expect, it } from "vitest";
 import { readXlsx, type Sheet } from "@/lib/v2/pay/sheet";
 import { buildDirectory, matchPenalty } from "./match";
-import { mostCommonPeriod, parseDate, parseMoney, planSheet, readPenalties } from "./parse";
+import { mostCommonPeriod, parseDate, parseMoney, planSheet, readPenalties, matchColumns } from "./parse";
 
 // Synthetic sheets in the shapes J&T HQ's QC files take: invented people, waybills and amounts.
 
@@ -170,11 +170,23 @@ describe("matchPenalty", () => {
 
   it("matches a name only one dispatcher has", () => {
     expect(matchPenalty({ extId: null, name: "ahmad faiz", outlet: null }, dir)).toEqual({ status: "MATCHED", dispatcherId: "ahmad" });
-    expect(matchPenalty({ extId: null, name: "Ali", outlet: "KUL4602" }, dir)).toEqual({ status: "UNMATCHED", dispatcherId: null });
+    expect(matchPenalty({ extId: null, name: "Ali", outlet: null }, dir)).toEqual({ status: "UNMATCHED", dispatcherId: null });
+  });
+
+  it("keeps a name match inside the branch the row names", () => {
+    expect(matchPenalty({ extId: null, name: "Ali", outlet: "KUL4602" }, dir)).toEqual({ status: "MATCHED", dispatcherId: "ali-kul" });
+    expect(matchPenalty({ extId: null, name: "Ahmad Faiz", outlet: "PHG415" }, dir)).toEqual({ status: "UNMATCHED", dispatcherId: null });
   });
 
   it("follows earlier decisions first", () => {
     expect(matchPenalty({ extId: "HUB01", name: "Ahmad Faiz", outlet: null }, dir)).toEqual({ status: "IGNORED", dispatcherId: null });
     expect(matchPenalty({ extId: "NEW1", name: "Siti  Aminah", outlet: null }, dir)).toEqual({ status: "MATCHED", dispatcherId: "ahmad" });
+  });
+});
+
+describe("matchColumns", () => {
+  it("reads a J&T ID header as the dispatcher's ID", () => {
+    expect(matchColumns(["Waybill", "J&T ID", "Name", "Outlet"]).extId).toBe(1);
+    expect(matchColumns(["Waybill", "JNT ID", "Name"]).extId).toBe(1);
   });
 });
