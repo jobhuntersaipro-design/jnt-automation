@@ -13,7 +13,9 @@ import { KINDS, type Employment, type Kind, type PenaltyType } from "@/lib/v2/pa
 import { deleteProfile, setProfiles } from "@/lib/v2/people/actions";
 import type { ProfileView } from "@/lib/v2/people/data";
 import { periodFromInput, periodToInput, type Period } from "@/lib/v2/pay/resolve";
+import type { PersonOption } from "@/lib/v2/penalties/data";
 import { addAssignment, removeAssignment } from "@/lib/v2/rules/actions";
+import { MergeDispatcher } from "./merge-dispatcher";
 import { monthLabel, penaltyLabel, PROFILES, profileKey, profileLabel, scopeLabel } from "../labels";
 import ui from "../ui.module.css";
 import styles from "./people.module.css";
@@ -41,13 +43,18 @@ interface Props {
   resolved: ResolvedView[];
   overrides: { id: string; ruleName: string; kind: Kind; effectiveFrom: Period }[];
   ruleOptions: { id: string; name: string; kind: Kind }[];
+  /** Everyone else, for joining a second record of the same person; `suggested` share this name. */
+  others: PersonOption[];
+  suggested: PersonOption[];
 }
 
 /** One dispatcher: vehicle and FT/PT over time, which rules pay them in a month, and their own rules. */
-export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasProfile, resolved, overrides, ruleOptions }: Props) {
+export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasProfile, resolved, overrides, ruleOptions, others, suggested }: Props) {
   const i18n = useI18n();
   const { t } = i18n;
   const router = useRouter();
+  // Two J&T IDs at one branch (after a merge) are still one branch to pick.
+  const branches = [...new Map(dispatcher.outlets.map((o) => [o.id, o])).values()];
   const go = (p: Period, outlet: string) => router.replace(`/app/dispatchers/${dispatcher.id}?month=${p}&outlet=${outlet}`, { scroll: false });
   // One row per kind; penalties get one per type that has a rule.
   const rows: { kind: Kind; r?: ResolvedView }[] = KINDS.flatMap((kind) => {
@@ -90,13 +97,8 @@ export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasPr
                   }}
                 />
               </label>
-              {dispatcher.outlets.length > 1 && (
-                <Select
-                  label={t("dispatcher.outlet")}
-                  value={outletId}
-                  onValueChange={(v) => go(period, v)}
-                  options={dispatcher.outlets.map((o) => ({ value: o.id, label: o.code }))}
-                />
+              {branches.length > 1 && (
+                <Select label={t("dispatcher.outlet")} value={outletId} onValueChange={(v) => go(period, v)} options={branches.map((o) => ({ value: o.id, label: o.code }))} />
               )}
             </div>
             {!hasProfile && <Alert tone="warning" title={t("dispatcher.noProfile")} />}
@@ -127,6 +129,7 @@ export function DispatcherDetail({ dispatcher, profiles, period, outletId, hasPr
             </ul>
           </section>
           <Overrides dispatcherId={dispatcher.id} overrides={overrides} ruleOptions={ruleOptions} period={period} />
+          <MergeDispatcher dispatcher={dispatcher} others={others} suggested={suggested} />
         </div>
         <Profiles dispatcherId={dispatcher.id} name={dispatcher.name} profiles={profiles} period={period} />
       </div>

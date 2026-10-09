@@ -8,7 +8,6 @@ import { toast } from "sonner";
 import { Alert } from "@/components/arc/alert/alert";
 import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Progress } from "@/components/arc/progress/progress";
 import { useI18n } from "@/components/v2/i18n-provider";
 import type { MessageKey } from "@/lib/i18n/en";

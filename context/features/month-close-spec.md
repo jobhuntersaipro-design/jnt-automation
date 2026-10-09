@@ -118,7 +118,12 @@ payslips print both branches; first rate card applies to everyone. Unit tests fo
    runs − advance lines of other runs that month (`advancesOwed`, `run.ts`), so nothing is stored twice.
    New table `Advance` (migration `20261016_v2_advances`). An advance can't be deleted once finalised pay
    took advances back for that dispatcher. Instalment loans: not built (asked; owner chose one-off).
-4. Merge a transferred rider (two J&T IDs, one person).
+4. **Built:** merge a transferred rider (two J&T IDs, one person). On a dispatcher's page, *Same person with
+   another J&T ID?* (riders with the same name suggested; nothing pre-selected) joins another record into this one
+   (`mergeDispatchers`, plan in `src/lib/v2/people/merge.ts`): its J&T IDs, pay results, vehicle and type (this
+   record's months win), advances, penalty cases and remembered matches, own rules and phone move over, and the
+   other record goes. Finalised payslips keep the name and ID they were paid under. When both are in one draft run
+   their parcels join and the run recalculates; both in one finalised run is refused. Logged in the change log.
 5. Roles: branch supervisor prepares, owner finalises.
 6. Accounting export (Bukku, SQL Account, Xero); LHDN self-billed e-Invoice if riders are contractors
    (verify against LHDN); success-rate bonus tiers; COD reconciliation; weekly pay.

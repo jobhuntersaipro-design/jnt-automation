@@ -26,18 +26,19 @@ export function ProfileHistory({ changes }: { changes: ProfileChange[] }) {
   const router = useRouter();
 
   const rows: Row[] = changes.map((c) => {
-    const to = profileLabel(i18n, c.to);
+    const to = c.merged ? "" : profileLabel(i18n, c.to);
     return {
       id: c.id,
       dispatcherId: c.dispatcherId ?? "",
       dispatcher: c.dispatcher ?? t("dispatchers.history.many", { count: c.count }),
-      change:
-        c.action === "profileDelete"
+      change: c.merged
+        ? t("dispatchers.history.merged", { name: c.merged.name, ids: c.merged.ids })
+        : c.action === "profileDelete"
           ? t("dispatchers.history.removed", { profile: to })
           : c.from
             ? t("dispatchers.history.changed", { from: profileLabel(i18n, c.from), to })
             : t("dispatchers.history.set", { to }),
-      month: periodToInput(c.month),
+      month: c.month === null ? "" : periodToInput(c.month),
       by: c.actor ?? "",
       when: stamp(c.at),
     };
