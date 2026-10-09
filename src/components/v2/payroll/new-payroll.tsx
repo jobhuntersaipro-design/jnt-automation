@@ -25,7 +25,7 @@ export interface WizardRun {
   unmatched: number;
 }
 
-export function NewPayroll({ run }: { run: WizardRun | null }) {
+export function NewPayroll({ run, hasCard }: { run: WizardRun | null; hasCard: boolean }) {
   const { t } = useI18n();
   return (
     <div className={ui.page}>
@@ -48,6 +48,13 @@ export function NewPayroll({ run }: { run: WizardRun | null }) {
           { id: "review", label: t("wizard.step.review") },
         ]}
       />
+      {!run && !hasCard && (
+        <Alert tone="warning" title={t("wizard.noCard")}>
+          <Link href="/app/rules" className={ui.link}>
+            {t("run.cover.create")}
+          </Link>
+        </Alert>
+      )}
       {run ? <PenaltiesStep run={run} /> : <RunUpload />}
     </div>
   );

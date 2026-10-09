@@ -63,7 +63,7 @@ const FIELD_WORDS: [Field, RegExp][] = [
   ["waybill", /waybill|\bawb\b|tracking|运单|单号|\bresi\b|bill\s*code|consignment/i],
   [
     "extId",
-    /(dispatcher|courier|rider|staff|employee|emp|driver|kurier)\s*(id|code|no\b|no\.|number)|\bid\s*(dispatcher|courier|rider|staff|kurier|pekerja)|员工(编号|工号|id)|工号|(派件|快递|派送|业务)员?(编号|工号|id|账号|代码)|^id$/i,
+    /(dispatcher|courier|rider|staff|employee|emp|driver|kurier)\s*(id|code|no\b|no\.|number)|\bid\s*(dispatcher|courier|rider|staff|kurier|pekerja)|员工(编号|工号|id)|工号|(派件|快递|派送|业务)员?(编号|工号|id|账号|代码)|\bj\s*&?\s*n?\s*t\s*(id|no\b|no\.|code)|^id$/i,
   ],
   ["name", /(dispatcher|courier|rider|staff|employee|driver)\s*name|^(name|nama|dispatcher|courier|rider|driver)$|^nama\b|姓名|名字|(派件|快递|派送|业务)员(姓名|名称|名字)?$/i],
   ["outlet", /outlet|branch|station|\bhub\b|\bdp\b|网点|站点|分部|cawangan/i],

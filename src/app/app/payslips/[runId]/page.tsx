@@ -34,5 +34,5 @@ export default async function PayslipsPage({ params, searchParams }: Props) {
   const results = d ? run.results.filter((r) => r.id === d) : run.results;
   if (results.length === 0) notFound();
   const langHref = (l: SlipLang) => `/app/payslips/${run.id}?${new URLSearchParams({ ...(d ? { d } : {}), ...(l === "both" ? {} : { lang: l }) })}`;
-  return <Payslips run={run} results={results} company={company} back={`/app/payroll/${run.id}`} lang={lang} langHref={langHref} />;
+  return <Payslips slips={results.map((result) => ({ run, result }))} company={company} back={`/app/payroll/${run.id}`} lang={lang} langHref={langHref} />;
 }

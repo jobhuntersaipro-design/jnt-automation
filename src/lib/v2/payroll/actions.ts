@@ -8,6 +8,7 @@ import { r2, R2_BUCKET } from "@/lib/r2";
 import { v2Session, type ActionResult } from "@/lib/v2/session";
 import { planCover } from "./cover";
 import { branchPenaltyCounts } from "./data";
+import { getMonthClose } from "./month";
 import { calculateRun, finaliseRun } from "./run";
 
 // Mutations behind the v2 payroll screens; every one is scoped to the caller's account.
@@ -90,6 +91,19 @@ export async function coverRunMonth(input: { runId: string }): Promise<ActionRes
   revalidatePath("/app/rules", "layout");
   if (result.ok) refresh();
   return result;
+}
+
+/** Month close: finalises every branch of the month that's ready (the same checks as one run). */
+export async function finaliseMonth(input: { period: number; outlet: string | null }): Promise<ActionResult<{ branches: string[] }>> {
+  const s = await v2Session();
+  if (!s) return { ok: false, error: "error.forbidden" };
+  const rows = await getMonthClose(s.agentId, input.period, input.outlet);
+  const branches: string[] = [];
+  for (const row of rows) {
+    if (row.status === "ready" && row.run && (await finaliseRun(s.agentId, s.actor, row.run.id)).ok) branches.push(row.branch);
+  }
+  refresh();
+  return { ok: true, data: { branches } };
 }
 
 export async function finalise(input: { runId: string }): Promise<ActionResult> {

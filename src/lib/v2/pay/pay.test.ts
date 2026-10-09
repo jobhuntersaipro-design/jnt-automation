@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addBound, blankConfig, boundRanges, configProblems, parseConfig, removeBound, setBound, setByVehicle, type RuleConfig } from "./config";
 import { boundIndex, computePay, computeRule, toCents, type Parcels } from "./engine";
-import { inForce, periodFromInput, periodToInput, pickAssignments, type AssignmentRow, type Context } from "./resolve";
+import { inForce, monthChange, prevPeriod, periodFromInput, periodToInput, pickAssignments, type AssignmentRow, type Context } from "./resolve";
 
 const parcels = (weights: number[], cats?: string): Parcels => ({ w: weights, c: cats ?? "n".repeat(weights.length) });
 const many = (n: number, weight = 1) => parcels(Array.from({ length: n }, () => weight));
@@ -230,5 +230,19 @@ describe("rule resolution", () => {
     expect(periodToInput(202611)).toBe("2026-11");
     expect(periodFromInput("2026-13")).toBeNull();
     expect(periodFromInput("bad")).toBeNull();
+  });
+});
+
+describe("monthChange", () => {
+  const bikePt = { effectiveFrom: 202609, vehicle: "BIKE", employment: "PART_TIME" };
+  const carFt = { effectiveFrom: 202610, vehicle: "CAR", employment: "FULL_TIME" };
+  it("flags a vehicle or type that differs from last month", () => {
+    expect(monthChange([bikePt, carFt], 202610)).toEqual({ from: bikePt, to: carFt });
+    expect(prevPeriod(202601)).toBe(202512);
+  });
+  it("ignores first settings, same values and changes in other months", () => {
+    expect(monthChange([carFt], 202610)).toBeNull();
+    expect(monthChange([bikePt, { ...bikePt, effectiveFrom: 202610 }], 202610)).toBeNull();
+    expect(monthChange([bikePt, carFt], 202611)).toBeNull();
   });
 });

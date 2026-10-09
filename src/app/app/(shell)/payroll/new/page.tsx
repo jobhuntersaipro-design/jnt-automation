@@ -9,7 +9,10 @@ export default async function NewPayrollPage({ searchParams }: { searchParams: P
   const s = await v2Session();
   if (!s) notFound();
   const runId = (await searchParams).run;
-  if (!runId) return <NewPayroll run={null} />;
+  if (!runId) {
+    const cards = await prisma.payRule.count({ where: { agentId: s.agentId, kind: "PARCEL", archivedAt: null } });
+    return <NewPayroll run={null} hasCard={cards > 0} />;
+  }
   const run = await prisma.payrollRun.findFirst({
     where: { id: runId, agentId: s.agentId },
     select: { id: true, period: true, status: true, branch: { select: { id: true, code: true } } },
@@ -17,5 +20,5 @@ export default async function NewPayrollPage({ searchParams }: { searchParams: P
   if (!run) notFound();
   if (run.status === "FINAL") redirect(`/app/payroll/${run.id}`);
   const { cases, unmatched } = await branchPenaltyCounts(s.agentId, run.period, run.branch);
-  return <NewPayroll run={{ id: run.id, outlet: run.branch.code, period: run.period, cases, unmatched }} />;
+  return <NewPayroll hasCard run={{ id: run.id, outlet: run.branch.code, period: run.period, cases, unmatched }} />;
 }

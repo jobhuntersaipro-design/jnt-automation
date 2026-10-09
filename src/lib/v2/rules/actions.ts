@@ -36,6 +36,8 @@ export async function createRule(input: { kind: Kind; name: string; effectiveFro
   const parsed = z.object({ kind: z.enum(KINDS), name, effectiveFrom: period }).safeParse(input);
   if (!parsed.success) return { ok: false, error: "error.invalid" };
   const { kind, effectiveFrom } = parsed.data;
+  // The account's first rate card pays everyone straight away; later ones start with nobody.
+  const first = kind === "PARCEL" && (await prisma.payRule.count({ where: { agentId: s.agentId, kind: "PARCEL", archivedAt: null } })) === 0;
   const rule = await prisma.payRule.create({
     data: {
       agentId: s.agentId,
@@ -45,6 +47,10 @@ export async function createRule(input: { kind: Kind; name: string; effectiveFro
     },
   });
   await audit(s.agentId, s.actor, rule.id, "create", { name: rule.name, month: effectiveFrom });
+  if (first) {
+    await prisma.payRuleAssignment.create({ data: { agentId: s.agentId, ruleId: rule.id, kind, effectiveFrom } });
+    await audit(s.agentId, s.actor, rule.id, "assign", { outlet: null, dispatcher: null, employment: null, month: effectiveFrom });
+  }
   refresh();
   return { ok: true, data: { id: rule.id } };
 }
