@@ -34,6 +34,7 @@ export interface PlanView {
   limit: number;
   inUse: number;
   max: number;
+  /** RM per branch per month; the superadmin can set it per account. */
   price: number;
   /** Admin accounts aren't billed. */
   exempt: boolean;
@@ -43,7 +44,7 @@ export interface PlanView {
   nextInvoice: Period;
   payOnline: boolean;
   supportEmail: string;
-  invoices: { period: Period; outlets: number; amount: number; paid: boolean }[];
+  invoices: { period: Period; outlets: number; price: number; amount: number; paid: boolean }[];
 }
 
 /** A branch supervisor's settings: their own password only (the account's details are the owner's). */
@@ -268,7 +269,7 @@ function Plan({ plan }: { plan: PlanView }) {
         <h2 id="plan-title" className={ui.cardTitle}>
           {t("settings.plan")}
         </h2>
-        <p className={ui.help}>{t("settings.planHelp", { price: i18n.number(plan.price) })}</p>
+        <p className={ui.help}>{t("settings.planHelp", { price: i18n.money(plan.price) })}</p>
       </div>
       <div className={styles.plan}>
         <NumberField
@@ -322,7 +323,7 @@ function Plan({ plan }: { plan: PlanView }) {
               <li key={inv.period}>
                 <span className={styles.invoice}>
                   <strong>{month}</strong>
-                  <span className={ui.help}>{t("settings.invoiceLine", { count: inv.outlets, price: i18n.number(plan.price) })}</span>
+                  <span className={ui.help}>{t("settings.invoiceLine", { count: inv.outlets, price: i18n.money(inv.price) })}</span>
                 </span>
                 <span className={ui.row}>
                   <span className={styles.price}>{i18n.money(inv.amount)}</span>

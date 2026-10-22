@@ -1,17 +1,17 @@
 import { getInvoice, getInvoiceAgent } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, invoiceNumber } from "@/lib/billing";
+import { invoiceNumber } from "@/lib/billing";
 import { generateInvoicePdf } from "@/lib/invoice-pdf";
 
 export type InvoiceAgent = NonNullable<Awaited<ReturnType<typeof getInvoiceAgent>>>;
 
 /**
  * Render an agent's invoice PDF for a month. Paid months use the amount they
- * were paid at; unpaid ones follow the current branch limit.
+ * were paid at; unpaid ones follow the current branch limit and price.
  */
 export async function renderAgentInvoice(agent: InvoiceAgent, year: number, month: number) {
   const invoice = await getInvoice(agent.id, year, month);
   const branchCount = invoice?.paidAt ? invoice.branchCount : agent.maxBranches;
-  const unitPrice = invoice?.paidAt ? invoice.unitPrice : PRICE_PER_BRANCH;
+  const unitPrice = invoice?.paidAt ? invoice.unitPrice : agent.pricePerBranch;
   const pdf = await generateInvoicePdf({
     agentId: agent.id,
     agentName: agent.name,

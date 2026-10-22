@@ -10,6 +10,8 @@ const profileSchema = z
     phone: z.string().max(30).nullable().optional(),
     adminNotes: z.string().max(2000).nullable().optional(),
     maxBranches: z.number().int().min(1).max(1000).optional(),
+    /** RM per branch per month for this account; 0 = not charged. */
+    pricePerBranch: z.number().min(0).max(100_000).optional(),
     onlinePayment: z.boolean().optional(),
     uiVersion: z.enum(["V1", "V2"]).optional(),
     /** The v2 app's language until they pick one themselves; null = their browser's. */
@@ -57,6 +59,7 @@ export async function PATCH(
       data.phone = phone;
     }
   }
+  if (data.pricePerBranch !== undefined) data.pricePerBranch = Math.round(data.pricePerBranch * 100) / 100;
   if (typeof data.adminNotes === "string") data.adminNotes = data.adminNotes.trim() || null;
   if (data.uiVersion) {
     // Superadmins stay on v1: /admin is a v1 page, so v2 would lock them out of it.

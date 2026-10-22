@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Download, Loader2, Plus, Send, Trash2, X, Check, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import type { AdminAgent } from "@/lib/db/admin";
-import { billableMonths, firstBillableMonth, type YearMonth } from "@/lib/billing";
+import { PRICE_PER_BRANCH, billableMonths, firstBillableMonth, type YearMonth } from "@/lib/billing";
 import {
   BILLING_CHIP,
   describeLimitChange,
@@ -110,7 +110,7 @@ export function AgentDrawer({
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[0.85rem] font-semibold text-on-surface">Billing</h3>
                 <span className="text-[0.72rem] text-on-surface-variant">
-                  {agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150 = {formatRM(agent.maxBranches * 150)}/month
+                  {agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × {formatRM(agent.pricePerBranch)} = {formatRM(agent.maxBranches * agent.pricePerBranch)}/month
                 </span>
               </div>
               <OnlinePaymentToggle agent={agent} onUpdate={onUpdate} />
@@ -206,6 +206,7 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
   const [name, setName] = useState(agent.name);
   const [phone, setPhone] = useState(agent.phone ?? "");
   const [maxBranches, setMaxBranches] = useState(String(agent.maxBranches));
+  const [price, setPrice] = useState(String(agent.pricePerBranch));
   const [notes, setNotes] = useState(agent.adminNotes ?? "");
   const [saving, setSaving] = useState(false);
 
@@ -213,6 +214,7 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
     name !== agent.name ||
     phone !== (agent.phone ?? "") ||
     maxBranches !== String(agent.maxBranches) ||
+    Number(price) !== agent.pricePerBranch ||
     notes !== (agent.adminNotes ?? "");
 
   async function save(e: React.FormEvent) {
@@ -220,12 +222,14 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
     const max = parseInt(maxBranches, 10);
     if (!name.trim()) return toast.error("Name is required");
     if (isNaN(max) || max < 1) return toast.error("Branch limit must be at least 1");
+    const pricePerBranch = Number(price);
+    if (price.trim() === "" || !Number.isFinite(pricePerBranch) || pricePerBranch < 0) return toast.error("Price must be RM 0 or more");
 
     setSaving(true);
     const res = await fetch(`/api/admin/agents/${agent.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), phone, maxBranches: max, adminNotes: notes }),
+      body: JSON.stringify({ name: name.trim(), phone, maxBranches: max, pricePerBranch, adminNotes: notes }),
     });
     setSaving(false);
     const data = await res.json().catch(() => ({}));
@@ -244,8 +248,9 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
             ...agent.limitChanges,
           ]
         : agent.limitChanges;
-    onUpdate({ name: data.name, phone: data.phone, maxBranches: data.maxBranches, adminNotes: data.adminNotes, limitChanges });
+    onUpdate({ name: data.name, phone: data.phone, maxBranches: data.maxBranches, pricePerBranch: data.pricePerBranch, adminNotes: data.adminNotes, limitChanges });
     setPhone(data.phone ?? "");
+    setPrice(String(data.pricePerBranch));
     setNotes(data.adminNotes ?? "");
     toast.success("Saved");
   }
@@ -265,6 +270,13 @@ function ProfileForm({ agent, onUpdate }: { agent: AdminAgent; onUpdate: (u: Par
         <label className="flex flex-col gap-1">
           <span className={labelClass}>Branch limit</span>
           <input type="number" min={1} value={maxBranches} onChange={(e) => setMaxBranches(e.target.value)} className={inputClass} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className={labelClass}>Price per branch (RM / month)</span>
+          <input type="number" min={0} step="0.01" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} className={inputClass} />
+          <span className="text-[0.72rem] text-on-surface-variant/70">
+            Standard is RM {PRICE_PER_BRANCH}. Applies to unpaid invoices; paid months keep their price.
+          </span>
         </label>
       </div>
       <label className="flex flex-col gap-1">

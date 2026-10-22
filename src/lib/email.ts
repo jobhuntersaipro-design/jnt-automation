@@ -374,6 +374,7 @@ export async function sendPlanChangeNotification(
   agentName: string,
   from: number,
   to: number,
+  pricePerBranch: number,
 ) {
   try {
     const resend = getResend();
@@ -382,7 +383,7 @@ export async function sendPlanChangeNotification(
     if (recipients.length === 0) return;
 
     const direction = to > from ? "increased" : "reduced";
-    const monthly = `RM ${formatRMText(to * 150)}`;
+    const monthly = `RM ${formatRMText(to * pricePerBranch)}`;
     const adminUrl = `${APP_URL}/admin`;
     const html = wrapInTemplate(`
       <h2 style="margin:0 0 8px;font-family:'Manrope','Helvetica Neue',Arial,sans-serif;font-size:20px;font-weight:700;color:#191c1d;">

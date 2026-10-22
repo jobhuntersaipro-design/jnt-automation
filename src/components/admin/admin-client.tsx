@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { AdminAgent } from "@/lib/db/admin";
-import { monthKey, whatsappLink, type BillingStatus, type YearMonth } from "@/lib/billing";
+import { PRICE_PER_BRANCH, monthKey, whatsappLink, type BillingStatus, type YearMonth } from "@/lib/billing";
 import { ConfirmDialog, type ConfirmRequest } from "./confirm-dialog";
 import { AgentDrawer, type BillingActions } from "./agent-drawer";
 import {
@@ -209,7 +209,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         body: (
           <>
             Emails a PDF {paid ? "receipt" : "invoice"} for <strong className="text-on-surface">{formatRM(bill.amount)}</strong>
-            {!paid && <> ({agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150)</>} to{" "}
+            {!paid && <> ({agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × {formatRM(agent.pricePerBranch)})</>} to{" "}
             <strong className="text-on-surface">{agent.email}</strong>.
             {bill.invoice?.sentAt && <> It was already sent on {formatDate(bill.invoice.sentAt)}.</>}
           </>
@@ -390,6 +390,11 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
                   </td>
                   <td className="px-2.5 py-3">
                     <div className="tabular-nums text-on-surface">{agent.branchCount}/{agent.maxBranches}</div>
+                    {!agent.isSuperAdmin && agent.pricePerBranch !== PRICE_PER_BRANCH && (
+                      <div className="text-[0.68rem] font-medium text-brand tabular-nums whitespace-nowrap" title="Custom price per branch per month">
+                        {formatRM(agent.pricePerBranch)} / branch
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-1 mt-1 max-w-44">
                       {agent.branches.slice(0, 3).map((code) => (
                         <span key={code} className="px-1.5 py-0.5 text-[0.68rem] font-medium bg-surface-low rounded">{code}</span>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInvoiceAgent, upsertInvoice } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, billingStatus, isValidYearMonth } from "@/lib/billing";
+import { billingStatus, isValidYearMonth } from "@/lib/billing";
 import { billplzConfigured } from "@/lib/billplz";
 import { paymentLinkFor } from "@/lib/invoice-billing";
 import { prisma } from "@/lib/prisma";
@@ -33,7 +33,7 @@ export async function POST(
     return NextResponse.json({ error: "Nothing to pay for this month" }, { status: 400 });
   }
 
-  const inv = await upsertInvoice(agent.id, year, month, agent.maxBranches, PRICE_PER_BRANCH, {});
+  const inv = await upsertInvoice(agent.id, year, month, agent.maxBranches, agent.pricePerBranch, {});
   try {
     const url = await paymentLinkFor(agent, inv);
     return NextResponse.json({ url });

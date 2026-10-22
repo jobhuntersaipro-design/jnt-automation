@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Agent" ADD COLUMN     "pricePerBranch" DOUBLE PRECISION NOT NULL DEFAULT 150;

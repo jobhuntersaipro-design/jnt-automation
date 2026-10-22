@@ -27,6 +27,7 @@ model Agent {
   isApproved   Boolean        @default(false)
   isSuperAdmin Boolean        @default(false)
   maxBranches  Int            @default(1)
+  pricePerBranch Float        @default(150) // RM per branch per month; superadmin can set a per-account price
   onlinePayment Boolean  @default(false) // admin opt-in: auto invoices + Billplz Pay now
   // Which app the account uses. V1 is frozen; V2 is the config-driven payroll.
   // Default flips to V2 once v2 has screens to land on.

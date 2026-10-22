@@ -15,6 +15,7 @@ export async function getAllAgents() {
       isApproved: true,
       isSuperAdmin: true,
       maxBranches: true,
+      pricePerBranch: true,
       onlinePayment: true,
       uiVersion: true,
       language: true,
@@ -43,6 +44,7 @@ export async function getAllAgents() {
     isApproved: a.isApproved,
     isSuperAdmin: a.isSuperAdmin,
     maxBranches: a.maxBranches,
+    pricePerBranch: a.pricePerBranch,
     onlinePayment: a.onlinePayment,
     uiVersion: a.uiVersion,
     language: a.language,
@@ -118,7 +120,7 @@ export async function setBranchLimit(agentId: string, toLimit: number, actor: Li
 // Update the admin-editable profile fields; branch-limit changes are logged.
 export async function updateAgentProfile(
   agentId: string,
-  data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number; onlinePayment?: boolean; uiVersion?: UiVersion; language?: Language | null },
+  data: { name?: string; phone?: string | null; adminNotes?: string | null; maxBranches?: number; pricePerBranch?: number; onlinePayment?: boolean; uiVersion?: UiVersion; language?: Language | null },
   actor: LimitActor,
 ) {
   const { maxBranches, ...rest } = data;
@@ -126,7 +128,7 @@ export async function updateAgentProfile(
   return prisma.agent.update({
     where: { id: agentId },
     data: rest,
-    select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true, onlinePayment: true, uiVersion: true, language: true },
+    select: { id: true, name: true, phone: true, adminNotes: true, maxBranches: true, pricePerBranch: true, onlinePayment: true, uiVersion: true, language: true },
   });
 }
 
@@ -162,6 +164,7 @@ const INVOICE_AGENT_SELECT = {
   phone: true,
   isSuperAdmin: true,
   maxBranches: true,
+  pricePerBranch: true,
   onlinePayment: true,
   companyRegistrationNo: true,
   companyAddress: true,
@@ -178,7 +181,7 @@ export async function getInvoice(agentId: string, year: number, month: number) {
 
 /**
  * Create or refresh a month's invoice. An unpaid invoice re-snapshots the
- * branch limit; a paid one keeps the amount it was paid at.
+ * branch limit and price; a paid one keeps the amount it was paid at.
  */
 export async function upsertInvoice(
   agentId: string,

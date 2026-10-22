@@ -1,5 +1,4 @@
 import {
-  PRICE_PER_BRANCH,
   billingStatus,
   trialEndDate,
   type BillingStatus,
@@ -47,7 +46,7 @@ export interface MonthBill {
 export function monthBill(agent: AdminAgent, ym: YearMonth): MonthBill {
   const invoice = findInvoice(agent, ym);
   const status = billingStatus(agent, agent.invoices, ym);
-  const amount = invoice?.paidAt ? invoice.amount : agent.maxBranches * PRICE_PER_BRANCH;
+  const amount = invoice?.paidAt ? invoice.amount : agent.maxBranches * agent.pricePerBranch;
   return { status, amount, invoice };
 }
 

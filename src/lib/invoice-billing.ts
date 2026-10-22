@@ -6,7 +6,7 @@
 import type { Invoice } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getInvoiceAgent, upsertInvoice } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, invoiceAction, invoiceNumber } from "@/lib/billing";
+import { invoiceAction, invoiceNumber } from "@/lib/billing";
 import { billplzConfigured, createBill, deleteBill } from "@/lib/billplz";
 import { renderAgentInvoice, type InvoiceAgent } from "@/lib/invoice-render";
 import { sendInvoiceEmail } from "@/lib/email";
@@ -15,7 +15,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 /** Billplz link for an unpaid invoice; reuses the bill unless the amount changed. */
 export async function paymentLinkFor(agent: InvoiceAgent, inv: Invoice): Promise<string | null> {
-  if (inv.paidAt || !agent.onlinePayment || !billplzConfigured()) return null;
+  if (inv.paidAt || inv.amount <= 0 || !agent.onlinePayment || !billplzConfigured()) return null;
   if (inv.billplzBillId && inv.billplzUrl && inv.billplzAmount === inv.amount) return inv.billplzUrl;
   if (inv.billplzBillId) {
     // Retire the old bill so it can't be paid at the stale amount.
@@ -48,7 +48,7 @@ export async function sendAgentInvoice(
   kind: "invoice" | "reminder" | "receipt" = "invoice",
 ) {
   // Record the send first so the PDF's issue date matches the email.
-  const inv = await upsertInvoice(agent.id, year, month, agent.maxBranches, PRICE_PER_BRANCH,
+  const inv = await upsertInvoice(agent.id, year, month, agent.maxBranches, agent.pricePerBranch,
     kind === "invoice" ? { sentAt: new Date() } : {});
   const payUrl = await paymentLinkFor(agent, inv).catch((err) => {
     console.error("[billplz] create bill failed", err);
@@ -103,9 +103,9 @@ export async function runBillingJob(now: Date = new Date()) {
   const year = now.getUTCFullYear();
   const month = now.getUTCMonth() + 1;
   const agents = await prisma.agent.findMany({
-    where: { isSuperAdmin: false, isApproved: true, onlinePayment: true, branches: { some: { isDemo: false } } },
+    where: { isSuperAdmin: false, isApproved: true, onlinePayment: true, pricePerBranch: { gt: 0 }, branches: { some: { isDemo: false } } },
     select: {
-      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, onlinePayment: true,
+      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, pricePerBranch: true, onlinePayment: true,
       companyRegistrationNo: true, companyAddress: true, createdAt: true,
       invoices: { where: { year, month } },
     },

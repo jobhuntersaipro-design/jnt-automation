@@ -20,7 +20,7 @@ export async function PATCH(req: NextRequest) {
 
   const agentId = session.user.id;
   const [agent, branchesInUse] = await Promise.all([
-    prisma.agent.findUnique({ where: { id: agentId }, select: { name: true, email: true, maxBranches: true } }),
+    prisma.agent.findUnique({ where: { id: agentId }, select: { name: true, email: true, maxBranches: true, pricePerBranch: true } }),
     prisma.branch.count({ where: { agentId, isDemo: false } }),
   ]);
   if (!agent) return NextResponse.json({ error: "Account not found" }, { status: 404 });
@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest) {
 
   const previous = await setBranchLimit(agentId, requested, { changedBy: "agent", actorEmail: agent.email });
   if (previous !== null) {
-    await sendPlanChangeNotification(agent.email, agent.name, previous, requested);
+    await sendPlanChangeNotification(agent.email, agent.name, previous, requested, agent.pricePerBranch);
   }
 
   return NextResponse.json({ maxBranches: requested });

@@ -20,9 +20,10 @@ export default async function SettingsPage() {
       stampImageUrl: true,
       createdAt: true,
       maxBranches: true,
+      pricePerBranch: true,
       onlinePayment: true,
       isSuperAdmin: true,
-      invoices: { select: { year: true, month: true, branchCount: true, amount: true, paidAt: true } },
+      invoices: { select: { year: true, month: true, branchCount: true, unitPrice: true, amount: true, paidAt: true } },
       _count: { select: { branches: { where: { isDemo: false } } } },
     },
   });
@@ -55,6 +56,7 @@ export default async function SettingsPage() {
           memberSince={agent.createdAt.toISOString()}
           plan={{
             initialMaxBranches: agent.maxBranches,
+            pricePerBranch: agent.pricePerBranch,
             branchesInUse: agent._count.branches,
             createdAt: agent.createdAt.toISOString(),
             isSuperAdmin: agent.isSuperAdmin,

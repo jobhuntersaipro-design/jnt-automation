@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { MemberSettings, Settings } from "@/components/v2/settings/settings";
-import { billableMonths, billingStatus, firstBillableMonth, isInTrial, monthKey, PRICE_PER_BRANCH, SELF_SERVE_MAX_BRANCHES, trialEndDate } from "@/lib/billing";
+import { billableMonths, billingStatus, firstBillableMonth, isInTrial, monthKey, SELF_SERVE_MAX_BRANCHES, trialEndDate } from "@/lib/billing";
 import { billplzConfigured } from "@/lib/billplz";
 import { prisma } from "@/lib/prisma";
 import { SUPPORT_EMAIL } from "@/lib/support";
@@ -32,15 +32,16 @@ export default async function SettingsPage() {
       stampImageUrl: true,
       createdAt: true,
       maxBranches: true,
+      pricePerBranch: true,
       onlinePayment: true,
       isSuperAdmin: true,
-      invoices: { select: { year: true, month: true, branchCount: true, amount: true, paidAt: true } },
+      invoices: { select: { year: true, month: true, branchCount: true, unitPrice: true, amount: true, paidAt: true } },
       _count: { select: { branches: { where: { isDemo: false } } } },
     },
   });
   if (!agent) notFound();
 
-  // Billing as v1's Settings works it out: paid months keep what they were paid at, open months bill the current limit.
+  // Billing as v1's Settings works it out: paid months keep what they were paid at, open months bill the current limit and price.
   const now = new Date();
   const thisMonth = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
   const first = firstBillableMonth(agent.createdAt);
@@ -52,7 +53,8 @@ export default async function SettingsPage() {
       if (status !== "paid" && status !== "unpaid") return [];
       const inv = agent.invoices.find((i) => i.year === ym.year && i.month === ym.month);
       const outlets = inv?.paidAt ? inv.branchCount : agent.maxBranches;
-      return [{ period: toPeriod(ym.year, ym.month), outlets, amount: inv?.paidAt ? inv.amount : outlets * PRICE_PER_BRANCH, paid: status === "paid" }];
+      const price = inv?.paidAt ? inv.unitPrice : agent.pricePerBranch;
+      return [{ period: toPeriod(ym.year, ym.month), outlets, price, amount: inv?.paidAt ? inv.amount : outlets * price, paid: status === "paid" }];
     });
 
   return (
@@ -71,7 +73,7 @@ export default async function SettingsPage() {
         limit: agent.maxBranches,
         inUse: agent._count.branches,
         max: SELF_SERVE_MAX_BRANCHES,
-        price: PRICE_PER_BRANCH,
+        price: agent.pricePerBranch,
         exempt: agent.isSuperAdmin,
         trialEnd: isInTrial(agent.createdAt, now) ? trialEndDate(agent.createdAt).toISOString() : null,
         firstInvoice: toPeriod(first.year, first.month),
