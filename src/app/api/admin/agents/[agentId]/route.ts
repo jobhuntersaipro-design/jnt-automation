@@ -61,6 +61,14 @@ export async function PATCH(
   }
   if (data.pricePerBranch !== undefined) data.pricePerBranch = Math.round(data.pricePerBranch * 100) / 100;
   if (typeof data.adminNotes === "string") data.adminNotes = data.adminNotes.trim() || null;
+  if (data.pricePerBranch !== undefined) {
+    // Custom prices are for v2 accounts only; v1's Settings always shows the standard price.
+    const target = await getInvoiceAgent(agentId);
+    if (!target) return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+    if (target.uiVersion !== "V2") {
+      return NextResponse.json({ error: "Custom prices are for v2 accounts only" }, { status: 400 });
+    }
+  }
   if (data.uiVersion) {
     // Superadmins stay on v1: /admin is a v1 page, so v2 would lock them out of it.
     const target = await getInvoiceAgent(agentId);

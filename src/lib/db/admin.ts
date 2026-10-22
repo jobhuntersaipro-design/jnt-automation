@@ -166,6 +166,7 @@ const INVOICE_AGENT_SELECT = {
   maxBranches: true,
   pricePerBranch: true,
   onlinePayment: true,
+  uiVersion: true,
   companyRegistrationNo: true,
   companyAddress: true,
   createdAt: true,

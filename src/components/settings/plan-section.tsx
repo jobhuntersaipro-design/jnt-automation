@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, Download, Loader2, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import {
+  PRICE_PER_BRANCH,
   SELF_SERVE_MAX_BRANCHES,
   billableMonths,
   billingStatus,
@@ -17,7 +18,6 @@ import { formatDate, formatMonth, formatRM, trialInfo } from "@/components/admin
 
 export interface PlanInvoice extends YearMonth {
   branchCount: number;
-  unitPrice: number;
   amount: number;
   paidAt: string | null;
 }
@@ -26,7 +26,6 @@ const MONTHS_SHOWN = 12;
 
 export function PlanSection({
   initialMaxBranches,
-  pricePerBranch,
   branchesInUse,
   createdAt,
   isSuperAdmin,
@@ -34,8 +33,6 @@ export function PlanSection({
   invoices,
 }: {
   initialMaxBranches: number;
-  /** RM per branch per month; the superadmin can set it per account. */
-  pricePerBranch: number;
   branchesInUse: number;
   createdAt: string;
   isSuperAdmin: boolean;
@@ -93,8 +90,8 @@ export function PlanSection({
             "Admin accounts aren't billed."
           ) : (
             <>
-              Your plan becomes <strong className="text-on-surface">{formatRM(draft * pricePerBranch)}/month</strong>{" "}
-              ({draft} × {formatRM(pricePerBranch)}), starting with your {formatMonth(nextInvoice)} invoice
+              Your plan becomes <strong className="text-on-surface">{formatRM(draft * PRICE_PER_BRANCH)}/month</strong>{" "}
+              ({draft} × RM {PRICE_PER_BRANCH}), starting with your {formatMonth(nextInvoice)} invoice
               {trial.active ? ", after your free trial" : ""}.
             </>
           )}
@@ -123,7 +120,7 @@ export function PlanSection({
     <section id="plan">
       <h2 className="font-manrope font-semibold text-lg text-on-surface mb-1">Plan &amp; billing</h2>
       <p className="text-xs text-on-surface-variant mb-4">
-        {formatRM(pricePerBranch)} per branch per month. Change your branch limit any time.
+        RM {PRICE_PER_BRANCH} per branch per month. Change your branch limit any time.
       </p>
       <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -151,8 +148,8 @@ export function PlanSection({
           <Stat label="In use" value={`${branchesInUse} of ${maxBranches}`} />
           <Stat
             label={changed ? "New monthly price" : "Monthly price"}
-            value={isSuperAdmin ? "Not billed" : formatRM(draft * pricePerBranch)}
-            sub={changed && !isSuperAdmin ? `was ${formatRM(maxBranches * pricePerBranch)}` : undefined}
+            value={isSuperAdmin ? "Not billed" : formatRM(draft * PRICE_PER_BRANCH)}
+            sub={changed && !isSuperAdmin ? `was ${formatRM(maxBranches * PRICE_PER_BRANCH)}` : undefined}
           />
         </div>
 
@@ -192,17 +189,16 @@ export function PlanSection({
               const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
               const status = billingStatus({ createdAt, isSuperAdmin }, invoices, ym);
               if (status !== "paid" && status !== "unpaid") return null;
-              // Same rule as the invoice PDF: paid months keep their snapshot, open months bill the current limit and price.
+              // Same rule as the invoice PDF: paid months keep their snapshot, open months bill the current limit.
               const limit = inv?.paidAt ? inv.branchCount : maxBranches;
-              const price = inv?.paidAt ? inv.unitPrice : pricePerBranch;
-              const amount = inv?.paidAt ? inv.amount : limit * price;
+              const amount = inv?.paidAt ? inv.amount : limit * PRICE_PER_BRANCH;
               return (
                 <div key={`${ym.year}-${ym.month}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-1.5">
                   <span className="w-20 text-sm text-on-surface">{formatMonth(ym)}</span>
                   <span className="w-32 flex flex-col">
                     <span className="text-sm tabular-nums text-on-surface">{formatRM(amount)}</span>
                     <span className="text-xs tabular-nums text-on-surface-variant whitespace-nowrap">
-                      {limit} branch{limit === 1 ? "" : "es"} × {formatRM(price)}
+                      {limit} branch{limit === 1 ? "" : "es"} × RM {PRICE_PER_BRANCH}
                     </span>
                   </span>
                   <span

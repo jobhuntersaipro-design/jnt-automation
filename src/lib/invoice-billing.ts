@@ -105,7 +105,7 @@ export async function runBillingJob(now: Date = new Date()) {
   const agents = await prisma.agent.findMany({
     where: { isSuperAdmin: false, isApproved: true, onlinePayment: true, pricePerBranch: { gt: 0 }, branches: { some: { isDemo: false } } },
     select: {
-      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, pricePerBranch: true, onlinePayment: true,
+      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, pricePerBranch: true, onlinePayment: true, uiVersion: true,
       companyRegistrationNo: true, companyAddress: true, createdAt: true,
       invoices: { where: { year, month } },
     },
