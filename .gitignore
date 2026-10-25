@@ -45,7 +45,8 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
-.claude
+.claude/*
+!.claude/settings.json
 .playwright*
 
 # local MCP server config (may contain API tokens)
