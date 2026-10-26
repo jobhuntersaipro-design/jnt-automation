@@ -65,3 +65,13 @@ next-env.d.ts
 
 # Local mobile-audit screenshots (evidence only; measurements live in the spec)
 /docs/audit-results/mobile-375/
+
+# Product video work files (only video2/ is tracked)
+/video/
+/video2-scratch/
+/video2-backup-pre-subtitles/
+/.playwright-mcp/
+/video2/.hyperframes/
+/video2/node_modules/
+/video2/.thumbnails/
+/video2/.waveform-cache/

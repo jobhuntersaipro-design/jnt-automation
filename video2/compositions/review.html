@@ -1,0 +1,23 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; }
+    #rw-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 14001px; transform-origin: 0 0; }
+    #rw-shot { position: absolute; left: 0; top: 0; width: 1920px; height: 14001px; }
+  </style>
+  <div data-hf-id="hf-3y3n" id="root" data-composition-id="review" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-ce1e" id="rw-cam">
+      <img data-hf-id="hf-pegl" id="rw-shot" src="assets/screens/p-branch-kul218-full.png" alt="KUL218 September 2026 payroll review" />
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Branch totals: net pay, basic salary, parcel pay, bonus, deductions
+    tl.fromTo("#rw-cam", { scale: 1.2, x: -192, y: -2410, opacity: 0, filter: "blur(8px)" }, { scale: 1.2, x: -192, y: -2410, opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 0);
+    // Down to the review table, one row per dispatcher
+    tl.to("#rw-cam", { scale: 1.2, x: -192, y: -3700, duration: 0.6, ease: "power2.inOut" }, 2.4);
+    // Let the rows run past
+    tl.to("#rw-cam", { y: -4500, duration: 3.4, ease: "power1.inOut" }, 3.3);
+    tl.to("#rw-cam", { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 6.82);
+    window.__timelines["review"] = tl;
+  </script>
+</template>

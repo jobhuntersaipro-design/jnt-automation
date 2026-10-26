@@ -1,0 +1,92 @@
+[
+  {
+    "id": "w0",
+    "text": "Most",
+    "start": 0.299,
+    "end": 0.512
+  },
+  {
+    "id": "w1",
+    "text": "agents",
+    "start": 0.597,
+    "end": 0.853
+  },
+  {
+    "id": "w2",
+    "text": "work",
+    "start": 0.981,
+    "end": 1.109
+  },
+  {
+    "id": "w3",
+    "text": "it",
+    "start": 1.195,
+    "end": 1.237
+  },
+  {
+    "id": "w4",
+    "text": "out",
+    "start": 1.28,
+    "end": 1.365
+  },
+  {
+    "id": "w5",
+    "text": "in",
+    "start": 1.451,
+    "end": 1.536
+  },
+  {
+    "id": "w6",
+    "text": "spreadsheets.",
+    "start": 1.579,
+    "end": 2.24
+  },
+  {
+    "id": "w7",
+    "text": "One",
+    "start": 2.432,
+    "end": 3.1147
+  },
+  {
+    "id": "w8",
+    "text": "wrong",
+    "start": 3.243,
+    "end": 3.3707
+  },
+  {
+    "id": "w9",
+    "text": "formula,",
+    "start": 3.456,
+    "end": 3.989
+  },
+  {
+    "id": "w10",
+    "text": "and",
+    "start": 4.139,
+    "end": 4.309
+  },
+  {
+    "id": "w11",
+    "text": "someone",
+    "start": 4.352,
+    "end": 4.5227
+  },
+  {
+    "id": "w12",
+    "text": "gets",
+    "start": 4.651,
+    "end": 4.7787
+  },
+  {
+    "id": "w13",
+    "text": "paid",
+    "start": 4.864,
+    "end": 5.0347
+  },
+  {
+    "id": "w14",
+    "text": "wrong.",
+    "start": 5.12,
+    "end": 5.398503401360545
+  }
+]

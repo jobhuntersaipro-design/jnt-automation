@@ -1,0 +1,62 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; }
+    .ex-cam { position: absolute; left: 0; top: 0; width: 1920px; transform-origin: 0 0; }
+    #ex-cam1 { height: 1367px; }
+    #ex-cam2 { height: 1463px; opacity: 0; }
+    #ex-cam3 { height: 1080px; opacity: 0; }
+    .ex-cam img { position: absolute; left: 0; top: 0; width: 1920px; }
+    .ex-hl { position: absolute; border-radius: 7px; border: 3px solid #0b6e85; opacity: 0; }
+    #ex-hl-sum { left: 1296px; top: 743px; width: 118px; height: 40px; }
+    #ex-hl-csv { left: 1384px; top: 791px; width: 172px; height: 38px; }
+    #ex-hl-pdf { left: 1384px; top: 829px; width: 172px; height: 38px; }
+    #ex-hl-all { left: 284px; top: 252px; width: 524px; height: 46px; }
+    #ex-hl-col { left: 1427px; top: 368px; width: 194px; height: 138px; }
+    #ex-cur { position: absolute; left: 0; top: 0; width: 64px; height: 76px; transform-origin: 6px 4px; }
+  </style>
+  <div id="root" data-composition-id="export" data-width="1920" data-height="1080">
+    <div id="ex-cam1" class="ex-cam">
+      <img id="ex-shot1" src="assets/screens/k-payroll-export.png" alt="Payroll history with Summary and Line items exports" />
+      <div id="ex-hl-sum" class="ex-hl"></div>
+    </div>
+    <div id="ex-cam2" class="ex-cam">
+      <img id="ex-shot2" src="assets/screens/k-lineitems-menu-full.png" alt="Line items menu: CSV files (ZIP), PDF files (ZIP)" />
+      <div id="ex-hl-csv" class="ex-hl"></div>
+      <div id="ex-hl-pdf" class="ex-hl"></div>
+    </div>
+    <div id="ex-cam3" class="ex-cam">
+      <img id="ex-shot3" src="assets/screens/x-payslips.png" alt="Payslips: all finalised payslips, a PDF each" />
+      <div id="ex-hl-all" class="ex-hl"></div>
+      <div id="ex-hl-col" class="ex-hl"></div>
+    </div>
+    <svg id="ex-cur" viewBox="0 0 32 38" aria-hidden="true"><path d="M3 2 L3 31 L10 24.5 L14.6 35 L19.2 33 L14.7 22.8 L24.5 22.8 Z" fill="#191c1d" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" /></svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // A finalised branch's exports (KUL218 row)
+    tl.fromTo("#ex-cam1", { scale: 1.5, x: -960, y: -553.5, opacity: 0, filter: "blur(8px)" }, { scale: 1.5, x: -960, y: -553.5, opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 0);
+    // Summary
+    tl.fromTo("#ex-cur", { x: 1500, y: 1180 }, { x: 1080, y: 600, duration: 0.6, ease: "power3.out" }, 1.2);
+    tl.to("#ex-hl-sum", { opacity: 1, duration: 0.15, ease: "power2.out" }, 1.9);
+    // Line items: click opens its menu
+    tl.to("#ex-hl-sum", { opacity: 0, duration: 0.12, ease: "power2.in" }, 2.6);
+    tl.to("#ex-cur", { x: 1272, y: 596, duration: 0.4, ease: "power3.inOut" }, 2.6);
+    tl.to("#ex-cur", { scale: 0.88, duration: 0.06, ease: "power2.in" }, 3.1);
+    tl.to("#ex-cur", { scale: 1, duration: 0.1, ease: "power2.out" }, 3.16);
+    tl.set("#ex-cam2", { scale: 1.5, x: -903, y: -553.5, opacity: 1 }, 3.2);
+    tl.set("#ex-cam1", { opacity: 0 }, 3.2);
+    tl.to("#ex-cur", { x: 1300, y: 664, duration: 0.35, ease: "power3.out" }, 3.4);
+    tl.to("#ex-hl-csv", { opacity: 1, duration: 0.15, ease: "power2.out" }, 3.5);
+    tl.to("#ex-hl-csv", { opacity: 0, duration: 0.12, ease: "power2.in" }, 4.3);
+    tl.to("#ex-cur", { y: 721, duration: 0.25, ease: "power2.inOut" }, 4.3);
+    tl.to("#ex-hl-pdf", { opacity: 1, duration: 0.15, ease: "power2.out" }, 4.4);
+    // Payslips tab: everyone's payslip in one go, or per branch
+    tl.to(["#ex-cam2", "#ex-cur"], { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 5.2);
+    tl.fromTo("#ex-cam3", { scale: 1.4, x: 0, y: 0, opacity: 0, filter: "blur(8px)" }, { scale: 1.4, x: 0, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 5.3);
+    tl.to("#ex-hl-all", { opacity: 1, duration: 0.15, ease: "power2.out" }, 5.6);
+    tl.to("#ex-cam3", { scale: 1.4, x: -500, y: 0, duration: 0.5, ease: "power2.inOut" }, 6.6);
+    tl.to("#ex-hl-col", { opacity: 1, duration: 0.15, ease: "power2.out" }, 7.1);
+    tl.to("#ex-cam3", { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 8.22);
+    window.__timelines["export"] = tl;
+  </script>
+</template>

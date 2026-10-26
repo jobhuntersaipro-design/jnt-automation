@@ -1,0 +1,20 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; font-family: Inter, sans-serif; }
+    #rv-logo { position: absolute; left: 600px; top: 330px; width: 720px; height: 240px; }
+    #rv-sub { position: absolute; left: 0; right: 0; top: 640px; text-align: center; font-size: 60px; font-weight: 600; color: #191c1d; letter-spacing: -0.02em; }
+    #rv-sub .w { display: inline-block; }
+  </style>
+  <div data-hf-id="hf-yqoq" id="root" data-composition-id="reveal" data-width="1920" data-height="1080">
+    <img data-hf-id="hf-36ym" id="rv-logo" class="clip" data-start="0" data-duration="2.8" data-track-index="0" src="assets/brand/logo.svg" alt="EasyStaff" />
+    <div data-hf-id="hf-4l54" id="rv-sub" class="clip" data-start="0" data-duration="2.8" data-track-index="1"><span data-hf-id="hf-7ops" class="w">Here's</span> <span data-hf-id="hf-rd7k" class="w">how.</span></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Title fades in from the mark outward
+    tl.fromTo("#rv-logo", { opacity: 0, clipPath: "inset(0% 100% 0% 0%)", filter: "blur(8px)" }, { opacity: 1, clipPath: "inset(0% 0% 0% 0%)", filter: "blur(0px)", duration: 0.65, ease: "power3.out" }, 0.1);
+    tl.fromTo("#rv-sub .w", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power4.out", stagger: 0.08 }, 1.0);
+    tl.to(["#rv-logo", "#rv-sub"], { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 2.6);
+    window.__timelines["reveal"] = tl;
+  </script>
+</template>

@@ -1,0 +1,23 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; }
+    #ov-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 4778px; transform-origin: 0 0; }
+    #ov-shot { position: absolute; left: 0; top: 0; width: 1920px; height: 4778px; }
+  </style>
+  <div data-hf-id="hf-e804" id="root" data-composition-id="overview" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-lfsc" id="ov-cam">
+      <img data-hf-id="hf-0d3z" id="ov-shot" src="assets/screens/p-overview-full.png" alt="Overview dashboard, September 2026" />
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Tight on the month's net pay
+    tl.fromTo("#ov-cam", { scale: 1.8, x: 0, y: -120, opacity: 0, filter: "blur(8px)" }, { scale: 1.8, x: 0, y: -120, opacity: 1, filter: "blur(0px)", duration: 0.15, ease: "power2.out" }, 0);
+    // Pull back: every KPI and the six-month trend
+    tl.to("#ov-cam", { scale: 1, x: 0, y: 0, duration: 0.6, ease: "power2.inOut" }, 2.4);
+    // Down to pay by branch
+    tl.to("#ov-cam", { scale: 1.15, x: -150, y: -780, duration: 0.55, ease: "power2.inOut" }, 4.6);
+    tl.to("#ov-cam", { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 7.22);
+    window.__timelines["overview"] = tl;
+  </script>
+</template>

@@ -1,0 +1,22 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; }
+    #ps-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 3252px; transform-origin: 0 0; }
+    #ps-shot { position: absolute; left: 0; top: 0; width: 1920px; height: 3252px; }
+  </style>
+  <div data-hf-id="hf-asey" id="root" data-composition-id="person" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-vhlw" id="ps-cam">
+      <img data-hf-id="hf-vpfh" id="ps-shot" src="assets/screens/p-person-full.png" alt="Dispatcher pay page" />
+    </div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ps-cam", { scale: 1.08, x: -77, y: -43, opacity: 0, filter: "blur(8px)" }, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, 0);
+    // Days worked and busiest hours
+    tl.to("#ps-cam", { scale: 1.35, x: -336, y: -560, duration: 0.55, ease: "power2.inOut" }, 2.0);
+    // The rate card that paid them
+    tl.to("#ps-cam", { scale: 1.4, x: -672, y: -1530, duration: 0.55, ease: "power2.inOut" }, 4.3);
+    tl.to("#ps-cam", { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 7.22);
+    window.__timelines["person"] = tl;
+  </script>
+</template>

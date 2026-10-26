@@ -1,0 +1,49 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #eceef1; font-family: Inter, sans-serif; }
+    .fl-stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    .fl-sheet { position: absolute; background: #ffffff; box-shadow: 0 12px 40px -12px rgba(25, 28, 29, 0.22); }
+    .fl-sheet img { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+    #fl-sum { left: 210px; top: 90px; width: 1500px; height: 1061px; }
+    #fl-li { left: 592px; top: 80px; width: 735px; height: 1040px; }
+    #fl-stage2 { opacity: 0; }
+    .fl-hl { position: absolute; border-radius: 6px; border: 3px solid #0b6e85; opacity: 0; }
+    #fl-hl-net { left: 1554px; top: 248px; width: 112px; height: 790px; }
+    #fl-hl-range { left: 621px; top: 225px; width: 680px; height: 178px; }
+    #fl-hl-net2 { left: 1158px; top: 159px; width: 130px; height: 40px; }
+    .fl-label { position: absolute; left: 72px; top: 22px; padding: 10px 18px; border-radius: 8px; background: #191c1d; color: #ffffff; font-size: 30px; font-weight: 600; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="files" data-width="1920" data-height="1080">
+    <div id="fl-stage1" class="fl-stage">
+      <div id="fl-sum" class="fl-sheet"><img id="fl-sum-img" src="assets/screens/file-summary-k-1.png" alt="Exported summary PDF: payroll_KUL218_2026_09.pdf" /></div>
+      <div id="fl-hl-net" class="fl-hl"></div>
+    </div>
+    <div id="fl-stage2" class="fl-stage">
+      <div id="fl-li" class="fl-sheet"><img id="fl-li-img" src="assets/screens/file-lineitem-k-01.png" alt="Exported line-item PDF for one dispatcher" /></div>
+      <div id="fl-hl-net2" class="fl-hl"></div>
+      <div id="fl-hl-range" class="fl-hl"></div>
+    </div>
+    <div id="fl-label1" class="fl-label clip" data-start="0" data-duration="3.4" data-track-index="0">Summary · payroll_KUL218_2026_09.pdf</div>
+    <div id="fl-label2" class="fl-label clip" data-start="3.4" data-duration="5" data-track-index="1">Line items · 1 PDF per dispatcher (138 in the ZIP)</div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // The real summary PDF arrives
+    tl.fromTo("#fl-stage1", { scale: 0.94, x: 58, y: 32, opacity: 0, filter: "blur(8px)" }, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, 0);
+    tl.fromTo("#fl-label1", { opacity: 0 }, { opacity: 1, duration: 0.15, ease: "power2.out" }, 0.3);
+    tl.to("#fl-stage1", { scale: 1.3, x: -273, y: 0, duration: 0.55, ease: "power2.inOut" }, 0.9);
+    tl.to("#fl-hl-net", { opacity: 1, duration: 0.15, ease: "power2.out" }, 1.9);
+    tl.to(["#fl-stage1", "#fl-label1"], { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 3.2);
+    // One dispatcher's line-item PDF
+    tl.fromTo("#fl-stage2", { scale: 1, x: 260, y: 0, opacity: 0, filter: "blur(8px)" }, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 3.4);
+    tl.fromTo("#fl-label2", { opacity: 0 }, { opacity: 1, duration: 0.15, ease: "power2.out" }, 3.6);
+    tl.to("#fl-stage2", { scale: 1.6, x: -576, y: 0, duration: 0.55, ease: "power2.inOut" }, 4.2);
+    tl.to("#fl-hl-net2", { opacity: 1, duration: 0.15, ease: "power2.out" }, 4.8);
+    tl.to("#fl-hl-range", { opacity: 1, duration: 0.15, ease: "power2.out" }, 5.3);
+    // Down into the parcel list
+    tl.to(["#fl-hl-net2", "#fl-hl-range"], { opacity: 0, duration: 0.12, ease: "power2.in" }, 6.1);
+    tl.to("#fl-stage2", { scale: 1.6, x: -576, y: -420, duration: 0.6, ease: "power2.inOut" }, 6.1);
+    tl.to(["#fl-stage2", "#fl-label2"], { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 8.22);
+    window.__timelines["files"] = tl;
+  </script>
+</template>

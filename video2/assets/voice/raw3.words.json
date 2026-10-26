@@ -1,0 +1,44 @@
+[
+  {
+    "id": "w0",
+    "text": "EasyStaff",
+    "start": 0.299,
+    "end": 0.8107
+  },
+  {
+    "id": "w1",
+    "text": "does",
+    "start": 0.981,
+    "end": 1.109
+  },
+  {
+    "id": "w2",
+    "text": "it",
+    "start": 1.152,
+    "end": 1.237
+  },
+  {
+    "id": "w3",
+    "text": "for",
+    "start": 1.28,
+    "end": 1.408
+  },
+  {
+    "id": "w4",
+    "text": "you.",
+    "start": 1.536,
+    "end": 1.899
+  },
+  {
+    "id": "w5",
+    "text": "Here's",
+    "start": 2.133,
+    "end": 2.432
+  },
+  {
+    "id": "w6",
+    "text": "how.",
+    "start": 2.432,
+    "end": 2.704988662131519
+  }
+]

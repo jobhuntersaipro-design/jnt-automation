@@ -1,0 +1,110 @@
+[
+  {
+    "id": "w0",
+    "text": "Drop",
+    "start": 0.256,
+    "end": 0.469
+  },
+  {
+    "id": "w1",
+    "text": "in",
+    "start": 0.512,
+    "end": 0.597
+  },
+  {
+    "id": "w2",
+    "text": "the",
+    "start": 0.64,
+    "end": 0.725
+  },
+  {
+    "id": "w3",
+    "text": "month's",
+    "start": 0.768,
+    "end": 1.024
+  },
+  {
+    "id": "w4",
+    "text": "J",
+    "start": 1.067,
+    "end": 1.237
+  },
+  {
+    "id": "w5",
+    "text": "and",
+    "start": 1.323,
+    "end": 1.408
+  },
+  {
+    "id": "w6",
+    "text": "T",
+    "start": 1.493,
+    "end": 1.5787
+  },
+  {
+    "id": "w7",
+    "text": "file.",
+    "start": 1.664,
+    "end": 2.283
+  },
+  {
+    "id": "w8",
+    "text": "EasyStaff",
+    "start": 2.645,
+    "end": 3.157
+  },
+  {
+    "id": "w9",
+    "text": "uploads",
+    "start": 3.328,
+    "end": 3.712
+  },
+  {
+    "id": "w10",
+    "text": "it,",
+    "start": 3.797,
+    "end": 4.053
+  },
+  {
+    "id": "w11",
+    "text": "reads",
+    "start": 4.224,
+    "end": 4.48
+  },
+  {
+    "id": "w12",
+    "text": "every",
+    "start": 4.523,
+    "end": 4.736
+  },
+  {
+    "id": "w13",
+    "text": "parcel,",
+    "start": 4.821,
+    "end": 5.355
+  },
+  {
+    "id": "w14",
+    "text": "and",
+    "start": 5.504,
+    "end": 5.589
+  },
+  {
+    "id": "w15",
+    "text": "saves",
+    "start": 5.632,
+    "end": 5.845
+  },
+  {
+    "id": "w16",
+    "text": "the",
+    "start": 5.931,
+    "end": 6.016
+  },
+  {
+    "id": "w17",
+    "text": "month.",
+    "start": 6.059,
+    "end": 6.327
+  }
+]

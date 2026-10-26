@@ -1,0 +1,35 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; }
+    #ul-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #ul-shot { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #ul-press { position: absolute; left: 1474px; top: 289px; width: 142px; height: 37px; border-radius: 6px; background: #191c1d; opacity: 0; }
+    #ul-vcam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #ul-run { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+    #ul-cur { position: absolute; left: 0; top: 0; width: 64px; height: 76px; transform-origin: 6px 4px; }
+  </style>
+  <div data-hf-id="hf-jd5q" id="root" data-composition-id="upload" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-xzhs" id="ul-cam">
+      <img data-hf-id="hf-8p7d" id="ul-shot" src="assets/screens/m04-payroll-empty.png" alt="Payroll upload page" />
+      <div data-hf-id="hf-8qqg" id="ul-press"></div>
+    </div>
+    <div data-hf-id="hf-5l84" id="ul-vcam">
+      <video data-hf-id="hf-iif4" id="ul-run" class="clip" data-start="1.6" data-duration="3.85" data-track-index="0" src="assets/footage/upload-run.mp4" muted playsinline></video>
+    </div>
+    <svg data-hf-id="hf-octw" id="ul-cur" viewBox="0 0 32 38" aria-hidden="true"><path data-hf-id="hf-kelf" d="M3 2 L3 31 L10 24.5 L14.6 35 L19.2 33 L14.7 22.8 L24.5 22.8 Z" fill="#191c1d" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" /></svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ul-cam", { scale: 1.05, x: -48, y: -27, opacity: 0, filter: "blur(8px)" }, { scale: 1, x: 0, y: 0, opacity: 1, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 0);
+    // Cursor to Choose files (1544,306)
+    tl.fromTo("#ul-cur", { x: 1700, y: 1180 }, { x: 1548, y: 310, duration: 0.7, ease: "power3.out" }, 0.3);
+    tl.to("#ul-cur", { scale: 0.88, duration: 0.06, ease: "power2.in" }, 1.3);
+    tl.to("#ul-cur", { scale: 1, duration: 0.1, ease: "power2.out" }, 1.36);
+    tl.fromTo("#ul-press", { opacity: 0 }, { opacity: 0.12, duration: 0.05, ease: "none" }, 1.3);
+    tl.to("#ul-cur", { x: 1900, y: 1180, duration: 0.4, ease: "power3.in" }, 1.6);
+    // The real upload capture plays (3x real time); camera pushes to its progress steps
+    tl.fromTo("#ul-vcam", { scale: 1, x: 0, y: 0 }, { scale: 1.45, x: -432, y: -380, duration: 0.6, ease: "power2.inOut" }, 1.9);
+    tl.to(["#ul-vcam", "#ul-cam"], { opacity: 0, filter: "blur(8px)", duration: 0.16, ease: "power2.in" }, 5.3);
+    window.__timelines["upload"] = tl;
+  </script>
+</template>

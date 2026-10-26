@@ -1,0 +1,34 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #f8f9fa; font-family: Inter, sans-serif; }
+    #ec-ground { position: absolute; inset: 0; background: #ffffff; }
+    #ec-logo { position: absolute; left: 690px; top: 230px; width: 540px; height: 180px; }
+    #ec-tag { position: absolute; left: 0; right: 0; top: 470px; text-align: center; font-size: 64px; font-weight: 700; letter-spacing: -0.02em; color: #191c1d; }
+    #ec-tag .w { display: inline-block; }
+    #ec-cta { position: absolute; left: 700px; top: 620px; width: 520px; height: 100px; border-radius: 8px; background: #0b6e85; color: #ffffff; font-size: 46px; font-weight: 600; display: flex; align-items: center; justify-content: center; box-shadow: 0 12px 40px -12px rgba(25, 28, 29, 0.18); }
+    #ec-note { position: absolute; left: 0; right: 0; top: 760px; text-align: center; font-size: 36px; font-weight: 500; color: #424654; }
+    #ec-cur { position: absolute; left: 0; top: 0; width: 64px; height: 76px; transform-origin: 6px 4px; }
+  </style>
+  <div data-hf-id="hf-32ii" id="root" data-composition-id="endcard" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-bx2z" id="ec-ground"></div>
+    <img data-hf-id="hf-35xd" id="ec-logo" class="clip" data-start="0" data-duration="7.4" data-track-index="0" src="assets/brand/logo.svg" alt="EasyStaff" />
+    <div data-hf-id="hf-pslv" id="ec-tag" class="clip" data-start="0" data-duration="7.4" data-track-index="1"><span data-hf-id="hf-s0g9" class="w">Upload</span> <span data-hf-id="hf-9o0j" class="w">the</span> <span data-hf-id="hf-5224" class="w">J&amp;T</span> <span data-hf-id="hf-syzk" class="w">file.</span> <span data-hf-id="hf-1yt7" class="w">Payroll's</span> <span data-hf-id="hf-ukz6" class="w">done.</span></div>
+    <div data-hf-id="hf-k77a" id="ec-cta" class="clip" data-start="0" data-duration="7.4" data-track-index="2"><span data-hf-id="hf-h53n" id="ec-cta-label" data-var-text="ctaUrl">my.easystaff.top</span></div>
+    <div data-hf-id="hf-l3b6" id="ec-note" class="clip" data-start="0" data-duration="7.4" data-track-index="3" data-var-text="ctaNote">Free for the first 30 days</div>
+    <svg data-hf-id="hf-i5mz" id="ec-cur" viewBox="0 0 32 38" aria-hidden="true"><path data-hf-id="hf-kelf" d="M3 2 L3 31 L10 24.5 L14.6 35 L19.2 33 L14.7 22.8 L24.5 22.8 Z" fill="#191c1d" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" /></svg>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#ec-ground", { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.inOut" }, 0);
+    tl.fromTo("#ec-logo", { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.65, ease: "power3.out" }, 0.25);
+    tl.fromTo("#ec-tag .w", { opacity: 0.12 }, { opacity: 1, duration: 0.1, ease: "none", stagger: 0.09 }, 1.0);
+    tl.fromTo("#ec-cta", { opacity: 0, scale: 0.92 }, { opacity: 1, scale: 1, duration: 0.5, ease: "expo.out" }, 1.8);
+    tl.fromTo("#ec-note", { opacity: 0, filter: "blur(6px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, ease: "power4.out" }, 2.3);
+    tl.fromTo("#ec-cur", { x: 1500, y: 1180 }, { x: 1195, y: 690, duration: 0.7, ease: "power3.out" }, 3.4);
+    tl.to("#ec-cur", { scale: 0.88, duration: 0.06, ease: "power2.in" }, 4.3);
+    tl.to("#ec-cur", { scale: 1, duration: 0.1, ease: "power2.out" }, 4.36);
+    tl.to("#ec-cta", { backgroundColor: "#095a6d", duration: 0.05, ease: "none" }, 4.3);
+    tl.to("#ec-cta", { backgroundColor: "#0b6e85", duration: 0.2, ease: "power2.out" }, 4.38);
+    window.__timelines["endcard"] = tl;
+  </script>
+</template>
