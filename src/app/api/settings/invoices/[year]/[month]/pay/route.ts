@@ -40,6 +40,8 @@ export async function POST(
     return NextResponse.json({ url });
   } catch (err) {
     console.error("[billplz] create bill failed", err);
-    return NextResponse.json({ error: "Couldn't start the payment. Please try again." }, { status: 502 });
+    // Billplz's own reason (e.g. "Billplz 401: Access denied") tells the owner what to fix.
+    const reason = err instanceof Error && err.message.startsWith("Billplz") ? ` (${err.message})` : "";
+    return NextResponse.json({ error: `Couldn't start the payment. Please try again.${reason}` }, { status: 502 });
   }
 }
