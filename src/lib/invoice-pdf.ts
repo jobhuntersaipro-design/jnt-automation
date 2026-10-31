@@ -65,7 +65,7 @@ export async function generateInvoicePdf(input: InvoicePdfInput): Promise<Buffer
   // Header
   doc.fillColor(BRAND).font("Helvetica-Bold").fontSize(22).text("EasyStaff", MARGIN, MARGIN);
   doc.fillColor(MUTED).font("Helvetica").fontSize(9).text(SUPPORT_EMAIL, MARGIN, MARGIN + 28);
-  doc.fillColor(TEXT).font("Helvetica-Bold").fontSize(22).text("INVOICE", MARGIN, MARGIN, { width: WIDTH, align: "right" });
+  doc.fillColor(TEXT).font("Helvetica-Bold").fontSize(22).text(input.paidAt ? "RECEIPT" : "INVOICE", MARGIN, MARGIN, { width: WIDTH, align: "right" });
 
   const meta: [string, string][] = [
     ["Invoice no", number],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isOverdue, planPricing } from "@/lib/billing";
+import { billingStatus, historyMonths, isOverdue, planPricing } from "@/lib/billing";
 
 const agent = { createdAt: "2026-04-01T00:00:00Z", isSuperAdmin: false, onlinePayment: true };
 
@@ -23,5 +23,18 @@ describe("planPricing", () => {
   it("uses the fixed monthly price when set", () => {
     expect(planPricing({ maxBranches: 20, monthlyPrice: 2500 })).toEqual({ branchCount: 1, unitPrice: 2500, amount: 2500 });
     expect(planPricing({ maxBranches: 20, monthlyPrice: null }).amount).toBe(3000);
+  });
+});
+
+describe("payments recorded before billing was tracked", () => {
+  const a = { createdAt: "2026-04-01T00:00:00Z", isSuperAdmin: false };
+  const invoices = [{ year: 2026, month: 6, paidAt: "2026-10-31" }, { year: 2026, month: 7, paidAt: null }];
+  it("counts a paid earlier month as paid, an unpaid one as exempt", () => {
+    expect(billingStatus(a, invoices, { year: 2026, month: 6 })).toBe("paid");
+    expect(billingStatus(a, invoices, { year: 2026, month: 7 })).toBe("exempt");
+  });
+  it("lists months back to the earliest paid one", () => {
+    const months = historyMonths(a.createdAt, invoices, new Date("2026-10-15T00:00:00Z"));
+    expect(months.map((m) => m.month)).toEqual([10, 9, 8, 7, 6]);
   });
 });

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { Download, Loader2, Plus, Send, Trash2, X, Check, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import type { AdminAgent } from "@/lib/db/admin";
-import { billableMonths, firstBillableMonth, type YearMonth } from "@/lib/billing";
+import { billableMonths, firstBillableMonth, trialEndMonth, type YearMonth } from "@/lib/billing";
 import {
   BILLING_CHIP,
   describeLimitChange,
@@ -47,7 +47,8 @@ export function AgentDrawer({
   }, [onClose]);
 
   const trial = trialInfo(agent.createdAt);
-  const months = billableMonths(agent.createdAt).slice(0, MONTHS_SHOWN);
+  // From the trial's end, so payments made before billing was tracked can be recorded too.
+  const months = billableMonths(agent.createdAt, new Date(), trialEndMonth(agent.createdAt)).slice(0, MONTHS_SHOWN);
 
   return createPortal(
     <div className="fixed inset-0 z-[100]" data-testid="agent-drawer">

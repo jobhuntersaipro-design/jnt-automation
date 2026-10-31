@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CreditCard, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  billableMonths,
+  historyMonths,
   billingStatus,
   firstBillableMonth,
   isOverdue,
@@ -72,7 +72,7 @@ export function PlanSection({
   const now = new Date();
   const thisMonth = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
   const nextInvoice = monthKey(firstBill) > monthKey(thisMonth) ? firstBill : thisMonth;
-  const months = billableMonths(createdAt).slice(0, MONTHS_SHOWN);
+  const months = historyMonths(createdAt, invoices).slice(0, MONTHS_SHOWN);
   const overdue = isOverdue({ createdAt, isSuperAdmin, onlinePayment: payOnline }, invoices);
 
   return (
@@ -141,7 +141,7 @@ export function PlanSection({
                       href={`/api/settings/invoices/${ym.year}/${ym.month}`}
                       className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                     >
-                      <Download size={12} /> PDF
+                      <Download size={12} /> {status === "paid" ? "Receipt" : "PDF"}
                     </a>
                   </div>
                 </div>

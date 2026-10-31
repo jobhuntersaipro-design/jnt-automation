@@ -49,7 +49,7 @@ export function firstBillableMonth(createdAt: Date | string): YearMonth {
   return monthKey(trialMonth) < monthKey(BILLING_TRACKING_START) ? BILLING_TRACKING_START : trialMonth;
 }
 
-function trialEndMonth(createdAt: Date | string): YearMonth {
+export function trialEndMonth(createdAt: Date | string): YearMonth {
   const end = trialEndDate(createdAt);
   return { year: end.getUTCFullYear(), month: end.getUTCMonth() + 1 };
 }
@@ -59,8 +59,8 @@ export function monthKey({ year, month }: YearMonth): number {
 }
 
 /** Billable months from the first billable month up to `now`, newest first. */
-export function billableMonths(createdAt: Date | string, now: Date = new Date()): YearMonth[] {
-  const first = monthKey(firstBillableMonth(createdAt));
+export function billableMonths(createdAt: Date | string, now: Date = new Date(), from?: YearMonth): YearMonth[] {
+  const first = monthKey(from ?? firstBillableMonth(createdAt));
   const last = monthKey({ year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 });
   const months: YearMonth[] = [];
   for (let k = last; k >= first; k--) {
@@ -69,17 +69,26 @@ export function billableMonths(createdAt: Date | string, now: Date = new Date())
   return months;
 }
 
+/** Months to list for an agent: billable months plus earlier months with a recorded payment, newest first. */
+export function historyMonths(createdAt: Date | string, invoices: InvoiceLike[], now: Date = new Date()): YearMonth[] {
+  const paid = invoices.filter((i) => i.paidAt).map((i) => monthKey(i));
+  const first = Math.min(monthKey(firstBillableMonth(createdAt)), ...paid);
+  return billableMonths(createdAt, now, { year: Math.floor(first / 12), month: (first % 12) + 1 });
+}
+
 export function billingStatus(
   agent: { createdAt: Date | string; isSuperAdmin: boolean },
   invoices: InvoiceLike[],
   ym: YearMonth,
 ): BillingStatus {
   if (agent.isSuperAdmin) return "exempt";
+  // A payment recorded for any month (e.g. one paid before billing was tracked) counts as paid.
+  const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
+  if (inv?.paidAt) return "paid";
   if (monthKey(ym) < monthKey(trialEndMonth(agent.createdAt))) return "trial";
   // Months after the trial but before billing was tracked in the app.
   if (monthKey(ym) < monthKey(BILLING_TRACKING_START)) return "exempt";
-  const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
-  return inv?.paidAt ? "paid" : "unpaid";
+  return "unpaid";
 }
 
 /**
