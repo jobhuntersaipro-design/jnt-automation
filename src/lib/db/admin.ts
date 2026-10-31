@@ -15,6 +15,7 @@ export async function getAllAgents() {
       isApproved: true,
       isSuperAdmin: true,
       maxBranches: true,
+      monthlyPrice: true,
       onlinePayment: true,
       uiVersion: true,
       language: true,
@@ -43,6 +44,7 @@ export async function getAllAgents() {
     isApproved: a.isApproved,
     isSuperAdmin: a.isSuperAdmin,
     maxBranches: a.maxBranches,
+    monthlyPrice: a.monthlyPrice,
     onlinePayment: a.onlinePayment,
     uiVersion: a.uiVersion,
     language: a.language,
@@ -157,6 +159,7 @@ export async function deleteAgent(agentId: string) {
 
 const INVOICE_AGENT_SELECT = {
   id: true,
+  monthlyPrice: true,
   name: true,
   email: true,
   phone: true,

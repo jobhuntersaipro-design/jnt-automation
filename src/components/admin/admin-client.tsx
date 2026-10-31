@@ -209,7 +209,7 @@ export function AdminClient({ initialAgents, currentUserId }: { initialAgents: A
         body: (
           <>
             Emails a PDF {paid ? "receipt" : "invoice"} for <strong className="text-on-surface">{formatRM(bill.amount)}</strong>
-            {!paid && <> ({agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150)</>} to{" "}
+            {!paid && agent.monthlyPrice == null && <> ({agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150)</>} to{" "}
             <strong className="text-on-surface">{agent.email}</strong>.
             {bill.invoice?.sentAt && <> It was already sent on {formatDate(bill.invoice.sentAt)}.</>}
           </>

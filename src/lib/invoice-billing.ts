@@ -6,7 +6,7 @@
 import type { Invoice } from "@/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getInvoiceAgent, upsertInvoice } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, invoiceAction, invoiceNumber } from "@/lib/billing";
+import { invoiceAction, invoiceNumber, planPricing } from "@/lib/billing";
 import { billplzConfigured, createBill, deleteBill } from "@/lib/billplz";
 import { renderAgentInvoice, type InvoiceAgent } from "@/lib/invoice-render";
 import { sendInvoiceEmail } from "@/lib/email";
@@ -48,7 +48,8 @@ export async function sendAgentInvoice(
   kind: "invoice" | "reminder" | "receipt" = "invoice",
 ) {
   // Record the send first so the PDF's issue date matches the email.
-  const inv = await upsertInvoice(agent.id, year, month, agent.maxBranches, PRICE_PER_BRANCH,
+  const plan = planPricing(agent);
+  const inv = await upsertInvoice(agent.id, year, month, plan.branchCount, plan.unitPrice,
     kind === "invoice" ? { sentAt: new Date() } : {});
   const payUrl = await paymentLinkFor(agent, inv).catch((err) => {
     console.error("[billplz] create bill failed", err);
@@ -62,6 +63,7 @@ export async function sendAgentInvoice(
     month,
     amount: inv.amount,
     branchCount: inv.branchCount,
+    unitPrice: inv.unitPrice,
     invoiceNo: invoiceNumber(agent.id, { year, month }),
     paid: Boolean(inv.paidAt),
     reminder: kind === "reminder",
@@ -105,7 +107,7 @@ export async function runBillingJob(now: Date = new Date()) {
   const agents = await prisma.agent.findMany({
     where: { isSuperAdmin: false, isApproved: true, onlinePayment: true, branches: { some: { isDemo: false } } },
     select: {
-      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, onlinePayment: true,
+      id: true, name: true, email: true, phone: true, isSuperAdmin: true, maxBranches: true, monthlyPrice: true, onlinePayment: true,
       companyRegistrationNo: true, companyAddress: true, createdAt: true,
       invoices: { where: { year, month } },
     },

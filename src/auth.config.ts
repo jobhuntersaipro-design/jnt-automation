@@ -16,6 +16,8 @@ export const authConfig = {
     authorized({ auth, request }) {
       // v2 (/app) has its own sign-in page.
       const { pathname } = request.nextUrl;
+      // API routes check their own session; the proxy only refuses an overdue account's writes.
+      if (pathname.startsWith("/api/")) return true;
       if (pathname === "/app/login") return true;
       // A team invite: the token in the URL is checked when the password is set.
       if (pathname === "/app/join") return true;
@@ -31,6 +33,9 @@ export const authConfig = {
     session({ session, token }) {
       (session.user as { isApproved?: boolean }).isApproved =
         token.isApproved as boolean;
+      // The proxy's overdue check needs who it is and whether they're a superadmin.
+      session.user.id = token.id as string;
+      (session.user as { isSuperAdmin?: boolean }).isSuperAdmin = token.isSuperAdmin as boolean;
       return session;
     },
   },

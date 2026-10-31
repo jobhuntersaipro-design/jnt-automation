@@ -20,6 +20,7 @@ export default async function SettingsPage() {
       stampImageUrl: true,
       createdAt: true,
       maxBranches: true,
+      monthlyPrice: true,
       onlinePayment: true,
       isSuperAdmin: true,
       invoices: { select: { year: true, month: true, branchCount: true, amount: true, paidAt: true } },
@@ -54,7 +55,8 @@ export default async function SettingsPage() {
           stampImageUrl={agent.stampImageUrl}
           memberSince={agent.createdAt.toISOString()}
           plan={{
-            initialMaxBranches: agent.maxBranches,
+            maxBranches: agent.maxBranches,
+            monthlyPrice: agent.monthlyPrice,
             branchesInUse: agent._count.branches,
             createdAt: agent.createdAt.toISOString(),
             isSuperAdmin: agent.isSuperAdmin,

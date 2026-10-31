@@ -8,7 +8,7 @@ import { SUPPORT_EMAIL } from "@/lib/support";
 
 export const TRIAL_DAYS = 30;
 export const PRICE_PER_BRANCH = 150;
-export const INVOICE_DUE_DAYS = 7;
+export const INVOICE_DUE_DAYS = 1;
 /** Highest branch limit an agent can set themselves; admins can go higher. */
 export const SELF_SERVE_MAX_BRANCHES = 50;
 /** Billing was first tracked in the app this month; earlier months were settled outside it. */
@@ -109,6 +109,35 @@ export function planLimitError(requested: number, branchesInUse: number): string
     return `For more than ${SELF_SERVE_MAX_BRANCHES} branches, contact ${SUPPORT_EMAIL}.`;
   }
   return null;
+}
+
+/** One invoice line: a fixed monthly price (1 × price) when set, else branch limit × PRICE_PER_BRANCH. */
+export function planPricing(agent: { maxBranches: number; monthlyPrice?: number | null }) {
+  return agent.monthlyPrice != null
+    ? { branchCount: 1, unitPrice: agent.monthlyPrice, amount: agent.monthlyPrice }
+    : { branchCount: agent.maxBranches, unitPrice: PRICE_PER_BRANCH, amount: agent.maxBranches * PRICE_PER_BRANCH };
+}
+
+/** First month an unpaid invoice makes an account overdue (October was billed before overdue existed). */
+export const OVERDUE_START: YearMonth = { year: 2026, month: 11 };
+
+/**
+ * Overdue: a billed month from OVERDUE_START is still unpaid INVOICE_DUE_DAYS after its
+ * invoice day (the 1st, or the trial's end later that month). Only for accounts with online payment.
+ */
+export function isOverdue(
+  agent: { createdAt: Date | string; isSuperAdmin: boolean; onlinePayment: boolean },
+  invoices: InvoiceLike[],
+  now: Date = new Date(),
+): boolean {
+  if (agent.isSuperAdmin || !agent.onlinePayment) return false;
+  const trialEnd = trialEndDate(agent.createdAt).getTime();
+  return billableMonths(agent.createdAt, now).some((ym) => {
+    if (monthKey(ym) < monthKey(OVERDUE_START)) return false;
+    if (billingStatus(agent, invoices, ym) !== "unpaid") return false;
+    const invoiceDay = Math.max(Date.UTC(ym.year, ym.month - 1, 1), trialEnd);
+    return now.getTime() >= invoiceDay + INVOICE_DUE_DAYS * 86_400_000;
+  });
 }
 
 export function invoiceAmount(branchCount: number): number {

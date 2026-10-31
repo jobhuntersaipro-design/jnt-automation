@@ -14,6 +14,7 @@ import { prisma } from "@/lib/prisma";
 import { DemoBanner } from "@/components/onboarding/demo-banner";
 import { ProductTour } from "@/components/onboarding/product-tour";
 import { TrialChip } from "@/components/dashboard/trial-chip";
+import { agentOverdue } from "@/lib/overdue";
 
 export default async function DashboardLayout({
   children,
@@ -41,6 +42,7 @@ export default async function DashboardLayout({
   // v2 accounts never see v1 pages (impersonating admins follow the agent).
   if (onboarding?.uiVersion === "V2") redirect("/app");
   const hasDemo = (onboarding?.branches.length ?? 0) > 0;
+  const overdue = effective && !session.user.isSuperAdmin ? await agentOverdue(effective.agentId) : false;
 
   return (
     <div className="flex flex-col min-h-dvh lg:h-dvh lg:overflow-hidden bg-surface">
@@ -94,6 +96,13 @@ export default async function DashboardLayout({
         </div>
       </header>
 
+      {overdue && (
+        <div role="alert" className="shrink-0 bg-red-50 text-critical text-sm px-4 lg:px-16 py-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-semibold">Your account is overdue.</span>
+          <span>Changes are paused until your invoice is paid.</span>
+          <a href="/settings#plan" className="font-semibold underline">Pay now</a>
+        </div>
+      )}
       {hasDemo && <DemoBanner />}
       <ProductTour
         autoStart={!isImpersonating && onboarding?.hasSeenTutorial === false}

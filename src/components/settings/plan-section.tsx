@@ -1,19 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CreditCard, Download, Loader2, Minus, Plus } from "lucide-react";
+import { CreditCard, Download, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
-  PRICE_PER_BRANCH,
-  SELF_SERVE_MAX_BRANCHES,
   billableMonths,
   billingStatus,
   firstBillableMonth,
+  isOverdue,
   monthKey,
-  planLimitError,
+  planPricing,
   type YearMonth,
 } from "@/lib/billing";
-import { ConfirmDialog, type ConfirmRequest } from "@/components/admin/confirm-dialog";
 import { formatDate, formatMonth, formatRM, trialInfo } from "@/components/admin/admin-shared";
 
 export interface PlanInvoice extends YearMonth {
@@ -25,22 +23,24 @@ export interface PlanInvoice extends YearMonth {
 const MONTHS_SHOWN = 12;
 
 export function PlanSection({
-  initialMaxBranches,
+  maxBranches,
+  monthlyPrice,
   branchesInUse,
   createdAt,
   isSuperAdmin,
   payOnline,
   invoices,
 }: {
-  initialMaxBranches: number;
+  maxBranches: number;
+  /** Fixed RM a month set by the superadmin; null = branch limit × RM 150. */
+  monthlyPrice: number | null;
   branchesInUse: number;
   createdAt: string;
   isSuperAdmin: boolean;
-  /** Billplz is configured, so due months get a Pay now button. */
+  /** Billplz (FPX) is configured and on for this account, so due months get a Pay now button. */
   payOnline: boolean;
   invoices: PlanInvoice[];
 }) {
-  const [maxBranches, setMaxBranches] = useState(initialMaxBranches);
   const [paying, setPaying] = useState<string | null>(null);
 
   // Billplz redirects back here with billplz[paid]; the callback does the actual marking.
@@ -65,122 +65,40 @@ export function PlanSection({
     toast.error(data.error || "Couldn't start the payment");
     setPaying(null);
   }
-  const [draft, setDraft] = useState(initialMaxBranches);
-  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
-  const min = Math.max(1, branchesInUse);
+  const plan = planPricing({ maxBranches, monthlyPrice });
   const trial = trialInfo(createdAt);
   const firstBill = firstBillableMonth(createdAt);
   const now = new Date();
   const thisMonth = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
   const nextInvoice = monthKey(firstBill) > monthKey(thisMonth) ? firstBill : thisMonth;
   const months = billableMonths(createdAt).slice(0, MONTHS_SHOWN);
-  const changed = draft !== maxBranches;
-  const draftError = planLimitError(draft, branchesInUse);
-
-  function requestSave() {
-    if (draftError) return toast.error(draftError);
-    const increase = draft > maxBranches;
-    setConfirm({
-      title: increase ? `Increase to ${draft} branches?` : `Reduce to ${draft} branch${draft === 1 ? "" : "es"}?`,
-      body: (
-        <>
-          {increase ? "You can add more branches straight away. " : ""}
-          {isSuperAdmin ? (
-            "Admin accounts aren't billed."
-          ) : (
-            <>
-              Your plan becomes <strong className="text-on-surface">{formatRM(draft * PRICE_PER_BRANCH)}/month</strong>{" "}
-              ({draft} × RM {PRICE_PER_BRANCH}), starting with your {formatMonth(nextInvoice)} invoice
-              {trial.active ? ", after your free trial" : ""}.
-            </>
-          )}
-        </>
-      ),
-      confirmLabel: increase ? "Increase limit" : "Reduce limit",
-      onConfirm: async () => {
-        const res = await fetch("/api/settings/plan", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ maxBranches: draft }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast.error(data.error || "Couldn't update your plan");
-          return false;
-        }
-        setMaxBranches(data.maxBranches);
-        setDraft(data.maxBranches);
-        toast.success(`Branch limit is now ${data.maxBranches}`);
-      },
-    });
-  }
+  const overdue = isOverdue({ createdAt, isSuperAdmin, onlinePayment: payOnline }, invoices);
 
   return (
     <section id="plan">
       <h2 className="font-manrope font-semibold text-lg text-on-surface mb-1">Plan &amp; billing</h2>
       <p className="text-xs text-on-surface-variant mb-4">
-        RM {PRICE_PER_BRANCH} per branch per month. Change your branch limit any time.
+        An invoice is issued on the 1st of each month and is due the next day.
       </p>
       <div className="bg-surface-card rounded-lg p-6 flex flex-col gap-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">Branch limit</span>
-            <div className="flex items-center gap-2">
-              <StepButton label="Fewer branches" disabled={draft <= min} onClick={() => setDraft((d) => d - 1)}>
-                <Minus size={14} />
-              </StepButton>
-              <input
-                type="number"
-                inputMode="numeric"
-                min={min}
-                max={SELF_SERVE_MAX_BRANCHES}
-                value={draft}
-                onChange={(e) => setDraft(Math.trunc(Number(e.target.value)) || 0)}
-                aria-label="Branch limit"
-                className="w-16 border border-outline-variant rounded-md px-2 py-1.5 text-base sm:text-sm text-center tabular-nums text-on-surface bg-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
-              />
-              <StepButton label="More branches" disabled={draft >= SELF_SERVE_MAX_BRANCHES} onClick={() => setDraft((d) => d + 1)}>
-                <Plus size={14} />
-              </StepButton>
-            </div>
-          </div>
-          <Stat label="In use" value={`${branchesInUse} of ${maxBranches}`} />
-          <Stat
-            label={changed ? "New monthly price" : "Monthly price"}
-            value={isSuperAdmin ? "Not billed" : formatRM(draft * PRICE_PER_BRANCH)}
-            sub={changed && !isSuperAdmin ? `was ${formatRM(maxBranches * PRICE_PER_BRANCH)}` : undefined}
-          />
-        </div>
-
-        {changed && draftError && <p className="text-xs text-critical -mt-2">{draftError}</p>}
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-on-surface-variant">
-            {isSuperAdmin
-              ? "Admin account — not billed."
-              : trial.active
-                ? `Free trial until ${formatDate(trial.end)} (${trial.daysLeft} day${trial.daysLeft === 1 ? "" : "s"} left). First invoice: ${formatMonth(firstBill)}.`
-                : `Billed monthly. Next invoice: ${formatMonth(nextInvoice)}.`}
+        {overdue && (
+          <p className="text-sm text-critical bg-red-50 rounded-md px-3 py-2">
+            Your account is overdue. Pay the due invoice below to continue making changes.
           </p>
-          {changed && (
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDraft(maxBranches)}
-                className="text-sm text-on-surface-variant hover:text-on-surface px-3 py-2"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={requestSave}
-                disabled={Boolean(draftError)}
-                className="bg-primary text-white rounded-md px-5 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
-              >
-                Update plan
-              </button>
-            </div>
-          )}
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <Stat label="Monthly price" value={isSuperAdmin ? "Not billed" : formatRM(plan.amount)} />
+          <Stat label="Branches in use" value={String(branchesInUse)} />
         </div>
+
+        <p className="text-xs text-on-surface-variant">
+          {isSuperAdmin
+            ? "Admin account — not billed."
+            : trial.active
+              ? `Free trial until ${formatDate(trial.end)} (${trial.daysLeft} day${trial.daysLeft === 1 ? "" : "s"} left). First invoice: ${formatMonth(firstBill)}.`
+              : `Billed monthly. Next invoice: ${formatMonth(nextInvoice)}.`}
+        </p>
 
         {!isSuperAdmin && months.length > 0 && (
           <div className="flex flex-col gap-1 pt-2">
@@ -189,16 +107,16 @@ export function PlanSection({
               const inv = invoices.find((i) => i.year === ym.year && i.month === ym.month);
               const status = billingStatus({ createdAt, isSuperAdmin }, invoices, ym);
               if (status !== "paid" && status !== "unpaid") return null;
-              // Same rule as the invoice PDF: paid months keep their snapshot, open months bill the current limit.
-              const limit = inv?.paidAt ? inv.branchCount : maxBranches;
-              const amount = inv?.paidAt ? inv.amount : limit * PRICE_PER_BRANCH;
+              // Same rule as the invoice PDF: paid months keep their snapshot, open months bill today's plan.
+              const amount = inv?.paidAt ? inv.amount : plan.amount;
+              const count = inv?.paidAt ? inv.branchCount : plan.branchCount;
               return (
                 <div key={`${ym.year}-${ym.month}`} className="flex flex-wrap items-center gap-x-3 gap-y-2 py-1.5">
                   <span className="w-20 text-sm text-on-surface">{formatMonth(ym)}</span>
                   <span className="w-32 flex flex-col">
                     <span className="text-sm tabular-nums text-on-surface">{formatRM(amount)}</span>
                     <span className="text-xs tabular-nums text-on-surface-variant whitespace-nowrap">
-                      {limit} branch{limit === 1 ? "" : "es"} × RM {PRICE_PER_BRANCH}
+                      {count === 1 ? "Monthly plan" : `${count} branches × RM 150`}
                     </span>
                   </span>
                   <span
@@ -216,7 +134,7 @@ export function PlanSection({
                         className="inline-flex items-center gap-1.5 bg-primary text-white rounded-md px-3 py-1.5 text-xs font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
                       >
                         {paying === `${ym.year}-${ym.month}` ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />}
-                        Pay now
+                        Pay now (FPX)
                       </button>
                     )}
                     <a
@@ -232,31 +150,15 @@ export function PlanSection({
           </div>
         )}
       </div>
-      <ConfirmDialog request={confirm} onClose={() => setConfirm(null)} />
     </section>
   );
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-col gap-1.5">
       <span className="text-xs font-medium text-on-surface-variant uppercase tracking-wide">{label}</span>
       <span className="text-lg font-semibold tabular-nums text-on-surface leading-8">{value}</span>
-      {sub && <span className="text-xs text-on-surface-variant/70 -mt-1.5">{sub}</span>}
     </div>
-  );
-}
-
-function StepButton({ label, disabled, onClick, children }: { label: string; disabled: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="w-9 h-9 flex items-center justify-center border border-outline-variant rounded-md text-on-surface hover:bg-surface-hover disabled:opacity-40 disabled:hover:bg-transparent"
-    >
-      {children}
-    </button>
   );
 }

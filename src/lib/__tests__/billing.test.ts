@@ -147,8 +147,8 @@ describe("invoiceAction (daily billing job)", () => {
   });
   it("reminds once, on or after the due date", () => {
     const sent = "2026-10-02T01:00:00.000Z";
-    expect(invoiceAction(agent, inv(sent), oct(8))).toBeNull();
-    expect(invoiceAction(agent, inv(sent), oct(9))).toBe("remind");
+    expect(invoiceAction(agent, inv(sent), oct(2))).toBeNull();
+    expect(invoiceAction(agent, inv(sent), oct(3))).toBe("remind");
     expect(invoiceAction(agent, inv(sent, { remindedAt: "2026-10-09T01:00:00.000Z" }), oct(12))).toBeNull();
   });
   it("skips paid months", () => {

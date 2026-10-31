@@ -110,7 +110,9 @@ export function AgentDrawer({
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[0.85rem] font-semibold text-on-surface">Billing</h3>
                 <span className="text-[0.72rem] text-on-surface-variant">
-                  {agent.maxBranches} branch{agent.maxBranches === 1 ? "" : "es"} × RM 150 = {formatRM(agent.maxBranches * 150)}/month
+                  {agent.monthlyPrice != null
+                    ? `${formatRM(agent.monthlyPrice)}/month (set in EasyStaff 2.0 admin)`
+                    : `${agent.maxBranches} branch${agent.maxBranches === 1 ? "" : "es"} × RM 150 = ${formatRM(agent.maxBranches * 150)}/month`}
                 </span>
               </div>
               <OnlinePaymentToggle agent={agent} onUpdate={onUpdate} />

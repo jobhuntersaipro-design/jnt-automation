@@ -305,6 +305,7 @@ export async function sendInvoiceEmail(input: {
   month: number;
   amount: number;
   branchCount: number;
+  unitPrice: number;
   invoiceNo: string;
   paid: boolean;
   /** Due-date reminder for an unpaid invoice. */
@@ -319,7 +320,9 @@ export async function sendInvoiceEmail(input: {
 
   const period = `${MONTH_NAMES[input.month - 1]} ${input.year}`;
   const amount = `RM ${formatRMText(input.amount)}`;
-  const branches = `${input.branchCount} branch${input.branchCount === 1 ? "" : "es"} × RM 150.00`;
+  const branches = input.branchCount === 1
+    ? `monthly plan`
+    : `${input.branchCount} branches × RM ${formatRMText(input.unitPrice)}`;
   const summary = input.paid
     ? `This is your receipt for ${period}. Payment of ${amount} has been received — thank you.`
     : input.reminder

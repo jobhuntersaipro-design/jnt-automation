@@ -27,6 +27,8 @@ model Agent {
   isApproved   Boolean        @default(false)
   isSuperAdmin Boolean        @default(false)
   maxBranches  Int            @default(1)
+  // Fixed RM a month, set from EasyStaff 2.0's superadmin page. Null = branch limit × PRICE_PER_BRANCH.
+  monthlyPrice Float?
   onlinePayment Boolean  @default(false) // admin opt-in: auto invoices + Billplz Pay now
   // Which app the account uses. V1 is frozen; V2 is the config-driven payroll.
   // Default flips to V2 once v2 has screens to land on.

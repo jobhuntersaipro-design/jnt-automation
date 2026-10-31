@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getInvoiceAgent, upsertInvoice } from "@/lib/db/admin";
-import { PRICE_PER_BRANCH, isValidYearMonth } from "@/lib/billing";
+import { planPricing, isValidYearMonth } from "@/lib/billing";
 import { pdfResponseInit, renderAgentInvoice } from "@/lib/invoice-render";
 import { sendAgentInvoice } from "@/lib/invoice-billing";
 import { deleteBill } from "@/lib/billplz";
@@ -42,7 +42,8 @@ export async function PATCH(req: NextRequest, ctx: Params) {
   if (typeof body?.paid !== "boolean") {
     return NextResponse.json({ error: "paid must be a boolean" }, { status: 400 });
   }
-  const inv = await upsertInvoice(r.agent.id, r.year, r.month, r.agent.maxBranches, PRICE_PER_BRANCH, {
+  const plan = planPricing(r.agent);
+  const inv = await upsertInvoice(r.agent.id, r.year, r.month, plan.branchCount, plan.unitPrice, {
     paidAt: body.paid ? new Date() : null,
   });
   if (body.paid && inv.billplzBillId) {
