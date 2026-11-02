@@ -4,12 +4,17 @@ import { markStaleUploadsFailed } from "@/lib/db/upload";
 import { getPayrollHistory } from "@/lib/db/payroll";
 import { DispatchersClient } from "@/components/dispatchers/dispatchers-client";
 import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { agentOverdue } from "@/lib/overdue";
 
 export default async function DispatchersPage() {
   const { getEffectiveAgentId } = await import("@/lib/impersonation");
   const effective = await getEffectiveAgentId();
   if (!effective) redirect("/auth/login");
   const agentId = effective.agentId;
+  const session = await auth();
+  // Same rule as the overdue banner in the layout: superadmins are never blocked.
+  const overdue = session?.user?.isSuperAdmin ? false : await agentOverdue(agentId);
 
   // Mark stale PROCESSING uploads as FAILED on page load
   await markStaleUploadsFailed(agentId);
@@ -33,6 +38,7 @@ export default async function DispatchersPage() {
       defaults={defaults}
       payrollHistory={payrollHistory}
       payrollBranchCodes={branchCodes}
+      uploadsBlocked={overdue}
     />
   );
 }
