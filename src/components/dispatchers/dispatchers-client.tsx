@@ -39,6 +39,8 @@ interface DispatchersClientProps {
   // Payroll tab data
   payrollHistory: PayrollHistory;
   payrollBranchCodes: string[];
+  /** Account is overdue: payroll uploads are paused until the invoice is paid. */
+  uploadsBlocked?: boolean;
 }
 
 function sortItems(list: StaffDispatcher[]) {
@@ -72,6 +74,7 @@ export function DispatchersClient({
   defaults,
   payrollHistory,
   payrollBranchCodes,
+  uploadsBlocked = false,
 }: DispatchersClientProps) {
   const searchParams = useSearchParams();
   const initialTab = searchParams.get("tab") === "settings" ? "settings" : "payroll";
@@ -474,6 +477,7 @@ export function DispatchersClient({
           <PayrollClient
             initialHistory={payrollHistory}
             branchCodes={payrollBranchCodes}
+            uploadsBlocked={uploadsBlocked}
           />
         ) : (
         <>

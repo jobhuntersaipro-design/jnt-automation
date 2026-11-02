@@ -1,16 +1,19 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, Lock } from "lucide-react";
 
 const ALLOWED_EXTENSIONS = new Set(["xlsx", "xls"]);
 
 interface UploadZoneProps {
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
+  /** Account is overdue: uploads are paused until the invoice is paid. */
+  blocked?: boolean;
 }
 
-export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
+export function UploadZone({ onFilesSelected, disabled: disabledProp, blocked }: UploadZoneProps) {
+  const disabled = disabledProp || blocked;
   const [isDragging, setIsDragging] = useState(false);
 
   const validateAndSelect = useCallback((fileList: FileList) => {
@@ -53,6 +56,31 @@ export function UploadZone({ onFilesSelected, disabled }: UploadZoneProps) {
     };
     input.click();
   }, [validateAndSelect, disabled]);
+
+  if (blocked) {
+    return (
+      <div
+        role="status"
+        className="flex flex-col items-center justify-center gap-3 p-10 rounded-lg border-2 border-dashed border-critical/30 bg-red-50/60 cursor-not-allowed"
+      >
+        <Lock className="w-10 h-10 text-critical/70" />
+        <div className="text-center">
+          <p className="text-[0.95rem] font-semibold text-on-surface">
+            Payroll uploads are paused
+          </p>
+          <p className="text-[0.85rem] text-on-surface-variant mt-0.5">
+            Your account is overdue. Pay your invoice to upload delivery data again.
+          </p>
+          <a
+            href="/settings#plan"
+            className="inline-block mt-3 px-4 py-2 rounded-[0.375rem] bg-critical text-white text-[0.85rem] font-semibold hover:opacity-90 transition-opacity"
+          >
+            Pay now
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

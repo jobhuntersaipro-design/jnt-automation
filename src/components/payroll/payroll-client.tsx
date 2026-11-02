@@ -10,6 +10,7 @@ import { PayrollHistory, type PayrollRecord } from "./payroll-history";
 interface PayrollClientProps {
   initialHistory: PayrollRecord[];
   branchCodes: string[];
+  uploadsBlocked?: boolean;
 }
 
 interface DuplicateInfo {
@@ -27,7 +28,7 @@ function genId() {
   return `upload-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProps) {
+export function PayrollClient({ initialHistory, branchCodes, uploadsBlocked = false }: PayrollClientProps) {
   const [activeUploads, setActiveUploads] = useState<ActiveUpload[]>([]);
   const [history, setHistory] = useState<PayrollRecord[]>(initialHistory);
   const [duplicateQueue, setDuplicateQueue] = useState<DuplicateInfo[]>([]);
@@ -203,11 +204,12 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
 
   const handleFilesSelected = useCallback(
     (files: File[]) => {
+      if (uploadsBlocked) return;
       for (const file of files) {
         processFile(file);
       }
     },
-    [processFile]
+    [processFile, uploadsBlocked]
   );
 
   const handleDuplicateConfirm = useCallback(async () => {
@@ -294,7 +296,7 @@ export function PayrollClient({ initialHistory, branchCodes }: PayrollClientProp
         {/* Upload section */}
         <section className="flex flex-col gap-4">
           <div data-tour="upload-zone">
-            <UploadZone onFilesSelected={handleFilesSelected} />
+            <UploadZone onFilesSelected={handleFilesSelected} blocked={uploadsBlocked} />
           </div>
 
           <ActiveUploadList
